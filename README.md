@@ -13,7 +13,7 @@
 <img alt="Gemini: beta" src="https://img.shields.io/badge/Gemini-beta-yellow">
 </p>
 
-<p align="center"><b><a href="https://iamforma.pro/#intro">iamforma.pro</a></b> · <a href="https://yaforma.pro/">Russian: yaforma.pro</a> · <a href="https://github.com/IamForma/forma">IamForma/forma</a></p>
+<p align="center"><b><a href="https://iamforma.pro/#intro">iamforma.pro</a></b> · <a href="https://yaforma.pro/">Russian: yaforma.pro</a> · <a href="https://github.com/FormaMindPro/formamind">FormaMindPro/formamind</a></p>
 
 [![Forma: natural workflow — from intent to concrete result through five nodes](assets/hero-how-it-works.webp)](https://iamforma.pro/#intro)
 
@@ -48,10 +48,10 @@ Mandatory requirement: work in **VS Code** or **Antigravity** with the **[Kanban
 From the project folder:
 
 ```
-npx github:IamForma/forma init
+npx github:FormaMindPro/formamind init
 ```
 
-The installer will ask three questions — engines (`claude`), project template (`none`), kanban board (`auto`) — and will install the core: `AGENTS.md`, roles, hooks, board, dashboard. Re-running updates the system; `project/` is left untouched. Non-interactive: `npx github:IamForma/forma init --engines claude --template none --board auto`. Other methods — git clone and the Claude Code plugin: [Installation](#installation).
+The installer will ask three questions — engines (`claude`), project template (`none`), kanban board (`auto`) — and will install the core: `AGENTS.md`, roles, hooks, board, dashboard. Re-running updates the system; `project/` is left untouched. Non-interactive: `npx github:FormaMindPro/formamind init --engines claude --template none --board auto`. Other methods — git clone and the Claude Code plugin: [Installation](#installation).
 
 ## From the author
 
@@ -328,15 +328,15 @@ Author's thesis: this framework has no alternative — other methodologies (PMBO
 **Method 1 — installer (recommended).** From the project folder:
 
 ```
-npx github:IamForma/forma init
+npx github:FormaMindPro/formamind init
 ```
 
-The installer asks: engines (`claude` ready; `gemini` — beta; `codex` is dormant — not offered and not installed until it is woken in `core/engines.json`), project template (or no template), kanban board, document language, auto-compaction window. Non-interactive: `npx github:IamForma/forma init --engines claude --template none --board auto`. No npm registry package — only `github:`.
+The installer asks: engines (`claude` ready; `gemini` — beta; `codex` is dormant — not offered and not installed until it is woken in `core/engines.json`), project template (or no template), kanban board, document language, auto-compaction window. Non-interactive: `npx github:FormaMindPro/formamind init --engines claude --template none --board auto`. No npm registry package — only `github:`.
 
 **Method 2 — git clone.**
 
 ```
-git clone https://github.com/IamForma/forma.git protocol
+git clone https://github.com/FormaMindPro/formamind.git protocol
 ```
 
 Then in a Claude Code session: "read protocol/skills/forma/SKILL.md and install Forma protocol from it". Update: `git -C protocol pull`, then "Update Forma".
@@ -344,7 +344,7 @@ Then in a Claude Code session: "read protocol/skills/forma/SKILL.md and install 
 **Method 3 — Claude Code plugin.**
 
 ```
-claude plugin marketplace add IamForma/forma
+claude plugin marketplace add FormaMindPro/formamind
 claude plugin install forma@forma
 ```
 
@@ -375,10 +375,10 @@ Three layers (`AGENTS.md` §6): 1 — engine roles and skills; 2 — `.forma/`, 
 
 ## Version and updates
 
-- **Current version.** `npx github:IamForma/forma --version`; inside a project — the `version` field in `.forma/install-manifest.json`.
+- **Current version.** `npx github:FormaMindPro/formamind --version`; inside a project — the `version` field in `.forma/install-manifest.json`.
 - **Notification.** Once a day at session start, the Claude Code hook compares the version with the latest on GitHub and reports only if GitHub has a newer one. Without network access it stays silent.
-- **Update.** Run `npx github:IamForma/forma init` again in the project folder; `project/`, the board, and `living/` are preserved.
-- **Update without questions.** `npx github:IamForma/forma init --yes` pulls the latest version from GitHub and overwrites the schema configuration with no menu and no prompts (defaults for anything missing). Add `--no-adopt` to skip the first-install question about moving root files, `--no-dashboard` not to start the dashboard. Only the project extensions: `npx github:IamForma/forma extensions` (`--check` reports without copying).
+- **Update.** Run `npx github:FormaMindPro/formamind init` again in the project folder; `project/`, the board, and `living/` are preserved.
+- **Update without questions.** `npx github:FormaMindPro/formamind init --yes` pulls the latest version from GitHub and overwrites the schema configuration with no menu and no prompts (defaults for anything missing). Add `--no-adopt` to skip the first-install question about moving root files, `--no-dashboard` not to start the dashboard. Only the project extensions: `npx github:FormaMindPro/formamind extensions` (`--check` reports without copying).
 - **Auto-compaction window.** The installer suggests 250000 tokens (`.claude/settings.json`) and does not overwrite your existing value. `--compact <tokens>` sets a different limit, `--compact off` leaves the Claude Code default.
 
 ## If something doesn't work

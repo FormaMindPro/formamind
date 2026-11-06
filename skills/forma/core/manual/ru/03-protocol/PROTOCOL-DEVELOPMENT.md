@@ -1,6 +1,6 @@
 # Разработка протокола из проекта
 
-Любой проект может не только получать протокол, но и улучшать его. Улучшение, сделанное и проверенное в движке проекта, попадает в исходный репозиторий `IamForma/forma` в строгом порядке. Нужны права на запись в этот репозиторий; без них клон только для чтения, и раздел не применяется.
+Любой проект может не только получать протокол, но и улучшать его. Улучшение, сделанное и проверенное в движке проекта, попадает в исходный репозиторий `FormaMindPro/formamind` в строгом порядке. Нужны права на запись в этот репозиторий; без них клон только для чтения, и раздел не применяется.
 
 ## Что уходит, что остаётся
 
@@ -11,7 +11,7 @@
 ## Шаги
 
 1. **Развернуть клон** (один раз на проект). Из корня проекта:
-   `git clone --branch dev https://github.com/IamForma/forma .forma/protocol`
+   `git clone https://github.com/FormaMindPro/formamind .forma/protocol`
    и добавить `.forma/protocol/` в `.gitignore`. Клон — вложенный репозиторий, в коммиты проекта он попадать не должен.
 2. **Проверить правку в работе** в движке проекта (`.claude/`, `.forma/`, `AGENTS.md`).
 3. **Сверить остальные движки** с Claude, эталоном: `node .claude/scripts/sync-engines.cjs --check` (`--diff` показывает строки). Каждый движок правит свою зону — Codex в `.codex/` и `.agents/skills/`, Gemini в `.agents/` — по письменному промпту; Claude руками их не правит. После работы запустить проверку снова: строк «✗ Дрейф» нет, замечаний по Codex и Gemini нет.
@@ -25,7 +25,7 @@
 7. **Версия:** следующий patch в `.forma/protocol/.claude-plugin/plugin.json`.
 8. **Коммит в клоне:** `git -C .forma/protocol add -A && git -C .forma/protocol commit -m "<версия>: <что изменено>"`, затем `node .forma/protocol/scripts/engine-to-protocol.cjs --mark` (записывает базу для следующего прогона).
 9. **Перед пушем:** `git -C .forma/protocol pull --rebase`, затем `node .forma/protocol/scripts/engine-to-protocol.cjs --before-push` — стоп, если версия не выше опубликованной или ветка отстала. Одинаковый номер версии на обеих сторонах git сливает молча; эта проверка его ловит.
-10. **Пуш:** `git -C .forma/protocol push origin dev`. Только по слову человека — агент сам не пушит. Выпуск в `main` — отдельный шаг.
+10. **Пуш:** `git -C .forma/protocol push origin HEAD:main`. Только по слову человека — агент сам не пушит.
 11. **Остальные проекты:** `git -C .forma/protocol pull`, затем «прочитай `.forma/protocol/skills/forma/SKILL.md` и обнови по нему протокол Форма». Один `pull` обновит клон, но не движок в `.claude/`. После этого автор запускает `--mark`.
 
 `node .forma/protocol/scripts/forma-commit.cjs "<сообщение>"` связывает проверки, перенос и коммиты в один вызов и останавливается на конфликте; подходит, когда проект — основной у автора.
@@ -45,7 +45,7 @@
 
 ## Удаление протокола
 
-`node .forma/protocol/bin/forma.cjs uninstall [--dir <путь>] [--yes]` (или `npx github:IamForma/forma uninstall`). По умолчанию dry-run: печатает, что уйдёт и что останется. `--yes` пишет.
+`node .forma/protocol/bin/forma.cjs uninstall [--dir <путь>] [--yes]` (или `npx github:FormaMindPro/formamind uninstall`). По умолчанию dry-run: печатает, что уйдёт и что останется. `--yes` пишет.
 
 Файлы в `.claude/`, которых нет в релизе, — собственная работа проекта. Dry-run перечисляет их, `--yes` переносит их в `project/extensions/<движок>/` до удаления движка, а следующая установка копирует их обратно. Где лежат собственные роли, скиллы и скрипты проекта и как они попадают в каталоги движков — `project/extensions/README.md`; `node .forma/extensions/extensions.cjs [sync|check]`.
 

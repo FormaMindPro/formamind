@@ -19,7 +19,7 @@
 
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 
-REPO="IamForma/forma"
+REPO="FormaMindPro/formamind"
 STAMP=".claude/hooks/.plugin-check-stamp"
 TODAY=$(date +%Y-%m-%d)
 VER_RE='[0-9][0-9]*\(\.[0-9][0-9]*\)*\(-[0-9A-Za-z.]*\)\{0,1\}'

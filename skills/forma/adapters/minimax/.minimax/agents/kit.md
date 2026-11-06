@@ -3,7 +3,7 @@ name: kit
 description: Kit — six units per task, a single return channel
 model: minimax-m3.1-flash
 tier: standard
-effort: medium
+effort: high
 tools: Read, Grep, Glob, Write, Edit, Bash(claude plugin *), Bash(node .claude/scripts/build-kit-graphs.cjs *), Bash(node .claude/scripts/build-done-cards-graph.cjs *), Bash(node .claude/scripts/build-tendons.cjs *), Bash(node .claude/scripts/external-model-bridge.cjs *), mcp_browser, mcp_browser, mcp_browser, ask_user, Bash(python .claude/scripts/*), Bash(node .claude/scripts/*), Bash(node .claude/scripts/site.cjs *), mcp__site__mcp-adapter-discover-abilities, mcp__site__mcp-adapter-get-ability-info, mcp__site__mcp-adapter-execute-ability, Bash(node .forma/board/*), Bash(node .forma/dashboard/*), Bash(npm --prefix .forma/protocol *), Bash(node .forma/protocol/scripts/engine-to-protocol.cjs *)
 uses: skill-authoring, skill-creator, graphify
 ---

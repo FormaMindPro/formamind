@@ -3,7 +3,7 @@ name: core
 description: Core — thresholds, cycle verdict, node diagnosis, balance trend
 model: minimax-m3.1-flash
 tier: standard
-effort: medium
+effort: low
 tools: Read, Grep, Glob, Write, Edit, ask_user, Bash(node .forma/dashboard/tally.cjs *), Bash(node .forma/board/card-move.cjs *), Bash(node .claude/scripts/graph-query.cjs *)
 ---
 

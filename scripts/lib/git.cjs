@@ -1,5 +1,5 @@
 // Запуск команд и git для сценариев автора протокола (protocol/scripts). В пакет не входит:
-// как и сами сценарии, нужен только там, где protocol/ — git-клон IamForma/forma.
+// как и сами сценарии, нужен только там, где protocol/ — git-клон FormaMindPro/formamind.
 'use strict';
 const { spawnSync, execFileSync } = require('child_process');
 

@@ -132,7 +132,7 @@ test('check-plugin-update.ps1 (Codex): compares by numbers, says how to update, 
     assert.equal(r.status, 0, r.stderr);
     return r.stdout;
   };
-  assert.match(runPs('0.4.185-alpha', '0.4.187-alpha'), /0\.4\.185-alpha.*0\.4\.187-alpha.*npx github:IamForma\/forma init/s);
+  assert.match(runPs('0.4.185-alpha', '0.4.187-alpha'), /0\.4\.185-alpha.*0\.4\.187-alpha.*npx github:FormaMindPro\/formamind init/s);
   assert.match(runPs('0.4.185-alpha', '0.4.1000'), /0\.4\.1000/);
   assert.equal(runPs('0.4.187-alpha', '0.4.187-alpha'), '');
   assert.equal(runPs('0.5.0', '0.4.187-alpha'), '', 'local ahead is not an update');

@@ -3,7 +3,7 @@ name: spec
 description: Spec — slicing into tasks, one qualification per card
 model: minimax-m3.1-flash
 tier: standard
-effort: medium
+effort: high
 tools: Read, Grep, Glob, Write, Edit, Bash(node .forma/dashboard/tally.cjs *), Bash(node .forma/board/new-card.cjs *), Bash(node .claude/scripts/graph-query.cjs *)
 ---
 

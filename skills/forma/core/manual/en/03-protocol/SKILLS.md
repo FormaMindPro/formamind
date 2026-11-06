@@ -1,6 +1,6 @@
 # Skills and plugins
 
-A registry of everything related to the «Форма» protocol — one section per marketplace plugin of `IamForma/forma` (`.forma/protocol/.claude-plugin/marketplace.json`), plus a kanban board that is not a plugin. The core (`forma`) brings everything the protocol cannot work without, in a single call. Two separable pieces remain: the project template (a plugin, chosen by the human) and the kanban board (an external editor extension, a mandatory condition).
+A registry of everything related to the «Форма» protocol — one section per marketplace plugin of `FormaMindPro/formamind` (`.forma/protocol/.claude-plugin/marketplace.json`), plus a kanban board that is not a plugin. The core (`forma`) brings everything the protocol cannot work without, in a single call. Two separable pieces remain: the project template (a plugin, chosen by the human) and the kanban board (an external editor extension, a mandatory condition).
 
 **Rule:** a new plugin in the marketplace means a new section here, in the same attempt the plugin is registered in. The one who created the plugin adds it.
 

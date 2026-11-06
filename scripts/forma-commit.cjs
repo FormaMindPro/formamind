@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Коммит движка без дрейфа: Claude → Gemini/Codex → исходник протокола → коммиты.
-// Для автора протокола, в любом проекте, где protocol/ — git-клон IamForma/forma. Запуск из корня проекта.
+// Для автора протокола, в любом проекте, где protocol/ — git-клон FormaMindPro/formamind. Запуск из корня проекта.
 //   node .forma/protocol/scripts/forma-commit.cjs "сообщение"          — синхронизировать, проверить, закоммитить
 //   ... --check                                                   — только проверить, ничего не пишет (для pre-commit)
 //   ... --release [--to X.Y.Z]                                    — выпуск сейчас: dev → main, версия +1 (или названная), push main и dev
@@ -39,7 +39,7 @@ const pgit = (...a) => gitRun(proto, ...a);
 const stop = (m, code = 1) => { console.error('СТОП: ' + m); process.exit(code); };
 const ok = (m) => console.log('✓ ' + m);
 
-if (!fs.existsSync(path.join(proto, '.git'))) stop('protocol/.git нет — это не клон IamForma/forma.', 2);
+if (!fs.existsSync(path.join(proto, '.git'))) stop('protocol/.git нет — это не клон FormaMindPro/formamind.', 2);
 
 // Выпуск по объёму: коммиты копятся в `dev`, версия поднимается раз на выпуск.
 // N — PROJECT.md, строка «Выпуск протокола»; нет строки — 10.
@@ -143,7 +143,7 @@ function release() {
   ok('protocol/ отправлен: main и dev');
   try {
     if (run('gh', ['auth', 'status']).code === 0) {
-      const rel = run('gh', ['release', 'create', `v${nv}`, '--title', nv, '--notes', `Release v${nv}`, '--latest', '-R', 'IamForma/forma']);
+      const rel = run('gh', ['release', 'create', `v${nv}`, '--title', nv, '--notes', `Release v${nv}`, '--latest', '-R', 'FormaMindPro/formamind']);
       if (rel.code === 0) ok('GitHub Release v' + nv + ' создан через gh CLI');
       else console.log('! gh release create не удался, релиз подхватит GitHub Actions:\n' + rel.out);
     } else {

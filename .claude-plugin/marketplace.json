@@ -2,8 +2,8 @@
   "name": "forma",
   "description": "Пятиузловой протокол управления проектом (Intent/Spec/Kit/Run/Core)",
   "owner": {
-    "name": "IamForma",
-    "github": "IamForma"
+    "name": "FormaMindPro",
+    "github": "FormaMindPro"
   },
   "plugins": [
     {

@@ -2,7 +2,7 @@
 name: run
 description: Run — does exactly what was assigned, with the skills it was given
 model: minimax-m3.1-flash
-effort: medium
+effort: low
 tools: Read, Grep, Glob, Write, Edit, Bash(node .forma/board/run-in-card.cjs *), Bash(node .forma/board/card-move.cjs *), Bash(node .claude/scripts/external-model-bridge.cjs *)
 ---
 

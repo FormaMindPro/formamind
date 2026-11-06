@@ -33,7 +33,7 @@ const forma = path.join(protoDir, ...FORMA_GIT.split('/'));
 const baseFile = path.join(protoDir, '.git', 'forma-base');
 
 if (!fs.existsSync(path.join(protoDir, '.git'))) {
-  console.error('СТОП: protocol/.git нет — это не клон IamForma/forma. Механизм только для автора (README, «Разработка протокола из любого проекта»).');
+  console.error('СТОП: protocol/.git нет — это не клон FormaMindPro/formamind. Механизм только для автора (README, «Разработка протокола из любого проекта»).');
   console.error('Запускать из корня проекта, где protocol/ — git-клон.');
   process.exit(2);
 }

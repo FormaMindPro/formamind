@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict'
-// Installer of the Forma protocol: `npx github:IamForma/forma init`.
+// Installer of the Forma protocol: `npx github:FormaMindPro/formamind init`.
 // Dependency-free Node. Always installs the core, then three steps: engines, project template, Kanban Markdown.
 // A rerun is an update: the schema configuration is overwritten; `project/`, the board and `.forma/living/` are left alone.
 
@@ -49,7 +49,7 @@ function parseArgs(argv) {
 
 const HELP = `forma ${VERSION} init — install/update the Forma protocol in the current folder
 
-  npx github:IamForma/forma init [flags]
+  npx github:FormaMindPro/formamind init [flags]
 
   --engines  claude[,gemini]         engines (gemini — beta; codex and minimax are dormant: core/engines.json)
   --template <name>|none             project template from templates/ (default: none)
@@ -67,11 +67,11 @@ const HELP = `forma ${VERSION} init — install/update the Forma protocol in the
   --dashboard / --no-dashboard       start the dashboard at the end (default: start it when run in a terminal); print the link either way
   --version                          print the installer version and exit
 
-  npx github:IamForma/forma uninstall [--dir <path>] [--yes]
+  npx github:FormaMindPro/formamind uninstall [--dir <path>] [--yes]
                                      remove the protocol from the project (engine folders, .forma, AGENTS.md, .env.example,
                                      installer lines in .gitignore). Dry run unless --yes. project/, .devtool/, .env, .mcp.json stay
 
-  npx github:IamForma/forma extensions [--check] [--dir <path>]
+  npx github:FormaMindPro/formamind extensions [--check] [--dir <path>]
                                      copy project/extensions/<engine>/ into the engine folders (project wins on a name clash);
                                      --check only reports missing, stale and hand-edited copies
 

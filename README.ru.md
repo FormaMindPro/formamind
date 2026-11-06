@@ -13,7 +13,7 @@
 <img alt="Gemini: бета" src="https://img.shields.io/badge/Gemini-beta-yellow">
 </p>
 
-<p align="center"><b><a href="https://yaforma.pro/">yaforma.pro</a></b> · <a href="https://iamforma.pro/#intro">English: iamforma.pro</a> · <a href="https://github.com/IamForma/forma">IamForma/forma</a></p>
+<p align="center"><b><a href="https://yaforma.pro/">yaforma.pro</a></b> · <a href="https://iamforma.pro/#intro">English: iamforma.pro</a> · <a href="https://github.com/FormaMindPro/formamind">FormaMindPro/formamind</a></p>
 
 [![Форма: естественный ход дела — от замысла до конкретного результата через пять узлов](assets/hero-how-it-works.ru.webp)](https://yaforma.pro/)
 
@@ -48,10 +48,10 @@
 Из папки проекта:
 
 ```
-npx github:IamForma/forma init
+npx github:FormaMindPro/formamind init
 ```
 
-Установщик задаст три вопроса — движки (`claude`), шаблон проекта (`none`), канбан-доска (`auto`) — и поставит ядро: `AGENTS.md`, роли, хуки, доску, дашборд. Повторный запуск — обновление, `project/` не трогается. Без вопросов: `npx github:IamForma/forma init --engines claude --template none --board auto`. Другие способы — git-клон и плагин Claude Code: [Установка](#установка).
+Установщик задаст три вопроса — движки (`claude`), шаблон проекта (`none`), канбан-доска (`auto`) — и поставит ядро: `AGENTS.md`, роли, хуки, доску, дашборд. Повторный запуск — обновление, `project/` не трогается. Без вопросов: `npx github:FormaMindPro/formamind init --engines claude --template none --board auto`. Другие способы — git-клон и плагин Claude Code: [Установка](#установка).
 
 ## От автора
 
@@ -328,15 +328,15 @@ NNN · дело | страница с формой связи | форма от�
 **Способ 1 — установщик (рекомендуется).** Из папки проекта:
 
 ```
-npx github:IamForma/forma init
+npx github:FormaMindPro/formamind init
 ```
 
-Установщик спрашивает: движки (`claude` готов; `gemini` — бета; `codex` спит — не предлагается и не ставится, пока его не разбудят в `core/engines.json`), шаблон проекта (или без шаблона), канбан-доску, язык документов, окно автосжатия. Без вопросов: `npx github:IamForma/forma init --engines claude --template none --board auto`. В реестре npm пакета нет — только `github:`.
+Установщик спрашивает: движки (`claude` готов; `gemini` — бета; `codex` спит — не предлагается и не ставится, пока его не разбудят в `core/engines.json`), шаблон проекта (или без шаблона), канбан-доску, язык документов, окно автосжатия. Без вопросов: `npx github:FormaMindPro/formamind init --engines claude --template none --board auto`. В реестре npm пакета нет — только `github:`.
 
 **Способ 2 — git-клон.**
 
 ```
-git clone https://github.com/IamForma/forma.git protocol
+git clone https://github.com/FormaMindPro/formamind.git protocol
 ```
 
 Затем в сессии Claude Code: «прочитай protocol/skills/forma/SKILL.md и установи по нему протокол Форма». Обновление: `git -C protocol pull`, затем «обнови протокол Форма».
@@ -344,7 +344,7 @@ git clone https://github.com/IamForma/forma.git protocol
 **Способ 3 — плагин Claude Code.**
 
 ```
-claude plugin marketplace add IamForma/forma
+claude plugin marketplace add FormaMindPro/formamind
 claude plugin install forma@forma
 ```
 
@@ -375,10 +375,10 @@ project/           продукт: config/, brief/, extensions/, cards/, ops/ �
 
 ## Версия и обновление
 
-- **Какая версия стоит.** `npx github:IamForma/forma --version`; в проекте — поле `version` в `.forma/install-manifest.json`.
+- **Какая версия стоит.** `npx github:FormaMindPro/formamind --version`; в проекте — поле `version` в `.forma/install-manifest.json`.
 - **Уведомление.** Раз в сутки при старте сессии Claude Code хук сравнивает версию с последней на GitHub и говорит, только если на GitHub новее. Без сети молчит.
-- **Обновить.** Снова `npx github:IamForma/forma init` в папке проекта; `project/`, доска и `living/` сохраняются.
-- **Обновить без вопросов.** `npx github:IamForma/forma init --yes` подтягивает последнюю версию с GitHub и перезаписывает конфигурацию схемы без меню и вопросов (для недостающего — значения по умолчанию). `--no-adopt` пропускает вопрос первой установки о переносе файлов корня, `--no-dashboard` не запускает дашборд. Только расширения проекта: `npx github:IamForma/forma extensions` (`--check` лишь сообщает, не копирует).
+- **Обновить.** Снова `npx github:FormaMindPro/formamind init` в папке проекта; `project/`, доска и `living/` сохраняются.
+- **Обновить без вопросов.** `npx github:FormaMindPro/formamind init --yes` подтягивает последнюю версию с GitHub и перезаписывает конфигурацию схемы без меню и вопросов (для недостающего — значения по умолчанию). `--no-adopt` пропускает вопрос первой установки о переносе файлов корня, `--no-dashboard` не запускает дашборд. Только расширения проекта: `npx github:FormaMindPro/formamind extensions` (`--check` лишь сообщает, не копирует).
 - **Окно автосжатия.** Установщик предлагает 250000 токенов (`.claude/settings.json`) и не перекрывает ваше значение. `--compact <токены>` задаёт другое, `--compact off` оставляет умолчание Claude Code.
 
 ## Если что-то не работает

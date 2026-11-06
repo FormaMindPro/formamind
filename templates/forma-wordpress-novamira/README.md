@@ -86,7 +86,7 @@ Names and types only — never values; the credentials stay in the project `.env
 ## Installation
 
 ```
-claude plugin marketplace add IamForma/forma   # if not added yet
+claude plugin marketplace add FormaMindPro/formamind   # if not added yet
 claude plugin install forma-wordpress-novamira@forma
 # in the project:
 "deploy the project/config/SITE.md stub" (or /forma-wordpress-novamira)

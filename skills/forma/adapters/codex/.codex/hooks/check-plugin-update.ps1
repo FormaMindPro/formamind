@@ -11,7 +11,7 @@ $today = (Get-Date).ToString('yyyy-MM-dd')
 if ((Test-Path -LiteralPath $stamp) -and ((Get-Content -Raw $stamp).Trim() -eq $today)) { exit 0 }
 
 $repoRoot = Split-Path -Parent (Split-Path $PSScriptRoot -Parent)
-$repo = 'IamForma/forma'
+$repo = 'FormaMindPro/formamind'
 
 function Get-Core([string]$v) {
     $c = ($v -split '-', 2)[0]
@@ -46,7 +46,7 @@ try {
     if ((Get-Command node -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $cli)) {
         & node $cli msg hook.plugin_update_npx "have=$have" "want=$want" --root $repoRoot
     } else {
-        Write-Output "Forma: this project has $have, GitHub has $want. Update: run npx github:IamForma/forma init in the project folder."
+        Write-Output "Forma: this project has $have, GitHub has $want. Update: run npx github:FormaMindPro/formamind init in the project folder."
     }
 } catch {
     # Startup checks never block the session.
