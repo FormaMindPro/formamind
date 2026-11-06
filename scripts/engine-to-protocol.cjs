@@ -108,6 +108,7 @@ const MAP = [
   ['.forma/manual', 'core/manual'],
   ['.forma/skills', 'core/skills'],   // интервью — ядро; .claude/skills/<интервью> — доставленная копия, в адаптер не идёт
   ['.forma/board', 'core/board'],
+  ['.forma/i18n', 'core/i18n'],   // словарь ключей (§6) и тексты установщика
   ['.forma/plumb', 'core/plumb'],   // Отвес: plumb-run.cjs и соседи
   ['.forma/engines.json', 'core/engines.json'],   // реестр спящих движков
   // адаптер Claude (читатели стенограмм Claude живут в .forma/dashboard проекта, но принадлежат адаптеру)

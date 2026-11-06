@@ -111,14 +111,14 @@ const rbProject = (dormantList, withGemini) => {
   return d;
 };
 
-test('rebuild: активный gemini пересобирается один раз, спящие codex и minimax не тронуты', () => {
-  const d = rbProject(['codex', 'minimax'], true);
+test('rebuild: активный gemini пересобирается один раз, спящие codex, kimi и minimax не тронуты', () => {
+  const d = rbProject(['codex', 'kimi', 'minimax'], true);
   try {
     const r = swIn(d, 'rebuild');
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.deepEqual(fs.readFileSync(path.join(d, 'order.log'), 'utf8').trim().split(/\r?\n/), ['--apply']);
     assert.match(r.stdout, /пересобраны: gemini/);
-    assert.match(r.stdout, /спят, не тронуты: codex, minimax/);
+    assert.match(r.stdout, /спят, не тронуты: codex, kimi, minimax/);
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });
 
@@ -142,7 +142,7 @@ test('rebuild: нет скрипта шага активного движка �
 });
 
 test('rebuild: разбуженный minimax входит в пересборку по порядку REBUILD', () => {
-  const d = rbProject(['codex'], true);
+  const d = rbProject(['codex', 'kimi'], true);
   for (const s of MM_STEPS) {
     fs.mkdirSync(path.dirname(path.join(d, s)), { recursive: true });
     fs.writeFileSync(path.join(d, s), `require('fs').appendFileSync(${JSON.stringify(path.join(d, 'order.log'))}, ${JSON.stringify(s)} + '\\n');`);

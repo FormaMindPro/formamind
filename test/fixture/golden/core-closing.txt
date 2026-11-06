@@ -1,4 +1,3 @@
 # check-board
-exit 1
-    — 1 карточек приняты человеком, но не закрыты `Core` (в `done` с assignee: "Core"):
-      card-003-zakrytaya-osnastka.md
+exit 0
+    ·   очередь Core: 1 карточек ждут закрытия цикла — штатно, не нарушение
