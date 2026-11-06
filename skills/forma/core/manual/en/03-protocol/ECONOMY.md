@@ -1,0 +1,100 @@
+# Economy contract
+
+One contract for every engine. The core counts; an engine adapter only extracts. Math — `.forma/dashboard/economy.cjs`; conformance test — `node .forma/dashboard/economy.test.cjs`.
+
+## Canonical variables
+
+| Variable | Meaning | Unit | Required | `unknown` |
+|---|---|---|---|---|
+| `tokens_in` | uncached input of the call | tokens | per call, transcript | — |
+| `tokens_out` | model output | tokens | per call, transcript | — |
+| `cache_read` | input read from cache (R) | tokens | yes on a card line | `(cache-read unknown)` |
+| `cache_write` | input written into cache | tokens | per call, transcript | — |
+| `duration_s` | call duration (T) | whole seconds | yes on a card line | `unknown s` |
+| `turns` | number of turns / round trips the call took | count | no | — |
+| `call_id` | id of that one call; session id for main-session work | string | yes on a card line | `` `id unknown` `` |
+| `tool_uses` | tool reaches of the call | count | no | — |
+| `ext_units` | paid external service, its own unit | `N <unit> (service/operation)` | when used | — |
+
+A card line records the total **N = tokens_in + cache_write + cache_read + tokens_out**; work = N − R. A per-call split lives in the transcript, not in the card.
+
+## Three states of a field
+
+- number — recorded;
+- `unknown` marker — the engine did not return it, the node named it: counted **separately**, never as 0;
+- absent — the line predates the rule: not counted at all.
+
+## Line skeleton (card `## History`, `AGENTS.md` §3)
+
+`` `Node`, YYYY-MM-DD: attempt, N tokens (R cache-read), T s[, K turns][, $X (provider/model)][, N <unit> (service/op)], `<call_id>` — <engine>: <what was done>. ``
+
+The engine tag after the dash is the grouping key. Tokens of different engine tags are never summed; engines are compared only by shared fields — attempts, time, accepted cards.
+
+## Who writes the line, and where
+
+- **Who:** the caller, right after the return — never the node itself, never after the fact. **Where:** the card's `## History`. A card handoff writes it itself: `card-move.cjs … --agent-id <id> --duration-ms MS [--tokens N] [--cache-read R] [--turns K]` appends the spend line before the stage line; N, R and O are read from the call's transcript, `--tokens` is the fallback (written as is); no transcript and no `--tokens` gives `unknown` with the reason, never 0.
+- **Spend is counted by fact, not by impression.** A node doesn't know its own spend from inside — that knowledge is in the call's metadata, not in its context. **Field names:** which field of the engine's return fills which variable of the skeleton — §8 of the engine file; read, never estimated.
+
+## The key part is English; the engine opens the description
+
+- **Language.** The key part — everything before the dash: `attempt`, `tokens`, `cache-read`, `s`, the markers, the external-model and external-service segments — is written **in English, in every project, whatever its language**; the description after the dash is in the card's language (`AGENTS.md` §6). The key part is what the counters parse: one encoding keeps them reading every project the same. Lines written earlier in another language stay as they are (prohibition 5) and are still read; a new one written so is reported by `sync-engines --check`.
+- **Engine.** The description after the dash **opens with the engine that did the work** — the `spendTag` of its adapter (`engine`, then `id`, are accepted as aliases) — so a card shows who executed it and who left its spend unrecorded. The set of valid tags is built from the loaded adapters, never hard-coded: a tag no adapter declares is a violation of the engine-tag check, and a new engine folder with an adapter becomes valid, and gets its own economy column and tab, with no change to the dashboard. The dashboard's «Speed and efficiency» section compares engines by their own tags: output tokens per second and seconds per attempt, attempts, tokens and price per closed card, cache share; rows with `out unknown` stay out of the speed denominator and are marked.
+
+## T, R, K and the call id
+
+- **T:** the call's duration in whole seconds.
+- **R:** the call's cache-read counter, read straight from the call's own result, no separate call. R is almost always fixed overhead (loading these rules and the role), not the work itself; it isn't split finer, because nothing inside one call separates card content from the work proper without adding another call.
+- **K:** the number of turns or round trips the call took — optional. Present only when the call or its transcript records this number. Cards without turns data are not counted in turn averages and display `—` (not 0).
+- **Call id:** the identifier of that one call, read straight from the call's own result like the numbers beside it — never composed, never guessed. Which field of the return carries it is named in §8 of the engine file, like every other spend field. It stands **last in the spend block, immediately before the dash**, after any external-model or external-service segment: the numbers stay where the eye already looks for them, and the opaque token sits where the eye passes over it into the prose. **No separate call — the session id**: work done inside the shared session takes its numbers and its id from the engine's transcript of that session (see "`Intent` in the shared session" below).
+- **A continuation of the same `Run` (`AGENTS.md` §2) reuses that call's id on purpose.** `Kit` sending a written correction to a live call is still one call, read and recorded the same way as any other — the line keeps the form `attempt,` (the counters parse it) and opens its description after the dash with the engine tag and `continuation of the call —`, so two lines sharing one `call_id` on the same card read as one call extended, not as a duplicate or a mistake.
+
+## The `unknown` marker
+
+The engine did not return the number at all: the line is still written in full, with a **marker in the field's place** — `(cache-read unknown)` instead of `(R cache-read)`, `` `id unknown` `` instead of the identifier. Two conditions, both binding: the marker goes in **only after an attempt to take the number from the call's own transcript** (the reading is named in §8 of the engine file, next to the spend fields themselves), and the **reason is named in the prose after the dash**. The marker is not a licence to skip the reading, and never a substitute for a number the call did return.
+
+**What the engine never returned is written as a fact, not left as a hole.** Estimating by eye is forbidden and an off-form line drops out of the sum silently: the marker keeps the line lawful and the gap **counted separately** — reported as its own quantity ("unknown: N attempts"), never as zero.
+
+## External model and external service
+
+- **External model.** The calling node writes its own line and inserts `$X.XXXXXX (provider/model)` before the dash. The sole exception to "the caller writes it"; it doesn't violate prohibition 1. Mechanics — `run-external-model.md`, `kit-graphs.md`.
+- **External service.** A paid service reached through MCP or an API — image generation, 3D, speech — is charged in **its own unit**, not in tokens and not in dollars. The node inserts `N <unit> (service/operation)` before the dash, one segment per service touched: `` 1160 credits (image-service/upscale) ``. The number is read from the call's own answer, like any other spend — never estimated from a price list. Which services are connected, in what unit each charges and where its number is read — `PROJECT.md`, "External services".
+
+## Splitting one call's spend across a batch
+
+A batch call — `Spec` slicing several cards in one call, `Kit` kitting up to 4 in one call (`kit.md`, "Task kitting") — touches several cards with one call, one `call_id`, one set of totals. **The call's N, R and T are divided by the number of cards it touched, not repeated in full on each** — the same call attributed whole to every card it served would sum to a multiple of its real cost the moment two such lines are read together.
+
+- **The split is exact, integer, no remainder lost:** each of the K cards gets `floor(total/K)`, and the first `total mod K` cards get one more — the K shares always sum back to the call's own total.
+- **The line still carries the call's real `call_id`**, the same one on all K lines — never composed, never guessed (prohibition on inventing an id holds exactly as for any other line). What marks a line as a batch share, not a mistaken repeat, is the batch marker in its description: `(batch I/K)`, `I` this card's position, `K` the batch size.
+- **A counter reading many cards together sums the shares, not the whole call K times.** The batch marker is also the dedup key when two shares happen to divide out equal (an even split can give every card the same number) — without it a counter reading by number alone would mistake two equal, legitimate shares for one line copied twice and silently drop a card's spend.
+- **This is not the same case as one call read by two cards without a split** (one `Run` answer referenced from two cards verbatim, full numbers equal) — that stays a literal duplicate, collapsed to one. The batch marker is what tells the two cases apart; a line claims to be a share only when it carries `(batch I/K)`.
+
+Mechanics of the split and the marker — `claude-8.md`/`spend-line.md` for Claude Code; the same shape holds for every engine, since the split is arithmetic on already-read numbers, not a new field.
+
+## `Intent` in the shared session
+
+Work `Intent` does inside the shared session — executing a card itself, checking, orchestrating the nodes — is counted **from the engine's transcript of the main session** and written into the card as an ordinary spend line: N, R and T read by the engine's script (§8), the session id in place of the call id, subagent answers excluded (they are already in `## History`). Each answer belongs to one card only. Written by the engine that did the work, before the card's commit. **`0 tokens` is an exception, not the default:** allowed only when the transcript could not be read or holds nothing for the card, written with the markers of "The `unknown` marker" (`unknown tokens (cache-read unknown)`, `` `id unknown` ``) and the reason after the dash. An event that is no work — the human's approval, a status change — is an event line without `attempt` (`AGENTS.md` §6). Invoked as a subagent instead — the caller writes the line on the general terms. The article **"`Intent` ↔ human"** stays as the whole-dialog ledger and overlaps these lines; routes are compared by the card lines, never by adding the two.
+
+## What the checks require
+
+- **R and T are not optional.** A line lacking either is reported by `sync-engines --check` (from the day the rule entered the project, `.forma/living/checks.json`; earlier lines stay as they are, prohibition 5). A call's metadata does not outlive the call, so an unwritten spend cannot be recovered.
+- **The call id stitches the card to the tool journal** — one shared field makes kitting by kind of task readable. It is checked only forward: required of lines dated later than the day the field entered the project (`.forma/living/checks.json`), since the id does not outlive its call.
+
+## Adapter duty
+
+Each engine's §8 — or the on-demand file it points to — names which of its return fields map to which variable and how R is read. Its line must pass the conformance test.
+
+## Automatic recording (adapter duty)
+
+The spend line is derived from a fact the engine records, not typed by hand.
+
+- **Journal:** `<adapter dir>/.ledger/calls.jsonl`, one JSON object per line, appended. Fields: `timestamp`, `conversationId` (the call id — the key `ledger-parity.cjs` reads), `engine`, `node`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `duration_s`, `cards` (card numbers the call served); `continuation: true` on a repeat record of a call already in the journal. A number the engine did not return is `null`, never 0.
+- **Latency field:** an adapter that can writes `first_response_s` into the journal record — seconds from the call's first message (its prompt) to the first assistant entry, for a continuation from the continuation message to the first new assistant entry; `null` when it cannot be read. The dashboard summary takes the median over the engine's records; an engine whose records lack the field shows «no data», never zero.
+- **Spend and performance in the summary:** per engine, over the attempt lines of `## History` (not the journal): spend — tokens, price and seconds, total and per closed card; the price counts only attempts that recorded one (no recorded price is «no data», never $0). Performance — output tokens per second of the call: the sum of `out` / the sum of call seconds over attempts where both are known and seconds are above zero (an `out unknown` line stays out of the denominator); beside it stays the journal measure per second of active work. The «Total» row covers all engines and counts a card closed by two engines once; tokens of different engines are summed there as volume only. A value with no source is «no data», never zero; fewer than 5 observations, or known output on fewer than half of the attempts, is marked «low data (N of M)» and the number stays. Time intervals between calls are not part of this metric.
+- **Trigger:** the return of a subagent call. An engine with a stop hook for it records from the hook; the numbers come from the call's transcript, as in "T, R, K and the call id".
+- **Card line:** derived from the journal record through `.forma/dashboard/spend-line.cjs` (`formatSpendLine`) into the `## History` of every card in `cards` found on the board or in `done/`; the description after the dash opens with the engine tag and names the automatic recording. A batch call is split as in "Splitting one call's spend across a batch". A continuation writes only the delta against what the card already holds for that call id.
+- **Dedup:** by call id — a card that already holds a line with the id of a first-time record gets no second line; a repeat event with no new spend writes nothing.
+- **Failure is silent:** a recorder error never blocks the engine; the reason goes to a log beside the journal. A card not found leaves the journal record alone — the parity check shows it as an orphan.
+- **Check:** `.forma/board/checks/ledger-parity.cjs` — every `conversationId` in an adapter's journal must stand as a call id on some card line.
+- **No hook in the engine:** the node (or caller) appends the record with the adapter's `sync-ledger --append` command right after the return. This is discipline, weaker than a hook: the journal then holds what the node read, not what the engine recorded.
+
+Reference implementation: Claude Code, `.claude/scripts/ledger-recorder.cjs` (hook `SubagentStop`).

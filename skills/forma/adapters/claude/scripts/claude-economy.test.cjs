@@ -1,0 +1,107 @@
+#!/usr/bin/env node
+'use strict';
+/**
+ * Соответствие адаптера Claude контракту (.forma/manual/en/03-protocol/ECONOMY.md): строки, собранные
+ * адаптером, читаются tally.cjs в те же канонические суммы; отсутствующее у Claude — unknown, не 0.
+ * Общий тест контракта — .forma/dashboard/economy.test.cjs, этот идёт вместе с ним.
+ *   node .claude/scripts/claude-economy.test.cjs
+ */
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { claudeUsage, fromAgentResult } = require('./claude-economy.cjs');
+const { formatSpendLine } = require('../../.forma/dashboard/spend-line.cjs');
+const { tally } = require('../../.forma/dashboard/tally.cjs');
+
+const D = ['2000', '01', '02'].join('-');
+let passed = 0;
+const it = (name, fn) => { fn(); passed += 1; console.log('ok  ' + name); };
+const tallyLines = (lines) => {
+  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'claude-econ-')), 'fixture.md');
+  fs.writeFileSync(f, '# t\n\n## History\n' + lines.map((l) => '- ' + l).join('\n') + '\n');
+  return tally([f]);
+};
+const line = (rec) => formatSpendLine({ node: 'Run', date: D, engine: 'claude-code', desc: 'x.', ...rec });
+
+it('<usage> + стенограмма → N, R, T, id; tally читает те же числа', () => {
+  const rec = fromAgentResult({ agent_id: 'a1b2', subagent_tokens: 52339, tool_uses: 7, duration_ms: 120499 },
+    { cacheRead: 40000, cacheCreate: 900, input: 10, output: 300 });
+  assert.deepEqual([rec.tokens, rec.cache_read, rec.duration_s, rec.call_id, rec.tool_uses], [41210, 40000, 120, 'a1b2', 7]);
+  assert.equal(rec.tokens_basis, 'sum'); // N = 10 + 900 + 40000 + 300, не subagent_tokens (размер контекста)
+  const n = tallyLines([line(rec)]).byNode.Run;
+  assert.equal(n.tokens, 41210);
+  assert.equal(n.cacheRead, 40000);
+  assert.equal(n.seconds, 120);
+  assert.equal(n.tokensUnknown + n.cacheUnknown + n.secondsUnknown + n.idUnknown, 0);
+});
+
+it('нет стенограммы: cache_read и cache_write — unknown (null), не 0; tally считает отдельно', () => {
+  const rec = fromAgentResult({ agent_id: 'a1b2', subagent_tokens: 100, duration_ms: 5000 }, null);
+  // Падает, если адаптер вернёт 0: `<usage>` Claude не несёт ни R, ни cache_write.
+  assert.equal(rec.cache_read, null);
+  assert.equal(rec.cache_write, null);
+  assert.equal(rec.tokens_in, null);
+  assert.equal(rec.tool_uses, null);
+  assert.equal(rec.tokens, 100); // запасное значение из <usage>
+  assert.equal(rec.tokens_basis, 'context');
+  const s = line(rec);
+  assert.match(s, /\(cache-read unknown\)/);
+  const n = tallyLines([s]).byNode.Run;
+  assert.equal(n.cacheUnknown, 1);
+  assert.equal(n.withCacheRead, 0);
+});
+
+it('пустые поля <usage> → unknown tokens / unknown s / id unknown', () => {
+  const s = line(fromAgentResult({}, null));
+  assert.match(s, /attempt, unknown tokens \(cache-read unknown\), out unknown, unknown s, `id unknown` —/);
+  const n = tallyLines([s]).byNode.Run;
+  assert.deepEqual([n.tokensUnknown, n.cacheUnknown, n.secondsUnknown, n.idUnknown], [1, 1, 1, 1]);
+});
+
+it('шаг транскрипта: поле отсутствует — null, присутствует 0 — 0', () => {
+  const u = claudeUsage({ input_tokens: 0, output_tokens: 5, cache_read_input_tokens: 9 });
+  assert.deepEqual(u, { tokens_in: 0, tokens_out: 5, cache_read: 9, cache_write: null });
+});
+
+it('сегмент «O out»: новая строка несёт его, старая читается как out unknown и не меняется', () => {
+  const { outTokens } = require('../../.forma/dashboard/spend-line.cjs');
+  const withOut = line({ tokens: 900, cache_read: 100, tokens_out: 2500, duration_s: 5, call_id: 'abcdef123456' });
+  assert.match(withOut, /\(100 cache-read\), 2 500 out, 5 s,/);
+  assert.equal(outTokens(withOut), 2500);
+  assert.equal(outTokens(line({ tokens: 9, cache_read: 1, duration_s: 5, call_id: 'abcdef123456' })), null);
+  const old = '`Run`, ' + D + ': attempt, 900 tokens (100 cache-read), 5 s, `second-call-id` — claude-code: x.';
+  assert.equal(outTokens(old), null);
+  const n = tallyLines([withOut, old]).byNode.Run;
+  assert.equal(n.tokens, 1800); // обе строки читаются разбором расхода
+});
+
+it('журнал основной сессии: mainStepOf нормализует запись, isSidechain — не запись', () => {
+  const { mainStepOf, mainSessions } = require('./claude-economy.cjs');
+  const row = mainStepOf({ type: 'assistant', timestamp: '2000-01-02T10:00:00.000Z',
+    message: { id: 'msg_1', model: 'claude-sonnet-5-5', content: [{ type: 'tool_use', name: 'Edit', input: {} }],
+      usage: { input_tokens: 10, output_tokens: 20, cache_read_input_tokens: 100, cache_creation_input_tokens: 5 } } });
+  assert.equal(row.key, 'msg_1');
+  assert.equal(row.toolCalls.length, 1);
+  assert.equal(row.human, false);
+  assert.equal(row.model, 'claude-sonnet-5-5');
+  assert.equal(row.usage.input_tokens, 10);
+  const human = mainStepOf({ type: 'user', timestamp: '2000-01-02T10:01:00.000Z', message: { role: 'user', content: 'сделай' } });
+  assert.equal(human.human, true);
+  assert.equal(human.key, null);
+  assert.equal(mainStepOf({ type: 'user', isMeta: true, timestamp: '2000-01-02T10:02:00.000Z', message: { content: 'x' } }).human, false);
+  assert.equal(mainStepOf({ type: 'assistant', isSidechain: true, timestamp: '2000-01-02T10:03:00.000Z', message: { id: 'm' } }), null);
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'proj-'));
+  const dir = path.join(home, 'p');
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir, 'sess-a.jsonl'), '{}\n');
+  fs.writeFileSync(path.join(dir, 'readme.txt'), 'x\n');
+  process.env.CLAUDE_SPEND_PROJECTS = dir;
+  try {
+    const list = mainSessions(home);
+    assert.deepEqual(list.map((s) => s.id), ['sess-a']);
+    assert.ok(fs.existsSync(list[0].file));
+  } finally { delete process.env.CLAUDE_SPEND_PROJECTS; fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+console.log(`\n${passed} проверок пройдено`);

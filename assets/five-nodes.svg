@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 652" width="900" height="652" role="img" aria-labelledby="t d" lang="en">
+<title id="t">The five nodes</title>
+<desc id="d">The five nodes: Intent slices through Spec, Kit assembles the kit, Run executes, Intent checks; the human accepts and Core gives the cycle verdict. Plumb is a measure between slicing and execution, not a node.</desc>
+<style>
+text{font-family:Arial,Helvetica,sans-serif;fill:#f2f6fb;font-size:11px;text-anchor:middle}
+.b{font-family:Consolas,Menlo,monospace;font-weight:700;font-size:17px}
+.m{fill:#b9cce5}.y{fill:#ffc266}.k{fill:#ff8a76}.c{fill:#93c8f7}.l{text-anchor:start}.e{text-anchor:end}
+.nd{fill:#1d3b68;stroke:#8fb2dc;stroke-width:1.5}
+.ac{fill:#93c8f7}
+.fw{fill:none;stroke:#f2f6fb;stroke-width:2}
+.rt{fill:none;stroke:#ffc266;stroke-width:2;stroke-dasharray:6 5}
+.cr{fill:none;stroke:#ff8a76;stroke-width:2;stroke-dasharray:6 5}
+</style>
+<defs>
+<marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#f2f6fb"/></marker>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ffc266"/></marker>
+<marker id="ak" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ff8a76"/></marker>
+</defs>
+<rect width="900" height="652" rx="10" fill="#13294b"/>
+
+<!-- Core verdict returns -->
+<polyline class="cr" points="350,215 244,192" marker-end="url(#ak)"/>
+<polyline class="cr" points="550,215 656,192" marker-end="url(#ak)"/>
+<polyline class="cr" points="350,325 244,448" marker-end="url(#ak)"/>
+<polyline class="cr" points="550,325 656,448" marker-end="url(#ak)"/>
+
+<!-- main route: Intent -> Spec -> (Plumb) -> Kit -> Run -> Intent -->
+<polyline class="fw" points="140,450 140,192" marker-end="url(#af)"/>
+<text class="e" x="132" y="325">slicing</text>
+<polyline class="fw" points="240,130 375,130"/>
+<polyline class="fw" points="525,130 658,130" marker-end="url(#af)"/>
+<text x="592" y="120">kitting</text>
+<polyline class="fw" points="760,192 760,448" marker-end="url(#af)"/>
+<text class="l" x="768" y="325">execution</text>
+<polyline class="fw" points="658,510 242,510" marker-end="url(#af)"/>
+<text x="450" y="502">check</text>
+
+<!-- returns -->
+<polyline class="rt" points="190,192 190,448" marker-end="url(#ar)"/>
+<text class="l y" x="198" y="255">end-image unfit</text>
+<polyline class="rt" points="700,448 700,192" marker-end="url(#ar)"/>
+<text class="e y" x="692" y="255">missing form field</text>
+<polyline class="rt" points="140,572 140,598 890,598 890,130 862,130" marker-end="url(#ar)"/>
+<text class="y" x="515" y="590">check failed: back to Kit</text>
+
+<!-- Plumb: a measure, not a node -->
+<rect x="375" y="108" width="150" height="44" rx="22" fill="#1d3b68" stroke="#93c8f7" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text class="b" x="450" y="128" style="font-size:14px">Plumb</text>
+<text class="m" x="450" y="144" style="font-size:10.5px">role fit reading</text>
+<text class="c" x="450" y="172">a measure, not a node</text>
+
+<!-- Spec -->
+<rect class="nd" x="40" y="70" width="200" height="122" rx="8"/><rect class="ac" x="40" y="70" width="6" height="122" rx="3"/>
+<text class="b" x="140" y="98">Spec</text><text class="m" x="140" y="118">slices the goal</text>
+<text x="140" y="142">judges: simply</text><text x="140" y="158">decides: completely</text><text class="m" x="140" y="176">breaks into: omission</text>
+<!-- Kit -->
+<rect class="nd" x="660" y="70" width="200" height="122" rx="8"/><rect class="ac" x="660" y="70" width="6" height="122" rx="3"/>
+<text class="b" x="760" y="98">Kit</text><text class="m" x="760" y="118">assembles the kit</text>
+<text x="760" y="142">judges: naturally</text><text x="760" y="158">decides: lawfully</text><text class="m" x="760" y="176">breaks into: distortion</text>
+<!-- Intent -->
+<rect class="nd" x="40" y="450" width="200" height="122" rx="8"/><rect class="ac" x="40" y="450" width="6" height="122" rx="3"/>
+<text class="b" x="140" y="478">Intent</text><text class="m" x="140" y="498">talks with the human</text>
+<text x="140" y="522">judges: beautifully</text><text x="140" y="538">decides: justly</text><text class="m" x="140" y="556">breaks into: generalization</text>
+<!-- Run -->
+<rect class="nd" x="660" y="450" width="200" height="122" rx="8"/><rect class="ac" x="660" y="450" width="6" height="122" rx="3"/>
+<text class="b" x="760" y="478">Run</text><text class="m" x="760" y="498">executes the card</text>
+<text x="760" y="522">judges: honestly</text><text x="760" y="538">decides: humanely</text><text class="m" x="760" y="556">breaks into: substitution</text>
+<!-- Core -->
+<rect x="350" y="215" width="200" height="110" rx="8" fill="#1d3b68" stroke="#ff8a76" stroke-width="2"/>
+<text class="b k" x="450" y="243">Core</text><text class="m" x="450" y="262">judges the cycle</text>
+<text x="450" y="284">judges: individually</text><text x="450" y="300">decides: the true path</text><text class="m" x="450" y="316" style="font-size:10px">breaks into: map is not the territory</text>
+<text class="k" x="450" y="205" style="font-size:10.5px">not reached: named node</text>
+
+<!-- human -->
+<circle cx="450" cy="380" r="8" fill="#f2f6fb"/>
+<path d="M450 388 V412 M436 396 H464 M450 412 L440 428 M450 412 L460 428" stroke="#f2f6fb" stroke-width="3" fill="none" stroke-linecap="round"/>
+<text x="450" y="446" style="font-size:12px">human</text>
+<polyline class="fw" points="244,480 412,418" marker-end="url(#af)"/>
+<text x="305" y="440">acceptance</text>
+<polyline class="fw" points="450,364 450,328" marker-end="url(#af)"/>
+<text class="l" x="458" y="352">verdict</text>
+
+<!-- legend -->
+<line x1="150" y1="632" x2="190" y2="632" stroke="#f2f6fb" stroke-width="2"/><text class="l m" x="196" y="636">main route</text>
+<line x1="350" y1="632" x2="390" y2="632" stroke="#ffc266" stroke-width="2" stroke-dasharray="6 5"/><text class="l m" x="396" y="636">return</text>
+<line x1="600" y1="632" x2="640" y2="632" stroke="#ff8a76" stroke-width="2" stroke-dasharray="6 5"/><text class="l m" x="646" y="636">Core verdict return</text>
+</svg>

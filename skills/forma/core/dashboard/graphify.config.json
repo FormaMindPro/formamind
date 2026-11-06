@@ -1,0 +1,11 @@
+{
+  "trigger": {
+    "mode": "off",
+    "threshold": 20,
+    "_mode_options": [
+      "history-accumulation",
+      "off"
+    ],
+    "_threshold_meaning": "число новых событий (закрытых карточек + строк History) с момента последнего запуска /graphify, накопление которых ставит граф в очередь на пересборку"
+  }
+}
