@@ -1,4 +1,5 @@
 // Включатель движков: реестр спящих читается, sleep и wake правят его, claude не усыпляется.
+// Rebuild пропускает движок без установленного адаптера (нет его зоны) с маркером и кодом 0; wake без адаптера падает громко.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -11,6 +12,9 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-switch-'));
 fs.mkdirSync(path.join(dir, '.forma'));
 const registry = path.join(dir, '.forma', 'engines.json');
 fs.writeFileSync(registry, '{ "dormant": ["codex"] }\n');
+fs.mkdirSync(path.join(dir, '.agents', 'plugins', 'forma'), { recursive: true }); // зона gemini — адаптер установлен
+fs.mkdirSync(path.join(dir, '.claude', 'scripts'), { recursive: true });
+fs.writeFileSync(path.join(dir, '.claude', 'scripts', 'sync-engines.cjs'), '');   // шаг gemini проходит
 const sw = (...a) => spawnSync(process.execPath, [SCRIPT, ...a], { cwd: dir, encoding: 'utf8' });
 const dormant = () => JSON.parse(fs.readFileSync(registry, 'utf8')).dormant;
 
@@ -48,6 +52,7 @@ const mmProject = (withSteps) => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-switch-mm-'));
   fs.mkdirSync(path.join(d, '.forma'));
   fs.writeFileSync(path.join(d, '.forma', 'engines.json'), '{ "dormant": ["codex", "minimax"] }\n');
+  fs.mkdirSync(path.join(d, '.agents', 'plugins', 'forma'), { recursive: true }); // зона gemini — «активен» в status
   if (withSteps) for (const s of MM_STEPS) {
     fs.mkdirSync(path.dirname(path.join(d, s)), { recursive: true });
     fs.writeFileSync(path.join(d, s), `require('fs').appendFileSync(${JSON.stringify(path.join(d, 'order.log'))}, ${JSON.stringify(s)} + '\\n');`);
@@ -104,6 +109,7 @@ const rbProject = (dormantList, withGemini) => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-switch-rb-'));
   fs.mkdirSync(path.join(d, '.forma'));
   fs.writeFileSync(path.join(d, '.forma', 'engines.json'), JSON.stringify({ dormant: dormantList }) + '\n');
+  fs.mkdirSync(path.join(d, '.agents', 'plugins', 'forma'), { recursive: true }); // зона gemini — адаптер установлен
   if (withGemini) {
     fs.mkdirSync(path.dirname(path.join(d, GEM_STEP)), { recursive: true });
     fs.writeFileSync(path.join(d, GEM_STEP), `require('fs').appendFileSync(${JSON.stringify(path.join(d, 'order.log'))}, process.argv.slice(2).join(' ') + '\\n');`);
@@ -151,5 +157,31 @@ test('rebuild: разбуженный minimax входит в пересборк
     const r = swIn(d, 'rebuild');
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.deepEqual(fs.readFileSync(path.join(d, 'order.log'), 'utf8').trim().split(/\r?\n/), ['--apply', ...MM_STEPS]);
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+
+// Защита: среда без установленных адаптеров — rebuild не падает, движки помечены как пропущенные.
+test('rebuild: среда без адаптеров — маркеры пропуска, код 0', () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-switch-skip-'));
+  fs.mkdirSync(path.join(d, '.forma'));
+  fs.writeFileSync(path.join(d, '.forma', 'engines.json'), '{ "dormant": [] }\n');
+  try {
+    const r = swIn(d, 'rebuild');
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /адаптер не установлен, пропущены: codex, gemini, kimi, minimax, zcode/);
+    for (const e of ['codex', 'gemini', 'kimi', 'minimax', 'zcode']) assert.match(r.stdout, new RegExp('^' + e + ': адаптер не установлен — пропущен$', 'm'));
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+
+test('status: движок без адаптера — «адаптер не установлен», не «активен»', () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-switch-st-'));
+  fs.mkdirSync(path.join(d, '.forma'));
+  fs.writeFileSync(path.join(d, '.forma', 'engines.json'), '{ "dormant": [] }\n');
+  try {
+    const r = swIn(d, 'status');
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /zcode: адаптер не установлен/);
+    assert.doesNotMatch(r.stdout, /zcode: активен/);
+    assert.match(r.stdout, /claude: активен/);
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });

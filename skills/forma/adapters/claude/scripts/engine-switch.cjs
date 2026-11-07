@@ -5,7 +5,8 @@
 //   node .claude/scripts/engine-switch.cjs status
 //   node .claude/scripts/engine-switch.cjs sleep <движок>     — в реестр; движок не сверяется и не ставится
 //   node .claude/scripts/engine-switch.cjs wake <движок>      — из реестра, пересборка данных движка, сверка
-//   node .claude/scripts/engine-switch.cjs rebuild            — пересборка зеркал всех активных движков из .claude/; спящие не трогаются
+//   node .claude/scripts/engine-switch.cjs rebuild            — пересборка зеркал всех активных движков из .claude/; спящие не трогаются;
+//                                                                 у движка без установленного адаптера (нет его зоны) — маркер пропуска, код 0
 // Пересборка (wake) у каждого движка своя — таблица REBUILD. Движка в таблице нет — только маркер и общая сверка.
 // Реестр правится здесь, в проекте; в исходник протокола он уходит обычным forma-commit (engine-to-protocol, core/engines.json).
 
@@ -15,7 +16,10 @@ const { spawnSync } = require('child_process');
 
 const ROOT = process.cwd();
 const REGISTRY = path.join(ROOT, '.forma', 'engines.json');
-const ENGINES = ['claude', 'codex', 'gemini', 'kimi', 'minimax'];
+const ENGINES = ['claude', 'codex', 'gemini', 'kimi', 'minimax', 'zcode'];
+// Зона адаптера — признак «движок установлен»; claude — эталон, живёт в .claude/ и зоны не имеет.
+const ZONE = { gemini: '.agents/plugins/forma', kimi: '.kimi', codex: '.codex', minimax: '.minimax', zcode: '.zcode' };
+const installed = (id) => !ZONE[id] || fs.existsSync(path.join(ROOT, ZONE[id]));
 const REBUILD = {
   gemini: [
     ['.claude/scripts/sync-engines.cjs', '--apply'], // зеркало ролей .agents/plugins/forma/agents/ заново из .claude/agents/
@@ -34,6 +38,10 @@ const REBUILD = {
     ['.minimax/scripts/gen-plugin-agents.cjs'],   // субагенты пакета miniapps/minimax-engine/ из .minimax/agents/
     ['.minimax/scripts/install-plugin.cjs'],      // пакет — в каталог данных MiniMax
     ['.minimax/tests/test-minimax-adapter.cjs'],
+  ],
+  zcode: [
+    ['.zcode/scripts/gen-roles.cjs'],        // зеркало ролей .zcode/agents/ заново из .claude/agents/
+    ['.zcode/tests/test-zcode-adapter.cjs'],
   ],
 };
 
@@ -55,15 +63,20 @@ function rebuildEngine(id) {
 const [cmd, id] = process.argv.slice(2);
 if (cmd === 'status' || !cmd) {
   const d = read();
-  for (const e of ENGINES) console.log(`${e}: ${d.includes(e) ? 'спит' : 'активен'}`);
+  for (const e of ENGINES) console.log(`${e}: ${d.includes(e) ? 'спит' : installed(e) ? 'активен' : 'адаптер не установлен'}`);
   process.exit(0);
 }
 if (cmd === 'rebuild') {
   const dormantList = read();
   const active = ENGINES.filter((e) => e !== 'claude' && !dormantList.includes(e));
-  for (const e of active) rebuildEngine(e);
+  const built = [], noAdapter = [];
+  for (const e of active) {
+    if (!installed(e)) { console.log(`${e}: адаптер не установлен — пропущен`); noAdapter.push(e); continue; }
+    rebuildEngine(e);
+    built.push(e);
+  }
   const skipped = ENGINES.filter((e) => e !== 'claude' && dormantList.includes(e));
-  console.log(`✓ пересобраны: ${active.join(', ') || 'нет активных'}${skipped.length ? '; спят, не тронуты: ' + skipped.join(', ') : ''}`);
+  console.log(`✓ пересобраны: ${built.join(', ') || 'нет'}${noAdapter.length ? '; адаптер не установлен, пропущены: ' + noAdapter.join(', ') : ''}${skipped.length ? '; спят, не тронуты: ' + skipped.join(', ') : ''}`);
   process.exit(0);
 }
 if (!['sleep', 'wake'].includes(cmd) || !ENGINES.includes(id)) fail('node .claude/scripts/engine-switch.cjs status | rebuild | sleep <движок> | wake <движок>; движки: ' + ENGINES.join(', '));
