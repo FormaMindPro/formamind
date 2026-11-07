@@ -13,9 +13,9 @@
 <img alt="Gemini: beta" src="https://img.shields.io/badge/Gemini-beta-yellow">
 </p>
 
-<p align="center"><b><a href="https://iamforma.pro/#intro">iamforma.pro</a></b> · <a href="https://yaforma.pro/">Russian: yaforma.pro</a> · <a href="https://github.com/FormaMindPro/formamind">FormaMindPro/formamind</a></p>
+<p align="center"><b><a href="https://formamind.tech/">formamind.tech</a></b> · <a href="https://formamind.pro/">Russian: formamind.pro</a> · <a href="https://github.com/FormaMindPro/formamind">FormaMindPro/formamind</a></p>
 
-[![Forma: natural workflow — from intent to concrete result through five nodes](assets/hero-how-it-works.webp)](https://iamforma.pro/#intro)
+[![Forma: natural workflow — from intent to concrete result through five nodes](assets/hero-how-it-works.webp)](https://formamind.tech/)
 
 ## What it is
 
@@ -389,7 +389,7 @@ Three layers (`AGENTS.md` §6): 1 — engine roles and skills; 2 — `.forma/`, 
 
 ## Full documentation
 
-- Website: [yaforma.pro](https://yaforma.pro/) (RU), [iamforma.pro](https://iamforma.pro/#intro) (EN) — how it works, community.
+- Website: [formamind.pro](https://formamind.pro/) (RU), [formamind.tech](https://formamind.tech/) (EN) — how it works, community.
 - Manual: `.forma/manual/ru/` and `.forma/manual/en/` (in the repository — `skills/forma/core/manual/`).
 - Previous detailed README: [ru](skills/forma/core/manual/ru/archive/README-full.md) · [en](skills/forma/core/manual/en/archive/README-full.md).
 - New engine adapter: [docs/ADAPTER.ru.md](docs/ADAPTER.ru.md).

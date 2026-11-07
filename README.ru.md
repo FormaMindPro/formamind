@@ -13,9 +13,9 @@
 <img alt="Gemini: бета" src="https://img.shields.io/badge/Gemini-beta-yellow">
 </p>
 
-<p align="center"><b><a href="https://yaforma.pro/">yaforma.pro</a></b> · <a href="https://iamforma.pro/#intro">English: iamforma.pro</a> · <a href="https://github.com/FormaMindPro/formamind">FormaMindPro/formamind</a></p>
+<p align="center"><b><a href="https://formamind.pro/">formamind.pro</a></b> · <a href="https://formamind.tech/">English: formamind.tech</a> · <a href="https://github.com/FormaMindPro/formamind">FormaMindPro/formamind</a></p>
 
-[![Форма: естественный ход дела — от замысла до конкретного результата через пять узлов](assets/hero-how-it-works.ru.webp)](https://yaforma.pro/)
+[![Форма: естественный ход дела — от замысла до конкретного результата через пять узлов](assets/hero-how-it-works.ru.webp)](https://formamind.pro/)
 
 ## Что это
 
@@ -389,7 +389,7 @@ project/           продукт: config/, brief/, extensions/, cards/, ops/ �
 
 ## Полная документация
 
-- Сайт: [yaforma.pro](https://yaforma.pro/) (RU), [iamforma.pro](https://iamforma.pro/#intro) (EN) — как это работает, сообщество.
+- Сайт: [formamind.pro](https://formamind.pro/) (RU), [formamind.tech](https://formamind.tech/) (EN) — как это работает, сообщество.
 - Руководство: `.forma/manual/ru/` и `.forma/manual/en/` (в репозитории — `skills/forma/core/manual/`).
 - Прежний подробный README: [ru](skills/forma/core/manual/ru/archive/README-full.md) · [en](skills/forma/core/manual/en/archive/README-full.md).
 - Адаптер нового движка: [docs/ADAPTER.ru.md](docs/ADAPTER.ru.md).
