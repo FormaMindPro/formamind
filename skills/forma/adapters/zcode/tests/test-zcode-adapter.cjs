@@ -95,12 +95,16 @@ it('mainSessions перечисляет основные сессии, без с
     'model-io-sess_subagent_agent_cc33.jsonl', 'model-io-no-session.jsonl', 'чужой-файл.txt']) {
     fs.writeFileSync(path.join(dir, f), '{}\n');
   }
+  const outerHome = process.env.ZCODE_HOME;
   process.env.ZCODE_HOME = home;
   try {
     const list = a.mainSessions(root);
     assert.deepEqual(list.map((s) => s.id).sort(), ['model-io-sess_aa11', 'model-io-sess_bb22']);
     for (const s of list) assert.ok(fs.existsSync(s.file), 'файл записи существует');
-  } finally { delete process.env.ZCODE_HOME; fs.rmSync(home, { recursive: true, force: true }); }
+  } finally {
+    if (outerHome === undefined) delete process.env.ZCODE_HOME; else process.env.ZCODE_HOME = outerHome;
+    fs.rmSync(home, { recursive: true, force: true });
+  }
 });
 
 it('mainStepOf: ключ requestId, toolCalls ответа, реплика человека — новый turnId', () => {
@@ -134,12 +138,16 @@ it('тег zcode: проходит стену тегов ядра, чужой т
 });
 
 it('transcriptsDir указывает на rollout хоста', () => {
-  const dir = adapter().transcriptsDir(root);
-  assert.ok(dir && /rollout/.test(dir), 'ожидали каталог rollout хоста');
-  // Существование проверяем только там, где хост ZCode реально стоит: каталог пишет сам хост,
-  // адаптеру он не принадлежит; на машине без хоста (CI, установка вперёд) его нет — и это не красное.
   const base = process.env.ZCODE_HOME || path.join(os.homedir(), '.zcode');
-  if (fs.existsSync(base)) assert.ok(fs.existsSync(dir), 'каталог стенограмм не найден');
+  const dir = adapter().transcriptsDir(root);
+  // Каталог пишет сам хост, адаптеру он не принадлежит: на машине без хоста (CI, установка вперёд)
+  // его нет и адаптер отвечает null — это не красное; красное — каталог есть, а адаптер молчит.
+  if (!dir) {
+    assert.ok(!fs.existsSync(path.join(base, 'cli', 'rollout')), 'каталог rollout есть, а адаптер его не нашёл');
+    return;
+  }
+  assert.ok(/rollout/.test(dir), 'ожидали каталог rollout хоста');
+  assert.ok(fs.existsSync(dir), 'каталог стенограмм не найден');
 });
 
 // 5. Вкладки ядра читают адаптер
