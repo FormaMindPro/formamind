@@ -129,8 +129,8 @@ it('mainStepOf: ключ requestId, toolCalls ответа, реплика че�
 
 it('тег zcode: проходит стену тегов ядра, чужой тег — нет', () => {
   const re = engineTagRe(root);
-  assert.ok(re.test(' — `Run`, 2024-01-15: attempt, 121761 tokens (cache-read unknown), 575 s, `id unknown` — zcode: сборка адаптера'));
-  assert.ok(!re.test(' — `Run`, 2024-01-15: attempt, 100 tokens, 5 s, `id unknown` — bogus-tag: чужая метка'));
+  assert.ok(re.test(' — `Run`, YYYY-MM-DD: attempt, 121761 tokens (cache-read unknown), 575 s, `id unknown` — zcode: сборка адаптера'));
+  assert.ok(!re.test(' — `Run`, YYYY-MM-DD: attempt, 100 tokens, 5 s, `id unknown` — bogus-tag: чужая метка'));
 });
 
 it('transcriptsDir указывает на rollout хоста', () => {
