@@ -9,16 +9,25 @@ const { spawnSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '..');
 const TEST_DIR = path.join(ROOT, 'test');
 
+// Подкаталог проекта: несколько открытых проектов не делят один временный каталог
+const PROJECT_SLUG =
+  path
+    .basename(ROOT)
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'project';
+
 // 1. Определение временной папки (RAM-диск или системный откат)
 function resolveTmpDir() {
   if (process.env.FORMA_TEST_TMP) {
     const custom = path.resolve(process.env.FORMA_TEST_TMP);
     try {
-      fs.mkdirSync(custom, { recursive: true });
+      fs.mkdirSync(path.join(custom, PROJECT_SLUG), { recursive: true });
       fs.accessSync(custom, fs.constants.W_OK);
-      return { path: custom, type: 'FORMA_TEST_TMP' };
+      return { path: path.join(custom, PROJECT_SLUG), type: 'FORMA_TEST_TMP' };
     } catch {
-      // откат при невалидном пути
+      // переменная задана, но путь мёртв: предупреждение и откат на автоопределение — слепая вера в переменную запрещена
+      console.warn(`[test-runner] FORMA_TEST_TMP задана, но путь недоступен (${custom}) — откат на автоопределение`);
     }
   }
 
@@ -27,9 +36,10 @@ function resolveTmpDir() {
     const winRam = 'R:\\forma-tmp';
     try {
       if (fs.existsSync('R:\\')) {
-        fs.mkdirSync(winRam, { recursive: true });
-        fs.accessSync(winRam, fs.constants.W_OK);
-        return { path: winRam, type: 'RAM-диск (R:)' };
+        const winDir = path.join(winRam, PROJECT_SLUG);
+        fs.mkdirSync(winDir, { recursive: true });
+        fs.accessSync(winDir, fs.constants.W_OK);
+        return { path: winDir, type: 'RAM-диск (R:)' };
       }
     } catch {
       // откат при ошибке доступа к R:
@@ -41,9 +51,10 @@ function resolveTmpDir() {
     const shmRam = '/dev/shm/forma-tmp';
     try {
       if (fs.existsSync('/dev/shm')) {
-        fs.mkdirSync(shmRam, { recursive: true });
-        fs.accessSync(shmRam, fs.constants.W_OK);
-        return { path: shmRam, type: 'RAM-диск (/dev/shm)' };
+        const shmDir = path.join(shmRam, PROJECT_SLUG);
+        fs.mkdirSync(shmDir, { recursive: true });
+        fs.accessSync(shmDir, fs.constants.W_OK);
+        return { path: shmDir, type: 'RAM-диск (/dev/shm)' };
       }
     } catch {
       // откат
@@ -51,7 +62,7 @@ function resolveTmpDir() {
   }
 
   // Системный откат (Graceful degradation)
-  const fallback = path.join(os.tmpdir(), 'forma-tmp');
+  const fallback = path.join(os.tmpdir(), 'forma-tmp', PROJECT_SLUG);
   try {
     fs.mkdirSync(fallback, { recursive: true });
     return { path: fallback, type: 'os.tmpdir()' };

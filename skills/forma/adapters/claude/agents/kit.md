@@ -128,7 +128,9 @@ Profiles that exist only for one product are not in this table: they live in the
 - **No catalog role fits the subject** — create it inline, same call (see "Every assembly leaves the catalog something" above); no separate tooling card, no `after-card-NNN` wait.
 - **One asset or a light edit → `run-image`; a series or a package (several assets, one style) → `run-image-series`.**
 - **A prototype built from a reference** (page, screen, layout, an exact-match criterion): the kit carries a `run-visual-check` pass before the card's `stage check`, and the criterion names the tolerance. A deviation beyond it is not recorded as "accepted with deviations" inside the result — it becomes its own fix card, or the human changes the criterion. "Similar" never closes an "exact" criterion.
+
 - **Surgical testing in Tool.** When kitting a card with code changes, equip `Tool` with targeted test execution commands (e.g. `npm test <module>` or `node scripts/test-runner.cjs <module>`), not full-suite runs. Full test suite validation is reserved for `Core` or `Intent` acceptance.
+- **RAM disk in `Data` and `Tool`.** When kitting a card with test or build load, point its temp output at the project's subdirectory of the resolved temp base: `FORMA_TEST_TMP` — checked for existence even when set, a dead path falls through with a warning — else the detected RAM disk, else `os.tmpdir()`; the subdirectory derives from the repository name, so open projects never share one temp directory. Global user `TEMP`/`TMP` are never redirected; the redirection is per-process, only where the kit or the test runner sets it.
 
 **Access credentials — always exact, never generic.** "Access exists" without an account name isn't kitting, it's a note of intent: `Run` needs exactly what it takes to log in and confirm the criterion.
 
