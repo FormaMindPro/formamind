@@ -30,8 +30,9 @@ const EXT_ID = 'LachyFS.kanban-markdown'
 const EDITOR_CLIS = ['code', 'antigravity-ide', 'antigravity']
 const ENGINES = [
   { id: 'claude', label: 'Claude Code' },
-  { id: 'codex', label: 'Codex' },
   { id: 'gemini', label: 'Gemini (Antigravity)' },
+  { id: 'zcode', label: 'ZCode' },
+  { id: 'codex', label: 'Codex' },
   { id: 'minimax', label: 'MiniMax Code' },
 ]
 // Dormant engines (core/engines.json): shipped as files, but not offered in the menu and not installed; wake up = remove from the list.
@@ -51,7 +52,7 @@ const HELP = `forma ${VERSION} init — install/update the Forma protocol in the
 
   npx github:FormaMindPro/formamind init [flags]
 
-  --engines  claude[,gemini]         engines (gemini — beta; codex and minimax are dormant: core/engines.json)
+  --engines  claude[,gemini,zcode]   engines (claude is always core; codex and minimax are dormant: core/engines.json)
   --template <name>|none             project template from templates/ (default: none)
   --board    auto|skip               Kanban Markdown: find editor CLIs and install (default: auto)
   --lang     <code>                  project document language (default: en). Catalogs shipped: en, ru; any other code (fr, de, ...)
@@ -395,12 +396,13 @@ function board(mode) {
 async function chooseEngines(o, ask) {
   let engines = o.engines
   if (!engines && ask) {
-    console.log('\n[1/5] Engines:')
-    ACTIVE_ENGINES.forEach((e, i) => console.log(`  ${i + 1}. ${e.label}${e.id === 'claude' ? '' : ' — beta'}`))
+    console.log('\n[1/5] Engines (Claude Code is installed by default as core):')
+    ACTIVE_ENGINES.forEach((e, i) => console.log(`  ${i + 1}. ${e.label}`))
     const a = await ask('Numbers, comma-separated [1]: ')
     engines = (a.trim() || '1').split(/[\s,]+/).map((x) => (ACTIVE_ENGINES[Number(x) - 1] || {}).id || x).join(',')
   }
   engines = (engines || 'claude').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean)
+  if (!engines.includes('claude')) engines.unshift('claude')
   for (const e of engines) {
     if (DORMANT.includes(e)) { console.error(`Engine ${e} is dormant in this protocol version and is not installed (core/engines.json)`); process.exit(2) }
     if (!ENGINES.some((x) => x.id === e)) { console.error(`Unknown engine: ${e}`); process.exit(2) }
@@ -527,7 +529,22 @@ function installGemini(root) {
   fs.mkdirSync(path.join(root, '.agents', '.ledger'), { recursive: true })
   const ledgerCalls = path.join(root, '.agents', '.ledger', 'calls.jsonl')
   if (!fs.existsSync(ledgerCalls)) fs.writeFileSync(ledgerCalls, '', 'utf8')
-  return ['Gemini (Antigravity, beta): .agents/rules, .agents/tests, .agents/plugins/forma (roles, plugin.json) — installed']
+  return ['Gemini (Antigravity): .agents/rules, .agents/tests, .agents/plugins/forma (roles, plugin.json) — installed']
+}
+
+// ZCode: .zcode/ adapter, rules, agents, tests, scripts
+function installZCode(root) {
+  const A = path.join(ADAPTERS, 'zcode')
+  const Z = path.join(root, '.zcode')
+  copyFile(path.join(A, 'forma-adapter.cjs'), path.join(Z, 'forma-adapter.cjs'))
+  copyTree(path.join(A, 'rules'), path.join(Z, 'rules'))
+  copyTree(path.join(A, 'tests'), path.join(Z, 'tests'))
+  copyTree(path.join(A, 'scripts'), path.join(Z, 'scripts'))
+  copyTree(path.join(A, 'agents'), path.join(Z, 'agents'))
+  if (fs.existsSync(path.join(A, '.state'))) {
+    copyTree(path.join(A, '.state'), path.join(Z, '.state'))
+  }
+  return ['ZCode: .zcode/rules, .zcode/tests, .zcode/scripts, .zcode/agents — installed']
 }
 
 // Claude Code runs every hook as `bash .claude/hooks/<name>.sh`: without a working bash the delete guard, the card check
@@ -556,6 +573,8 @@ function installEngines(root, choice, protectedPaths, report) {
       report.push(...installCodex(root, protectedPaths))
     } else if (e === 'gemini') {
       report.push(...installGemini(root))
+    } else if (e === 'zcode') {
+      report.push(...installZCode(root))
     }
   }
   syncExtensions(root, report)

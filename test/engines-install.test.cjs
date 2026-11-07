@@ -20,7 +20,7 @@ test('claude,gemini: адаптер Gemini установлен, Codex не ст
     '.agents/rules/gemini-8.md', '.agents/forma-adapter.cjs', '.agents/plugins/forma/plugin.json', '.agents/plugins/forma/agents/kit.md', '.agents/plugins/forma/mcp_config.json',
   ]) assert.ok(fs.existsSync(path.join(dir, f)), f);
   assert.ok(!fs.existsSync(path.join(dir, '.codex')), 'Codex спит — .codex/ не ставится');
-  assert.match(r.stdout, /Gemini \(Antigravity, beta\)/);
+  assert.match(r.stdout, /Gemini \(Antigravity\)/);
   assert.doesNotMatch(r.stdout, /Codex/);
   assert.match(r.stdout, /install is intact/);
 });

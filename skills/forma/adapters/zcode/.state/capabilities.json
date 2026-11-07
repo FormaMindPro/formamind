@@ -1,0 +1,53 @@
+{
+  "engine": "zcode",
+  "engineTag": "zcode",
+  "probedAt": "2026-11-04T14:25:00.000Z",
+  "isolation": {
+    "available": true,
+    "mechanism": "инструмент Agent хоста: подагенты исполняются в отдельных контекстах; роли узлов Формы зарегистрированы типами агента из зеркала .zcode/agents",
+    "verifiedBy": "реестр агентов сессии пополнился типами intent, spec, kit, run, core, plumb-haiku, extractor, asset-describer-haiku после создания зеркала; шапка агента intent несёт mcp_browser — переименование, существующее только в генераторе этой зоны; живая делегация к роли extractor вернулась из дочерней сессии (ответ одним файлом роли, id вызова в журнале сессии)",
+    "projectRolesRegistered": true,
+    "projectRolesMechanism": "хост читает .zcode/agents/ и регистрирует роли типами агента: intent, spec, kit, run, core, plumb-haiku, extractor, asset-describer-haiku",
+    "projectRolesReason": null,
+    "degradedFallback": "на свежей среде, пока роли не зарегистрированы, маршрут идёт деградированным — стадии в одном контексте под метками [STAGE], объявляется человеку до старта (degraded-mode.md)"
+  },
+  "continuation": {
+    "available": true,
+    "reason": null,
+    "mechanism": "SendMessage по agent_<id> возобновляет завершённого подагента в фоне с его контекстом",
+    "what": "id делегированного агента вернулся с живой пробой (ответ агента и предложение продолжения по id); самого продолжения этим же вызовом не было",
+    "observedLive": null,
+    "verifiedBy": "контракт инструмента SendMessage хоста; id от пробы получен"
+  },
+  "hooks": {
+    "available": null,
+    "reason": "хост заявляет перехват вызовов инструментов; проектного пакета хуков для ZCode нет, доставка событий не наблюдалась — true не ставится без доказательства"
+  },
+  "roleDelivery": {
+    "available": true,
+    "reason": null,
+    "method": "главная сессия читает .zcode/agents/intent.md первым действием сессии; SessionStart-хука нет — чтение ручное",
+    "what": "чтение роли как первое действие доказано живой сессией (та же механика на зеркале другого движка); доставка из .zcode/agents — та же операция чтения файла",
+    "hook": null,
+    "observedLive": null,
+    "verifiedBy": "чтение роли первым действием главной сессии — наблюдение текущей сессии"
+  },
+  "usage": {
+    "source": "rollout",
+    "available": true,
+    "reason": null,
+    "ledger": null,
+    "ledgerReason": "своего журнала вызовов у движка нет; источник расхода — стенограммы модель-IO хоста и метаданные возвратов подагентов",
+    "transcriptsDir": "~/.zcode/cli/rollout (model-io-sess_<id>.jsonl)",
+    "fields": [
+      "inputTokens", "outputTokens", "totalTokens", "cacheReadTokens", "cacheWriteTokens",
+      "провайдерские: input_tokens, output_tokens, cache_read_input_tokens"
+    ],
+    "records": 2,
+    "verifiedBy": "файлы стенограмм найдены в ~/.zcode/cli/rollout, форма usage прочитана из живой записи; живая делегация вернула usage: токены, число инструментов, длительность, id агента",
+    "subagentReaches": "метаданные возврата подагента несут токены/длительность/id — строки попыток пишутся по факту; собственные вызовы главной сессии метаданных не возвращают — остаётся unknown, не ноль",
+    "writer": null,
+    "writerReason": "журнал модель-IO пишет сам хост; форматтера строки расхода §3 для zcode нет — строки пишутся вызывающим узлом из метаданных, неизвестное — маркером unknown, не нулём"
+  },
+  "note": "Проба пишет только доказуемое из среды. Недоказуемое — null/false с причиной; true — только с названным доказательством."
+}
