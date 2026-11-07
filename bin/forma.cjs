@@ -532,7 +532,11 @@ function installGemini(root) {
   return ['Gemini (Antigravity): .agents/rules, .agents/tests, .agents/plugins/forma (roles, plugin.json) — installed']
 }
 
-// ZCode: .zcode/ adapter, rules, agents, tests, scripts
+// ZCode: .zcode/ adapter, rules, agents, tests, scripts. The shared skills mirror comes with it: the adapter
+// declares .agents/skills as its skillsDir and the roles read skills there natively, while on a fresh machine
+// nobody else installs the mirror (codex, its first consumer, is dormant). Roles are regenerated from
+// .claude/agents so the mirror matches the reference actually installed, not the shipped snapshot.
+// Machine state (.state/) is never shipped — it belongs to the host, not to the protocol.
 function installZCode(root) {
   const A = path.join(ADAPTERS, 'zcode')
   const Z = path.join(root, '.zcode')
@@ -541,10 +545,17 @@ function installZCode(root) {
   copyTree(path.join(A, 'tests'), path.join(Z, 'tests'))
   copyTree(path.join(A, 'scripts'), path.join(Z, 'scripts'))
   copyTree(path.join(A, 'agents'), path.join(Z, 'agents'))
-  if (fs.existsSync(path.join(A, '.state'))) {
-    copyTree(path.join(A, '.state'), path.join(Z, '.state'))
+  copyTree(path.join(ADAPTERS, 'codex', '.agents', 'skills'), path.join(root, '.agents', 'skills'))
+  const out = ['ZCode: .zcode/rules, .zcode/tests, .zcode/scripts, .zcode/agents, .agents/skills (shared mirror) — installed']
+  if (fs.existsSync(path.join(root, '.claude', 'agents'))) {
+    const r = spawnSync(process.execPath, [path.join(Z, 'scripts', 'gen-roles.cjs')], { encoding: 'utf8' })
+    out.push(r.status === 0
+      ? '  gen-roles: role mirror rebuilt from .claude/agents'
+      : '  ! gen-roles exited with code ' + r.status + ': ' + ((r.stdout || '') + (r.stderr || '')).trim().split(/\r?\n/).slice(-3).join(' | '))
+  } else {
+    out.push('  ! .claude/agents not found — roles ship as installed; install Claude Code, then run: node .zcode/scripts/gen-roles.cjs')
   }
-  return ['ZCode: .zcode/rules, .zcode/tests, .zcode/scripts, .zcode/agents — installed']
+  return out
 }
 
 // Claude Code runs every hook as `bash .claude/hooks/<name>.sh`: without a working bash the delete guard, the card check

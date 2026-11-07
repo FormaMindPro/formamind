@@ -132,6 +132,12 @@ const MAP = [
   // MiniMax: заготовка в шаблоне, движок спит по умолчанию; переносится независимо от реестра спящих
   ['.minimax', 'adapters/minimax/.minimax'],
   ['miniapps/minimax-engine', 'adapters/minimax/miniapps/minimax-engine'],
+  // ZCode: плоскими подпутями, как gemini; машинный .state/ в шаблон не едет
+  ['.zcode/forma-adapter.cjs', 'adapters/zcode/forma-adapter.cjs'],
+  ['.zcode/rules', 'adapters/zcode/rules'],
+  ['.zcode/scripts', 'adapters/zcode/scripts'],
+  ['.zcode/tests', 'adapters/zcode/tests'],
+  ['.zcode/agents', 'adapters/zcode/agents'],
 ].filter(([p]) => !(CODEX_ASLEEP && p === '.codex'));
 // Файл проекта, уже известный одному из отображений (например dashboard/floor.cjs — адаптеру Claude),
 // для другого отображения того же каталога не «новый».

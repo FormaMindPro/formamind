@@ -71,3 +71,36 @@ test('установка по умолчанию: ни .minimax/, ни miniapps/
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(d3, '.forma', 'engines.json'), 'utf8')).dormant, ['codex', 'minimax']);
   } finally { fs.rmSync(d3, { recursive: true, force: true }); }
 });
+
+test('claude,zcode: адаптер ZCode установлен, .state не едет, зеркало скиллов на месте, адаптер цел на свежей машине', () => {
+  const r = init('claude,zcode');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  for (const f of [
+    '.zcode/rules/zcode-8.md', '.zcode/forma-adapter.cjs', '.zcode/scripts/gen-roles.cjs',
+    '.zcode/tests/test-zcode-adapter.cjs', '.zcode/agents/intent.md', '.agents/skills/grilling',
+  ]) assert.ok(fs.existsSync(path.join(dir, f)), f);
+  assert.ok(!fs.existsSync(path.join(dir, '.zcode', '.state')), 'машинное состояние .state/ не едет в чужой проект');
+  assert.match(r.stdout, /ZCode: .*— installed/);
+  assert.match(r.stdout, /gen-roles: role mirror rebuilt/);
+  // Регресс красного v0.0.5: конформность адаптера целиком на свежей установке. ZCODE_HOME
+  // подменяется на пустой rollout — проверка не зависит от того, стоит ли ZCode на этой машине.
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'zcode-home-'));
+  fs.mkdirSync(path.join(home, 'cli', 'rollout'), { recursive: true });
+  try {
+    const t = spawnSync(process.execPath, [path.join(dir, '.zcode', 'tests', 'test-zcode-adapter.cjs')],
+      { encoding: 'utf8', cwd: dir, env: { ...process.env, ZCODE_HOME: home } });
+    assert.equal(t.status, 0, t.stdout + t.stderr);
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});
+
+test('--engines zcode: claude ставится ядром автоматически, скиллы на месте', () => {
+  const d4 = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-engines5-'));
+  try {
+    const r = spawnSync(process.execPath, [FORMA, 'init', '--dir', d4, '--engines', 'zcode', '--board', 'skip', '--yes'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.ok(fs.existsSync(path.join(d4, '.zcode', 'forma-adapter.cjs')), '.zcode/ не поставлен');
+    assert.ok(fs.existsSync(path.join(d4, '.claude', 'rules')), 'claude не поставлен ядром');
+    assert.ok(fs.existsSync(path.join(d4, '.agents', 'skills')), 'общее зеркало скиллов не поставлено');
+    assert.ok(!fs.existsSync(path.join(d4, '.zcode', '.state')), 'машинное состояние не едет');
+  } finally { fs.rmSync(d4, { recursive: true, force: true }); }
+});

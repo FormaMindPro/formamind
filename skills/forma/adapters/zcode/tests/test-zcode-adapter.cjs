@@ -135,8 +135,11 @@ it('тег zcode: проходит стену тегов ядра, чужой т
 
 it('transcriptsDir указывает на rollout хоста', () => {
   const dir = adapter().transcriptsDir(root);
-  assert.ok(dir && fs.existsSync(dir), 'каталог стенограмм не найден');
-  assert.ok(/rollout/.test(dir), 'ожидали каталог rollout хоста');
+  assert.ok(dir && /rollout/.test(dir), 'ожидали каталог rollout хоста');
+  // Существование проверяем только там, где хост ZCode реально стоит: каталог пишет сам хост,
+  // адаптеру он не принадлежит; на машине без хоста (CI, установка вперёд) его нет — и это не красное.
+  const base = process.env.ZCODE_HOME || path.join(os.homedir(), '.zcode');
+  if (fs.existsSync(base)) assert.ok(fs.existsSync(dir), 'каталог стенограмм не найден');
 });
 
 // 5. Вкладки ядра читают адаптер
