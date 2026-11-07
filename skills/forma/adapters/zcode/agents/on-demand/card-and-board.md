@@ -49,6 +49,8 @@ Required of cards created from the day the rule entered the project (`.forma/liv
 
 **A `work` card whose result is read by someone other than the human** — a node, a script, the next card — names that consumer and the form it needs in the criterion. Otherwise the result passes its own check and fails where it is used.
 
+**The readiness criterion is written in two parts — the gate and the verdict.** The gate is the machine's share: each clause is a `check:` command stated in the criterion itself (field 3, a clause runs to the nearest `;`), judged by `node .forma/board/check-ready.cjs <card>` — exit code 0 is green, anything else red, the command's stdout is the fact. Where the criterion admits a gate, it must be a command: a description in its place is not a criterion. The verdict is the remainder the command cannot decide — it stays with judgment, `Core`'s or the human's, at check time. A card does not close on a red gate: the gate turns green, or `## History` carries an `exception: <what> — <why> — <who approved>` line naming that gate — fail-closed: an exception that names no gate leaves the gate red.
+
 **Kind is `work`, `tooling` or `decision`:**
 
 - **work** moves the goal closer to its end-image;
