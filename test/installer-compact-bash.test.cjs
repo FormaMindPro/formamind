@@ -62,8 +62,10 @@ test("auto-compact: the human's own value is never changed nor shadowed", () => 
 
 test('no working bash: the installer says the hooks will not run', { skip: process.platform === 'win32' && 'POSIX PATH trick' }, () => {
   const bin = tmp('forma-nobash-');
-  for (const t of ['git']) {
-    const p = spawnSync('sh', ['-c', `command -v ${t}`], { encoding: 'utf8' }).stdout.trim();
+  // The scenario is "no bash" — node itself is present (the installer runs under it) and the
+  // post-install integrity probes run node by name; only bash and the shell are kept out.
+  for (const t of ['git', 'node']) {
+    const p = t === 'node' ? process.execPath : spawnSync('sh', ['-c', `command -v ${t}`], { encoding: 'utf8' }).stdout.trim();
     if (p) fs.symlinkSync(p, path.join(bin, t));
   }
   const r = install(tmp('forma-c-'), tmp('forma-h-'), [], { PATH: bin });
