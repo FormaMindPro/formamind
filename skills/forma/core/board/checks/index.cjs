@@ -21,4 +21,5 @@ module.exports = [
   require('./engine-tag.cjs'),
   require('./ledger-parity.cjs'),
   require('./route-regression.cjs'),
+  require('./check-ready.cjs'),
 ];

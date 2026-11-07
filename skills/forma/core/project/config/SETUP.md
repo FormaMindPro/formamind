@@ -47,3 +47,12 @@ Step 11 fills `ROADMAP.md` too, not only `GOAL.md`: from the brief — a short s
 ---
 
 Next — `Spec` slices the tasks. That is already the next node, outside this preparation.
+
+---
+
+## Development environment & testing
+
+- **Surgical testing during iterations**: `Run` runs ONLY targeted tests for the affected module (`npm test <module>`). Full test suite runs are performed only by `Core` before cycle closure or during release validation.
+- **RAM disk acceleration**: On Windows or systems with heavy I/O antivirus checks, disk integration tests run orders of magnitude faster when executed in RAM. Optional setting in `.env`:
+  `# FORMA_TEST_TMP=R:\forma-tmp`
+  (or run `scripts/setup-ramdisk.ps1` for automated 1-click Windows setup).

@@ -8,7 +8,8 @@
     "forma": "bin/forma.cjs"
   },
   "scripts": {
-    "test": "node --test \"test/**/*.test.cjs\"",
+    "test": "node scripts/test-runner.cjs",
+    "test:all": "node --test \"test/**/*.test.cjs\"",
     "lint": "eslint .",
     "baseline:save": "node test/baseline.cjs save",
     "baseline:diff": "node test/baseline.cjs diff",

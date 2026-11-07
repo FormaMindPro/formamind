@@ -22,7 +22,8 @@ function isolatedEnv(home) {
 }
 
 function makeFixture() {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-fixture-'));
+  const baseTmp = process.env.FORMA_TEST_TMP || os.tmpdir();
+  const base = fs.mkdtempSync(path.join(baseTmp, 'forma-fixture-'));
   const root = path.join(base, 'project');
   const home = path.join(base, 'home');
   fs.mkdirSync(home);

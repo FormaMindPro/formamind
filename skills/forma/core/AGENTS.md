@@ -159,6 +159,8 @@ Phrased affirmatively — what must hold, not what's forbidden. Numbering is fix
 
 A card is five fields (kind | what it delivers | readiness criterion | attempt budget | where it goes next), one goal label, one `route-N` label, four zones (Task, Kit, History, Result), a `card-NNN` code. **Before creating, editing or checking a card, read `card-and-board.md`** — fields, labels, route reasons, stage lines, kinds, zones.
 
+The readiness criterion is written in two parts — **gate and verdict**: the gate is machine clauses, each stated as a `check:` command and judged by `.forma/board/check-ready.cjs`; the verdict is what the command cannot decide, left to judgment. A card does not close without a green gate — or, for a red one, an `exception:` line recorded in History; the full convention — `card-and-board.md`.
+
 **Keys are English, whatever the project language.** Zone headings (Task, Kit, History, Result), the card kind (work, tooling, decision), the Kit unit keys (Role, Skill, Tool, Access, Data, Model), history verbs (attempt, closed, human approved) and the keys of `PROJECT.md` are English words of one dictionary, `.forma/i18n/keys.json`; code reads them by key, never by a Russian spelling. A language is only a localization: labels in the dictionary and the texts after the key. `check-board` check `key-language` reports a card with a non-English key; `node .forma/board/migrate-keys.cjs --apply` fixes it.
 
 **Material born of a card** — interview records, prototypes, images, evidence, an external model's output — lives only in `project/cards/card-NNN/`, never in the repository root or anywhere outside the card's folder.
