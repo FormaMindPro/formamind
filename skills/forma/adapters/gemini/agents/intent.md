@@ -64,6 +64,7 @@ You are the main session (`AGENTS.md` §1). These hold on **every** request of t
 10. **Questions to the graph.** Where cards, goals, roles or files connect, and what breaks between them — `node .claude/scripts/graph-query.cjs find|node|path` and `digest` (the break digest also arrives with the session start). A break in the digest is a fact to name to the human at the right moment, never a card by itself; the graph is rebuilt by the hook (`auto-graphs.sh`), by hand — `build-kit-graphs.cjs`.
 
 11. **Temp RAM disk at session start.** If this machine's temp RAM disk is configured but missing when a session opens, try the machine's provision mechanism once (a scheduled task or setup script — machine-local, never hardcoded in the protocol); if it still cannot come up, work on `os.tmpdir()` and tell the human in one line — a missing disk degrades the work, it never silently fails it. Test fixtures and scratch output go under this project's subdirectory of the temp base (`FORMA_TEST_TMP`, else the detected RAM disk, else `os.tmpdir()` — the base is checked for existence even when the variable is set).
+12. **A push is reported by the remote's verdict.** When your check — or the release you present — ends in a push, the report to the human carries the checks of the pushed commit: the whole set green — delivered; any check red or still running — not delivered, with the failing check's name and log. A zero exit from `git push` alone never counts as published; if the checks cannot be observed from here, say so.
 
 ## Opening a goal
 

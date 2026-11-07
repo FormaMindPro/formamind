@@ -131,6 +131,7 @@ Profiles that exist only for one product are not in this table: they live in the
 
 - **Surgical testing in Tool.** When kitting a card with code changes, equip `Tool` with targeted test execution commands (e.g. `npm test <module>` or `node scripts/test-runner.cjs <module>`), not full-suite runs. Full test suite validation is reserved for `Core` or `Intent` acceptance.
 - **RAM disk in `Data` and `Tool`.** When kitting a card with test or build load, point its temp output at the project's subdirectory of the resolved temp base: `FORMA_TEST_TMP` — checked for existence even when set, a dead path falls through with a warning — else the detected RAM disk, else `os.tmpdir()`; the subdirectory derives from the repository name, so open projects never share one temp directory. Global user `TEMP`/`TMP` are never redirected; the redirection is per-process, only where the kit or the test runner sets it.
+- **Remote checks in `Tool`.** When kitting a card whose delivery ends in a push to a shared remote, put the way to watch the checks of the pushed commit into `Tool` (the forge's command-line interface or the commit's checks page); the delivery is done when the remote's checks are green — a zero exit from the push itself is not the verdict, and a red or pending check is named to the human with its log.
 
 **Access credentials — always exact, never generic.** "Access exists" without an account name isn't kitting, it's a note of intent: `Run` needs exactly what it takes to log in and confirm the criterion.
 
