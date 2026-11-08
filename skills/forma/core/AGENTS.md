@@ -149,6 +149,8 @@ Phrased affirmatively — what must hold, not what's forbidden. Numbering is fix
 
 18. Commit messages of the protocol repository are English only; the project repository keeps its own language — Cyrillic is a stop in `forma-commit.cjs` and the pre-push check, never a warning.
 
+19. Executable code of the template's clean zones (*.cjs, *.js, *.mjs, *.ps1, *.sh, *.py) carries no Cyrillic; the law, md roles and skills, i18n ru-data and fixture text stay data, not code (`check-english-code.cjs`).
+
 **Narrow exception to prohibition 1 — a short mechanical task:** `Intent` may execute a change of literally named values across an explicitly listed set of files within epics "3. Project protocol" or "8. Competence segments", without `Kit` and without a separate confirming node; a card is still opened and names the exception — `intent-housekeeping.md`.
 
 ---

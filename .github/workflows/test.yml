@@ -25,4 +25,6 @@ jobs:
         run: git ls-files -z '*.sh' | xargs -0 -n1 bash -n
       - run: npm ci
       - run: npm test
+      - name: Executable code is English-only
+        run: node skills/forma/core/board/checks/check-english-code.cjs
       - run: npm run lint

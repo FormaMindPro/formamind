@@ -24,4 +24,5 @@ module.exports = [
   require('./human-row-trace.cjs'),
   require('./route-regression.cjs'),
   require('./check-ready.cjs'),
+  require('./check-english-code.cjs'),
 ];

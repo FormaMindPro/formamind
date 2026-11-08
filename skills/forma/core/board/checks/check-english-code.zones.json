@@ -1,0 +1,23 @@
+{
+  "allowList": ["board-core", "hooks-spend", "adapters-installers", "tests-fixtures", "skill-scripts"],
+  "zones": {
+    "board-core": {
+      "prefixes": ["skills/forma/core/board/"]
+    },
+    "hooks-spend": {
+      "prefixGlobs": ["skills/forma/adapters/*/hooks/"],
+      "names": ["*spend*", "*ledger*", "*economy*", "*subagent-transcript*"]
+    },
+    "adapters-installers": {
+      "prefixes": ["skills/forma/adapters/"],
+      "files": ["scripts/scaffold-engine.cjs", "scripts/uninstall.cjs", "scripts/engine-to-protocol.cjs"],
+      "names": ["*gen-roles*"]
+    },
+    "tests-fixtures": {
+      "prefixes": ["test/"]
+    },
+    "skill-scripts": {
+      "rest": true
+    }
+  }
+}
