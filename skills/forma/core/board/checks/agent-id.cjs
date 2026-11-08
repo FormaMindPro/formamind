@@ -1,33 +1,33 @@
 'use strict';
 
-// Опознаватель вызова в строке захода. Закон (AGENTS.md §3): id стоит последним в блоке расхода, вплотную перед тире —
-//   `Узел`, ГГГГ-ММ-ДД: attempt, N tokens (R cache-read), T s, `<id вызова>` — что сделано.
-// Он единственное поле, общее у карточки и у журнала инструментов: журнал знает id и не знает карточки,
-// карточка знает задачу и не знает id.
+// The call identifier of a spend line. The law (AGENTS.md §3): the id stands last in the spend block, right before the dash -
+//   `Node`, YYYY-MM-DD: attempt, N tokens (R cache-read), T s, `<call id>` - what was done.
+// It is the only field shared by the card and the tool journal: the journal knows the id and does not know the cards,
+// the card knows the task and does not know the id.
 //
-// Граница по дате — строго ПОЗЖЕ дня вступления, а не «с этого дня»: строки, написанные в сам день введения поля,
-// его ещё не несут, и заполнить их нечем — id не переживает возврата вызова. Проверка, красная с первого дня
-// на неисправимом, перестаёт читаться (так вышло с R и T).
+// The date boundary - strictly AFTER the day of entry, not "from that day": lines written on the very day the field
+// was introduced do not carry it yet, and there is nothing to fill them with - the id does not survive the call return.
+// A check red from day one on the unfixable stops being readable (that is what happened with R and T).
 
+const i18n = require('../../i18n/index.cjs');
 const { toEnglish, SPEND_TOKENS_RE, HAS_CALL_ID_RE } = require('../../dashboard/spend-line.cjs');
 const { cardLines, bulletList } = require('./support/lines.cjs');
 
 function run({ root, since }) {
-  // Заявка на запись расхода — SPEND_TOKENS_RE. id — последнее поле блока расхода перед тире (HAS_CALL_ID_RE): сам
-  // опознаватель либо маркер неизвестного (ECONOMY.md, «The `unknown` marker»): движок его не вернул, узел это назвал, и строка остаётся полной.
+  // The claim of a spend record - SPEND_TOKENS_RE. The id - the last field of the spend block before the dash (HAS_CALL_ID_RE): the
+  // identifier itself, or the unknown marker (ECONOMY.md, "The `unknown` marker"): the engine never returned it, the node said so,
+  // and the line stays complete.
   const missing = [];
   for (const { file, line } of cardLines(root)) {
     const t = toEnglish(line.trim());
     const m = SPEND_TOKENS_RE.exec(t);
     if (!m || m[2] < since) continue;
-    // Законный ноль: узел работал внутри общей сессии, отдельного вызова не было — значит и id взяться неоткуда.
-    if (Number(m[3].replace(/[\s  ]/g, '')) === 0) continue;
+    // A legitimate zero: the node worked inside the shared session, there was no separate call - so there is nowhere for an id to come from.
+    if (Number(m[3].replace(/[\s\u00A0\u202F]/g, '')) === 0) continue;
     if (!HAS_CALL_ID_RE.test(t)) missing.push(`${file}: ${m[1]} ${m[2]}`);
   }
   if (!missing.length) return [];
-  return [`нет опознавателя вызова в ${missing.length} строках захода с ${since} ` +
-    `(формат §3: …, T s, \`<id>\` — что сделано; какое поле возврата несёт ` +
-    `опознаватель — §8 файла движка):\n      ` + bulletList(missing)];
+  return [i18n.message('board.agent-id.header', { n: missing.length, since }, 'ru') + bulletList(missing)];
 }
 
 module.exports = { id: 'agent-id', since: 'agent-id', run };

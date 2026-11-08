@@ -2,72 +2,82 @@
 'use strict';
 
 /**
- * human-row-trace — гейт видимого следа строки «human» таблицы маршрута (§2, fail-closed): строка останова
- * к человеку в History карточки обязана нести код карты следа — карты эпика протокола, ожидающей решения
- * (статус backlog, флаг ожидания решения; правило human-row-trace, card-and-board.md после §7). Обычная
- * запись остаётся где была; карта следа хранит находку от исчезновения, если её цель закроется раньше.
- * Без модельных вызовов: статус по коду возврата, находки — в stdout; потребители — узел Intent на
- * проверке карточки и check-board.
+ * human-row-trace - the gate of the visible trace of the route table's "human" row (§2, fail-closed): the stop line
+ * to the human in a card's History must carry the code of the trace card - a card of the protocol epic awaiting
+ * a decision (backlog status, the awaiting-decision flag; the human-row-trace rule, card-and-board.md after §7). An
+ * ordinary record stays where it was; the trace card keeps the finding from vanishing if its goal closes earlier.
+ * No model calls: the status by the exit code, the findings - in stdout; consumers - the Intent node at
+ * the card check and check-board.
  *
- *   node .forma/board/checks/human-row-trace.cjs --board [--root <каталог>]   (скан доски: живые карточки + done/)
- *   node .forma/board/checks/human-row-trace.cjs --selftest                   (приборы во временном каталоге ОС)
+ *   node .forma/board/checks/human-row-trace.cjs --board [--root <dir>]   (a board scan: live cards + done/)
+ *   node .forma/board/checks/human-row-trace.cjs --selftest               (probes into the OS temp directory)
  *
- * Конвенция (словарь строк останова общий с budget-stop.cjs — его шапка держатель конвенции; регулярки
- * продублированы локально, чтобы чекер стоял сам; обновление словаря — правка обеих шапок):
- *   1. Строка останова (History): описание строки начинается со слова stop/останов (сразу за датой) и
- *      называет порог — в строке есть слово budget/бюджет/порог/threshold/попытк/attempt и цифра.
- *      Строка захода (`attempt, …`) и слово stop внутри описания остановом не считаются. Строка останова
- *      судится по исходной строке — как в budget-stop (гейт fail-closed: останов ловится по всей строке).
- *   2. След: в строке останова назван код карты card-NNN — смежность: код ищется в той же строке, не в
- *      остальной карточке. Цитатная ограничительность (как в budget-stop.cjs): цитаты («…», "…",
- *      `…`) и скобки-иллюстрации после слов поимка/находка/цитата/цитирую/пример/например вырезаются до
- *      поиска кода — код из цитаты или иллюстрации следом не считается. Хватает одного названного кода,
- *      решающего следом; остальные названные коды — контекст строки.
- *   3. Карта следа: названный код обязан указывать на карту доски (живые + done/) со статусом backlog
- *      (флаг ожидания решения) и эпиком — дорожкой протокола: лейбл читается из таблицы эпиков
- *      PROJECT.md по коду protocol (один из девяти видов цели, как в epics.cjs; язык проекта не зашит).
+ * The convention (the stop-line dictionary is shared with budget-stop.cjs - its header holds the convention; the
+ * regexes are duplicated locally so the checker stands alone; a dictionary update - edit both headers):
+ *   1. The stop line (History): the line's description opens with the word stop (right behind the date) and
+ *      names a threshold - the line has a budget/threshold/attempt word and a digit.
+ *      A spend line (`attempt, …`) and the word stop inside a description do not count as a stop. The stop line
+ *      is judged by the original line - as in budget-stop (the gate is fail-closed: the stop is caught by the whole line).
+ *   2. The trace: the stop line names a card code card-NNN - adjacency: the code is searched in the same line, not in
+ *      the rest of the card. Citation strictness (as in budget-stop.cjs): quotes («…», "…",
+ *      `…`) and illustration parentheses after the caught/finding/quote/quoting/example words are cut out before
+ *      the code search - a code from a quote or an illustration does not count as a trace. One named code suffices,
+ *      the one deciding the trace; the other named codes - the line's context.
+ *   3. The trace card: the named code must point to a board card (live + done/) with the backlog status
+ *      (the awaiting-decision flag) and an epic - the protocol lane: the label is read from the epic table of
+ *      PROJECT.md by the protocol code (one of the nine goal kinds, as in epics.cjs; the project language is not hardwired).
  *
- * Вердикт: КРАСНАЯ, если (i) в строке останова нет ни одного кода карты вне цитат; (ii) названный код
- * не находится на доске; (iii) найденная карта не backlog; (iv) её эпик — не дорожка протокола.
- * Карточки без строк останова не судятся. Нераспознаваемо механически: полнота словаря остановов
- * (порог, кто остановился, решение) — часть вердикта человека при приёмке. Путь exception (как в
- * budget-stop): строка
- *   - `Узел`, ГГГГ-ММ-ДД: exception: … human-row-trace …
- * в History этой же карточки — находки карточки пропускаются с явной пометкой; решает человек.
+ * Verdict: RED if (i) the stop line has not a single card code outside quotes; (ii) the named code
+ * is not found on the board; (iii) the found card is not backlog; (iv) its epic is not the protocol lane.
+ * Cards without stop lines are not judged. Not recognizable mechanically: the completeness of the stop dictionary
+ * (the threshold, who stopped, the decision) - part of the human's verdict at acceptance. The exception path (as in
+ * budget-stop): a line
+ *   - `Node`, YYYY-MM-DD: exception: … human-row-trace …
+ * in this same card's History - the card's findings are skipped with an explicit mark; the human decides.
  *
- * Коды возврата: 0 — зелёный; 1 — КРАСНАЯ (останов без следа: без кода, код не находится, не backlog,
- * не эпик протокола); 2 — ошибка исполнения (самопроба не сошлась, каталог доски или таблица эпиков
- * PROJECT.md не читаются).
- * Модуль: require('./human-row-trace.cjs') → { id: 'human-row-trace', since: null, run, runBoard,
- * selftest, isStopLine, codesOf, protocolLane } — форма реестра проверок; включение одной строкой в
- * index.cjs — решение принимающего, по умолчанию гейт вызывается явно (--board).
- * Часть ядра: следов проекта не несёт (запрет 16; фикстурные коды карт собираются в рантайме —
- * литералов вида card-NNN в теле нет, регулярки распознавания не тронуты; дат в теле нет).
+ * Exit codes: 0 - green; 1 - RED (a stop without a trace: no code, the code is not found, not backlog,
+ * not the protocol epic); 2 - a runtime error (the self-probe mismatched, the board directory or the epic table
+ * of PROJECT.md is unreadable).
+ * Module: require('./human-row-trace.cjs') → { id: 'human-row-trace', since: null, run, runBoard,
+ * selftest, isStopLine, codesOf, protocolLane } - the form of the checks registry; inclusion by one line in
+ * index.cjs - the accepting node's decision, by default the gate is called explicitly (--board).
+ * Part of the core: carries no project traces (prohibition 16; fixture card codes are assembled in runtime -
+ * no card-NNN-like literals in the body, the recognition regexes untouched; no dates in the body).
  */
 
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const i18n = require('../../i18n/index.cjs');
 const { cardFiles, zone, parseFrontmatter } = require('../../dashboard/lib/card.cjs');
 
-// Словарь строк останова — общий с budget-stop.cjs (его шапка — держатель конвенции); продублировано,
-// чтобы чекер стоял сам. Обновление словаря — правка обеих шапок.
-const STOP_HEAD_RE = /^-\s*`[^`]+`,\s*\d{4}-\d{2}-\d{2}:\s*(?:stop\b|останов)/i;
-const STOP_THRESHOLD_RE = /(?:budget|бюджет|порог|threshold|попытк|attempt)/i;
+// The stop-line dictionary - shared with budget-stop.cjs (its header holds the convention); duplicated,
+// so the checker stands alone. A dictionary update - edit both headers. The words are labels of the
+// dictionary (keys.json), not literals of the code: Russian cards stop with the Russian stems.
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const stemsOf = (key, lang) => ((i18n.KEYS.labels[key] || {})[lang] || []).map(escapeRe);
+// An English stem ends at a word boundary; a Russian stem matches as a prefix (any ending follows).
+const EN_STOPS = stemsOf('term.stop', 'en').map((s) => s + '\\b');
+const RU_STOPS = stemsOf('term.stop', 'ru');
+const STOP_HEAD_RE = new RegExp('^-\\s*`[^`]+`,\\s*\\d{4}-\\d{2}-\\d{2}:\\s*(?:' + EN_STOPS.join('|') + '|' + RU_STOPS.join('|') + ')', 'i');
+const THRESHOLDS = stemsOf('term.threshold', 'en').concat(stemsOf('term.threshold', 'ru'));
+const STOP_THRESHOLD_RE = new RegExp('(?:' + THRESHOLDS.join('|') + ')', 'i');
 const QUOTE_RE = /«[^»]*»|"[^"]*"|`[^`]*`/g;
-const ILLUSTRATION_RE = /(?:поимк\w*|находк\w*|цитат\w*|цитиру\w*|пример\w*|например)[^\n()«"»]{0,40}?\([^()]*\)/gi;
+const ILLUSTRATIONS = stemsOf('term.illustration', 'en').concat(stemsOf('term.illustration', 'ru'));
+const ILLUSTRATION_RE = new RegExp('(?:' + ILLUSTRATIONS.join('|') + ')\\w*[^\\n()«"»]{0,40}?\\([^()]*\\)', 'gi');
 const CODE_RE = /\bcard-(\d+)\b/gi;
 const EXCEPTION_RE = /^-\s*`[^`]+`,\s*\d{4}-\d{2}-\d{2}:\s*exception:[^\n]*human-row-trace/i;
 const PROTOCOL_CODE = 'protocol';
 const PROJECT_REL = 'project/config/PROJECT.md';
+const msg = (key, params) => i18n.message(key, params, 'ru');
 
-const err = (msg) => Object.assign(new Error(msg), { exitCode: 2 });
+const err = (m) => Object.assign(new Error(m), { exitCode: 2 });
 
 /**
- * Цитатная ограничительность: цитаты («…», "…", `…`) и скобки-иллюстрации после слов поимка/находка/
- * цитата/цитирую/пример/например вырезаются до поиска кода следа — код из цитаты в прозе и описание
- * поимки не есть след. Порядок — как в budget-stop.cjs: цитаты → иллюстрации → цитаты.
- * Распознавание строки останова остаётся по исходной строке — вырезание касается только поиска кода.
+ * Citation strictness: quotes («…», "…", `…`) and illustration parentheses after the caught/finding/
+ * quote/quoting/example words are cut out before the trace-code search - a code from a quote in prose and an
+ * illustration of a catch is not a trace. The order - as in budget-stop.cjs: quotes → illustrations → quotes.
+ * The recognition of the stop line stays by the original line - the cutting concerns the code search only.
  */
 function stripQuoted(line) {
   const q1 = String(line).replace(QUOTE_RE, ' ');
@@ -75,19 +85,19 @@ function stripQuoted(line) {
   return q2.replace(QUOTE_RE, ' ');
 }
 
-/** Строки-события зоны History карточки; зоны нет — пусто (как в budget-stop). */
+/** Event lines of the card's History zone; no zone - empty (as in budget-stop). */
 function historyLines(text) {
   const history = zone(text, 'history');
   if (!history) return [];
   return history.split(/\r?\n/).filter((l) => /^\s*-\s/.test(l));
 }
 
-/** Строка останова: описание начинается со слова stop/останов, порог назван (слово + цифра); по исходной строке. */
+/** A stop line: the description opens with the stop word, a threshold is named (a word + a digit); by the original line. */
 function isStopLine(line) {
   return STOP_HEAD_RE.test(line) && STOP_THRESHOLD_RE.test(line) && /\d/.test(line);
 }
 
-/** Названные коды карт строки останова (вне цитат и скобок-иллюстраций), по порядку, без повторов. */
+/** The named card codes of a stop line (outside quotes and illustration parentheses), in order, without repeats. */
 function codesOf(line) {
   const out = [];
   for (const m of stripQuoted(line).matchAll(CODE_RE)) {
@@ -97,21 +107,21 @@ function codesOf(line) {
   return out;
 }
 
-/** Дорожка эпика протокола: лейбл из таблицы эпиков PROJECT.md по коду protocol (как в epics.cjs). */
+/** The protocol epic's lane: the label from the epic table of PROJECT.md by the protocol code (as in epics.cjs). */
 function protocolLane(root) {
   const pm = path.join(root, PROJECT_REL);
   if (!fs.existsSync(pm)) {
-    throw err(PROJECT_REL + ': не найден — таблица эпиков не прочитана, дорожка эпика протокола не опознана');
+    throw err(msg('board.human-row-trace.no_project'));
   }
   const re = new RegExp('^\\|\\s*`' + PROTOCOL_CODE + '`\\s*\\|\\s*([^|]+?)\\s*\\|');
   for (const line of fs.readFileSync(pm, 'utf8').split(/\r?\n/)) {
     const m = line.match(re);
     if (m) return m[1].replace(/`/g, '');
   }
-  throw err(PROJECT_REL + ': в таблице эпиков нет строки кода protocol — дорожка эпика протокола не опознана (проверка эпика не выполнялась)');
+  throw err(msg('board.human-row-trace.no_protocol_row', { rel: PROJECT_REL }));
 }
 
-/** Ядро гейта: скан карточек доски (живые + done/); карточки без строк останова не судятся. */
+/** Core of the gate: a scan of the board's cards (live + done/); cards without stop lines are not judged. */
 function runBoard({ root } = {}) {
   root = root || process.cwd();
   const lane = protocolLane(root);
@@ -140,7 +150,7 @@ function runBoard({ root } = {}) {
     if (hLines.some((l) => EXCEPTION_RE.test(l))) {
       lines.push({
         status: 'skipped',
-        fact: `${code}: строк останова: ${stops.length} — пропущены по exception — решает человек`,
+        fact: msg('board.human-row-trace.skipped', { code, n: stops.length }),
       });
       continue;
     }
@@ -150,7 +160,7 @@ function runBoard({ root } = {}) {
         red += 1;
         lines.push({
           status: 'red',
-          fact: `${code}: строка останова без кода карты следа — правило human-row-trace: останов к человеку обязан нести код карты эпика протокола в backlog (флаг ожидания решения); форма: код card-NNN в той же строке, вне цитат; путь exception — строка exception: … human-row-trace … в History этой карточки (решает человек)`,
+          fact: msg('board.human-row-trace.no_code', { code }),
         });
         continue;
       }
@@ -160,7 +170,7 @@ function runBoard({ root } = {}) {
       if (good) {
         lines.push({
           status: 'green',
-          fact: `${code}: останов — след записан: карта ${good.code} (backlog, эпик протокола «${lane}») — ждёт решения`,
+          fact: msg('board.human-row-trace.traced', { code, c: good.code, lane }),
         });
         continue;
       }
@@ -168,13 +178,13 @@ function runBoard({ root } = {}) {
         const card = cards.get(c) || null;
         red += 1;
         const why = !card
-          ? 'не находится на доске (живые + done/)'
+          ? msg('board.human-row-trace.why_not_found')
           : card.status !== 'backlog'
-            ? `не backlog (статус «${card.status}»)`
-            : `не эпик протокола (эпик «${card.epic}», дорожка протокола — «${lane}»)`;
+            ? msg('board.human-row-trace.why_not_backlog', { status: card.status })
+            : msg('board.human-row-trace.why_wrong_lane', { epic: card.epic, lane });
         lines.push({
           status: 'red',
-          fact: `${code}: строка останова — код ${c} ${why}; правило human-row-trace: след — карта эпика протокола в backlog, флаг ожидания решения; путь exception — строка exception: … human-row-trace … в History этой карточки (решает человек)`,
+          fact: msg('board.human-row-trace.red', { code, c, why }),
         });
       }
     }
@@ -182,37 +192,37 @@ function runBoard({ root } = {}) {
   return { ready: red === 0, lines, cardsScanned, stopsSeen, red, lane };
 }
 
-// ---- --selftest: приборы во временном каталоге ---------------------------------------------------
+// ---- --selftest: probes in a temp directory -------------------------------------------------------
 
-const LANE_PROTOCOL = '3. Пробный протокол';
-const LANE_OTHER = '4. Пробные ресурсы';
+const LANE_PROTOCOL = '3. Sample protocol';
+const LANE_OTHER = '4. Sample resources';
 const LANES_MD =
-  '# конфигурация\n\n| Код | Эпик |\n|---|---|\n' +
+  '# configuration\n\n| Code | Epic |\n|---|---|\n' +
   '| `protocol` | ' + LANE_PROTOCOL + ' |\n' +
   '| `resources` | ' + LANE_OTHER + ' |\n';
 
-// Запрет 16: фикстурные коды карт не бывают литералами тела — сканер чистой зоны матчит card-\d{3}
-// как след проекта; код собирается в рантайме, регулярки распознавания (card-\d+) не тронуты.
-const PROBE_CARD = ['card', '001'].join('-');    // карта следа, решающая гейтом (пробы а, з)
-const PROBE_CLOSED = ['card', '002'].join('-');  // закрытая карта следа (проба в)
-const PROBE_OTHER = ['card', '003'].join('-');   // карта другого эпика (проба г)
-const PROBE_UNKNOWN = ['card', '004'].join('-'); // кода на доске нет (проба д)
-const PROBE_GHOST = ['card', '099'].join('-');   // образцовая карта в цитатах и иллюстрациях (е, з, и)
+// Prohibition 16: fixture card codes are never literals of the body - the clean-zone scanner matches card-\d{3}
+// as a project trace; the code is assembled in runtime, the recognition regexes (card-\d+) untouched.
+const PROBE_CARD = ['card', '001'].join('-');    // the trace card deciding the gate (probes a, h)
+const PROBE_CLOSED = ['card', '002'].join('-');  // a closed trace card (probe c)
+const PROBE_OTHER = ['card', '003'].join('-');   // a card of another epic (probe d)
+const PROBE_UNKNOWN = ['card', '004'].join('-'); // the code is not on the board (probe e)
+const PROBE_GHOST = ['card', '099'].join('-');   // a sample card in quotes and illustrations (f, h, i)
 
-/** Карточка-проба (остановившийся узел): одна строка задачи и набор строк Истории. */
+/** A probe card (a stopped node): one task line and a set of History lines. */
 function probeCard(histLines) {
   return (
-    '# проба\n\n## Task\n901 · tooling | что доставляет проба | критерий пробы | 2 | куда далее\n\n## Kit\n\n## History\n' +
+    '# probe\n\n## Task\n901 · tooling | what the probe delivers | the probe criterion | 2 | where next\n\n## Kit\n\n## History\n' +
     histLines.join('\n') +
     '\n\n## Result\n'
   );
 }
 
-/** Карта следа пробы: frontmatter (статус, эпик) — единственное, что читает гейт. */
+/** A probe trace card: the frontmatter (status, epic) - the only thing the gate reads. */
 function traceCard(code, status, epic) {
   return (
-    '---\nid: "' + code + '-proba-sleda"\nstatus: "' + status + '"\nepic: "' + epic + '"\n---\n\n' +
-    '# ' + code + ' · проба карты следа\n\n## Task\n\n902 · decision | вопрос человеку | решает человек | 2 | человек\n\n## Kit\n\n## History\n\n## Result\n'
+    '---\nid: "' + code + '-probe-trace"\nstatus: "' + status + '"\nepic: "' + epic + '"\n---\n\n' +
+    '# ' + code + ' · a trace-card probe\n\n## Task\n\n902 · decision | a question to the human | the human decides | 2 | human\n\n## Kit\n\n## History\n\n## Result\n'
   );
 }
 
@@ -232,122 +242,122 @@ function selftest() {
   const today = new Date().toISOString().slice(0, 10);
   const STOP = (rest) => '- `Spec`, ' + today + ': ' + rest;
   try {
-    // а: останов с кодом backlog-карты эпика протокола — ЗЕЛЁНАЯ
+    // a: a stop with the code of a backlog card of the protocol epic - GREEN
     writeTree(path.join(dir, 'a'), {
       'project/config/PROJECT.md': LANES_MD,
       '.devtool/features/probe-911-stop-awaiting.md': probeCard([
-        STOP('останов — порог попыток 2 из 2 исчерпан, вопрос человеку: права записи; карта ' + PROBE_CARD + ' открыта в эпике протокола — ждёт решения.'),
+        STOP('stop — the attempts threshold 2 of 2 is exhausted, a question to the human: write rights; the card ' + PROBE_CARD + ' is open in the protocol epic — awaiting a decision.'),
       ]),
-      ['.devtool/features/' + PROBE_CARD + '-proba-sleda.md']: traceCard(PROBE_CARD, 'backlog', LANE_PROTOCOL),
+      ['.devtool/features/' + PROBE_CARD + '-probe-trace.md']: traceCard(PROBE_CARD, 'backlog', LANE_PROTOCOL),
     });
     const ra = runBoard({ root: path.join(dir, 'a') });
-    check('а: останов с кодом backlog-карты эпика протокола = ЗЕЛЁНАЯ', ra.ready && ra.stopsSeen === 1 && ra.lines.some((l) => l.status === 'green' && l.fact.includes(PROBE_CARD)));
+    check('a: a stop with the code of a backlog card of the protocol epic = GREEN', ra.ready && ra.stopsSeen === 1 && ra.lines.some((l) => l.status === 'green' && l.fact.includes(PROBE_CARD)));
 
-    // б: останов без кода — КРАСНАЯ (fail-closed)
+    // b: a stop without a code - RED (fail-closed)
     writeTree(path.join(dir, 'b'), {
       'project/config/PROJECT.md': LANES_MD,
       '.devtool/features/probe-912-stop-no-code.md': probeCard([
-        STOP('останов — порог попыток исчерпан (1 из 1), дальше нельзя — вопрос человеку.'),
+        STOP('stop — the attempts threshold is exhausted (1 of 1), no further - a question to the human.'),
       ]),
     });
     const rb = runBoard({ root: path.join(dir, 'b') });
-    check('б: останов без кода = КРАСНАЯ (названо: без кода карты)', !rb.ready && rb.lines.some((l) => l.status === 'red' && l.fact.includes('без кода карты')));
+    check('b: a stop without a code = RED (named: no trace-card code)', !rb.ready && rb.lines.some((l) => l.status === 'red' && l.fact.includes(msg('board.human-row-trace.no_code_marker'))));
 
-    // в: останов с кодом закрытой карты — КРАСНАЯ
+    // c: a stop with the code of a closed card - RED
     writeTree(path.join(dir, 'c'), {
       'project/config/PROJECT.md': LANES_MD,
       '.devtool/features/probe-913-stop-closed.md': probeCard([
-        STOP('останов — порог 2 из 2 исчерпан; карта ' + PROBE_CLOSED + ' названа следом.'),
+        STOP('stop — the threshold 2 of 2 is exhausted; the card ' + PROBE_CLOSED + ' named as the trace.'),
       ]),
-      ['.devtool/features/' + PROBE_CLOSED + '-proba-zakrytaya.md']: traceCard(PROBE_CLOSED, 'done', LANE_PROTOCOL),
+      ['.devtool/features/' + PROBE_CLOSED + '-probe-closed.md']: traceCard(PROBE_CLOSED, 'done', LANE_PROTOCOL),
     });
     const rc = runBoard({ root: path.join(dir, 'c') });
-    check('в: останов с кодом закрытой карты = КРАСНАЯ (названо: не backlog)', !rc.ready && rc.lines.some((l) => l.status === 'red' && l.fact.includes('не backlog') && l.fact.includes(PROBE_CLOSED)));
+    check('c: a stop with the code of a closed card = RED (named: not backlog)', !rc.ready && rc.lines.some((l) => l.status === 'red' && l.fact.includes(msg('board.human-row-trace.why_not_backlog', { status: 'done' })) && l.fact.includes(PROBE_CLOSED)));
 
-    // г: останов с кодом карты другого эпика — КРАСНАЯ
+    // d: a stop with the code of a card of another epic - RED
     writeTree(path.join(dir, 'd'), {
       'project/config/PROJECT.md': LANES_MD,
       '.devtool/features/probe-914-stop-other-epic.md': probeCard([
-        STOP('останов — порог 2 из 2 исчерпан; карта ' + PROBE_OTHER + ' названа следом.'),
+        STOP('stop — the threshold 2 of 2 is exhausted; the card ' + PROBE_OTHER + ' named as the trace.'),
       ]),
-      ['.devtool/features/' + PROBE_OTHER + '-proba-drugoy-epik.md']: traceCard(PROBE_OTHER, 'backlog', LANE_OTHER),
+      ['.devtool/features/' + PROBE_OTHER + '-probe-other-epic.md']: traceCard(PROBE_OTHER, 'backlog', LANE_OTHER),
     });
     const rd = runBoard({ root: path.join(dir, 'd') });
-    check('г: останов с кодом карты другого эпика = КРАСНАЯ (названо: не эпик протокола)', !rd.ready && rd.lines.some((l) => l.status === 'red' && l.fact.includes('не эпик протокола') && l.fact.includes(PROBE_OTHER)));
+    check('d: a stop with the code of a card of another epic = RED (named: not the protocol epic)', !rd.ready && rd.lines.some((l) => l.status === 'red' && l.fact.includes(msg('board.human-row-trace.why_wrong_lane', { epic: LANE_OTHER, lane: LANE_PROTOCOL })) && l.fact.includes(PROBE_OTHER)));
 
-    // д: останов с кодом, которого нет на доске — КРАСНАЯ
+    // e: a stop with a code that is not on the board - RED
     writeTree(path.join(dir, 'e'), {
       'project/config/PROJECT.md': LANES_MD,
       '.devtool/features/probe-915-stop-unknown-code.md': probeCard([
-        STOP('останов — порог 2 из 2 исчерпан; карта ' + PROBE_UNKNOWN + ' названа следом.'),
+        STOP('stop — the threshold 2 of 2 is exhausted; the card ' + PROBE_UNKNOWN + ' named as the trace.'),
       ]),
     });
     const re2 = runBoard({ root: path.join(dir, 'e') });
-    check('д: останов с кодом, которого нет на доске = КРАСНАЯ (названо: не находится)', !re2.ready && re2.lines.some((l) => l.status === 'red' && l.fact.includes('не находится') && l.fact.includes(PROBE_UNKNOWN)));
+    check('e: a stop with a code not on the board = RED (named: not found)', !re2.ready && re2.lines.some((l) => l.status === 'red' && l.fact.includes(msg('board.human-row-trace.why_not_found')) && l.fact.includes(PROBE_UNKNOWN)));
 
-    // е: обычные строки Истории — 0 срабатываний
+    // f: ordinary History lines - 0 hits
     writeTree(path.join(dir, 'f'), {
       'project/config/PROJECT.md': LANES_MD,
       '.devtool/features/probe-916-ordinary-lines.md': probeCard([
-        '- `Kit`, ' + today + ': stage exec — работа по карточке.',
-        '- `Kit`, ' + today + ': attempt, 123 tokens (100 cache-read), 10 out, 5 s, `sess-1` — запись расхода (human-row-trace probe-999).',
-        '- `Intent`, ' + today + ': human approved the five fields, 0 tokens, 0 s — план одобрен ответом «да».',
-        '- `Intent`, ' + today + ': человек решил (' + today + '): «принимаю» — запись решения, не останов.',
-        '- `Core`, ' + today + ': closed — образ достигнут.',
-        '- `Kit`, ' + today + ': поимка probe-911 (останов — порог 2 из 2, карта ' + PROBE_GHOST + ') — форма останова внутри скобок-иллюстрации.',
-        '- `Kit`, ' + today + ': «останов — порог 1 из 1, карта ' + PROBE_GHOST + '» — цитата формы останова в начале описания.',
+        '- `Kit`, ' + today + ': stage exec — work on the card.',
+        '- `Kit`, ' + today + ': attempt, 123 tokens (100 cache-read), 10 out, 5 s, `sess-1` — a spend record (human-row-trace probe-999).',
+        '- `Intent`, ' + today + ': human approved the five fields, 0 tokens, 0 s — the plan approved by the answer "yes".',
+        '- `Intent`, ' + today + ': the human decided (' + today + '): "I accept" — a decision record, not a stop.',
+        '- `Core`, ' + today + ': closed — the image reached.',
+        '- `Kit`, ' + today + ': caught probe-911 (stop — threshold 2 of 2, card ' + PROBE_GHOST + ') — the stop form inside an illustration parenthesis.',
+        '- `Kit`, ' + today + ': «stop — threshold 1 of 1, card ' + PROBE_GHOST + '» — a quoted stop form at the start of the description.',
       ]),
     });
     const rf = runBoard({ root: path.join(dir, 'f') });
-    check('е: обычные строки (stage/attempt/human approved/человек решил/closed/цитаты форм) = ЗЕЛЁНАЯ, остановов 0, ложных срабатываний нет', rf.ready && rf.stopsSeen === 0 && rf.lines.length === 0);
+    check('f: ordinary lines (stage/attempt/human approved/human decided/closed/quoted forms) = GREEN, 0 stops, no false hits', rf.ready && rf.stopsSeen === 0 && rf.lines.length === 0);
 
-    // ж: exception в той же карточке — находка пропущена с явной пометкой
+    // g: an exception in the same card - the finding skipped with an explicit mark
     writeTree(path.join(dir, 'g'), {
       'project/config/PROJECT.md': LANES_MD,
       '.devtool/features/probe-917-exception.md': probeCard([
-        STOP('останов — порог попыток 1 из 1 исчерпан, дальше нельзя.'),
-        '- `Intent`, ' + today + ': exception: human-row-trace — останов был, след открыт задним числом — решает человек.',
+        STOP('stop — the attempts threshold 1 of 1 is exhausted, no further.'),
+        '- `Intent`, ' + today + ': exception: human-row-trace — there was a stop, the trace was opened retroactively — the human decides.',
       ]),
     });
     const rg = runBoard({ root: path.join(dir, 'g') });
-    check('ж: exception в карточке = пропуск находки с пометкой, код зелёный', rg.ready && rg.stopsSeen === 1 && rg.lines.some((l) => l.status === 'skipped'));
+    check('g: an exception in the card = the finding skipped with a mark, the code green', rg.ready && rg.stopsSeen === 1 && rg.lines.some((l) => l.status === 'skipped'));
 
-    // з: два названных кода, один решает (backlog эпика протокола) — ЗЕЛЁНАЯ
+    // h: two named codes, one decides (a backlog card of the protocol epic) - GREEN
     writeTree(path.join(dir, 'h'), {
       'project/config/PROJECT.md': LANES_MD,
       '.devtool/features/probe-918-two-codes.md': probeCard([
-        STOP('останов — порог попыток 2 из 2; правка по образцу ' + PROBE_GHOST + ' не встала в критерий; карта ' + PROBE_CARD + ' открыта — ждёт решения.'),
+        STOP('stop — the attempts threshold 2 of 2; the edit by the ' + PROBE_GHOST + ' sample did not fit the criterion; the card ' + PROBE_CARD + ' is open — awaiting a decision.'),
       ]),
-      ['.devtool/features/' + PROBE_CARD + '-proba-sleda.md']: traceCard(PROBE_CARD, 'backlog', LANE_PROTOCOL),
+      ['.devtool/features/' + PROBE_CARD + '-probe-trace.md']: traceCard(PROBE_CARD, 'backlog', LANE_PROTOCOL),
     });
     const rh = runBoard({ root: path.join(dir, 'h') });
-    check('з: из двух названных кодов один решает (backlog эпика протокола) = ЗЕЛЁНАЯ — хватает одного решающего кода', rh.ready && rh.lines.some((l) => l.status === 'green' && l.fact.includes(PROBE_CARD)));
+    check('h: of two named codes one decides (a backlog card of the protocol epic) = GREEN - one deciding code suffices', rh.ready && rh.lines.some((l) => l.status === 'green' && l.fact.includes(PROBE_CARD)));
 
-    // и: строка останова, код только в цитате-иллюстрации — КРАСНАЯ (цитатная ограничительность)
+    // i: a stop line, the code only inside a quotation-illustration - RED (citation strictness)
     writeTree(path.join(dir, 'i'), {
       'project/config/PROJECT.md': LANES_MD,
       '.devtool/features/probe-919-code-in-quote.md': probeCard([
-        STOP('останов — по образцу «останов — порог 2 из 2, карта ' + PROBE_GHOST + '» — иллюстрация словаря, не запись.'),
+        STOP('stop — by the sample «stop — threshold 2 of 2, card ' + PROBE_GHOST + '» — a dictionary illustration, not a record.'),
       ]),
     });
     const ri = runBoard({ root: path.join(dir, 'i') });
-    check('и: строка останова, код только в цитате-иллюстрации = КРАСНАЯ (цитатная ограничительность: код из цитаты не след)', !ri.ready && ri.lines.some((l) => l.status === 'red' && l.fact.includes('без кода карты')));
+    check('i: a stop line, the code only inside a quotation-illustration = RED (citation strictness: a code from a quote is not a trace)', !ri.ready && ri.lines.some((l) => l.status === 'red' && l.fact.includes(msg('board.human-row-trace.no_code_marker'))));
 
     const failed = results.filter((r) => !r.ok);
     return {
       ok: failed.length === 0,
       note: failed.length
-        ? 'не сошлось: ' + failed.map((r) => r.name).join('; ')
-        : 'все 9 проб зелёные: останов с кодом backlog-карты эпика протокола ЗЕЛЁНАЯ, без кода КРАСНАЯ, код закрытой карты КРАСНАЯ (не backlog), код карты другого эпика КРАСНАЯ (не эпик протокола), код не находится КРАСНАЯ, обычные строки без ложных срабатываний, exception пропускает с пометкой, из двух названных кодов хватает одного решающего, код из цитаты-иллюстрации не след (КРАСНАЯ)',
+        ? msg('board.selftest.mismatch') + failed.map((r) => r.name).join('; ')
+        : msg('board.human-row-trace.selftest_ok'),
     };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
 
-// ---- форма реестра проверок ----------------------------------------------------------------------
+// ---- the form of the checks registry --------------------------------------------------------------
 
-/** Находки для реестра (`run(ctx)` → строки, пустой список — чисто); регистрация в index.cjs — решение принимающего. */
+/** Findings for the registry (`run(ctx)` → lines, an empty list - clean); registration in index.cjs - the accepting node's decision. */
 function run(ctx = {}) {
   const r = runBoard({ root: ctx.root });
   return r.lines.filter((l) => l.status === 'red').map((l) => 'human-row-trace: ' + l.fact);
@@ -355,7 +365,7 @@ function run(ctx = {}) {
 
 module.exports = { id: 'human-row-trace', since: null, run, runBoard, selftest, isStopLine, codesOf, protocolLane };
 
-// ---- CLI ----------------------------------------------------------------------------------------
+// ---- CLI ------------------------------------------------------------------------------------------
 
 if (require.main === module) {
   const argv = process.argv.slice(2);
@@ -369,12 +379,12 @@ if (require.main === module) {
     }
     const r = runBoard({ root });
     for (const l of r.lines) console.log((l.status === 'green' ? '✓ ' : l.status === 'red' ? '✗ ' : '· ') + l.fact);
-    if (!r.lines.length) console.log(`· строк останова в History не найдено (карточек просмотрено: ${r.cardsScanned})`);
-    if (r.ready) console.log(`HUMAN-ROW-TRACE: ЗЕЛЁНАЯ — остановов: ${r.stopsSeen} (след записан при каждом), карточек просмотрено: ${r.cardsScanned}`);
-    else console.log(`HUMAN-ROW-TRACE: КРАСНАЯ — находок: ${r.red} (см. строки ✗)`);
+    if (!r.lines.length) console.log(msg('board.human-row-trace.cli_none', { n: r.cardsScanned }));
+    if (r.ready) console.log(msg('board.human-row-trace.cli_green', { n: r.stopsSeen, cards: r.cardsScanned }));
+    else console.log(msg('board.human-row-trace.cli_red', { n: r.red }));
     process.exit(r.ready ? 0 : 1);
   } catch (e) {
-    console.error('СТОП: ' + e.message);
+    console.error(msg('board.stop') + e.message);
     process.exit(e.exitCode || 2);
   }
 }

@@ -6,6 +6,8 @@
 // (checks-registry requires every checker; the scan runs only on direct execution).
 const fs = require('node:fs');
 const path = require('node:path');
+const i18n = require('../../i18n/index.cjs');
+const msg = (key, params) => i18n.message(key, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const PROTO = path.join(ROOT, '.forma', 'protocol');
@@ -29,22 +31,22 @@ function runGate() {
   const zones = fs.readdirSync(ROOT, { withFileTypes: true })
     .filter((e) => e.isDirectory() && e.name.startsWith('.') && read(path.join(ROOT, e.name, 'agents', 'run.md')) !== null)
     .map((e) => e.name);
-  facts.push(`зеркала движков проекта: ${zones.join(', ') || 'НЕТ'}`);
-  if (zones.length === 0) problems.push('не найдено ни одного зеркала движков');
+  facts.push(msg('board.push-verify-rule.mirrors', { zones: zones.join(', ') || msg('board.push-verify-rule.none') }));
+  if (zones.length === 0) problems.push(msg('board.push-verify-rule.no_mirrors'));
   for (const z of zones) {
     const run = read(path.join(ROOT, z, 'agents', 'run.md'));
     const kit = read(path.join(ROOT, z, 'agents', 'kit.md'));
     const intent = read(path.join(ROOT, z, 'agents', 'intent.md'));
-    if (!run || !run.includes(MARK.run) || !run.includes(CONCEPT)) problems.push(`${z}/agents/run.md: нет маркера правила вердикта пуша`);
-    if (!kit || !kit.includes(MARK.kit) || !kit.includes(CONCEPT)) problems.push(`${z}/agents/kit.md: нет маркера правила вердикта пуша`);
-    if (!intent || !intent.includes(MARK.intent)) problems.push(`${z}/agents/intent.md: нет правила отчёта по вердикту пуша`);
+    if (!run || !run.includes(MARK.run) || !run.includes(CONCEPT)) problems.push(msg('board.push-verify-rule.no_marker', { f: z + '/agents/run.md' }));
+    if (!kit || !kit.includes(MARK.kit) || !kit.includes(CONCEPT)) problems.push(msg('board.push-verify-rule.no_marker', { f: z + '/agents/kit.md' }));
+    if (!intent || !intent.includes(MARK.intent)) problems.push(msg('board.push-verify-rule.no_report', { f: z + '/agents/intent.md' }));
   }
 
   // 2. Template source: every adapter role file (any nesting) carries the markers; at least 3 adapters with run.md.
   const adaptersDir = path.join(PROTO, 'skills', 'forma', 'adapters');
   let adaptersWithRun = 0;
   if (!fs.existsSync(adaptersDir)) {
-    problems.push('шаблон: skills/forma/adapters не найден');
+    problems.push(msg('board.push-verify-rule.no_adapters_dir'));
   } else {
     const roleFiles = [];
     (function walk(dir) {
@@ -61,13 +63,13 @@ function runGate() {
       const src = read(f);
       if (name === 'run.md') {
         adaptersWithRun += 1;
-        if (!src.includes(MARK.run) || !src.includes(CONCEPT)) problems.push(`шаблон ${rel}: нет маркера правила вердикта пуша`);
+        if (!src.includes(MARK.run) || !src.includes(CONCEPT)) problems.push(msg('board.push-verify-rule.template_no_marker', { rel }));
       }
-      if (name === 'kit.md' && (!src.includes(MARK.kit) || !src.includes(CONCEPT))) problems.push(`шаблон ${rel}: нет маркера правила вердикта пуша`);
-      if (name === 'intent.md' && !src.includes(MARK.intent)) problems.push(`шаблон ${rel}: нет правила отчёта по вердикту пуша`);
+      if (name === 'kit.md' && (!src.includes(MARK.kit) || !src.includes(CONCEPT))) problems.push(msg('board.push-verify-rule.template_no_marker', { rel }));
+      if (name === 'intent.md' && !src.includes(MARK.intent)) problems.push(msg('board.push-verify-rule.template_no_report', { rel }));
     }
-    facts.push(`шаблон: адаптеров с run.md — ${adaptersWithRun} (${[...adapters].join(', ')})`);
-    if (adaptersWithRun < 3) problems.push(`шаблон: ожидается минимум 3 адаптера с run.md, найдено ${adaptersWithRun}`);
+    facts.push(msg('board.push-verify-rule.adapters', { n: adaptersWithRun, list: [...adapters].join(', ') }));
+    if (adaptersWithRun < 3) problems.push(msg('board.push-verify-rule.too_few', { n: adaptersWithRun }));
   }
 
   // 3. Machine and service traces forbidden in role texts (clean zones, prohibition 16):
@@ -89,16 +91,16 @@ function runGate() {
     const src = read(f);
     if (!src) continue;
     for (const re of tracePatterns) {
-      if (re.test(src)) problems.push(`${path.relative(ROOT, f)}: машинный след ${re} в тексте роли`);
+      if (re.test(src)) problems.push(msg('board.push-verify-rule.machine_trace', { f: path.relative(ROOT, f), re }));
     }
   }
 
   console.log(facts.join('\n'));
   if (problems.length) {
-    console.log('ПРОБЛЕМЫ:\n' + problems.map((p) => '  - ' + p).join('\n'));
+    console.log(msg('board.push-verify-rule.problems') + problems.map((p) => '  - ' + p).join('\n'));
     process.exit(1);
   }
-  console.log('Push-verify rule: все проверки зелёные');
+  console.log(msg('board.push-verify-rule.green'));
   process.exit(0);
 }
 

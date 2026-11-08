@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Проверка доски .devtool/features/ — часть ядра, одна для всех движков (AGENTS.md §6–7).
-// Эпики и цели, метки маршрута и этапы, материалы карточек, строки расхода (§3), закрытие Core.
-// Сами проверки — реестр `.forma/board/checks/`: одна проверка — один файл, порядок — в `.forma/board/checks/index.cjs`.
+// The board check of .devtool/features/ - part of the core, one for all engines (AGENTS.md §6–7).
+// Epics and goals, route labels and stages, card materials, spend lines (§3), the Core closing.
+// The checks themselves - the registry `.forma/board/checks/`: one check - one file, the order - in `.forma/board/checks/index.cjs`.
 //
-//   node .forma/board/check-board.cjs [<card-id>]   — все нарушения доски; с <card-id> — только строки этой карточки.
-//   Выход: 0 — нарушений нет, 1 — есть (печатаются по строке, с префиксом «— »).
-// Модуль: require('./check-board.cjs').checkBoard(root) → [строки нарушений]. Движок вызывает его
-// из своей сверки (sync-engines) и из своего хука записи карточки.
+//   node .forma/board/check-board.cjs [<card-id>]   - all the board violations; with <card-id> - only this card's lines.
+//   Exit: 0 - no violations, 1 - there are (printed line by line, with the «— » prefix).
+// Module: require('./check-board.cjs').checkBoard(root) → [lines of violations]. The engine calls it
+// from its reconciliation (sync-engines) and from its card-write hook.
 
 const path = require('path');
 const { runChecks } = require('../dashboard/lib/checks.cjs');
@@ -14,8 +14,8 @@ const CHECKS = require('./checks/index.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 
-/** Нарушения доски проекта `root` (по умолчанию — проект, в котором лежит скрипт), в порядке реестра.
- *  `info` — необязательный массив для сведений проверок (не нарушения: «журнал не покрывает», очередь Core). */
+/** The board violations of the project `root` (by default - the project the script lies in), in the registry's order.
+ *  `info` - an optional array for the checks' notes (not violations: "the journal does not cover", the Core queue). */
 function checkBoard(root, info) {
   return runChecks(CHECKS, { root: root ? path.resolve(root) : ROOT, ...(Array.isArray(info) ? { info } : {}) });
 }

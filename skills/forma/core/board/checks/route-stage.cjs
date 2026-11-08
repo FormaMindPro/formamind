@@ -1,11 +1,12 @@
 'use strict';
 
-// Причина и этап маршрута (AGENTS.md §6). С дня вступления правила: строка «route route-N (why: <код>)» обязательна,
-// код и ключ этапа — из закрытых списков, последняя строка «stage <ключ>» не противоречит статусу.
-// Нет строки этапа — не нарушение (этап по статусу).
+// Reason and stage of the route (AGENTS.md §6). From the rule's day of entry: a "route route-N (why: <code>)" line is required,
+// the code and the stage key come from closed lists, the last "stage <key>" line does not contradict the status.
+// No stage line - no violation (stage from the status).
 
 const fs = require('fs');
 const path = require('path');
+const i18n = require('../../i18n/index.cjs');
 const { cardFiles, createdDay } = require('../../dashboard/lib/card.cjs');
 
 const WHY_CODES = ['human', 'ready', 'scale', 'risk', 'decision', 'tooling', 'plumb'];
@@ -16,16 +17,16 @@ function cardProblems(f, text) {
   const problems = [];
   const lines = text.split('\n').filter((l) => /^-\s*`\w+`,\s*\d{4}-\d{2}-\d{2}:/.test(l));
   const whys = lines.map((l) => l.match(/:\s*route route-\d[^(—]*\(why:\s*([^)]*)\)/)).filter(Boolean);
-  if (!whys.length) problems.push(`${f}: нет строки причины маршрута «route route-N (why: <код>)» в истории`);
+  if (!whys.length) problems.push(i18n.message('board.route-stage.no_reason', { f }, 'ru'));
   for (const m of whys) {
-    if (!WHY_CODES.includes(m[1].trim())) problems.push(`${f}: причина маршрута «${m[1].trim()}» — нет такого кода (${WHY_CODES.join('|')})`);
+    if (!WHY_CODES.includes(m[1].trim())) problems.push(i18n.message('board.route-stage.bad_why', { f, why: m[1].trim(), codes: WHY_CODES.join('|') }, 'ru'));
   }
   const stages = lines.map((l) => l.match(/:\s*stage\s+(\S+?)(?=\s|—|\.|$)/)).filter(Boolean).map((m) => m[1]);
-  for (const s of stages) if (!STAGE_KEYS.includes(s)) problems.push(`${f}: этап «${s}» — нет такого ключа (${STAGE_KEYS.join('|')})`);
+  for (const s of stages) if (!STAGE_KEYS.includes(s)) problems.push(i18n.message('board.route-stage.bad_stage', { f, stage: s, keys: STAGE_KEYS.join('|') }, 'ru'));
   const status = (text.match(/^status:\s*"?([\w-]+)/m) || [])[1];
   const last = stages[stages.length - 1];
   if (last && STAGE_KEYS.includes(last) && STAGE_BY_STATUS[status] && !STAGE_BY_STATUS[status].includes(last)) {
-    problems.push(`${f}: последний этап «${last}» не сходится со статусом ${status} (ожидается ${STAGE_BY_STATUS[status].join('|')})`);
+    problems.push(i18n.message('board.route-stage.stage_status', { f, stage: last, status, expected: STAGE_BY_STATUS[status].join('|') }, 'ru'));
   }
   return problems;
 }

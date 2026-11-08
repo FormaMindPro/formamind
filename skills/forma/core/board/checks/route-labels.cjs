@@ -1,8 +1,8 @@
 'use strict';
 
-// Метки маршрута. С дня вступления правила у карточки ровно одна route-N; route-0…route-5 открываются только
-// одобрением пяти полей человеком (вне backlog) — строка `Intent` «человек одобрил…» в истории. Старая метка
-// route-intent-run читается как route-2. after-card-NNN — на существующую карточку и из более ранней волны.
+// Route labels. From the rule's day of entry a card has exactly one route-N; route-0…route-5 are opened only by the
+// human's approval of the five fields (outside backlog) - the `Intent` line "human approved…" in the history. The old
+// route-intent-run label reads as route-2. after-card-NNN - onto an existing card and from an earlier wave.
 
 const fs = require('fs');
 const path = require('path');
@@ -10,8 +10,9 @@ const { cardFiles, boardDir, labelsOf, createdDay } = require('../../dashboard/l
 
 const i18n = require('../../i18n/index.cjs');
 const APPROVAL_RE = new RegExp('(' + i18n.alt('hist.approved') + ')', 'i');
+const msg = (key, params) => i18n.message(key, params, 'ru');
 
-/** Карточки доски по номеру: `Map NNN → { name, labels, text, created }`. */
+/** Board cards by number: `Map NNN → { name, labels, text, created }`. */
 function readCards(root) {
   const cards = new Map();
   for (const file of cardFiles(root, /^card-\d+.*\.md$/)) {
@@ -28,43 +29,43 @@ const waveOf = (c) => {
   return w ? +w.slice(5) : null;
 };
 
-/** Формы меток: route-0…8, over-1…4, wave-/seg- — натуральные числа. */
+/** Label forms: route-0…8, over-1…4, wave-/seg- - natural numbers. */
 function formProblems({ name, labels }) {
   const problems = [];
   for (const l of labels.filter((l) => /^route-/.test(l))) {
-    if (!/^route-[0-8]$/.test(l)) problems.push(`${name}: метка ${l} — нет такого маршрута (route-0…route-8)`);
+    if (!/^route-[0-8]$/.test(l)) problems.push(msg('board.route-labels.no_route', { name, l }));
   }
   for (const l of labels.filter((l) => /^over-/.test(l))) {
-    if (!/^over-[1-4]$/.test(l)) problems.push(`${name}: метка ${l} — нет такого наложения (over-1…over-4)`);
+    if (!/^over-[1-4]$/.test(l)) problems.push(msg('board.route-labels.no_overlay', { name, l }));
   }
   for (const l of labels.filter((l) => /^(wave|seg)-/.test(l))) {
-    if (!/^(wave|seg)-[1-9]\d*$/.test(l)) problems.push(`${name}: метка ${l} — номер должен быть натуральным`);
+    if (!/^(wave|seg)-[1-9]\d*$/.test(l)) problems.push(msg('board.route-labels.bad_number', { name, l }));
   }
   return problems;
 }
 
-/** Ровно одна метка маршрута; route-0…5 — с одобрением пяти полей (в backlog его ещё ждут — это законно). */
+/** Exactly one route label; route-0…5 - with the five-field approval (in backlog it is still awaited - that is lawful). */
 function routeProblems(c) {
   const routes = c.labels.filter((l) => /^route-/.test(l));
-  if (routes.length !== 1) return [`${c.name}: меток маршрута ${routes.length}, нужна ровно одна (route-0…route-8)`];
+  if (routes.length !== 1) return [msg('board.route-labels.count', { name: c.name, n: routes.length })];
   if (!/^route-[0-5]$/.test(routes[0]) || /^status:\s*"backlog"/m.test(c.text)) return [];
-  // §7: одобрение — строка-событие без `attempt`; прежние строки «attempt, 0 tokens, 0 s» тоже засчитываются.
+  // §7: the approval is an event line without `attempt`; the former "attempt, 0 tokens, 0 s" lines count too.
   const approved = c.text.split('\n').some((l) => /^-\s*`Intent`/.test(l) && APPROVAL_RE.test(l) &&
     (/0 tokens, 0 s/.test(l) || !/:\s*attempt,/.test(l)));
-  return approved ? [] : [`${c.name}: ${routes[0]} без одобрения пяти полей человеком — нет строки-события \`Intent\` «человек одобрил…» (без attempt) в истории`];
+  return approved ? [] : [msg('board.route-labels.no_approval', { name: c.name, route: routes[0] })];
 }
 
-/** after-card-NNN: форма метки, существование карточки и более ранняя волна. */
+/** after-card-NNN: the label's form, the card's existence and an earlier wave. */
 function afterProblems(c, cards) {
   const problems = [];
   const w = waveOf(c);
   for (const l of c.labels.filter((l) => /^after-/.test(l))) {
     const am = l.match(/^after-card-(\d{3,})$/);
-    if (!am) { problems.push(`${c.name}: метка ${l} — ожидается after-card-NNN`); continue; }
+    if (!am) { problems.push(msg('board.route-labels.expect_after', { name: c.name, l })); continue; }
     const dep = cards.get(am[1]);
-    if (!dep) { problems.push(`${c.name}: ${l} — карточки card-${am[1]} на доске нет`); continue; }
+    if (!dep) { problems.push(msg('board.route-labels.no_card', { name: c.name, l, num: am[1] })); continue; }
     const dw = waveOf(dep);
-    if (w !== null && dw !== null && !(w > dw)) problems.push(`${c.name}: ${l} — зависимость из волны wave-${dw}, а карточка в wave-${w}; нужна более ранняя волна`);
+    if (w !== null && dw !== null && !(w > dw)) problems.push(msg('board.route-labels.wave_order', { name: c.name, l, dw, w }));
   }
   return problems;
 }

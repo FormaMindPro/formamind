@@ -1,24 +1,26 @@
 'use strict';
 
-// Паритет журнала вызовов и карточек задач — в обе стороны.
-// Для каждого адаптера с файлом `<dir>/.ledger/calls.jsonl` (адаптеры — из loadAdapters):
-//   журнал → карточка: вызов не старше `since` (conversationId без `unknown`), чьего id нет ни в одной строке
-//     расхода карточек, — находка;
-//   карточка → журнал: строка расхода с меткой движка этого адаптера, с id вызова (не `id unknown`, не строка
-//     основной сессии `card-session-spend`), датой не раньше `since` и строго позже первого дня журнала этого адаптера
-//     (строки дня установки журнала частично предшествуют хуку, а в строке только дата — сверять не с чем):
-//     • id в журнале есть — сверяются числа. Расхождение сумм по карточкам против нарастающих итогов журнала
-//       (N, cache-read, out) — находка; секунды не сверяются: у журнала и строки разные основания T (стенограмма
-//       против duration_ms вызова), продолжения и пакеты дают допустимые расхождения;
-//     • id в журнале нет — сведение в `ctx.info` («журнал не покрывает»), не нарушение: строки пишутся и рукой,
-//       и движком без хука, и отсутствие записи журнала не доказывает неверных чисел. Журнал есть, но пуст, — то же
-//       сведение (молчание было бы ложным «ок», а красным его быть не должно).
-// Нет файла журнала — адаптер не сверяется. Движок определяется по метке `spendTag` после тире.
-// `extraRows` — `[{ file, line }]`, строки расхода, которых на доске ещё нет (досрочная проверка передачи карточки
-// до записи файла, card-move.cjs): разбираются наравне с прочитанными.
+// Parity of the call journal and the task cards - in both directions.
+// For every adapter with a `<dir>/.ledger/calls.jsonl` file (adapters - from loadAdapters):
+//   journal → card: a call not older than `since` (conversationId without `unknown`) whose id is absent from any
+//     spend line of the cards - a finding;
+//   card → journal: a spend line with this adapter's engine tag, with a call id (not `id unknown`, not a line of
+//     the main `card-session-spend` session), dated no earlier than `since` and strictly later than the first day
+//     of this adapter's journal (the lines of the journal-install day partly precede the hook, and the line carries
+//     only a date - there is nothing to reconcile against):
+//     • the id is in the journal - the numbers are reconciled. A mismatch of the per-card sums against the journal's
+//       running totals (N, cache-read, out) - a finding; seconds are not reconciled: the journal and the line have
+//       different T bases (the transcript against the call's duration_ms), continuations and batches give allowed deviations;
+//     • the id is not in the journal - an info note in `ctx.info` ("the journal does not cover"), not a violation: lines
+//       are written by hand as well as by an engine without the hook, and the absence of a journal record does not prove
+//       wrong numbers. The journal exists but is empty - the same note (silence would be a false "ok", and it must not be red).
+// No journal file - the adapter is not reconciled. The engine is determined by the `spendTag` label after the dash.
+// `extraRows` - `[{ file, line }]`, spend lines not yet on the board (the early check of a card handoff before the
+// file is written, card-move.cjs): parsed on a par with the read ones.
 
 const fs = require('fs');
 const path = require('path');
+const i18n = require('../../i18n/index.cjs');
 const { cardLines, bulletList } = require('./support/lines.cjs');
 const { toEnglish, SPEND_SOURCE, outTokens, toInt } = require('../../dashboard/spend-line.cjs');
 const { loadAdapters } = require('../../dashboard/lib/engines.cjs');
@@ -26,9 +28,9 @@ const { loadAdapters } = require('../../dashboard/lib/engines.cjs');
 const LINE_DATE_RE = /(\d{4}-\d{2}-\d{2}):\s*attempt,/;
 const LINE_ID_RE = /,\s*`([^`\s]+)`\s*—/;
 const LINE_TAG_RE = /—\s*([a-z][a-z0-9-]*):/;
-const SPEND_ROW_RE = new RegExp(SPEND_SOURCE); // SPEND_SOURCE — строка-шаблон сегментов строки расхода
+const SPEND_ROW_RE = new RegExp(SPEND_SOURCE); // SPEND_SOURCE - the segment template of a spend line
 
-/** Вызовы журнала адаптера; `null` — файла нет, `[]` — файл есть, но пуст. */
+/** Calls of an adapter's journal; `null` - no file, `[]` - the file exists but is empty. */
 function readLedger(root, adapter) {
   const ledgerPath = path.join(root, adapter.dir, '.ledger', 'calls.jsonl');
   if (!fs.existsSync(ledgerPath)) return null;
@@ -44,7 +46,7 @@ function readLedger(root, adapter) {
   return calls;
 }
 
-/** Строка расхода → `{ file, date, id, tag, session, tokens, cache, out }`; чисел нет — `null` (не ноль). */
+/** A spend line → `{ file, date, id, tag, session, tokens, cache, out }`; no numbers - `null` (not zero). */
 function spendRow(file, line) {
   const t = toEnglish(line.trim());
   const d = LINE_DATE_RE.exec(t);
@@ -62,7 +64,7 @@ function spendRow(file, line) {
   };
 }
 
-/** Строки расхода карточек: `{ file, date, id, tag, session, tokens, cache, out }`. */
+/** Spend lines of the cards: `{ file, date, id, tag, session, tokens, cache, out }`. */
 function spendRows(root, extraRows) {
   const rows = [];
   for (const { file, line } of cardLines(root)) {
@@ -78,7 +80,7 @@ function spendRows(root, extraRows) {
 
 function run({ root, since, info, extraRows }) {
   const problems = [];
-  const notes = Array.isArray(info) ? info : null; // сведение «журнал не покрывает» — не нарушение; без sink — молчание
+  const notes = Array.isArray(info) ? info : null; // the "journal does not cover" note - not a violation; no sink - silence
   const rows = spendRows(root, extraRows);
   const cardCallIds = new Set(rows.filter((r) => r.id).map((r) => r.id));
 
@@ -88,33 +90,33 @@ function run({ root, since, info, extraRows }) {
     if (calls) ledgers.push({ adapter: a, calls });
   }
 
-  // журнал → карточка
+  // journal → card
   const orphanCalls = [];
   for (const { calls } of ledgers) {
     for (const call of calls) {
       const callDate = (call.timestamp || '').slice(0, 10);
       if (since && callDate < since) continue;
       if (!cardCallIds.has(call.conversationId)) {
-        orphanCalls.push(`вызов ${call.conversationId} (${callDate}) не привязан ни к одной карточке`);
+        orphanCalls.push(i18n.message('board.ledger-parity.orphan_call', { id: call.conversationId, date: callDate }, 'ru'));
       }
     }
   }
   if (orphanCalls.length > 0) {
-    problems.push(`нарушен паритет журнала вызовов и доски (${orphanCalls.length} вызовов без карточки):\n      ` + bulletList(orphanCalls));
+    problems.push(i18n.message('board.ledger-parity.orphan_header', { n: orphanCalls.length }, 'ru') + bulletList(orphanCalls));
   }
 
-  // карточка → журнал
-  const uncovered = []; // «журнал не покрывает» — сведение
-  const mismatch = [];  // числовое расхождение — нарушение
+  // card → journal
+  const uncovered = []; // "the journal does not cover" - a note
+  const mismatch = [];  // a numeric mismatch - a violation
   for (const { adapter, calls } of ledgers) {
     const tag = adapter.spendTag || adapter.tag || adapter.engine;
     const first = calls.map((c) => (c.timestamp || '').slice(0, 10)).filter(Boolean).sort()[0];
     const inWindow = rows.filter((r) => r.tag === tag && !r.session && r.id && (!since || r.date >= since));
     if (!calls.length) {
-      if (inWindow.length && notes) notes.push(`журнал не покрывает вызовы: ${adapter.dir}/.ledger/calls.jsonl пуст, а в карточках ${inWindow.length} строк расхода «${tag}» с id вызова — сверять не с чем`);
+      if (inWindow.length && notes) notes.push(i18n.message('board.ledger-parity.empty_journal', { dir: adapter.dir, n: inWindow.length, tag }, 'ru'));
       continue;
     }
-    // Нарастающие итоги журнала: последняя запись по id (продолжения повторяют итоги с нарастанием).
+    // Running totals of the journal: the last record per id (continuations repeat the totals cumulatively).
     const totals = new Map();
     for (const c of calls) {
       const known = [c.input_tokens, c.output_tokens, c.cache_read_tokens, c.cache_write_tokens].every((x) => x == null || Number.isFinite(Number(x)));
@@ -125,15 +127,15 @@ function run({ root, since, info, extraRows }) {
         cache: c.cache_read_tokens, out: c.output_tokens,
       });
     }
-    // Суммы по карточкам: пакеты (доли) и продолжения (дельты) в сумме по всем строкам id дают итог журнала.
+    // Per-card sums: batches (fractions) and continuations (deltas) summed over all lines of an id give the journal's total.
     const sums = new Map();
     for (const r of inWindow) {
       if (first && r.date <= first) continue;
       if (!totals.has(r.id)) {
-        uncovered.push(`${r.file}: строка расхода (${r.date}) с id ${r.id} — вызова нет в журнале ${adapter.dir}/.ledger`);
+        uncovered.push(i18n.message('board.ledger-parity.uncovered_row', { file: r.file, date: r.date, id: r.id, dir: adapter.dir }, 'ru'));
         continue;
       }
-      if (r.tokens == null) continue; // «unknown tokens» — сверять нечего, это не ноль
+      if (r.tokens == null) continue; // "unknown tokens" - nothing to reconcile, this is not zero
       const s = sums.get(r.id) || { tokens: 0, cache: 0, out: 0, cacheKnown: true, outKnown: true, files: new Set() };
       s.tokens += r.tokens;
       if (r.cache != null) s.cache += r.cache; else s.cacheKnown = false;
@@ -144,16 +146,16 @@ function run({ root, since, info, extraRows }) {
     for (const [id, s] of sums) {
       const t = totals.get(id);
       const parts = [];
-      if (t.tokens != null && t.tokens !== s.tokens) parts.push(`Σ по карточкам ${s.tokens} tokens, в журнале ${t.tokens}`);
-      if (t.cache != null && s.cacheKnown && t.cache !== s.cache) parts.push(`Σ cache-read ${s.cache}, в журнале ${t.cache}`);
-      if (t.out != null && s.outKnown && t.out !== s.out) parts.push(`Σ out ${s.out}, в журнале ${t.out}`);
+      if (t.tokens != null && t.tokens !== s.tokens) parts.push(i18n.message('board.ledger-parity.diff_tokens', { s: s.tokens, t: t.tokens }, 'ru'));
+      if (t.cache != null && s.cacheKnown && t.cache !== s.cache) parts.push(i18n.message('board.ledger-parity.diff_cache', { s: s.cache, t: t.cache }, 'ru'));
+      if (t.out != null && s.outKnown && t.out !== s.out) parts.push(i18n.message('board.ledger-parity.diff_out', { s: s.out, t: t.out }, 'ru'));
       if (parts.length) mismatch.push({ id, parts, files: [...s.files] });
     }
   }
-  if (uncovered.length && notes) notes.push(`журнал не покрывает вызов${uncovered.length === 1 ? '' : 'ы'} (${uncovered.length} строк расхода без вызова в журнале):\n      ` + bulletList(uncovered));
+  if (uncovered.length && notes) notes.push(i18n.message(uncovered.length === 1 ? 'board.ledger-parity.uncovered_note_one' : 'board.ledger-parity.uncovered_note_many', { n: uncovered.length }, 'ru') + bulletList(uncovered));
   if (mismatch.length > 0) {
-    problems.push(`нарушен паритет доски и журнала вызовов (${mismatch.length} вызовов с расхождением чисел):\n      `
-      + bulletList(mismatch.map(({ id, parts, files }) => `вызов ${id}: ${parts.join('; ')} (строки: ${files.join(', ')})`)));
+    problems.push(i18n.message('board.ledger-parity.mismatch_header', { n: mismatch.length }, 'ru')
+      + bulletList(mismatch.map(({ id, parts, files }) => i18n.message('board.ledger-parity.mismatch_row', { id, parts: parts.join('; '), files: files.join(', ') }, 'ru'))));
   }
 
   return problems;

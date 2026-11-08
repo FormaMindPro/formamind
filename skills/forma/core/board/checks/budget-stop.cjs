@@ -2,67 +2,79 @@
 'use strict';
 
 /**
- * budget-stop — гейт смены бюджета попыток (запрет 3, fail-closed): строка смены attempt-бюджета в History
- * карточки обязана (а) нести новое значение — форма `budget N→M`, (б) опираться на строку останова с отчётом
- * в той же карточке; поле бюджета в Задаче обязано совпадать с последней записанной сменой. Молчаливой смены
- * нет: каждое новое значение стоит за записанным остановом. Без модельных вызовов: статус по коду возврата,
- * находки — в stdout; потребители — узел Intent на проверке карточки и при закрытиях.
+ * budget-stop - the gate of the attempt-budget change (prohibition 3, fail-closed): a change line of the attempt
+ * budget in a card's History must (a) carry the new value - the form `budget N→M`, (b) rest on a stop line with
+ * a report in the same card; the budget field in the Task must match the last recorded change. There is no silent
+ * change: every new value stands behind a recorded stop. No model calls: the status by the exit code,
+ * the findings - in stdout; consumers - the Intent node at the card check and at the closings.
  *
- *   node .forma/board/checks/budget-stop.cjs --board [--root <каталог>]   (скан доски: живые карточки + done/)
- *   node .forma/board/checks/budget-stop.cjs --selftest                   (приборы во временном каталоге ОС)
+ *   node .forma/board/checks/budget-stop.cjs --board [--root <dir>]   (a board scan: live cards + done/)
+ *   node .forma/board/checks/budget-stop.cjs --selftest               (probes into the OS temp directory)
  *
- * Конвенция форм (формат строки несёт обязательные данные — по образцу approval-parity):
- *   1. Строка смены бюджета (History): `- `Узел`, ГГГГ-ММ-ДД: budget N→M …` — слово `budget` (или `бюджет`
- *      с падежным окончанием до двух букв), необязательное двоеточие, число N, стрелка `→` или `->`, число M;
- *      пробелы вокруг стрелки допустимы. Форма сама несёт новое значение M. Бюджет-слово обязано быть
- *      смежным со стрелкой-выражением: присутствие слова в строке без смежности форму смены не образует.
- *      Цитатная ограничительность: цитаты («…», "…", `…`) и скобки-иллюстрации после слов поимка/находка/
- *      цитата/цитирую/пример/например вырезаются до поиска — цитата формы в прозе и описание поимки
- *      не есть запись смены; форма вне цитат ловится как прежде (гейт остаётся fail-closed).
- *   2. Строка останова с отчётом (History): описание строки начинается со слова `stop`/`останов` и называет
- *      порог — в строке есть слово `budget`/`бюджет`/`порог`/`threshold`/`попытк`/`attempt` и цифра. Строкой
- *      останова может быть и сама строка смены, если её описание начинается со слова `stop`/`останов`
- *      (совмещённая запись останова и смены). Строка захода (`attempt, …`) и упоминание слова `stop` внутри
- *      описания (например, в имени держателя) остановом не считаются.
- *   3. Поле бюджета в Задаче: четвёртое поле строки задачи `NNN · kind | что доставляет | критерий | БЮДЖЕТ |
- *      куда далее`, число с необязательным словом («2», «3 попытки»).
+ * The convention of the forms (the line's format carries the obligatory data - by the model of approval-parity):
+ *   1. A budget change line (History): `- `Node`, YYYY-MM-DD: budget N→M …` - the word `budget` (or the Russian
+ *      `budget` stem with a case ending of up to two letters), an optional colon, the number N, the arrow `→` or `->`, the number M;
+ *      spaces around the arrow are allowed. The form itself carries the new value M. The budget word must be
+ *      adjacent to the arrow expression: the word's presence in a line without adjacency does not form a change form.
+ *      Citation strictness: quotes («…», "…", `…`) and illustration parentheses after the caught/finding/
+ *      quote/quoting/example words are cut out before the search - a quoted form in prose and a description of a catch
+ *      is not a change record; a form outside quotes is caught as before (the gate stays fail-closed).
+ *   2. A stop line with a report (History): the line's description opens with the word `stop` (or the Russian stem) and names
+ *      a threshold - the line has a budget/threshold/attempt word and a digit. A change line itself
+ *      can be the stop line, if its description opens with the word `stop`
+ *      (a combined record of the stop and the change). A spend line (`attempt, …`) and a mention of the word `stop` inside
+ *      a description (for example, in a holder's name) do not count as a stop.
+ *   3. The budget field in the Task: the fourth field of the task line `NNN · kind | what it delivers | criterion | BUDGET |
+ *      where next`, a number with an optional word ("2", "3 attempts").
  *
- * Вердикт: КРАСНАЯ, если (i) у строки смены нет строки останова в той же карточке; (ii) поле бюджета в Задаче
- * ≠ последней записанной смене (последняя по порядку строк Истории); (iii) у карточки со сменами поле бюджета
- * не читается — равенство не доказано. Карточки без строк смены не судятся. Нераспознаваемо механически:
- * молча правленное поле бюджета без строки смены вовсе — нет основания для сравнения; это часть вердикта
- * человека при приёмке. Путь exception (как в approval-parity): строка
- *   `- `Узел`, ГГГГ-ММ-ДД: exception: … budget-stop …`
- * в History этой же карточки — находки карточки пропускаются с явной пометкой; решает человек.
+ * Verdict: RED if (i) the change line has no stop line in the same card; (ii) the budget field in the Task
+ * ≠ the last recorded change (the last in the order of the History lines); (iii) a card with changes has an
+ * unreadable budget field - the equality is not proven. Cards without change lines are not judged. Not recognizable
+ * mechanically: a silently edited budget field without any change line - no ground for comparison; that is part of
+ * the human's verdict at acceptance. The exception path (as in approval-parity): a line
+ *   `- `Node`, YYYY-MM-DD: exception: … budget-stop …`
+ * in this same card's History - the card's findings are skipped with an explicit mark; the human decides.
  *
- * Коды возврата: 0 — зелёный; 1 — КРАСНАЯ (смена без останова, поле ≠ смене, поле не читается);
- * 2 — ошибка исполнения (самопроба не сошлась, каталог доски не читается).
- * Модуль: require('./budget-stop.cjs') → { id: 'budget-stop', since: null, run, runBoard, selftest, … } —
- * форма реестра проверок; включение одной строкой в index.cjs — решение принимающего, по умолчанию гейт
- * вызывается явно (--board).
- * Часть ядра: следов проекта не несёт (запрет 16).
+ * Exit codes: 0 - green; 1 - RED (a change without a stop, the field ≠ the change, the field unreadable);
+ * 2 - a runtime error (the self-probe mismatched, the board directory unreadable).
+ * Module: require('./budget-stop.cjs') → { id: 'budget-stop', since: null, run, runBoard, selftest, … } -
+ * the form of the checks registry; inclusion by one line in index.cjs - the accepting node's decision, by default
+ * the gate is called explicitly (--board).
+ * Part of the core: carries no project traces (prohibition 16).
  */
 
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const i18n = require('../../i18n/index.cjs');
 const { cardFiles, zone } = require('../../dashboard/lib/card.cjs');
 
-const CHANGE_RE = /(?:\bbudget\b|бюджет[а-яё]{0,2})\s*:?\s*(\d+)\s*(?:→|->)\s*(\d+)/iu;
+// The form words are labels of the dictionary (keys.json), not literals of the code: Russian cards
+// change the budget with the Russian stems. An update of the words - an edit of keys.json.
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const stemsOf = (key, lang) => ((i18n.KEYS.labels[key] || {})[lang] || []).map(escapeRe);
+const BUDGET_EN = stemsOf('term.budget', 'en');
+const BUDGET_RU = stemsOf('term.budget', 'ru');
+// The change regex: the budget stem from the dictionary (EN word-bounded, RU with a suffix class over the escaped Cyrillic range U+0430..U+044F), then `: N → M` - built at runtime; the gate guards this file too.
+const CHANGE_RE = new RegExp('(?:\\b(?:' + BUDGET_EN.join('|') + ')\\b|' + BUDGET_RU.join('|') + '[\\u0430-\\u044F\\u0451]{0,2})\\s*:?\\s*(\\d+)\\s*(?:→|->)\\s*(\\d+)', 'iu');
 const QUOTE_RE = /«[^»]*»|"[^"]*"|`[^`]*`/g;
-const ILLUSTRATION_RE = /(?:поимк\w*|находк\w*|цитат\w*|цитиру\w*|пример\w*|например)[^\n()«"»]{0,40}?\([^()]*\)/gi;
-const STOP_HEAD_RE = /^-\s*`[^`]+`,\s*\d{4}-\d{2}-\d{2}:\s*(?:stop\b|останов)/i;
-const STOP_THRESHOLD_RE = /(?:budget|бюджет|порог|threshold|попытк|attempt)/i;
+const ILLUSTRATIONS = stemsOf('term.illustration', 'en').concat(stemsOf('term.illustration', 'ru'));
+const ILLUSTRATION_RE = new RegExp('(?:' + ILLUSTRATIONS.join('|') + ')\\w*[^\\n()«"»]{0,40}?\\([^()]*\\)', 'gi');
+// stop at the head of the description; the English stem ends at a word boundary, the Russian stem matches as a prefix.
+const STOP_HEAD_RE = new RegExp('^-\\s*`[^`]+`,\\s*\\d{4}-\\d{2}-\\d{2}:\\s*(?:' + stemsOf('term.stop', 'en').map((s) => s + '\\b').join('|') + '|' + stemsOf('term.stop', 'ru').join('|') + ')', 'i');
+const THRESHOLDS = stemsOf('term.threshold', 'en').concat(stemsOf('term.threshold', 'ru'));
+const STOP_THRESHOLD_RE = new RegExp('(?:' + THRESHOLDS.join('|') + ')', 'i');
 const EXCEPTION_RE = /^-\s*`[^`]+`,\s*\d{4}-\d{2}-\d{2}:\s*exception:[^\n]*budget-stop/i;
+const msg = (key, params) => i18n.message(key, params, 'ru');
 
-const err = (msg) => Object.assign(new Error(msg), { exitCode: 2 });
+const err = (m) => Object.assign(new Error(m), { exitCode: 2 });
 
 /**
- * Цитатная ограничительность: цитаты («…», "…", `…`) и скобки-иллюстрации после слов поимка/находка/цитата/
- * цитирую/пример/например вырезаются до поиска формы смены — цитата формы в прозе и описание поимки
- * не есть запись смены. Порядок: цитаты → иллюстрации → цитаты (иллюстрация может нести цитату внутри;
- * вырезание цитат первым открывает смежность маркера со скобкой). Строки останова и exception судятся
- * по исходной строке — вырезание касается только поиска формы смены.
+ * Citation strictness: quotes («…», "…", `…`) and illustration parentheses after the caught/finding/quote/
+ * quoting/example words are cut out before the change-form search - a quoted form in prose and a description
+ * of a catch is not a change record. The order: quotes → illustrations → quotes (an illustration may carry a
+ * quote inside; cutting the quotes first opens the adjacency of the marker to the parenthesis). Stop lines and
+ * exceptions are judged by the original line - the cutting concerns the change-form search only.
  */
 function stripQuoted(line) {
   const q1 = String(line).replace(QUOTE_RE, ' ');
@@ -70,14 +82,14 @@ function stripQuoted(line) {
   return q2.replace(QUOTE_RE, ' ');
 }
 
-/** Строки-события зоны History карточки; зоны нет — пусто. */
+/** Event lines of the card's History zone; no zone - empty. */
 function historyLines(text) {
   const history = zone(text, 'history');
   if (!history) return [];
   return history.split(/\r?\n/).filter((l) => /^\s*-\s/.test(l));
 }
 
-/** Строки смены бюджета: совпадение с формой `budget N→M` вне цитат и скобок-иллюстраций; порядок — порядок строк Истории. */
+/** Budget change lines: a match with the `budget N→M` form outside quotes and illustration parentheses; the order - the order of the History lines. */
 function changesOf(lines) {
   const out = [];
   for (const line of lines) {
@@ -87,17 +99,17 @@ function changesOf(lines) {
   return out;
 }
 
-/** Строка останова: описание начинается со слова stop/останов, порог назван (слово + цифра). */
+/** A stop line: the description opens with the stop word, a threshold is named (a word + a digit). */
 function isStopLine(line) {
   return STOP_HEAD_RE.test(line) && STOP_THRESHOLD_RE.test(line) && /\d/.test(line);
 }
 
-/** Путь exception: строка `exception: … budget-stop …` в History этой же карточки. */
+/** The exception path: an `exception: … budget-stop …` line in this same card's History. */
 function hasException(lines) {
   return lines.some((l) => EXCEPTION_RE.test(l));
 }
 
-/** Поле бюджета в Задаче: четвёртое поле первой строки задачи с четырьмя разделителями. */
+/** The budget field in the Task: the fourth field of the first task line with four separators. */
 function taskBudgetOf(text) {
   const task = zone(text, 'task');
   const line = task.split(/\r?\n/).find((l) => (l.match(/\|/g) || []).length >= 4);
@@ -108,7 +120,7 @@ function taskBudgetOf(text) {
   return { parsed: m ? Number(m[1]) : null, raw };
 }
 
-/** Ядро гейта: скан карточек доски (живые + done/); карточки без смен не судятся. */
+/** Core of the gate: a scan of the board's cards (live + done/); cards without changes are not judged. */
 function runBoard({ root } = {}) {
   root = root || process.cwd();
   const lines = [];
@@ -124,10 +136,11 @@ function runBoard({ root } = {}) {
     if (!changes.length) continue;
     changesSeen += changes.length;
     const code = (path.basename(file).match(/card-\d+/) || [path.basename(file)])[0];
+    const changesText = changes.map((c) => `${c.from}→${c.to}`).join(', ');
     if (hasException(hLines)) {
       lines.push({
         status: 'skipped',
-        fact: `${code}: смены бюджета (${changes.map((c) => `${c.from}→${c.to}`).join(', ')}) пропущены по exception — решает человек`,
+        fact: msg('board.budget-stop.skipped', { code, changes: changesText }),
       });
       continue;
     }
@@ -136,7 +149,7 @@ function runBoard({ root } = {}) {
       red += 1;
       lines.push({
         status: 'red',
-        fact: `${code}: строка смены бюджета (${changes.map((c) => `${c.from}→${c.to}`).join(', ')}) без строки останова с отчётом — запрет 3: бюджет меняется только через останов с отчётом и записью нового значения; форма останова: описание строки Истории начинается со слова stop/останов и называет порог; путь exception — строка exception: … budget-stop … в History этой карточки (решает человек)`,
+        fact: msg('board.budget-stop.red_no_stop', { code, changes: changesText }),
       });
     }
     const last = changes[changes.length - 1];
@@ -145,29 +158,33 @@ function runBoard({ root } = {}) {
       red += 1;
       lines.push({
         status: 'red',
-        fact: `${code}: поле бюджета в Задаче не читается${raw ? ` («${raw}»)` : ' — строки задачи с четырьмя разделителями нет'} — равенство последней записанной смене (${last.from}→${last.to}) не доказано`,
+        fact: msg('board.budget-stop.field_unreadable', {
+          code,
+          raw: raw ? msg('board.budget-stop.field_raw', { raw }) : msg('board.budget-stop.field_no_line'),
+          changes: `${last.from}→${last.to}`,
+        }),
       });
     } else if (parsed !== last.to) {
       red += 1;
       lines.push({
         status: 'red',
-        fact: `${code}: поле бюджета в Задаче (${parsed}) ≠ последней записанной смене (${last.from}→${last.to})`,
+        fact: msg('board.budget-stop.field_mismatch', { code, parsed, changes: `${last.from}→${last.to}` }),
       });
     } else if (stopOk) {
-      lines.push({ status: 'green', fact: `${code}: смена ${last.from}→${last.to} — останов записан, поле бюджета в Задаче совпадает (${parsed})` });
+      lines.push({ status: 'green', fact: msg('board.budget-stop.green', { code, changes: `${last.from}→${last.to}`, parsed }) });
     }
   }
   return { ready: red === 0, lines, cardsScanned, changesSeen, red };
 }
 
-// ---- --selftest: приборы во временном каталоге ---------------------------------------------------
+// ---- --selftest: probes in a temp directory -------------------------------------------------------
 
-/** Карточка-проба: одна строка задачи (поле бюджета подставляется) и набор строк Истории. */
+/** A probe card: one task line (the budget field substituted) and a set of History lines. */
 function probeCard(budgetField, histLines) {
   return (
-    '# проба\n\n## Task\n901 · tooling | что доставляет проба | критерий пробы | ' +
+    '# probe\n\n## Task\n901 · tooling | what the probe delivers | the probe criterion | ' +
     budgetField +
-    ' | куда далее\n\n## Kit\n\n## History\n' +
+    ' | where next\n\n## Kit\n\n## History\n' +
     histLines.join('\n') +
     '\n\n## Result\n'
   );
@@ -185,110 +202,110 @@ function selftest() {
   const results = [];
   const check = (name, cond) => results.push({ ok: !!cond, name });
   const today = new Date().toISOString().slice(0, 10);
-  const STOP = '- `Spec`, ' + today + ': останов — бюджет 1 из 1 исчерпан, отчёт: правка не встала в критерий, эскалация за новым бюджетом.';
+  const STOP = '- `Spec`, ' + today + ': stop — the budget 1 of 1 is exhausted, a report: the edit did not fit the criterion, escalation for a new budget.';
   try {
-    // а: смена с остановом и совпадающим полем — ЗЕЛЁНАЯ
+    // a: a change with a stop and a matching field - GREEN
     writeProbe(path.join(dir, 'a'), 'probe-901-budget-with-stop.md', probeCard('2', [
       STOP,
-      '- `Intent`, ' + today + ': budget 1 → 2 attempts — новый бюджет записан по останову.',
+      '- `Intent`, ' + today + ': budget 1 → 2 attempts — the new budget recorded by the stop.',
     ]));
     const ra = runBoard({ root: path.join(dir, 'a') });
-    check('а: смена с остановом и совпадающим полем = ЗЕЛЁНАЯ', ra.ready && ra.changesSeen === 1 && ra.lines.some((l) => l.status === 'green'));
+    check('a: a change with a stop and a matching field = GREEN', ra.ready && ra.changesSeen === 1 && ra.lines.some((l) => l.status === 'green'));
 
-    // б: смена без останова — КРАСНАЯ (fail-closed)
+    // b: a change without a stop - RED (fail-closed)
     writeProbe(path.join(dir, 'b'), 'probe-902-budget-no-stop.md', probeCard('3', [
-      '- `Intent`, ' + today + ': budget 2 → 3 attempts — смена записана, останова нет.',
+      '- `Intent`, ' + today + ': budget 2 → 3 attempts — the change recorded, there is no stop.',
     ]));
     const rb = runBoard({ root: path.join(dir, 'b') });
-    check('б: смена без останова = КРАСНАЯ (названо: без строки останова)', !rb.ready && rb.lines.some((l) => l.status === 'red' && l.fact.includes('без строки останова')));
+    check('b: a change without a stop = RED (named: no stop line)', !rb.ready && rb.lines.some((l) => l.status === 'red' && l.fact.includes(msg('board.budget-stop.no_stop_marker'))));
 
-    // в: поле бюджета в Задаче ≠ записанной смене — КРАСНАЯ
+    // c: the budget field in the Task ≠ the recorded change - RED
     writeProbe(path.join(dir, 'c'), 'probe-903-budget-field-mismatch.md', probeCard('2', [
       STOP,
-      '- `Intent`, ' + today + ': budget 2 → 3 attempts — смена по останову, поле не обновлено.',
+      '- `Intent`, ' + today + ': budget 2 → 3 attempts — the change by the stop, the field not updated.',
     ]));
     const rc = runBoard({ root: path.join(dir, 'c') });
-    check('в: поле бюджета ≠ записанной смене = КРАСНАЯ (названо ≠)', !rc.ready && rc.lines.some((l) => l.status === 'red' && l.fact.includes('≠')));
+    check('c: the budget field ≠ the recorded change = RED (the ≠ named)', !rc.ready && rc.lines.some((l) => l.status === 'red' && l.fact.includes('≠')));
 
-    // г: обычные строки Истории (stage exec, attempt, closed, Budget без стрелки, trap «budget-stop» в строке захода) — смен 0, ЗЕЛЁНАЯ
+    // d: ordinary History lines (stage exec, attempt, closed, Budget without an arrow, a "budget-stop" trap in a spend line) - 0 changes, GREEN
     writeProbe(path.join(dir, 'd'), 'probe-904-budget-ordinary-lines.md', probeCard('2', [
-      '- `Kit`, ' + today + ': stage exec — работа по карточке.',
-      '- `Kit`, ' + today + ': attempt, 123 tokens (100 cache-read), 10 out, 5 s, `sess-1` — запись расхода (budget-stop probe-999).',
-      '- `Intent`, ' + today + ': Budget: второй заход из двух — последняя, без стрелки.',
+      '- `Kit`, ' + today + ': stage exec — work on the card.',
+      '- `Kit`, ' + today + ': attempt, 123 tokens (100 cache-read), 10 out, 5 s, `sess-1` — a spend record (budget-stop probe-999).',
+      '- `Intent`, ' + today + ': Budget: the second attempt of two — the last, without an arrow.',
       '- `Kit`, ' + today + ': Similar: probe-901.',
-      '- `Core`, ' + today + ': closed — образ достигнут.',
+      '- `Core`, ' + today + ': closed — the image reached.',
     ]));
     const rd = runBoard({ root: path.join(dir, 'd') });
-    check('г: обычные строки Истории без стрелочных смен = ЗЕЛЁНАЯ, смен 0, ложных срабатываний нет', rd.ready && rd.changesSeen === 0 && rd.lines.length === 0);
+    check('d: ordinary History lines without arrow changes = GREEN, 0 changes, no false hits', rd.ready && rd.changesSeen === 0 && rd.lines.length === 0);
 
-    // д: две смены, каждая с остановом, поле = последней смене — ЗЕЛЁНАЯ
+    // e: two changes, each with a stop, the field = the last change - GREEN
     writeProbe(path.join(dir, 'e'), 'probe-905-budget-two-changes.md', probeCard('3', [
       STOP,
-      '- `Intent`, ' + today + ': budget 1 → 2 attempts — по останову.',
-      '- `Spec`, ' + today + ': останов — бюджет 2 из 2 исчерпан, отчёт: вторая попытка тоже мимо критерия.',
-      '- `Intent`, ' + today + ': budget 2 → 3 attempts — по второму останову.',
+      '- `Intent`, ' + today + ': budget 1 → 2 attempts — by the stop.',
+      '- `Spec`, ' + today + ': stop — the budget 2 of 2 is exhausted, a report: the second attempt also missed the criterion.',
+      '- `Intent`, ' + today + ': budget 2 → 3 attempts — by the second stop.',
     ]));
     const re = runBoard({ root: path.join(dir, 'e') });
-    check('д: две смены с остановами, поле = последней смене = ЗЕЛЁНАЯ', re.ready && re.changesSeen === 2);
+    check('e: two changes with stops, the field = the last change = GREEN', re.ready && re.changesSeen === 2);
 
-    // е: exception в той же карточке — находка пропущена с явной пометкой
+    // f: an exception in the same card - the finding skipped with an explicit mark
     writeProbe(path.join(dir, 'f'), 'probe-906-budget-exception.md', probeCard('3', [
-      '- `Intent`, ' + today + ': budget 2 → 3 attempts — смена без останова.',
-      '- `Intent`, ' + today + ': exception: budget-stop — останов был в сеансе, строка не записана — утверждено человеком.',
+      '- `Intent`, ' + today + ': budget 2 → 3 attempts — a change without a stop.',
+      '- `Intent`, ' + today + ': exception: budget-stop — the stop happened in the session, the line was not written — approved by the human.',
     ]));
     const rf = runBoard({ root: path.join(dir, 'f') });
-    check('е: exception в карточке = пропуск находки с пометкой, код зелёный', rf.ready && rf.lines.some((l) => l.status === 'skipped'));
+    check('f: an exception in the card = the finding skipped with a mark, the code green', rf.ready && rf.lines.some((l) => l.status === 'skipped'));
 
-    // ж (приёмка 2): цитата формы в прозе — НЕ смена
+    // g (acceptance 2): a quoted form in prose - NOT a change
     writeProbe(path.join(dir, 'g'), 'probe-907-budget-quote-in-prose.md', probeCard('2', [
-      '- `Intent`, ' + today + ': проверка приёмкой: поимка probe-901 сверена по файлу — строка 38 «budget 2 → 3 attempts», основания в строке есть, строки останова нет.',
+      '- `Intent`, ' + today + ': an acceptance check: caught probe-901 verified against the file — line 38 «budget 2 → 3 attempts», the grounds are in the line, there is no stop line.',
     ]));
     const rg = runBoard({ root: path.join(dir, 'g') });
-    check('ж: цитата формы «…» в прозе = НЕ смена, ЗЕЛЁНАЯ, смен 0', rg.ready && rg.changesSeen === 0);
+    check('g: a quoted form «…» in prose = NOT a change, GREEN, 0 changes', rg.ready && rg.changesSeen === 0);
 
-    // з (приёмка 2, вариант): форма в кавычках-коде — НЕ смена
+    // h (acceptance 2, variant): the form in code quotes - NOT a change
     writeProbe(path.join(dir, 'h'), 'probe-908-budget-quote-in-code.md', probeCard('2', [
-      '- `Intent`, ' + today + ': строка 38 `budget 2 → 3 attempts` — цитата формы в строке кода.',
+      '- `Intent`, ' + today + ': line 38 `budget 2 → 3 attempts` — a quoted form in a line of code.',
     ]));
     const rh = runBoard({ root: path.join(dir, 'h') });
-    check('з: цитата формы в кавычках-коде = НЕ смена, ЗЕЛЁНАЯ, смен 0', rh.ready && rh.changesSeen === 0);
+    check('h: a quoted form in code quotes = NOT a change, GREEN, 0 changes', rh.ready && rh.changesSeen === 0);
 
-    // и (приёмка 3): описание поимки без смежного budget-слова — НЕ смена (строка с budget-stop.cjs в тексте)
+    // i (acceptance 3): a catch description without an adjacent budget word - NOT a change (a line with budget-stop.cjs in the text)
     writeProbe(path.join(dir, 'i'), 'probe-909-budget-catch-description.md', probeCard('2', [
-      '- `Kit`, ' + today + ': stage exec — budget-stop.cjs собран: --selftest 6 проб зелёные (exit 0), --board живой доски — 1 поимка probe-901 (смена 2→3 без строки останова, exit 1 fail-closed).',
+      '- `Kit`, ' + today + ': stage exec — budget-stop.cjs built: --selftest 6 probes green (exit 0), --board of the live board — 1 catch of probe-901 (the change 2→3 without a stop line, exit 1 fail-closed).',
     ]));
     const ri = runBoard({ root: path.join(dir, 'i') });
-    check('и: описание поимки (смена 2→3) при budget-слове без смежности = НЕ смена, ЗЕЛЁНАЯ, смен 0', ri.ready && ri.changesSeen === 0);
+    check('i: a catch description (the change 2→3) with a budget word without adjacency = NOT a change, GREEN, 0 changes', ri.ready && ri.changesSeen === 0);
 
-    // к (приёмка 1, охрана от ослабления): настоящая запись вне цитат остаётся сменой — КРАСНАЯ
+    // j (acceptance 1, the guard against weakening): a real record outside quotes stays a change - RED
     writeProbe(path.join(dir, 'j'), 'probe-910-budget-real-record-quotes-in-reason.md', probeCard('3', [
-      '- `Intent`, ' + today + ': budget 2 → 3 attempts — основание «по команде», кавычки только в основании.',
+      '- `Intent`, ' + today + ': budget 2 → 3 attempts — the ground «by command», quotes only in the ground.',
     ]));
     const rj = runBoard({ root: path.join(dir, 'j') });
-    check('к: настоящая запись вне цитат (кавычки в основании) = по-прежнему КРАСНАЯ без останова', !rj.ready && rj.lines.some((l) => l.status === 'red' && l.fact.includes('без строки останова')));
+    check('j: a real record outside quotes (quotes in the ground) = still RED without a stop', !rj.ready && rj.lines.some((l) => l.status === 'red' && l.fact.includes(msg('board.budget-stop.no_stop_marker'))));
 
-    // л (приёмка 3, вариант): форма внутри скобок после слова поимка — НЕ смена
+    // k (acceptance 3, variant): the form inside parentheses after the caught word - NOT a change
     writeProbe(path.join(dir, 'k'), 'probe-911-budget-paren-after-marker.md', probeCard('2', [
-      '- `Kit`, ' + today + ': поимка probe-901 (смена budget 2→3 без останова) — форма внутри скобок-иллюстрации.',
+      '- `Kit`, ' + today + ': caught probe-901 (the change budget 2→3 without a stop) — the form inside an illustration parenthesis.',
     ]));
     const rk = runBoard({ root: path.join(dir, 'k') });
-    check('л: форма внутри скобок после слова поимка = НЕ смена, ЗЕЛЁНАЯ, смен 0', rk.ready && rk.changesSeen === 0);
+    check('k: the form inside parentheses after the caught word = NOT a change, GREEN, 0 changes', rk.ready && rk.changesSeen === 0);
 
     const failed = results.filter((r) => !r.ok);
     return {
       ok: failed.length === 0,
       note: failed.length
-        ? 'не сошлось: ' + failed.map((r) => r.name).join('; ')
-        : 'все 11 проб зелёные: смена с остановом и совпадающим полем ЗЕЛЁНАЯ, без останова КРАСНАЯ, поле ≠ смене КРАСНАЯ, обычные строки без ложных срабатываний, две смены с остановами ЗЕЛЁНАЯ, exception пропускает с пометкой; цитатная ограничительность: цитата формы в прозе и в кавычках-коде НЕ смена, описание поимки НЕ смена, форма в скобках после поимки НЕ смена, настоящая запись вне цитат по-прежнему КРАСНАЯ',
+        ? msg('board.selftest.mismatch') + failed.map((r) => r.name).join('; ')
+        : msg('board.budget-stop.selftest_ok'),
     };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
 
-// ---- форма реестра проверок ----------------------------------------------------------------------
+// ---- the form of the checks registry --------------------------------------------------------------
 
-/** Находки для реестра (`run(ctx)` → строки, пустой список — чисто); регистрация в index.cjs — решение принимающего. */
+/** Findings for the registry (`run(ctx)` → lines, an empty list - clean); registration in index.cjs - the accepting node's decision. */
 function run(ctx = {}) {
   const r = runBoard({ root: ctx.root });
   return r.lines.filter((l) => l.status === 'red').map((l) => 'budget-stop: ' + l.fact);
@@ -296,7 +313,7 @@ function run(ctx = {}) {
 
 module.exports = { id: 'budget-stop', since: null, run, runBoard, selftest, changesOf, taskBudgetOf, isStopLine };
 
-// ---- CLI ----------------------------------------------------------------------------------------
+// ---- CLI ------------------------------------------------------------------------------------------
 
 if (require.main === module) {
   const argv = process.argv.slice(2);
@@ -310,12 +327,12 @@ if (require.main === module) {
     }
     const r = runBoard({ root });
     for (const l of r.lines) console.log((l.status === 'green' ? '✓ ' : l.status === 'red' ? '✗ ' : '· ') + l.fact);
-    if (!r.lines.length) console.log(`· строк смены бюджета в History не найдено (карточек просмотрено: ${r.cardsScanned})`);
-    if (r.ready) console.log(`БЮДЖЕТ-СТОП: ЗЕЛЁНАЯ — смен: ${r.changesSeen} (все с остановом, поле бюджета совпадает), карточек просмотрено: ${r.cardsScanned}`);
-    else console.log(`БЮДЖЕТ-СТОП: КРАСНАЯ — находок: ${r.red} (см. строки ✗)`);
+    if (!r.lines.length) console.log(msg('board.budget-stop.cli_none', { n: r.cardsScanned }));
+    if (r.ready) console.log(msg('board.budget-stop.cli_green', { n: r.changesSeen, cards: r.cardsScanned }));
+    else console.log(msg('board.budget-stop.cli_red', { n: r.red }));
     process.exit(r.ready ? 0 : 1);
   } catch (e) {
-    console.error('СТОП: ' + e.message);
+    console.error(msg('board.stop') + e.message);
     process.exit(e.exitCode || 2);
   }
 }

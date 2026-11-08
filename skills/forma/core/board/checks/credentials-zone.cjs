@@ -2,51 +2,53 @@
 'use strict';
 
 /**
- * credentials-zone — гейт «зона реквизитов» (запрет 15, fail-closed): ЗНАЧЕНИЯ реквизитов
- * (API-ключи, токены, пароли, PEM-ключи) живут только в двух разрешённых местах — `.env`
- * в корне проекта и `project/VARS/credentials.md`; значение реквизита в любом другом файле —
- * находка. Ссылки по имени (`VARIABLE_NAME` для .env, `[[name]]` для VARS/) значениями не
- * считаются и не ловятся. Без модельных вызовов: статус по коду возврата, досье — в stdout;
- * потребители — гейты карточек (check-ready), хук движка на запись файла (Claude: PostToolUse
- * Write|Edit) и вызовы из хуков других движков по мере появления у них событий записи.
+ * credentials-zone - the "credentials zone" gate (prohibition 15, fail-closed): the VALUES of credentials
+ * (API keys, tokens, passwords, PEM keys) live only in two allowed places - `.env` in the project root and
+ * `project/VARS/credentials.md`; a credential value in any other file - a finding. References by name
+ * (`VARIABLE_NAME` for .env, `[[name]]` for VARS/) do not count as values and are not caught. No model calls:
+ * the status by the exit code, the dossier - in stdout; consumers - the card gates (check-ready), the engine's
+ * file-write hook (Claude: PostToolUse Write|Edit) and the calls from other engines' hooks as their write
+ * events appear.
  *
  *   node .forma/board/checks/credentials-zone.cjs --selftest
- *   node .forma/board/checks/credentials-zone.cjs --repo [--root <каталог>]
- *   node .forma/board/checks/credentials-zone.cjs --file <путь> [--root <каталог>]
- *   node .forma/board/checks/credentials-zone.cjs --wired [--root <каталог>]
+ *   node .forma/board/checks/credentials-zone.cjs --repo [--root <dir>]
+ *   node .forma/board/checks/credentials-zone.cjs --file <path> [--root <dir>]
+ *   node .forma/board/checks/credentials-zone.cjs --wired [--root <dir>]
  *
- * Режимы:
- *   --selftest  приборы во временном каталоге ОС: приманки-реквизиты вне разрешённых мест
- *               ловятся, сами разрешённые места и файл ссылок по имени — чисты.
- *   --repo      скан отслеживаемых файлов (git ls-files). Исключения: node_modules,
- *               .forma/protocol (его пробники несут приманки намеренно) и разрешённые места.
- *   --file      один файл — для вызова из хуков; разрешённые места пропускаются целиком.
- *   --wired     по каждому движку проекта (.forma/dashboard/lib/engines.cjs: loadAdapters)
- *               доказывает одно из двух («конструктивно либо дисциплина», ENGINE-CONTRACT.md):
- *               зарегистрированный вызов сканера из хука движка (по реестру hooks адаптера,
- *               включая вызовы через скрипт-обёртку) либо строка дисциплины с именем сканера
- *               в его файле правил §8.
+ * Modes:
+ *   --selftest  probes in the OS temp directory: bait credentials outside the allowed places
+ *               are caught, the allowed places themselves and the by-name references file - clean.
+ *   --repo      a scan of the tracked files (git ls-files). Exceptions: node_modules,
+ *               .forma/protocol (its probes carry baits deliberately) and the allowed places.
+ *   --file      one file - for a call from hooks; the allowed places are skipped whole.
+ *   --wired     for every engine of the project (.forma/dashboard/lib/engines.cjs: loadAdapters)
+ *               it proves one of the two ("constructively or by discipline", ENGINE-CONTRACT.md):
+ *               a registered scanner call from the engine's hook (by the adapter's hooks registry,
+ *               including calls through a wrapper script) or a discipline line naming the scanner
+ *               in its §8 rules file.
  *
- * Коды возврата: 0 — зелёный; 1 — находки, неприкрытый движок или несошедшаяся проба
- * selftest; 2 — ошибка исполнения (нет файла, нет git, неверный вызов).
- * Модуль: require('./credentials-zone.cjs').scanText(text) → находки; .scanFile(abs, root);
+ * Exit codes: 0 - green; 1 - findings, an uncovered engine or a mismatched selftest probe;
+ * 2 - a runtime error (no file, no git, a wrong call).
+ * Module: require('./credentials-zone.cjs').scanText(text) → findings; .scanFile(abs, root);
  * .runRepo(root); .runWired(root); .selftest().
- * Часть ядра: следов проекта не несёт (запрет 16); разрешённые места — конвенция запрета 15,
- * словарь — универсальные семейства реквизитов. Значения в досье маскируются: находка называет
- * файл, строку и семейство, но не печатает сам реквизит.
+ * Part of the core: carries no project traces (prohibition 16); the allowed places - the convention of
+ * prohibition 15, the dictionary - universal credential families. Values in the dossier are masked: a finding
+ * names the file, the line and the family, but does not print the credential itself.
  */
 
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const i18n = require('../../i18n/index.cjs');
+const msg = (key, params) => i18n.message(key, params, 'ru');
 
 const ROOT_DEFAULT = process.cwd();
-const MAX_BYTES = 16 * 1024 * 1024; // крупнее — пропуск с счётчиком, не скан
-const SCAN_FLOOR = 14;              // короче для присвоений — не реквизит
+const MAX_BYTES = 16 * 1024 * 1024; // larger - a skip with a counter, not a scan
+const SCAN_FLOOR = 14;              // shorter for assignments - not a credential
 
-// --- Разрешённые места (запрет 15): значения реквизитов живут только здесь ---------------------
-// Оба написания пути конвенции разрешены: реестр закона называет VARS/credentials.md,
-// раскладка проекта кладёт его в project/VARS/. Прочие .env (.env.local и подкаталоги) — НЕ разрешены.
+// --- Allowed places (prohibition 15): credential values live only here --------------------------
+// Both spellings of the convention's path are allowed: the law's registry names VARS/credentials.md,
+// the project layout puts it in project/VARS/. Other .env files (.env.local and subdirectories) - NOT allowed.
 
 function isAllowedPlace(rel) {
   if (rel === '.env') return true;
@@ -54,46 +56,46 @@ function isAllowedPlace(rel) {
   return false;
 }
 
-// --- Словарь признаков: ЗНАЧЕНИЯ, не имена-ссылки ----------------------------------------------
-// Семейства ключей с известными префиксами. Корпус после префикса обязан выглядеть случайно:
-// смешанные регистр и цифры — транслит-слова («poisk-…»), словарные цепочки из строчных букв
-// и плейсхолдеры вида sk-your-key-here не ловятся.
+// --- The dictionary of the signs: VALUES, not reference names ------------------------------------
+// Key families with known prefixes. The body after the prefix must look random:
+// mixed case and digits - transliterated words ("poisk-…"), dictionary chains of lowercase letters
+// and placeholders like sk-your-key-here are not caught.
 const KEY_FAMILIES = [
-  { name: 'ключ вида sk-…', re: /\bsk-[A-Za-z0-9_-]{28,}/g, body: 'sk-' },
-  { name: 'ключ вида ghp_…', re: /\bghp_[A-Za-z0-9]{36,}\b/g },
-  { name: 'ключ вида gh[pousr]_…', re: /\bgh[pousr]_[A-Za-z0-9]{30,}\b/g },
-  { name: 'ключ вида github_pat_…', re: /\bgithub_pat_[A-Za-z0-9_]{22,}\b/g },
-  { name: 'ключ вида AKIA…', re: /\bAKIA[0-9A-Z]{16}\b/g, check: null }, // форма задана самим выражением
-  { name: 'ключ вида xox…-', re: /\bxox[baprs]-[A-Za-z0-9-]{15,}\b/g },
-  { name: 'ключ вида glpat-…', re: /\bglpat-[A-Za-z0-9_-]{16,}\b/g },
-  { name: 'ключ вида AIza…', re: /\bAIza[0-9A-Za-z_-]{30,}\b/g },
-  { name: 'ключ вида gsk_…', re: /\bgsk_[A-Za-z0-9]{30,}\b/g },
-  { name: 'ключ вида hf_…', re: /\bhf_[A-Za-z0-9]{30,}\b/g },
-  { name: 'ключ вида npm_…', re: /\bnpm_[A-Za-z0-9]{30,}\b/g },
-  { name: 'ключ вида pypi-…', re: /\bpypi-[A-Za-z0-9_-]{60,}\b/g },
-  { name: 'токен вида eyJ…', re: /\beyJ[A-Za-z0-9_-]{40,}\b/g },
+  { name: () => msg('board.credentials-zone.family_sk'), re: /\bsk-[A-Za-z0-9_-]{28,}/g, body: 'sk-' },
+  { name: () => msg('board.credentials-zone.family_ghp'), re: /\bghp_[A-Za-z0-9]{36,}\b/g },
+  { name: () => msg('board.credentials-zone.family_ghpousr'), re: /\bgh[pousr]_[A-Za-z0-9]{30,}\b/g },
+  { name: () => msg('board.credentials-zone.family_github_pat'), re: /\bgithub_pat_[A-Za-z0-9_]{22,}\b/g },
+  { name: () => msg('board.credentials-zone.family_akia'), re: /\bAKIA[0-9A-Z]{16}\b/g, check: null }, // the form is given by the expression itself
+  { name: () => msg('board.credentials-zone.family_xox'), re: /\bxox[baprs]-[A-Za-z0-9-]{15,}\b/g },
+  { name: () => msg('board.credentials-zone.family_glpat'), re: /\bglpat-[A-Za-z0-9_-]{16,}\b/g },
+  { name: () => msg('board.credentials-zone.family_aiza'), re: /\bAIza[0-9A-Za-z_-]{30,}\b/g },
+  { name: () => msg('board.credentials-zone.family_gsk'), re: /\bgsk_[A-Za-z0-9]{30,}\b/g },
+  { name: () => msg('board.credentials-zone.family_hf'), re: /\bhf_[A-Za-z0-9]{30,}\b/g },
+  { name: () => msg('board.credentials-zone.family_npm'), re: /\bnpm_[A-Za-z0-9]{30,}\b/g },
+  { name: () => msg('board.credentials-zone.family_pypi'), re: /\bpypi-[A-Za-z0-9_-]{60,}\b/g },
+  { name: () => msg('board.credentials-zone.family_eyj'), re: /\beyJ[A-Za-z0-9_-]{40,}\b/g },
 ];
 
 const PEM_RE = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----/g;
 
-// Присвоения секретов с высокоэнтропийным значением в кавычках (пароли, токены, ключи без префикса).
+// Secret assignments with a high-entropy quoted value (passwords, tokens, keys without a prefix).
 const SECRET_ASSIGN_RE =
   /([A-Za-z0-9_.$/-]*(?:password|passwd|pwd|secret|api[_-]?key|apikey|access[_-]?key|auth[_-]?token|token|private[_-]?key|client[_-]?secret|credential)[A-Za-z0-9_.$/-]*)\s*[:=]\s*(["'`])([^"'\n]{14,})\2/gi;
 
-// Bearer-заголовки и реквизит внутри URL (https://user:pass@host).
+// Bearer headers and credentials inside a URL (https://user:pass@host).
 const BEARER_RE = /\bBearer\s+([A-Za-z0-9._+/=-]{20,})/g;
 const URL_CREDS_RE = /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@"]+:[^\s@/"]{6,}@[^\s"']+/g;
 
-// Ключ присвоения, по сути не секрет: ссылка-на-место, подпись, метаданные.
+// An assignment key that is by nature not a secret: a place reference, a signature, metadata.
 const ASSIGN_KEY_NOT_SECRET = /(?:url|uri|hint|label|policy|question|prompt|placeholder|example|mask|format|length|count|budget|per[_-]?minute|per[_-]?hour|type|kind|name)$/i;
 
-// Значение-заглушка или ссылка по имени: VARIABLE_NAME, [[name]], ${VAR}, <ваш-ключ>, changeme.
+// A placeholder value or a reference by name: VARIABLE_NAME, [[name]], ${VAR}, <your-key>, changeme.
 const VALUE_IS_REFERENCE =
   /^\$\{[^}]*\}$|^\[\[.*\]\]$|^<[^>]*>$|^[A-Z][A-Z0-9_]*$|^(?:x|\*|\.|#|-|_)+$|process\.env|os\.environ|getenv|changeme|placeholder|your[-_]|insert[-_ ]|example[-_]|dummy|todo|fixme|n\/a|none|null|undefined|teste?[-_]|sk-your/i;
 
-// --- Помощники ----------------------------------------------------------------------------------
+// --- Helpers --------------------------------------------------------------------------------------
 
-/** Энтропия Шеннона, бит на знак: случайный реквизит — заметно выше словарного текста. */
+/** Shannon entropy, bits per character: a random credential is noticeably above dictionary text. */
 function bitsPerChar(s) {
   const freq = new Map();
   for (const ch of s) freq.set(ch, (freq.get(ch) || 0) + 1);
@@ -109,12 +111,12 @@ function charClasses(s) {
   return [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((re) => re.test(s)).length;
 }
 
-/** Корпус после префикса выглядит случайно: есть и цифры, и оба регистра. */
+/** The body after the prefix looks random: it has both digits and both cases. */
 function bodyLooksRandom(body) {
   return /[0-9]/.test(body) && /[A-Z]/.test(body) && /[a-z]/.test(body);
 }
 
-/** Значение присвоения не реквизит: ссылка по имени, заглушка, слишком словарное, URL без userinfo. */
+/** An assignment value that is not a credential: a reference by name, a placeholder, too dictionary-like, a URL without userinfo. */
 function valueIsNotSecret(value) {
   if (VALUE_IS_REFERENCE.test(value)) return true;
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value) && !URL_CREDS_RE.test(value)) return true;
@@ -123,9 +125,9 @@ function valueIsNotSecret(value) {
   return false;
 }
 
-/** Реквизит в досье не печатается: маска с длиной. */
+/** A credential is not printed in the dossier: a mask with the length. */
 function maskValue(s) {
-  return s.length <= 8 ? '***' : s.slice(0, 6) + '…(' + s.length + ' зн.)';
+  return s.length <= 8 ? '***' : s.slice(0, 6) + msg('board.credentials-zone.mask_tail', { n: s.length });
 }
 
 function lineOf(text, index) {
@@ -135,8 +137,8 @@ function lineOf(text, index) {
 }
 
 /**
- * Скан текста: список находок [{ line, family, value (маска) }]. Ловит только значения;
- * ссылки по имени ([[name]], VARIABLE_NAME, ${VAR}, process.env.X) не ловит.
+ * A text scan: a list of findings [{ line, family, value (a mask) }]. Catches values only;
+ * references by name ([[name]], VARIABLE_NAME, ${VAR}, process.env.X) it does not catch.
  */
 function scanText(text) {
   const out = [];
@@ -154,59 +156,59 @@ function scanText(text) {
       const matched = m[0];
       if (fam.check !== null) {
         const body = fam.body ? matched.slice(fam.body.length) : matched.replace(/^[^A-Za-z0-9]+/, '');
-        if (!bodyLooksRandom(body)) continue; // словарное слово или транслит, не случайный корпус
+        if (!bodyLooksRandom(body)) continue; // a dictionary word or a transliteration, not a random body
       }
-      push(m.index, fam.name, matched);
+      push(m.index, fam.name(), matched);
     }
   }
   PEM_RE.lastIndex = 0;
   let m;
-  while ((m = PEM_RE.exec(text)) !== null) push(m.index, 'PEM-заголовок приватного ключа', m[0]);
+  while ((m = PEM_RE.exec(text)) !== null) push(m.index, msg('board.credentials-zone.family_pem'), m[0]);
   SECRET_ASSIGN_RE.lastIndex = 0;
   while ((m = SECRET_ASSIGN_RE.exec(text)) !== null) {
     const key = m[1];
     const value = m[3];
-    if (ASSIGN_KEY_NOT_SECRET.test(key)) continue; // url/hint/label и метаданные — не секрет
+    if (ASSIGN_KEY_NOT_SECRET.test(key)) continue; // url/hint/label and metadata - not a secret
     if (valueIsNotSecret(value)) continue;
-    push(m.index, 'присвоение секрета («' + key.trim() + '»)', value);
+    push(m.index, msg('board.credentials-zone.family_assign', { key: key.trim() }), value);
   }
   BEARER_RE.lastIndex = 0;
   while ((m = BEARER_RE.exec(text)) !== null) {
     if (valueIsNotSecret(m[1])) continue;
-    push(m.index, 'Bearer-токен', m[1]);
+    push(m.index, msg('board.credentials-zone.family_bearer'), m[1]);
   }
   URL_CREDS_RE.lastIndex = 0;
-  while ((m = URL_CREDS_RE.exec(text)) !== null) push(m.index, 'реквизит внутри URL', m[0]);
+  while ((m = URL_CREDS_RE.exec(text)) !== null) push(m.index, msg('board.credentials-zone.family_url'), m[0]);
   return out.sort((a, b) => a.line - b.line || a.family.localeCompare(b.family));
 }
 
-/** Скан одного файла: разрешённые места пропускаются целиком; бинарное и крупное — пропуск с пометкой. */
+/** A scan of one file: the allowed places are skipped whole; binary and large - a skip with a mark. */
 function scanFile(abs, root) {
   const rel = path.relative(root || path.dirname(abs), abs).split(path.sep).join('/');
-  if (isAllowedPlace(rel)) return { findings: [], note: 'разрешённое место (' + rel + ')' };
+  if (isAllowedPlace(rel)) return { findings: [], note: msg('board.credentials-zone.note_allowed', { rel }) };
   let buf;
   try {
     const st = fs.statSync(abs);
-    if (st.size > MAX_BYTES) return { findings: [], note: 'пропущен: крупнее ' + MAX_BYTES + ' байт' };
+    if (st.size > MAX_BYTES) return { findings: [], note: msg('board.credentials-zone.note_too_big', { n: MAX_BYTES }) };
     buf = fs.readFileSync(abs);
   } catch (e) {
-    const err = new Error('файл не прочитан: ' + rel + ' — ' + e.message);
+    const err = new Error(msg('board.credentials-zone.err_unreadable', { rel, why: e.message }));
     err.exitCode = 2;
     err.code = e.code || 'EREAD';
     throw err;
   }
-  if (buf.slice(0, 8192).includes(0)) return { findings: [], note: 'пропущен: бинарный' };
+  if (buf.slice(0, 8192).includes(0)) return { findings: [], note: msg('board.credentials-zone.note_binary') };
   const text = buf.toString('utf8');
   return { findings: scanText(text).map((f) => ({ ...f, file: rel })), note: null };
 }
 
-/** Режим --repo: скан отслеживаемых файлов; возвращает { findings, checked, notes }. */
+/** The --repo mode: a scan of the tracked files; returns { findings, checked, notes }. */
 function runRepo(root) {
   let out;
   try {
     out = require('child_process').execFileSync('git', ['-C', root, 'ls-files', '-z'], { maxBuffer: 64 * 1024 * 1024 });
   } catch (e) {
-    const err = new Error('git ls-files не выполнен: ' + e.message);
+    const err = new Error(msg('board.credentials-zone.err_lsfiles', { why: e.message }));
     err.exitCode = 2;
     throw err;
   }
@@ -222,8 +224,8 @@ function runRepo(root) {
     try {
       r = scanFile(path.join(root, ...rel.split('/')), root);
     } catch (e) {
-      // в индексе есть, на диске нет (удалён в рабочем дереве) или не читается — пометка, не падение
-      notes.push(rel + ': не прочитан (' + (e.code || e.message.split('\n')[0]) + ')');
+      // in the index but not on disk (removed in the working tree) or unreadable - a mark, not a crash
+      notes.push(rel + ': ' + msg('board.credentials-zone.note_unreadable', { why: e.code || e.message.split('\n')[0] }));
       continue;
     }
     if (r.note) notes.push(rel + ': ' + r.note);
@@ -233,12 +235,12 @@ function runRepo(root) {
   return { findings, checked, notes };
 }
 
-// --- Режим --wired: конструктивно либо дисциплина, по движкам -----------------------------------
+// --- The --wired mode: constructively or by discipline, per engine ---------------------------------
 
 const SCANNER_MARK = 'credentials-zone';
 const SCANNER_FILE = 'credentials-zone.cjs';
 
-/** Рекурсивно собирает строки из JSON-конфига хуков. */
+/** Recursively collects the strings of a hooks JSON config. */
 function collectStrings(v, acc) {
   if (typeof v === 'string') acc.push(v);
   else if (Array.isArray(v)) v.forEach((x) => collectStrings(x, acc));
@@ -247,8 +249,8 @@ function collectStrings(v, acc) {
 }
 
 /**
- * Хук-доказательство по реестру hooks адаптера (engineSettings): зарегистрированная команда
- * называет сканер напрямую либо вызывает скрипт-обёртку, который его вызывает.
+ * A hook proof by the adapter's hooks registry (engineSettings): a registered command
+ * names the scanner directly or calls a wrapper script that calls it.
  */
 function hookWired(adapter, root) {
   let hooks = [];
@@ -278,19 +280,19 @@ function hookWired(adapter, root) {
   return { wired: false, wrappers: checkedWrappers };
 }
 
-/** Дисциплина-доказательство: §8 движка называет сканер (строка дисциплины, ENGINE-CONTRACT.md). */
+/** A discipline proof: the engine's §8 names the scanner (a discipline line, ENGINE-CONTRACT.md). */
 function disciplineWired(adapter, root) {
   if (!adapter.engineRulesFile) return false;
   const abs = path.join(root, ...adapter.engineRulesFile.split('/'));
   try { return fs.readFileSync(abs, 'utf8').includes(SCANNER_FILE); } catch { return false; }
 }
 
-/** Режим --wired: по каждому движку — хук либо строка дисциплины. Возвращает { rows, ready }. */
+/** The --wired mode: per engine - a hook or a discipline line. Returns { rows, ready }. */
 function runWired(root) {
   const { loadAdapters } = require('../../dashboard/lib/engines.cjs');
   const adapters = loadAdapters(root);
   if (!adapters.length) {
-    const err = new Error('движков не найдено: ни одного адаптера ' + 'forma-adapter.cjs в каталогах корня');
+    const err = new Error(msg('board.credentials-zone.err_no_engines'));
     err.exitCode = 2;
     throw err;
   }
@@ -302,14 +304,14 @@ function runWired(root) {
     return {
       id,
       rules,
-      mode: hook.wired ? 'конструктивно' : disc ? 'дисциплина' : null,
+      mode: hook.wired ? msg('board.credentials-zone.mode_hook') : disc ? msg('board.credentials-zone.mode_disc') : null,
       via: hook.wired ? hook.via : disc ? rules : null,
     };
   });
   return { rows, ready: rows.every((r) => r.mode !== null) };
 }
 
-// --- Режим --selftest: приборы во временном каталоге ОС -----------------------------------------
+// --- The --selftest mode: probes in the OS temp directory ------------------------------------------
 
 function selftest() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'credentials-zone-'));
@@ -320,27 +322,27 @@ function selftest() {
     const jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N0UXtuxEBrKfyoBfjbVoww';
     const fixtures = [
       { rel: 'outside/openai-key.txt', text: 'OPENAI_API_KEY=' + sk + '\n', expect: 'caught' },
-      { rel: 'outside/github-token.md', text: 'токен: ' + ghp + '\n', expect: 'caught' },
-      { rel: 'outside/aws.txt', text: 'ключ AKIAIOSFODNN7EXAMPLE в тексте\n', expect: 'caught' },
+      { rel: 'outside/github-token.md', text: 'token: ' + ghp + '\n', expect: 'caught' },
+      { rel: 'outside/aws.txt', text: 'the key AKIAIOSFODNN7EXAMPLE in the text\n', expect: 'caught' },
       { rel: 'outside/server.pem', text: '-----BEGIN RSA PRIVATE KEY-----\nMIIB\n-----END RSA PRIVATE KEY-----\n', expect: 'caught' },
       { rel: 'outside/config.yaml', text: 'password = "' + pwd + '"\n', expect: 'caught' },
       { rel: 'outside/jwt.txt', text: 'Authorization: Bearer ' + jwt + '\n', expect: 'caught' },
-      { rel: 'outside/db-url.txt', text: 'доступ: postgres://admin:S3cr3tP4' + 'ss' + String.fromCharCode(64) + 'db.example' + '.internal:5432/base\n', expect: 'caught' },
+      { rel: 'outside/db-url.txt', text: 'access: postgres://admin:S3cr3tP4' + 'ss' + String.fromCharCode(64) + 'db.example' + '.internal:5432/base\n', expect: 'caught' },
       { rel: '.env', text: 'DEEPSEEK_API_KEY=' + sk + '\nAPP_PASSWORD=' + pwd + '\n', expect: 'allowed' },
       {
         rel: 'project/VARS/credentials.md',
-        text: '# Тестовые аккаунты\n\npassword: ' + pwd + '\ntoken: ' + ghp + '\n',
+        text: '# Test accounts\n\npassword: ' + pwd + '\ntoken: ' + ghp + '\n',
         expect: 'allowed',
       },
       {
         rel: 'outside/refs.md',
         text: [
-          '[[smtp-password]] — ссылка по имени, значение в project/VARS/credentials.md',
-          'см. [[test-user-1]] (VARS/)',
-          'OPENROUTER_API_KEY и DEEPSEEK_API_KEY — имена переменных (.env)',
+          '[[smtp-password]] — a reference by name, the value in project/VARS/credentials.md',
+          'see [[test-user-1]] (VARS/)',
+          'OPENROUTER_API_KEY and DEEPSEEK_API_KEY — variable names (.env)',
           'const apiKey = process.env.OPENAI_API_KEY;',
           'const token = os.environ["MY_ACCESS_TOKEN"];',
-          '${DB_PASSWORD} — подстановка по имени',
+          '${DB_PASSWORD} — a substitution by name',
           'VARIABLE_NAME=NOT_A_SECRET',
           'password = "changeme"',
           'api_key = "YOUR_API_KEY_HERE"',
@@ -378,11 +380,11 @@ function selftest() {
   }
 }
 
-// --- CLI ----------------------------------------------------------------------------------------
+// --- CLI -------------------------------------------------------------------------------------------
 
 function printFileFindings(findings) {
   for (const f of findings) {
-    console.log('  ' + (f.file ? f.file + ':' : 'строка ') + f.line + ' — ' + f.family + ' — ' + f.value);
+    console.log('  ' + (f.file ? f.file + ':' : msg('board.credentials-zone.no_file_prefix')) + f.line + ' — ' + f.family + ' — ' + f.value);
   }
 }
 
@@ -394,34 +396,34 @@ function main() {
   if (argv.includes('--selftest')) {
     const st = selftest();
     for (const p of st.probes) {
-      const tag = p.fx.expect === 'caught' ? 'приманка' : p.fx.expect === 'allowed' ? 'разрешённое место' : 'ссылки по имени';
+      const tag = p.fx.expect === 'caught' ? msg('board.credentials-zone.tag_bait') : p.fx.expect === 'allowed' ? msg('board.credentials-zone.tag_allowed') : msg('board.credentials-zone.tag_refs');
       if (p.ok) {
         const fam = p.findings && p.findings.length ? ' (' + p.findings[0].family + ')' : '';
-        console.log('✓ ' + p.fx.rel + ' — ' + tag + ' — как ждали' + fam);
+        console.log('✓ ' + p.fx.rel + ' — ' + tag + ' — ' + msg('board.credentials-zone.as_expected') + fam);
       } else {
-        console.log('✗ ' + p.fx.rel + ' — ' + tag + ' — ПРОБА НЕ СОШЛАСЬ' + (p.why ? ': ' + p.why : ''));
+        console.log('✗ ' + p.fx.rel + ' — ' + tag + ' — ' + msg('board.credentials-zone.probe_failed') + (p.why ? ': ' + p.why : ''));
       }
     }
     const caught = st.probes.filter((p) => p.fx.expect === 'caught').length;
     const passed = st.probes.filter((p) => p.ok).length;
     if (st.ok) {
-      console.log('selftest: ГОТОВ — ловит ' + caught + ' приманок, пропускает разрешённые места и ссылки по имени (проб: ' + st.probes.length + ')');
+      console.log(msg('board.credentials-zone.selftest_green', { n: caught, total: st.probes.length }));
       process.exit(0);
     }
-    console.log('selftest: ПРОВАЛ — проб сошлось ' + passed + ' из ' + st.probes.length + '; словарь или разрешённые места расходятся с приборами');
+    console.log(msg('board.credentials-zone.selftest_red', { n: passed, total: st.probes.length }));
     process.exit(1);
   }
 
   if (argv.includes('--repo')) {
     const r = runRepo(root);
-    console.log('проверено файлов: ' + r.checked + (r.notes.length ? '; пропущено: ' + r.notes.length + ' (' + r.notes.slice(0, 5).join('; ') + ')' : ''));
+    console.log(msg('board.credentials-zone.checked_line', { n: r.checked, notes: r.notes.length ? msg('board.credentials-zone.skipped_part', { n: r.notes.length, list: r.notes.slice(0, 5).join('; ') }) : '' }));
     if (r.findings.length) {
-      console.log('НАХОДКИ (' + r.findings.length + '):');
+      console.log(msg('board.credentials-zone.findings_header', { n: r.findings.length }));
       printFileFindings(r.findings);
-      console.log('НАЙДЕНО ПОДОЗРЕНИЙ НА РЕКВИЗИТЫ ВНЕ РАЗРЕШЁННЫХ МЕСТ: ' + r.findings.length + ' — словарь не ослаблять: гейт судится исключением (exception: в History) или человеком');
+      console.log(msg('board.credentials-zone.repo_red', { n: r.findings.length }));
       process.exit(1);
     }
-    console.log('РЕКВИЗИТОВ ВНЕ РАЗРЕШЁННЫХ МЕСТ НЕ НАЙДЕНО (исключения: node_modules, .forma/protocol, .env, project/VARS/credentials.md)');
+    console.log(msg('board.credentials-zone.repo_clean'));
     process.exit(0);
   }
 
@@ -429,27 +431,27 @@ function main() {
   if (fileIdx >= 0) {
     const target = path.resolve(argv[fileIdx + 1] || '');
     if (!argv[fileIdx + 1]) {
-      console.error('СТОП: --file требует путь');
+      console.error(msg('board.stop') + msg('board.credentials-zone.err_file_path'));
       process.exit(2);
     }
     let r;
     try {
       r = scanFile(target, root);
     } catch (e) {
-      console.error('СТОП: ' + e.message);
+      console.error(msg('board.stop') + e.message);
       process.exit(e.exitCode || 2);
     }
     if (r.note) {
-      console.log('--file: чисто — ' + r.note);
+      console.log(msg('board.credentials-zone.file_clean', { note: r.note }));
       process.exit(0);
     }
     if (r.findings.length) {
-      console.log('НАХОДКИ (' + r.findings.length + '):');
+      console.log(msg('board.credentials-zone.findings_header', { n: r.findings.length }));
       printFileFindings(r.findings);
-      console.log('СТОП: значение реквизита вне разрешённых мест (' + path.relative(root, target).split(path.sep).join('/') + ') — значения живут только в .env (корень) и project/VARS/credentials.md; ссылка по имени ([[name]] / VARIABLE_NAME) — вместо значения');
+      console.log(msg('board.credentials-zone.file_red', { rel: path.relative(root, target).split(path.sep).join('/') }));
       process.exit(1);
     }
-    console.log('--file: реквизитов не найдено (' + path.relative(root, target).split(path.sep).join('/') + ')');
+    console.log(msg('board.credentials-zone.file_clean_ok', { rel: path.relative(root, target).split(path.sep).join('/') }));
     process.exit(0);
   }
 
@@ -458,22 +460,22 @@ function main() {
     try {
       r = runWired(root);
     } catch (e) {
-      console.error('СТОП: ' + e.message);
+      console.error(msg('board.stop') + e.message);
       process.exit(e.exitCode || 2);
     }
     for (const row of r.rows) {
       if (row.mode) console.log('✓ ' + row.id + ' — ' + row.mode + ' (' + row.via + ')');
-      else console.log('✗ ' + row.id + ' — не прикрыт: ни зарегистрированного вызова сканера из хука, ни строки дисциплины в ' + (row.rules || '§8 (файл правил не объявлен адаптером)'));
+      else console.log('✗ ' + row.id + ' — ' + msg('board.credentials-zone.wired_uncovered', { rules: row.rules || msg('board.credentials-zone.wired_no_rules') }));
     }
     if (r.ready) {
-      console.log('ЗАПРЕТ 15 ПРИКРЫТ У ВСЕХ ДВИЖКОВ (конструктивно либо дисциплина): ' + r.rows.map((x) => x.id).join(', '));
+      console.log(msg('board.credentials-zone.wired_green', { list: r.rows.map((x) => x.id).join(', ') }));
       process.exit(0);
     }
-    console.log('ЕСТЬ НЕПРИКРЫТЫЕ ДВИЖКИ — подключи хук или добавь строку дисциплины в §8');
+    console.log(msg('board.credentials-zone.wired_red'));
     process.exit(1);
   }
 
-  console.error('usage: node .forma/board/checks/credentials-zone.cjs --selftest | --repo | --file <путь> | --wired [--root <каталог>]');
+  console.error(msg('board.credentials-zone.usage'));
   process.exit(2);
 }
 

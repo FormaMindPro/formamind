@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// Приводит карточки доски (открытые и закрытые) к английским ключам протокола, по словарю .forma/i18n/keys.json:
-//   - заголовки зон: `## Задача` → `## Task` (Task, Kit, History, Result), якорь зоны не нужен;
-//   - вид карточки в первом поле задачи: `дело | оснастка | решение` → `work | tooling | decision`;
-//   - ключи «Снаряжения»: `Роль:` → `Role:`, `Скилл:` → `Skill:`, `Инструменты:` → `Tools:` …;
-//   - глаголы истории: `закрыто —` → `closed —`, `заход,` → `attempt,`, `человек одобрил` → `human approved`, `Сервис,` → `Service,`.
-// Тексты (значения, описания, строки истории после глагола) остаются на языке проекта.
+// Brings the board cards (open and closed) to the English keys of the protocol, by the dictionary .forma/i18n/keys.json:
+//   - zone headings: the Russian `## <heading>` → `## Task` (Task, Kit, History, Result), no zone anchor needed;
+//   - the card kind in the task's first field: the Russian kind words → `work | tooling | decision`;
+//   - the "Kit" keys: the Russian key labels → `Role:`, `Skill:`, `Tools:` …;
+//   - history verbs: the Russian verbs → `closed —`, `attempt,`, `human approved`, `Service,` (the mapping - the dictionary labels).
+// Texts (values, descriptions, history lines after the verb) stay in the project language.
 //
-//   node .forma/board/migrate-keys.cjs                  отчёт по каждой карточке (dry-run), ничего не пишет
-//   node .forma/board/migrate-keys.cjs --apply          резервная копия карточки в project/cards/card-NNN/assets/, затем запись
-//   node .forma/board/migrate-keys.cjs --card NNN       только эта карточка (повторяемо)
+//   node .forma/board/migrate-keys.cjs                  a report per card (dry-run), nothing is written
+//   node .forma/board/migrate-keys.cjs --apply          a backup of the card into project/cards/card-NNN/assets/, then a write
+//   node .forma/board/migrate-keys.cjs --card NNN       only this card (repeatable)
 //
-// Идемпотентно: у карточки без русских ключей ничего не меняется, копия существующую не затирает. После записи — проверка доски.
-// Часть ядра: языка проекта не знает, всё берёт из словаря.
+// Idempotent: a card without Russian keys changes nothing, a copy does not overwrite an existing one. After a write - the board check.
+// Part of the core: it knows no project language, everything comes from the dictionary.
 
 const fs = require('fs');
 const path = require('path');
@@ -24,11 +24,12 @@ const L = i18n.KEYS.labels;
 const ru = (key) => (L[key] || {}).ru || [];
 const en = (key) => (L[key] || {}).en || [];
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const msg = (key, params) => i18n.message(key, params, 'ru');
 
 const ZONES = ['task', 'kit', 'history', 'result'];
 const zoneOfHeading = (core) => ZONES.find((z) => i18n.headingRe('zone.' + z, '').test(core)) || null;
 
-// Ключи «Снаряжения»: русский лейбл (с окончанием) → английский; множественное — по окончанию.
+// The "Kit" keys: the Russian label (with an ending) → the English one; the plural - by the ending.
 const KIT_KEYS = Object.keys(L).filter((k) => k.startsWith('kit.'));
 const KIT_RU = KIT_KEYS.flatMap((k) => ru(k));
 const KIT_RE = new RegExp('(^|[\\s·(;*>-])(' + KIT_RU.map(escapeRe).join('|') + ')(\\p{L}{0,3})(?=\\*{0,2}\\s*[:—–])', 'gu');
@@ -36,11 +37,12 @@ function kitEnglish(label, suffix) {
   const key = i18n.keyOf(label + suffix, 'kit');
   if (!key) return null;
   const word = en(key)[0];
-  const plural = /^(ы|и|я)$/.test(suffix) && !/s$/.test(word);
+  // The Russian plural endings by \u escapes (three vowel letters) - this file is guarded by the gate itself.
+  const plural = /^(\u044B|\u0438|\u044F)$/.test(suffix) && !/s$/.test(word);
   return plural ? word + 's' : word;
 }
 
-// Глаголы истории: [регулярка по строке, замена]; русская часть — лейблы словаря.
+// History verbs: [a line regex, a replacement]; the Russian part - the dictionary labels.
 const NODE = '(- `[^`]+`, \\d{4}-\\d{2}-\\d{2}[^:\\n]*: )';
 const VERBS = [
   [new RegExp('^' + NODE + '(?:' + ru('hist.closed').map(escapeRe).join('|') + ')(?= —)'), '$1' + en('hist.closed')[0]],
@@ -50,7 +52,7 @@ const VERBS = [
   [new RegExp('^- (?:' + ru('service').map(escapeRe).join('|') + ')(?=,\\s*\\d{4}-\\d{2}-\\d{2}:)'), '- ' + en('service')[0]],
 ];
 
-/** Новый текст карточки и счётчики правок по видам. */
+/** The new card text and the counters of the edits by kind. */
 function migrate(text) {
   const n = { headings: 0, kind: 0, kit: 0, verbs: 0 };
   let zone = null, kindDone = false;
@@ -117,12 +119,14 @@ function main() {
     fs.writeFileSync(f, r.text);
     touched.push(name.replace(/\.md$/, ''));
   }
-  console.log(`${apply ? 'записано' : 'к записи (dry-run)'}: ${changed} из ${files.length} карточек; правок: заголовки ${totals.headings}, вид ${totals.kind}, ключи Снаряжения ${totals.kit}, глаголы истории ${totals.verbs}`);
+  console.log(msg(apply ? 'board.migrate-keys.written' : 'board.migrate-keys.to_write', {
+    changed, total: files.length, headings: totals.headings, kind: totals.kind, kit: totals.kit, history: totals.verbs,
+  }));
   if (apply && touched.length) {
     let out = '';
     try { out = execFileSync(process.execPath, [path.join(__dirname, 'check-board.cjs')], { cwd: ROOT, encoding: 'utf8' }); } catch (e) { out = (e.stdout || '') + (e.stderr || ''); process.exitCode = 1; }
     const bad = out.split('\n').filter((l) => touched.some((c) => l.includes(c)));
-    if (bad.length) { console.error(bad.join('\n')); process.exitCode = 1; } else console.log('check-board: по тронутым карточкам замечаний нет');
+    if (bad.length) { console.error(bad.join('\n')); process.exitCode = 1; } else console.log(msg('board.migrate-keys.checkboard_clean'));
   }
 }
 

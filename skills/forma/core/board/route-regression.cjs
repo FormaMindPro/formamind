@@ -2,37 +2,39 @@
 'use strict';
 
 /**
- * Регрессия маршрута (закон §2) — машинная, без модельных вызовов.
- * Песочница во временном каталоге: консервированная карточка проходит имитацию Spec→Kit→Run
- * (строки этапа, смена status/assignee по §7, строка расхода по §3), и на каждом шаге живые
- * проверки доски (.forma/board/checks/) обязаны быть чистыми. Затем пробы подмены: сломанный
- * маркер позиции, пропущенное поле из пяти, битая строка расхода, «закрытие без результата» —
- * каждая ловится находкой с адресом (имя файла) и ненулевым кодом возврата.
+ * The route regression (the law §2) - machine-made, without model calls.
+ * A sandbox in a temp directory: a canned card passes the imitation of Spec→Kit→Run
+ * (the stage lines, the status/assignee change by §7, the spend line by §3), and at every step the live
+ * board checks (.forma/board/checks/) must be clean. Then the tamper probes: a broken
+ * position marker, a missing field of the five, a broken spend line, "a closing without a result" -
+ * each caught by a finding with an address (the file name) and a non-zero exit code.
  *
- * Запускается само прогоном check-board / sync-engines --check (проверка-обёртка
- * checks/route-regression.cjs) — после правок AGENTS.md и файлов ролей домохозяйство гоняет
- * именно этот прогон, отдельной команды помнить не нужно.
+ * It is run by the check-board / sync-engines --check pass itself (the wrapper check
+ * checks/route-regression.cjs) - after edits of AGENTS.md and the role files the housekeeping runs
+ * exactly this pass; there is no separate command to remember.
  *
- *   node .forma/board/route-regression.cjs          — прогон; код 0 чисто, 1 ловля/провал
- *   node .forma/board/route-regression.cjs --quiet  — одна строка итога
- * Модуль: runRegression() → { problems: [...] } — находки с адресами.
+ *   node .forma/board/route-regression.cjs          - a run; code 0 clean, 1 caught/failed
+ *   node .forma/board/route-regression.cjs --quiet  - one summary line
+ * Module: runRegression() → { problems: [...] } - findings with addresses.
  */
 
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const i18n = require('../i18n/index.cjs');
+const msg = (key, params) => i18n.message(key, params, 'ru');
 
 const MARKERS = ['holding course', 'counting cost', 'assembling', 'preserving'];
 const FIVE_KEYS = ['kind', 'delivers', 'criterion', 'budget', 'next'];
-const D = () => new Date().toISOString().slice(0, 10);  // дата песочницы — рантаймом, не литералом (запрет 16)
-const NNN = String(Date.now()).slice(-3);  // номер карточки песочницы — рантаймом, не литералом (запрет 16)
+const D = () => new Date().toISOString().slice(0, 10);  // the sandbox date - in runtime, not a literal (prohibition 16)
+const NNN = String(Date.now()).slice(-3);  // the sandbox card number - in runtime, not a literal (prohibition 16)
 
-// Живые проверки доски, работающие от корня песочницы без журнала движка.
+// Live board checks, working from the sandbox root without an engine journal.
 const CHECK_IDS = ['route-labels', 'route-stage', 'status-values', 'key-language', 'spend-language', 'attempt-parses', 'attempt-format', 'agent-id', 'engine-tag'];
 const checks = {};
 for (const id of CHECK_IDS) checks[id] = require('./checks/' + id + '.cjs');
 
-function cardName() { return 'card-' + '900-route-regression-sandbox.md'; }  // код песочницы собран: чистая зона, запрет 16
+function cardName() { return 'card-' + '900-route-regression-sandbox.md'; }  // the sandbox code assembled: a clean zone, prohibition 16
 
 function cannedCard() {
   return [
@@ -53,7 +55,7 @@ function cannedCard() {
     '',
     '## History',
     '- `Intent`, ' + D() + ': route route-7 (why: tooling).',
-    '- `Intent`, ' + D() + ': stage card — карточка создана.',
+    '- `Intent`, ' + D() + ': stage card — the card created.',
     '',
     '## Result',
     ''
@@ -72,7 +74,7 @@ function setPair(text, status, assignee) {
 
 function addLine(text, line) { return text.replace(/\n\n## Result/, '\n' + line + '\n\n## Result'); }
 
-/** Находки живых проверок по карточке песочницы. */
+/** The findings of the live checks over the sandbox card. */
 function boardFindings(dir) {
   const out = [];
   for (const id of CHECK_IDS) {
@@ -82,50 +84,50 @@ function boardFindings(dir) {
   return out;
 }
 
-/** Маркер позиции — первая строка любой передачи (закон §4). */
+/** The position marker - the first line of any handoff (the law §4). */
 function markerProblem(handoff) {
   const first = String(handoff).split('\n')[0].trim();
-  return MARKERS.includes(first) ? [] : ['handoff: маркер позиции «' + first + '» — нет такого маркера (' + MARKERS.join('|') + ')'];
+  return MARKERS.includes(first) ? [] : [msg('board.route-regression.bad_marker', { marker: first, markers: MARKERS.join('|') })];
 }
 
-/** Пять полей карточки: kind | delivers | criterion | budget | next (закон §6). */
+/** The five fields of a card: kind | delivers | criterion | budget | next (the law §6). */
 function fiveFieldProblems(text) {
   const m = text.match(/^## Task\n(\d+ · .+)$/m);
-  if (!m) return [cardName() + ': зона Task не держит строку пяти полей'];
+  if (!m) return [cardName() + ': ' + msg('board.route-regression.no_five_fields')];
   const parts = m[1].split('|').map(s => s.trim());
-  if (parts.length !== 5) return [cardName() + ': полей ' + parts.length + ' вместо 5 (kind|delivers|criterion|budget|next)'];
+  if (parts.length !== 5) return [cardName() + ': ' + msg('board.route-regression.field_count', { n: parts.length })];
   return [];
 }
 
-/** Строка расхода — канон §3, читается парсером spend-line (attempt-parses это и проверяет). */
+/** The spend line - the §3 canon, read by the spend-line parser (attempt-parses checks exactly this). */
 function spendLine(node, tokens) {
-  return '- `' + node + '`, ' + D() + ': attempt, ' + tokens + ' tokens (0 cache-read), 12 out, 3 s, `agent_sandbox-0001` — sandbox: имитация шага';
+  return '- `' + node + '`, ' + D() + ': attempt, ' + tokens + ' tokens (0 cache-read), 12 out, 3 s, `agent_sandbox-0001` — sandbox: a step imitation';
 }
 
-/** «Театр подтверждения»: карточка ушла в приёмку, а Result пуст — подмена результата. */
+/** "The confirmation theater": the card went to acceptance while Result is empty - a substituted result. */
 function substitutionProblems(text) {
   const status = (text.match(/^status:\s*"?([\w-]+)/m) || [])[1];
   const result = (text.split(/## Result/)[1] || '').trim();
   if ((status === 'review' || status === 'done') && !result) {
-    return [cardName() + ': статус ' + status + ', а зона Result пуста — результат подменён этапом'];
+    return [cardName() + ': ' + msg('board.route-regression.empty_result', { status })];
   }
   return [];
 }
 
-/** Один прогон: имитация + пробы. Возвращает находки (пустой список — регрессия чиста). */
+/** One run: the imitation + the probes. Returns the findings (an empty list - the regression is clean). */
 function runRegression() {
   const problems = [];
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-route-reg-'));
   try {
-    // --- Фаза 1: честный прогон Spec → Kit → Run -----------------------------------------
+    // --- Phase 1: the honest run of Spec → Kit → Run ---------------------------------------
     let text = cannedCard();
     const steps = [
-      { status: 'todo', assignee: 'Kit', line: '- `Kit`, ' + D() + ': stage kit — снаряжение выдано.' },
-      { status: 'in-progress', assignee: 'Run', line: '- `Kit`, ' + D() + ': stage exec — исполнение.' },
-      { status: 'review', assignee: 'Intent', line: '- `Run`, ' + D() + ': stage check — критерий достигнут.' }
+      { status: 'todo', assignee: 'Kit', line: '- `Kit`, ' + D() + ': stage kit — the kit issued.' },
+      { status: 'in-progress', assignee: 'Run', line: '- `Kit`, ' + D() + ': stage exec — execution.' },
+      { status: 'review', assignee: 'Intent', line: '- `Run`, ' + D() + ': stage check — the criterion reached.' }
     ];
     writeCard(dir, text);
-    problems.push(...boardFindings(dir).map(p => 'фаза 1 (старт): ' + p));
+    problems.push(...boardFindings(dir).map(p => msg('board.route-regression.phase1_start') + p));
     for (const st of steps) {
       text = setPair(text, st.status, st.assignee);
       text = addLine(text, st.line);
@@ -133,20 +135,20 @@ function runRegression() {
       if (st.status === 'review') text = addLine(text, spendLine('Run', 2000));
       writeCard(dir, text);
       const found = boardFindings(dir);
-      for (const p of found) problems.push('фаза 1 (' + st.status + '): ' + p);
+      for (const p of found) problems.push(msg('board.route-regression.phase1_status', { status: st.status }) + p);
     }
-    // Маркер позиции и пять полей — на честной карточке обязаны проходить.
-    problems.push(...markerProblem('assembling\n' + cardName()).map(p => 'фаза 1: ' + p));
-    problems.push(...fiveFieldProblems(text).map(p => 'фаза 1: ' + p));
+    // The position marker and the five fields - on the honest card they must pass.
+    problems.push(...markerProblem('assembling\n' + cardName()).map(p => msg('board.route-regression.phase1') + p));
+    problems.push(...fiveFieldProblems(text).map(p => msg('board.route-regression.phase1') + p));
 
-    // --- Фаза 2: пробы подмены — каждая обязана быть поймана ------------------------------
+    // --- Phase 2: the tamper probes - each must be caught -----------------------------------
     const probes = [
       {
-        name: 'маркер позиции',
-        run() { return markerProblem('делай как знаешь\n' + cardName()); }
+        name: msg('board.route-regression.probe_marker'),
+        run() { return markerProblem('do as you know\n' + cardName()); }
       },
       {
-        name: 'пять полей',
+        name: msg('board.route-regression.probe_five_fields'),
         run() {
           const bad = cannedCard().replace(NNN + ' · tooling | Deliver a sandbox artifact | The sandbox file exists and is empty | 2 | Spec → Kit → Run → Intent',
             NNN + ' · tooling | Deliver a sandbox artifact | 2 | Spec → Kit → Run → Intent');
@@ -154,15 +156,15 @@ function runRegression() {
         }
       },
       {
-        name: 'строка расхода',
+        name: msg('board.route-regression.probe_spend_line'),
         run() {
-          const bad = addLine(cannedCard(), '- `Kit`, ' + D() + ': attempt, много tokens — как-то так');
+          const bad = addLine(cannedCard(), '- `Kit`, ' + D() + ': attempt, many tokens — something like that');
           writeCard(dir, bad);
           return boardFindings(dir);
         }
       },
       {
-        name: 'подмена результата',
+        name: msg('board.route-regression.probe_substitution'),
         run() {
           const bad = setPair(cannedCard(), 'review', 'Intent');
           return substitutionProblems(bad);
@@ -171,9 +173,9 @@ function runRegression() {
     ];
     for (const probe of probes) {
       const caught = probe.run();
-      if (!caught.length) problems.push('проба «' + probe.name + '» НЕ поймана — проверка слепа');
+      if (!caught.length) problems.push(msg('board.route-regression.probe_not_caught', { name: probe.name }));
       else if (!caught.some(c => c.includes(cardName())) && !caught.some(c => c.includes('handoff'))) {
-        problems.push('проба «' + probe.name + '» поймана без адреса: ' + caught.join('; '));
+        problems.push(msg('board.route-regression.probe_no_address', { name: probe.name, list: caught.join('; ') }));
       }
     }
   } finally {
@@ -185,13 +187,13 @@ function runRegression() {
 function main() {
   const quiet = process.argv.includes('--quiet');
   const { problems } = runRegression();
-  if (quiet) { console.log(problems.length ? 'route-regression: ' + problems.length + ' находок' : 'route-regression: чисто'); process.exit(problems.length ? 1 : 0); }
+  if (quiet) { console.log(problems.length ? msg('board.route-regression.quiet_red', { n: problems.length }) : msg('board.route-regression.quiet_green')); process.exit(problems.length ? 1 : 0); }
   if (problems.length) {
     for (const p of problems) console.error(p);
-    console.error('route-regression: ' + problems.length + ' находок, регрессия не пройдена');
+    console.error(msg('board.route-regression.red', { n: problems.length }));
     process.exit(1);
   }
-  console.log('route-regression: песочница Spec→Kit→Run чистая, 4 пробы подмены пойманы с адресом');
+  console.log(msg('board.route-regression.green'));
   process.exit(0);
 }
 

@@ -1,6 +1,5 @@
 {
   "allowList": [
-    "board-core",
     "hooks-spend",
     "adapters-installers",
     "tests-fixtures",

@@ -1,8 +1,8 @@
 'use strict';
 
-// Реестр проверок доски — ядро, одни для всех движков. Одна проверка — один файл рядом: `{ id, since, run(ctx) }`
-// (форма — `.forma/dashboard/lib/checks.cjs`). Новая проверка — новый файл и одна строка здесь; порядок строк — порядок находок.
-// Помощники проверок — в `support/`. Запускает реестр `.forma/board/check-board.cjs`.
+// Registry of the board checks - part of the core, one for all engines. One check - one file next door: `{ id, since, run(ctx) }`
+// (the form - `.forma/dashboard/lib/checks.cjs`). A new check - a new file and one line here; the order of lines - the order of findings.
+// Check helpers live in `support/`. The registry is run by `.forma/board/check-board.cjs`.
 
 module.exports = [
   require('./epics.cjs'),

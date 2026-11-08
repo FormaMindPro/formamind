@@ -1,12 +1,13 @@
 'use strict';
 
-// Допустимые значения `status` карточки — ровно пять (AGENTS.md §7): backlog, todo, in-progress, review, done.
-// `done/` хранит закрытые карточки, но множество значений то же самое — переезд файла в `done/` меняет
-// только место на диске, не форму поля. Старые/чужие формы («in_progress», «completed») молча расходятся
-// с реестром движка (kanban-markdown) и ломают счёт волн и закрытие `Core`.
+// Allowed `status` values of a card - exactly five (AGENTS.md §7): backlog, todo, in-progress, review, done.
+// `done/` keeps closed cards, but the set of values is the same - moving the file into `done/` changes only
+// the place on disk, not the form of the field. Old/alien forms ("in_progress", "completed") silently diverge
+// from the engine registry (kanban-markdown) and break the wave counting and the `Core` closing.
 
 const path = require('path');
 const fs = require('fs');
+const i18n = require('../../i18n/index.cjs');
 const { cardFiles, field } = require('../../dashboard/lib/card.cjs');
 
 const ALLOWED = ['backlog', 'todo', 'in-progress', 'review', 'done'];
@@ -16,7 +17,7 @@ function run({ root }) {
   for (const file of cardFiles(root)) {
     const status = field(fs.readFileSync(file, 'utf8'), 'status');
     if (!ALLOWED.includes(status)) {
-      problems.push(`${path.basename(file)}: status "${status}" — допустимо только ${ALLOWED.join('/')}`);
+      problems.push(`${path.basename(file)}: ` + i18n.message('board.status-values.not_allowed', { status, values: ALLOWED.join('/') }, 'ru'));
     }
   }
   return problems;

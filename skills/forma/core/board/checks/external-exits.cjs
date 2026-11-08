@@ -2,61 +2,63 @@
 'use strict';
 
 /**
- * external-exits — гейт «внешние выходы под скрабом» (запрет 17 конструктивно): реестр сетевых
- * выходов из семейства моделей и проверка, что каждый выход прикрыт. Обнаружение динамическое:
- * git grep по отслеживаемым скриптам (*.cjs *.js *.mjs *.sh) на сетевые паттерны
- * (https.request, https.get, fetch(, axios, curl ) — в теле прибора нет ни одного пути,
- * домена или кода конкретного проекта (запрет 16). Шаблон протокола (.forma/protocol) и
- * тестовые файлы не сканируются; веб-ассеты дашборда сканируются и классифицируются.
+ * external-exits - the "external exits under scrub" gate (prohibition 17 made constructive): a registry of the
+ * network exits from the model family and a check that every exit is covered. Detection is dynamic:
+ * git grep over the tracked scripts (*.cjs *.js *.mjs *.sh) for the network patterns
+ * (https.request, https.get, fetch(, axios, curl ) - the probe's body carries not a single path,
+ * domain or code of a concrete project (prohibition 16). The protocol template (.forma/protocol) and
+ * test files are not scanned; the dashboard's web assets are scanned and classified.
  *
- * Классификация каждого найденного файла — чтением его текста, по убыванию силы claims:
- *   через-скраб   — использует модуль скраба (plumb-scrub.cjs), есть проверка residue и
- *                   явный отказ (process.exit(2) / «scrub-refused») — отказ до сети здесь
- *                   подтверждает человек при приёмке, прибор ловит только маркеры;
- *   внутренний    — сетевые вызовы без единого внешнего хоста: только относительные пути
- *                   и localhost/127.0.0.1 (внутренний контур, скраб не нужен);
- *   без данных    — узкий доброкачественный паттерн: GET без тела запроса (нет -d/--data/
- *                   -F/-T/-X POST/stdin-подстановки), наружу не уходит материал проекта;
- *   КРАСНАЯ       — всё прочее: сетевой вызов не прикрыт.
+ * The classification of each found file - by reading its text, by descending strength of claims:
+ *   through-scrub - uses the scrub module (plumb-scrub.cjs), there is a residue check and
+ *                   an explicit refusal (process.exit(2) / "scrub-refused") - the refusal before the network is
+ *                   confirmed here by the human at acceptance, the probe only catches the markers;
+ *   internal      - network calls without a single external host: only relative paths
+ *                   and localhost/127.0.0.1 (the internal contour, no scrub needed);
+ *   no data       - a narrow benign pattern: GET without a request body (no -d/--data/
+ *                   -F/-T/-X POST/stdin substitution), no project material leaves outward;
+ *   RED           - everything else: a network call is not covered.
  *
- *   node .forma/board/checks/external-exits.cjs               (полный прогон по дереву)
- *   node .forma/board/checks/external-exits.cjs --selftest    (приборы во временный каталог ОС)
+ *   node .forma/board/checks/external-exits.cjs               (a full run over the tree)
+ *   node .forma/board/checks/external-exits.cjs --selftest    (probes into the OS temp directory)
  *
- * Обнаружение — git grep, то есть только отслеживаемые файлы: незакоммиченный скрипт в
- * реестр не попадёт. Такие файлы (вне исключений) печатаются отдельной info-строкой.
+ * Detection - git grep, that is only tracked files: an uncommitted script does not
+ * land in the registry. Such files (outside the exceptions) are printed as a separate info line.
  *
- * Коды возврата: 0 — все выходы прикрыты (через-скраб / внутренний / без данных);
- * 1 — есть КРАСНАЯ или самотест не сошёлся; 2 — ошибка исполнения.
- * Модуль: require('./external-exits.cjs').runExternalExits({ root }) → { ready, lines }.
- * Часть ядра: следов проекта не несёт (запрет 16).
+ * Exit codes: 0 - all exits are covered (through-scrub / internal / no data);
+ * 1 - there is a RED or the self-test mismatched; 2 - a runtime error.
+ * Module: require('./external-exits.cjs').runExternalExits({ root }) → { ready, lines }.
+ * Part of the core: carries no project traces (prohibition 16).
  */
 
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const i18n = require('../../i18n/index.cjs');
 const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
+const msg = (key, params) => i18n.message(key, params, 'ru');
 
-// Сетевые паттерны (ERE) — один источник истины для git grep и для повторной сверки текста.
+// Network patterns (ERE) - one source of truth for git grep and for the re-check of the text.
 const NET_RE_SOURCE = 'https\\.request|https\\.get|fetch\\(|axios|curl ';
 const NET_RE = new RegExp(NET_RE_SOURCE);
-// Внешний хост: абсолютный URL не на localhost/127.0.0.1.
+// An external host: an absolute URL not on localhost/127.0.0.1.
 const EXTERNAL_URL_RE = /https?:\/\/(?!localhost|127\.0\.0\.1|::1)/;
-// Флаги тела/загрузки curl (POST-объём наружу = материал проекта).
+// The body/upload flags of curl (POST volume outward = project material).
 const CURL_BODY_RE = /(^|\s)(-d\b|--data\b|--data-raw\b|--data-binary\b|--data-urlencode\b|-F\b|--form\b|--form-string\b|--form-file\b|-T\b|--upload-file\b)/;
-// Явный не-GET метод curl.
+// An explicit non-GET curl method.
 const CURL_METHOD_RE = /(^|\s)(-X|--request)\s*(POST|PUT|PATCH|DELETE)\b/i;
-// Тело из stdin/файла в строке curl.
+// A body from stdin/file in a curl line.
 const CURL_STDIN_RE = /\s<\s?\S/;
 
-/** Список отслеживаемых скриптов с сетевыми паттернами, вне исключений. */
+/** The list of tracked scripts with network patterns, outside the exceptions. */
 function discover(root) {
   let out = '';
   try {
     out = execFileSync('git', ['grep', '-l', '-E', NET_RE_SOURCE, '--', '*.cjs', '*.js', '*.mjs', '*.sh'], { cwd: root, encoding: 'utf8' });
   } catch (e) {
-    if (e.status === 1) return []; // нет совпадений — реестр пуст
+    if (e.status === 1) return []; // no matches - the registry is empty
     throw e;
   }
   return out.split(/\r?\n/).filter(Boolean).filter((p) => !isExcluded(p));
@@ -64,14 +66,14 @@ function discover(root) {
 
 function isExcluded(p) {
   const parts = p.split('/');
-  if (parts[0] === '.forma' && parts[1] === 'protocol') return true; // шаблон протокола
+  if (parts[0] === '.forma' && parts[1] === 'protocol') return true; // the protocol template
   const base = parts[parts.length - 1];
-  if (/\.(test|spec)\./.test(base)) return true; // тестовые файлы
+  if (/\.(test|spec)\./.test(base)) return true; // test files
   if (parts.slice(0, -1).some((s) => s === 'test' || s === 'tests')) return true;
   return false;
 }
 
-/** Незаконченные (не отслеживаемые) скрипты с сетевыми паттернами — вне реестра, но видны. */
+/** Unfinished (untracked) scripts with network patterns - outside the registry, but visible. */
 function untrackedScripts(root) {
   let out = '';
   try {
@@ -85,7 +87,7 @@ function untrackedScripts(root) {
     .filter((p) => /\.(cjs|mjs|js|sh)$/.test(p) && !isExcluded(p) && fs.existsSync(path.join(root, p)));
 }
 
-/** Код без строк-комментариев (JS // /* * и shell #) — для проверки внешних хостов. */
+/** Code without comment lines (JS // /* * and shell #) - for checking external hosts. */
 function codeText(text) {
   return text.split(/\r?\n/)
     .filter((l) => { const t = l.trim(); return t && !t.startsWith('//') && !t.startsWith('#') && !t.startsWith('/*') && !t.startsWith('*'); })
@@ -94,14 +96,14 @@ function codeText(text) {
 
 function classify(text) {
   if (!NET_RE.test(text)) return { status: 'none' };
-  // 1. через-скраб: модуль скраба + проверка остатка + явный отказ (exit(2)/«scrub-refused»).
+  // 1. through-scrub: the scrub module + the residue check + an explicit refusal (exit(2)/"scrub-refused").
   if (/plumb-scrub\.cjs/.test(text) && /residue\s*\(/.test(text) && (/scrub-refused/.test(text) || /process\.exit\(2\)/.test(text))) {
     const where = text.split(/\r?\n/).map((l, i) => (/\bresidue\s*\(/.test(l) ? i + 1 : null)).filter(Boolean);
     return { status: 'scrub', where };
   }
-  // 2. внутренний: ни одного абсолютного внешнего хоста в коде (только localhost/относительные).
+  // 2. internal: not a single absolute external host in the code (only localhost/relative).
   if (!EXTERNAL_URL_RE.test(codeText(text))) return { status: 'internal' };
-  // 3. без данных проекта: каждый curl — GET без тела/загрузки/незаголовочного stdin.
+  // 3. no project data: every curl is a GET without a body/upload/non-header stdin.
   const curlLines = text.split(/\r?\n/).filter((l) => /\bcurl\s/.test(l));
   if (curlLines.length && curlLines.every((l) => !CURL_BODY_RE.test(l) && !CURL_METHOD_RE.test(l) && !CURL_STDIN_RE.test(l))) {
     return { status: 'benign' };
@@ -109,19 +111,25 @@ function classify(text) {
   return { status: 'red' };
 }
 
-const STATUS_WORD = { scrub: 'через-скраб', internal: 'внутренний', benign: 'без данных проекта', red: 'НЕ ПРИКРЫТ' };
+// The status words - the dictionary (data), not literals of the code; the summary composes from the same keys.
+const STATUS_WORD = {
+  scrub: () => msg('board.external-exits.word_scrub'),
+  internal: () => msg('board.external-exits.word_internal'),
+  benign: () => msg('board.external-exits.word_benign'),
+  red: () => msg('board.external-exits.word_red'),
+};
 
 function scan(root, files) {
   return files.map((rel) => {
     let text = '';
-    try { text = fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return { rel, status: 'red', fact: `${rel}: файл не читается` }; }
+    try { text = fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return { rel, status: 'red', fact: msg('board.external-exits.unreadable', { rel }) }; }
     const c = classify(text);
     if (c.status === 'none') return null;
     let fact;
-    if (c.status === 'scrub') fact = `${rel} — ${STATUS_WORD.scrub} — скраб plumb-scrub.cjs, проверка остатка на строках ${c.where.join(', ')}`;
-    else if (c.status === 'internal') fact = `${rel} — ${STATUS_WORD.internal} — сетевые вызовы только на localhost/относительные пути`;
-    else if (c.status === 'benign') fact = `${rel} — ${STATUS_WORD.benign} — GET без тела запроса, наружу материал не уходит`;
-    else fact = `${rel} — ${STATUS_WORD.red} — сетевой вызов без скраба: добавь скраб fail-closed до сети, ограничь внутренним контуром или объяви дисциплину в §8`;
+    if (c.status === 'scrub') fact = msg('board.external-exits.fact_scrub', { rel, word: STATUS_WORD.scrub(), where: c.where.join(', ') });
+    else if (c.status === 'internal') fact = msg('board.external-exits.fact_internal', { rel, word: STATUS_WORD.internal() });
+    else if (c.status === 'benign') fact = msg('board.external-exits.fact_benign', { rel, word: STATUS_WORD.benign() });
+    else fact = msg('board.external-exits.fact_red', { rel, word: STATUS_WORD.red() });
     return { rel, status: c.status, fact };
   }).filter(Boolean);
 }
@@ -133,10 +141,16 @@ function runExternalExits({ root } = {}) {
   const red = rows.filter((r) => r.status === 'red');
   const lines = rows.map((r) => ({ status: r.status === 'red' ? 'red' : 'green', fact: r.fact }));
   const stray = untrackedScripts(root);
-  if (stray.length) lines.push({ status: 'info', fact: `вне реестра (не отслеживаются git): ${stray.join(', ')}` });
-  if (!rows.length) lines.push({ status: 'info', fact: 'сетевых выходов не найдено — реестр пуст' });
+  if (stray.length) lines.push({ status: 'info', fact: msg('board.external-exits.stray', { list: stray.join(', ') }) });
+  if (!rows.length) lines.push({ status: 'info', fact: msg('board.external-exits.empty') });
   const counts = rows.reduce((a, r) => ((a[r.status] = (a[r.status] || 0) + 1), a), {});
-  const summary = `ВНЕШНИЕ ВЫХОДЫ: найдено ${rows.length} · через-скраб ${counts.scrub || 0} · внутренний ${counts.internal || 0} · без данных ${counts.benign || 0} · КРАСНЫХ ${red.length}`;
+  const summary = msg('board.external-exits.summary', {
+    n: rows.length,
+    scrub: counts.scrub || 0,
+    internal: counts.internal || 0,
+    benign: counts.benign || 0,
+    red: red.length,
+  });
   return { ready: red.length === 0, lines, summary };
 }
 
@@ -156,11 +170,11 @@ function selftest() {
       const r = rows.find((x) => x.rel === f.name);
       return !r || r.status !== f.expect;
     });
-    const got = (n) => { const r = rows.find((x) => x.rel === n); return r ? r.status : 'нет'; };
+    const got = (n) => { const r = rows.find((x) => x.rel === n); return r ? r.status : msg('board.external-exits.no_status'); };
     if (mismatches.length) {
-      return { ok: false, note: `приборы не сошлись: ${mismatches.map((f) => `${f.name} ожидался ${f.expect}, получен ${got(f.name)}`).join('; ')}` };
+      return { ok: false, note: msg('board.external-exits.selftest_mismatch', { list: mismatches.map((f) => `${f.name} ${msg('board.external-exits.expected')} ${f.expect}, ${msg('board.external-exits.got')} ${got(f.name)}`).join('; ') }) };
     }
-    return { ok: true, note: `самотест: все ${fixtures.length} приборов классифицированы верно (${fixtures.map((f) => f.expect).join(', ')})` };
+    return { ok: true, note: msg('board.external-exits.selftest_ok', { n: fixtures.length, list: fixtures.map((f) => f.expect).join(', ') }) };
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
@@ -175,10 +189,10 @@ if (require.main === module) {
     const r = runExternalExits();
     for (const l of r.lines) console.log((l.status === 'green' ? '✓ ' : l.status === 'red' ? '✗ ' : '· ') + l.fact);
     console.log(r.summary);
-    console.log(r.ready ? 'ГОТОВ: все сетевые выходы прикрыты (скраб fail-closed / внутренний контур / GET без данных)' : 'ГОТОВОСТИ НЕТ: есть неприкрытый внешний выход — доведи до скраба или исключи');
+    console.log(r.ready ? msg('board.external-exits.cli_green') : msg('board.external-exits.cli_red'));
     process.exit(r.ready ? 0 : 1);
   } catch (e) {
-    console.error('СТОП: ' + e.message);
+    console.error(msg('board.stop') + e.message);
     process.exit(2);
   }
 }

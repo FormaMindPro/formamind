@@ -1,16 +1,17 @@
 'use strict';
 
-// §3 и ECONOMY.md («`Intent` in the shared session»): у строки захода описание открывается меткой движка, а `0 tokens` числом — нарушение:
-// ноль допустим только маркером `unknown tokens` с причиной, событие без работы пишется без `attempt`.
-// Граница — строго позже дня вступления, по той же причине, что у проверки `agent-id`.
+// §3 and ECONOMY.md ("`Intent` in the shared session"): the description of a spend line opens with the engine tag, and a numeric `0 tokens` is a violation:
+// zero is allowed only as the `unknown tokens` marker with a reason; an event without work is written without `attempt`.
+// The boundary is strictly later than the day of entry, for the same reason as in the `agent-id` check.
 
+const i18n = require('../../i18n/index.cjs');
 const { toEnglish, SPEND_TOKENS_OR_UNKNOWN_RE, engineTagRe } = require('../../dashboard/spend-line.cjs');
 const { cardLines, bulletList } = require('./support/lines.cjs');
 
 function run({ root, since }) {
   const tagRe = engineTagRe(root);
-  // Движок выключен или удалён — его прошлые строки остаются в карточках (запрет 5): метка вида `имя:` после тире
-  // принимается и без загруженного адаптера. Нарушение — строка вовсе без метки.
+  // The engine is off or removed - its past lines stay in the cards (prohibition 5): a tag like `name:` after the dash
+  // is accepted without a loaded adapter too. A violation - a line with no tag at all.
   const shapedRe = /\s—\s*[a-z][a-z0-9-]*:/;
   const known = require('../../dashboard/lib/engines.cjs').spendTags(root);
   const untagged = [];
@@ -20,17 +21,14 @@ function run({ root, since }) {
     const m = SPEND_TOKENS_OR_UNKNOWN_RE.exec(t);
     if (!m || m[2] < since) continue;
     if (!tagRe.test(t) && !shapedRe.test(t)) untagged.push(`${file}: ${m[1]} ${m[2]}`);
-    if (m[3] !== 'unknown' && Number(m[3].replace(/[\s  ]/g, '')) === 0) zero.push(`${file}: ${m[1]} ${m[2]}`);
+    if (m[3] !== 'unknown' && Number(m[3].replace(/[\s\u00A0\u202F]/g, '')) === 0) zero.push(`${file}: ${m[1]} ${m[2]}`);
   }
   const problems = [];
   if (untagged.length) {
-    problems.push(`нет метки движка в ${untagged.length} строках захода с ${since} ` +
-      `(§3: описание после тире начинается с метки загруженного адаптера: ${known.join(' / ') || 'ни одного адаптера'}):\n      ` + bulletList(untagged));
+    problems.push(i18n.message('board.engine-tag.untagged', { n: untagged.length, since, known: known.join(' / ') || i18n.message('board.engine-tag.no_adapters', null, 'ru') }, 'ru') + bulletList(untagged));
   }
   if (zero.length) {
-    problems.push(`\`0 tokens\` числом в ${zero.length} строках захода с ${since} ` +
-      `(ECONOMY.md, «\`Intent\` in the shared session»: расход — из журнала сессии, card-session-spend.cjs; не найден — ` +
-      `\`unknown tokens (cache-read unknown)\` с причиной; событие без работы — без \`attempt\`):\n      ` + bulletList(zero));
+    problems.push(i18n.message('board.engine-tag.zero', { n: zero.length, since }, 'ru') + bulletList(zero));
   }
   return problems;
 }

@@ -1,20 +1,22 @@
 'use strict';
 
-// Сверка доски с дорожной картой: содержательный эпик = цель, один к одному.
-// Метка цели — истина; эпик — дорожка её вида. Метка обязательна вперёд, с дня вступления правила `goal-label`.
+// Reconciliation of the board with the roadmap: a content epic = a goal, one to one.
+// The goal label is the truth; the epic is the lane of its kind. The label is obligatory going forward, from the day
+// of entry of the `goal-label` rule.
 
 const fs = require('fs');
 const { projectFile, opsFile } = require('../../dashboard/lib/fs.cjs');
 const path = require('path');
+const i18n = require('../../i18n/index.cjs');
 const { cardFiles, boardDir, labelsOf, createdDay } = require('../../dashboard/lib/card.cjs');
 
-// Девять видов цели: код не зависит от языка, лейбл эпика — во втором столбце таблицы PROJECT.md. Коды меняет только человек.
+// Nine kinds of a goal: the code is language-independent, the epic label - in the second column of the PROJECT.md table. Only the human changes the codes.
 const CODES = ['analytics', 'structure', 'protocol', 'resources', 'balance', 'discussion', 'channels', 'competencies', 'results'];
 const GOAL_LABEL_RE = new RegExp('^goal-(\\d+|' + CODES.join('|') + ')$');
 
 const read = (file) => fs.readFileSync(file, 'utf8');
 
-/** Код вида → лейбл эпика, из таблицы эпиков `project/config/PROJECT.md` (первая строка кода побеждает). */
+/** Kind code → epic label, from the epic table of `project/config/PROJECT.md` (the first line of a code wins). */
 function readLanes(root) {
   const laneOf = new Map();
   const projectMd = projectFile(root, 'PROJECT.md');
@@ -27,7 +29,7 @@ function readLanes(root) {
   return laneOf;
 }
 
-/** Цели — из имён каталогов `project/goals/`: главная goal-<код>, подцель goal-NN-*; черновик — GOAL.md с `draft: true` либо без GOAL.md. */
+/** Goals - from the directory names of `project/goals/`: main goal-<code>, subgoal goal-NN-*; a draft - GOAL.md with `draft: true` or without GOAL.md. */
 function readGoals(root) {
   const goals = new Set();
   const draft = new Set();
@@ -44,7 +46,7 @@ function readGoals(root) {
   return { goals, draft };
 }
 
-/** Вид подцели — из карты `project/ops/ROADMAP.md`: подцель стоит под своей главной целью (строка goal-<код>), глубже неё. */
+/** Kind of a subgoal - from the map `project/ops/ROADMAP.md`: the subgoal stands under its main goal (a goal-<code> line), deeper than it. */
 function readKinds(root) {
   const kindOf = new Map();
   for (const c of CODES) kindOf.set('goal-' + c, c);
@@ -54,7 +56,7 @@ function readKinds(root) {
   let depth = -1;
   const mainRe = new RegExp('^(.*?)goal-(' + CODES.join('|') + ')\\b');
   for (const line of read(roadmap).split('\n')) {
-    if (!line.includes('── ')) continue;               // только строки дерева карты, не проза под ней
+    if (!line.includes('── ')) continue;               // only the map tree lines, not the prose under them
     const mm = line.match(mainRe);
     if (mm && !/goal-\d/.test(line.slice(0, mm[1].length + 8))) { current = mm[2]; depth = mm[1].length; continue; }
     const sm = line.match(/^(.*?)(goal-\d+)\b/);
@@ -63,38 +65,37 @@ function readKinds(root) {
   return kindOf;
 }
 
-/** Нарушения одной карточки: не больше одного до сверки цели, после неё — черновик цели и дорожка вида. */
+/** Violations of one card: no more than one before the goal reconciliation, after it - the goal draft and the kind lane. */
 function cardProblems(name, text, model) {
   const em = text.match(/^epic:\s*"(.+?)"/m);
-  if (!em) return [`${name}: карточка без эпика`];
+  if (!em) return [i18n.message('board.epics.no_epic', { name }, 'ru')];
   const epic = em[1];
-  if (!model.lanes.has(epic)) return [`${name}: эпик "${epic}" не из девяти видов (PROJECT.md, «Эпики проекта»)`];
+  if (!model.lanes.has(epic)) return [i18n.message('board.epics.epic_unknown', { name, epic }, 'ru')];
   const gl = labelsOf(text).filter((l) => GOAL_LABEL_RE.test(l));
   if (gl.length !== 1) {
-    return createdDay(text) >= model.since ? [`${name}: меток цели ${gl.length}, нужна ровно одна (goal-NN или goal-<код>)`] : [];
+    return createdDay(text) >= model.since ? [i18n.message('board.epics.label_count', { name, n: gl.length }, 'ru')] : [];
   }
   const g = gl[0];
-  if (model.goals.size && !model.goals.has(g)) return [`${name}: метка ${g} — каталога цели нет в project/goals/`];
+  if (model.goals.size && !model.goals.has(g)) return [i18n.message('board.epics.no_catalog', { name, g }, 'ru')];
   const problems = [];
   const kind = model.kindOf.get(g);
-  // Производство под черновиком цели — стоп старта. Интервью и прочие виды можно: они и формируют образ. Закрытые не трогаем.
-  // Исключение — демонстрационный круг (метка demo): человек согласился на него при закрытых воротах.
+  // Production under a draft goal - a start stop. The interview and other kinds are fine: they form the image themselves. Closed ones are not touched.
+  // The exception - a demonstration cycle (the demo label): the human agreed to it with the start gate closed.
   const demo = labelsOf(text).includes('demo');
   if (kind === 'channels' && model.draft.has(g) && !demo && !/^status:\s*"done"/m.test(text)) {
-    problems.push(`${name}: производство под целью ${g} в черновике — сначала образ цели (GOAL.md draft: false)`);
+    problems.push(i18n.message('board.epics.draft_production', { name, g }, 'ru'));
   }
   if (kind && epic !== model.laneOf.get(kind) && epic !== model.laneOf.get('discussion')) {
-    problems.push(`${name}: эпик "${epic}" не дорожка вида цели ${g} ("${model.laneOf.get(kind)}") — верна метка`);
+    problems.push(i18n.message('board.epics.wrong_lane', { name, epic, g, lane: model.laneOf.get(kind) }, 'ru'));
   }
   return problems;
 }
 
 function run({ root, since }) {
-  if (!fs.existsSync(boardDir(root))) return [];            // доски ещё нет — проверять нечего
+  if (!fs.existsSync(boardDir(root))) return [];            // no board yet - nothing to check
   const laneOf = readLanes(root);
   if (!laneOf.size) {
-    return ['PROJECT.md: не разобрана таблица эпиков (строки вида | `discussion` | <лейбл> | …) — ' +
-            'проверка эпиков доски не выполнялась'];
+    return [i18n.message('board.epics.no_table', null, 'ru')];
   }
   const model = { laneOf, lanes: new Set(laneOf.values()), kindOf: readKinds(root), since, ...readGoals(root) };
   return cardFiles(root).flatMap((f) => cardProblems(path.basename(f), read(f), model));

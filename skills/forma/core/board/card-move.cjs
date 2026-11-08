@@ -1,44 +1,44 @@
 #!/usr/bin/env node
-// Передача карточки следующему узлу одним вызовом: status + assignee + строка этапа + проверка доски (AGENTS.md §6–7).
+// Handing a card to the next node in one call: status + assignee + the stage line + the board check (AGENTS.md §6–7).
 //
-//   node .forma/board/card-move.cjs <card> --to kit|run|intent|accept|close --note "<что сделано>" [--node <узел>] [--dry]
-//                                 [--duration-ms MS --agent-id <id> [--tokens N] [--cache-read R] [--turns K] [--engine <тег движка>]]
-//                                 [--kit "<текст>"|-] [--result "<текст>"|-] [--session-spend <NNN>]
+//   node .forma/board/card-move.cjs <card> --to kit|run|intent|accept|close --note "<what is done>" [--node <node>] [--dry]
+//                                 [--duration-ms MS --agent-id <id> [--tokens N] [--cache-read R] [--turns K] [--engine <engine tag>]]
+//                                 [--kit "<text>"|-] [--result "<text>"|-] [--session-spend <NNN>]
 //
-// <card>  — «NNN», «card-NNN» или полный код «card-NNN-slug»; выборка точная: короткий номер — только при
-//           единственном кандидате, неоднозначность (несколько карточек под одним номером) — отказ со списком
-//           кандидатов, ничего не записывается (назовите полный код); в done/ — уже закрыта, передавать нечего.
-// --to    — куда передаём; таблица §7 → поля frontmatter, ключ этапа §6:
-//             kit     todo        Kit      stage kit      пишет Intent: открыл цикл, карточка в комплектацию
-//             run     in-progress Run      stage exec     пишет Kit: комплект готов, исполнение
-//             intent  review      Intent   stage check     пишет тот, кто исполнял: результат на проверку
-//             accept  review      Intent   stage accept    пишет Intent: проверка пройдена, ждёт «да» человека
-//             close   done        Core     stage close    пишет Intent: человек принял; файл уходит в done/
-//           Кто держит `run`, задаёт метка `route-N` карточки (§6–7): `route-4` (короткий маршрут) — исполняет Kit, `run`
-//           держит "Kit"; `route-0` и `route-1` — исполняет Intent, `run` держит "Intent"; остальные маршруты — Run.
-// --note  — «что» в строке этапа; без него — ошибка: пустая строка этапа ничего не говорит.
-// --node  — чья строка; по умолчанию узел, который делает эту передачу (см. таблицу; для `intent` — прежний исполнитель).
-// Расход (AGENTS.md §3, ECONOMY.md) — вызывающий пишет его сразу после возврата узла; тот же вызов дописывает и строку расхода:
-//           --duration-ms MS (секунды округляются), --agent-id <id вызова>; нужны оба. N, R и O читаются из стенограммы вызова
-//           (как `claude-economy.cjs line`); --tokens N — запасное значение: с ним строка пишется как есть, без чтения стенограммы.
-//           Стенограммы нет и --tokens нет — N, R и O = unknown с причиной в описании, не ноль.
-//           --cache-read R — иначе «(cache-read unknown)» с причиной в описании; --turns K — «K turns»; --engine — тег движка; без него — движок, чьи стенограммы свежее всех (адаптеры), иначе единственный адаптер.
-//           Строка расхода идёт от узла `--node` (того, чей вызов вернулся), перед строкой этапа. Без этих флагов расход не пишется.
-// Секции карточки — тем же вызовом, без отдельной правки файла:
-//           --kit    — тело зоны «Комплект» (шесть единиц, AGENTS.md §6); только с --to run: Kit записывает комплект при передаче.
-//           --result — тело зоны «Результат»; только с --to intent: исполнитель записывает итог при возврате на проверку.
-//           Значение «-» читает текст из stdin (многострочный текст — через heredoc); иначе берётся сам аргумент. Тело зоны заменяется
-//           целиком (при правке комплекта после возврата — новый комплект, а не дописывание). Только одно из двух может быть «-».
-//           --session-spend NNN — только с --to accept|close: тем же вызовом дописывает строку расхода `Intent` по карточке
-//           (вывод `card-session-spend.cjs NNN --write` адаптера движка, строка перед строкой этапа); NNN — номер этой же карточки.
-//           Скрипта у адаптеров нет или он ничего не дал — ошибка до любой записи. Нового расхода нет — строка не пишется, это не ошибка.
-// Закрытие круга: node .forma/board/card-move.cjs --to core-close <NNN|card-NNN-slug…> --note "<основание>" [--dry] — пишет `Core`: на каждой названной
-//           карточке (done, assignee "Core") строка «закрыто — <основание>» в «История» и assignee: null; остальное не меняется.
-//           Неизвестный номер, повтор или карточка не в done/Core — стоп до любой записи. Флаги расхода и секций здесь не принимаются.
-// --dry   — показать изменения, файл не писать.
-// --selftest — приборы выборки карточки по коду во временном каталоге ОС (фиктивная доска); ничего не пишет; exit 0 — зелёный.
-// Пишет `modified` (на `close` — и `completedAt`), дописывает строку в «История», затем проверяет доску по этой карточке.
-// Часть ядра: одна для всех движков, путей движка не знает.
+// <card>  - "NNN", "card-NNN" or the full code "card-NNN-slug"; the sampling is exact: a short number - only with
+//           a single candidate, an ambiguity (several cards under one number) - a refusal with the list
+//           of candidates, nothing is written (name the full code); in done/ - already closed, nothing to hand over.
+// --to    - where we hand over; the table §7 → the frontmatter fields, the stage key §6:
+//             kit     todo        Kit      stage kit      Intent writes: opened the cycle, the card goes to kitting
+//             run     in-progress Run      stage exec     Kit writes: the kit is ready, execution
+//             intent  review      Intent   stage check    the one who executed writes: the result goes to the check
+//             accept  review      Intent   stage accept   Intent writes: the check passed, awaits the human's "yes"
+//             close   done        Core     stage close    Intent writes: the human accepted; the file goes to done/
+//           Who holds `run` is set by the card's `route-N` label (§6–7): `route-4` (the short route) - Kit executes, `run`
+//           holds "Kit"; `route-0` and `route-1` - Intent executes, `run` holds "Intent"; the other routes - Run.
+// --note  - the "what" in the stage line; without it - an error: an empty stage line says nothing.
+// --node  - whose line; by default the node making this handover (see the table; for `intent` - the previous executor).
+// The spend (AGENTS.md §3, ECONOMY.md) - the caller writes it right after the node's return; the same call also appends the spend line:
+//           --duration-ms MS (seconds are rounded), --agent-id <id of the call>; both are needed. N, R and O are read from the call's transcript
+//           (as `claude-economy.cjs line`); --tokens N - the fallback value: with it the line is written as is, without reading the transcript.
+//           No transcript and no --tokens - N, R and O = unknown with the reason in the description, not zero.
+//           --cache-read R - otherwise "(cache-read unknown)" with the reason in the description; --turns K - "K turns"; --engine - the engine tag; without it - the engine whose transcripts are the newest (the adapters), otherwise the only adapter.
+//           The spend line goes from the `--node` node (the one whose call returned), before the stage line. Without these flags no spend is written.
+// The card's sections - by the same call, without a separate file edit:
+//           --kit    - the body of the "Kit" zone (six units, AGENTS.md §6); only with --to run: Kit writes the kit at the handover.
+//           --result - the body of the "Result" zone; only with --to intent: the executor writes the result at the return to the check.
+//           The value "-" reads the text from stdin (multiline text - via a heredoc); otherwise the argument itself is taken. The zone body is replaced
+//           whole (when editing the kit after the return - the new kit, not an append). Only one of the two may be "-".
+//           --session-spend NNN - only with --to accept|close: by the same call appends the `Intent` spend line over the card
+//           (the output of the engine adapter's `card-session-spend.cjs NNN --write`, the line before the stage line); NNN - the number of this same card.
+//           The adapters have no script or it gave nothing - an error before any write. No new spend - the line is not written, that is not an error.
+// Closing the cycle: node .forma/board/card-move.cjs --to core-close <NNN|card-NNN-slug…> --note "<the grounds>" [--dry] - writes `Core`: on every named
+//           card (done, assignee "Core") the line "closed - <the grounds>" in "History" and assignee: null; the rest does not change.
+//           An unknown number, a repeat or a card not in done/Core - a stop before any write. The spend and section flags are not accepted here.
+// --dry   - show the changes, do not write the file.
+// --selftest - the gauges of the card sampling by code in the OS temp directory (a dummy board); writes nothing; exit 0 - green.
+// Writes `modified` (on `close` - and `completedAt`), appends a line into "History", then checks the board over this card.
+// Part of the core: one for all engines, it knows no engine paths.
 
 const fs = require('fs');
 const os = require('os');
@@ -53,6 +53,7 @@ const { formatSpendLine } = require('../dashboard/spend-line.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BOARD = path.join(ROOT, '.devtool', 'features');
+const msg = (key, params) => i18n.message(key, params, 'ru');
 
 const cli = makeCli();
 const { arg, flag } = cli;
@@ -66,17 +67,17 @@ const TARGETS = {
   close: { status: 'done', assignee: 'Core', stage: 'close', by: 'Intent' },
 };
 
-// Код карточки: «NNN»|«card-NNN» → короткий «card-NNN» (normalize); «card-NNN-slug» → полный код; иначе null.
+// The card code: "NNN"|"card-NNN" → the short "card-NNN" (normalize); "card-NNN-slug" → the full code; otherwise null.
 function cardCode(word) {
   const s = String(word || '').trim();
   if (/^(?:card-)?\d+$/.test(s)) return normalize(s);
   return /^card-\d+-.+$/.test(s) ? s : null;
 }
 
-/** Единая выборка карточки по коду — точный номер, fail-closed при неоднозначности:
- *  полный код card-NNN-slug — точное имя файла, ровно один; короткий номер — точное имя или один префикс,
- *  только при единственном кандидате; два и больше — `{ ambiguous: [относительные пути] }`, вызывающий
- *  отказывает со списком кандидатов до любой записи. Только читает, ничего не пишет. */
+/** The unified card sampling by code - an exact number, fail-closed under ambiguity:
+ *  the full code card-NNN-slug - the exact file name, exactly one; a short number - the exact name or one prefix,
+ *  only with a single candidate; two or more - `{ ambiguous: [relative paths] }`, the caller
+ *  refuses with the list of candidates before any write. Only reads, writes nothing. */
 function resolveCardFiles(root, cid) {
   const cands = /^card-\d+$/.test(cid)
     ? cardFiles(root, (n) => n === cid + '.md' || (n.startsWith(cid + '-') && n.endsWith('.md')))
@@ -87,19 +88,19 @@ function resolveCardFiles(root, cid) {
 }
 
 const dieAmbiguous = (cid, rels) =>
-  die(`«${cid}» — неоднозначный номер, кандидаты (назовите полный код):\n  ${rels.join('\n  ')}\nничего не записано`);
+  die(msg('board.card-move.ambiguous', { cid, rels: rels.join('\n  ') }));
 
-// ---- --selftest: приборы выборки во временном каталоге ОС (по образцу goal-freeze.cjs) -----------
+// ---- --selftest: the sampling gauges in the OS temp directory (after the model of goal-freeze.cjs) -----------
 
 function selftest() {
   const base = process.env.FORMA_TEST_TMP && fs.existsSync(process.env.FORMA_TEST_TMP) ? process.env.FORMA_TEST_TMP : os.tmpdir();
   const dir = fs.mkdtempSync(path.join(base, 'card-move-'));
   const results = [];
   const check = (name, cond) => results.push({ ok: !!cond, name });
-  // коды фикстур собираются на ходу (конвенция динамических фикстурных кодов): литерал card-NNN в чистой зоне флагает сканер
+  // the fixture codes are assembled on the fly (the dynamic fixture-code convention): a literal card-NNN in a clean zone flags the scanner
   const probe = (n) => ['card', String(n)].join('-');
   const LIVE = probe(901) + '-zhivaya-proba', DONE = probe(901) + '-zakrytaya-proba', UNIQUE = probe(902) + '-unikalnaya-proba';
-  const mk = (name) => `---\nid: "${name}"\nstatus: "todo"\n---\n\n# ${name}\n\n## Task\nпроба выборки.\n\n## History\n\n## Result\n`;
+  const mk = (name) => `---\nid: "${name}"\nstatus: "todo"\n---\n\n# ${name}\n\n## Task\na sampling probe.\n\n## History\n\n## Result\n`;
   const board = path.join(dir, '.devtool', 'features');
   const snap = () => [board, path.join(board, 'done')].flatMap((d) => fs.existsSync(d)
     ? fs.readdirSync(d).filter((n) => n.endsWith('.md')).map((n) => n + ':' + fs.readFileSync(path.join(d, n), 'utf8')) : []).join('#');
@@ -108,29 +109,29 @@ function selftest() {
     fs.writeFileSync(path.join(board, LIVE + '.md'), mk(LIVE));
     fs.writeFileSync(path.join(board, 'done', DONE + '.md'), mk(DONE));
     fs.writeFileSync(path.join(board, UNIQUE + '.md'), mk(UNIQUE));
-    // (а) полный код резолвится среди префиксно-коллизионных имён
+    // (a) the full code resolves among prefix-colliding names
     const ra = resolveCardFiles(dir, DONE);
-    check('(а) полный код при коллизии номеров — ровно done-файл', !!ra.file && path.basename(ra.file, '.md') === DONE);
+    check('(a) the full code with a number collision - exactly the done file', !!ra.file && path.basename(ra.file, '.md') === DONE);
     const ra2 = resolveCardFiles(dir, LIVE);
-    check('(а) полный код живой — ровно живой файл', !!ra2.file && path.basename(ra2.file, '.md') === LIVE);
-    // (б) короткий номер с двумя кандидатами — отказ со списком
+    check('(a) the full code alive - exactly the live file', !!ra2.file && path.basename(ra2.file, '.md') === LIVE);
+    // (b) a short number with two candidates - a refusal with the list
     const rb = resolveCardFiles(dir, probe(901));
-    check('(б) короткий номер при коллизии — отказ со списком', !!rb.ambiguous && rb.ambiguous.length === 2);
-    check('(б) в списке оба пути — живой и done', !!rb.ambiguous && rb.ambiguous.some((p) => p.endsWith(LIVE + '.md')) && rb.ambiguous.some((p) => p.endsWith(DONE + '.md')));
-    // (в) короткий номер уникальный — резолвится как раньше
+    check('(b) a short number under a collision - a refusal with the list', !!rb.ambiguous && rb.ambiguous.length === 2);
+    check('(b) the list holds both paths - the live one and done', !!rb.ambiguous && rb.ambiguous.some((p) => p.endsWith(LIVE + '.md')) && rb.ambiguous.some((p) => p.endsWith(DONE + '.md')));
+    // (c) a unique short number - resolves as before
     const rv = resolveCardFiles(dir, probe(902));
-    check('(в) короткий уникальный резолвится', !!rv.file && path.basename(rv.file, '.md') === UNIQUE);
-    // (г) отказ ничего не пишет
+    check('(c) a short unique one resolves', !!rv.file && path.basename(rv.file, '.md') === UNIQUE);
+    // (d) the refusal writes nothing
     const before = snap();
     resolveCardFiles(dir, probe(901));
-    check('(г) отказ ничего не пишет — фиктивная доска не изменена', snap() === before);
-    // (д) неизвестный номер — пустая выборка (вызов умирает «нет на доске»)
+    check('(d) the refusal writes nothing - the dummy board unchanged', snap() === before);
+    // (e) an unknown number - an empty sampling (the call dies "not on the board")
     const rd = resolveCardFiles(dir, probe(500));
-    check('(д) неизвестный номер — нет кандидатов', !rd.file && !rd.ambiguous);
+    check('(e) an unknown number - no candidates', !rd.file && !rd.ambiguous);
     const failed = results.filter((r) => !r.ok);
     console.log((failed.length ? '✗ ' : '✓ ') + (failed.length
-      ? 'не сошлось: ' + failed.map((r) => r.name).join('; ')
-      : 'выборка точная, ' + results.length + ' проб зелёные: полный код резолвится среди префиксных коллизий, короткий при коллизии отказывается со списком обоих путей, короткий уникальный резолвится как раньше, отказ ничего не пишет'));
+      ? 'mismatch: ' + failed.map((r) => r.name).join('; ')
+      : 'the sampling is exact, ' + results.length + ' probes green: the full code resolves among the prefix collisions, a short one under a collision refuses with the list of both paths, a short unique one resolves as before, the refusal writes nothing'));
     return failed.length === 0;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -142,10 +143,10 @@ const id = cardCode(cli.positional()[0]);
 const to = arg('to');
 const note = arg('note');
 
-/** Досрочная проверка паритета расхода (ledger-parity) по названным карточкам, до любой записи:
- *  `problems` — числовое расхождение строки с журналом (передачу останавливает до мутации статуса),
- *  `notes` — «журнал не покрывает» (сведение, не преграда). `extraRows` — строки расхода, которых на доске
- *  ещё нет (строка, которую эта передача сама допишет). */
+/** The early spend-parity check (ledger-parity) over the named cards, before any write:
+ *  `problems` - a numeric drift of the line from the journal (it stops the handover before the status mutation),
+ *  `notes` - "the journal does not cover" (a summary, not a barrier). `extraRows` - the spend lines not yet
+ *  on the board (the line this handover itself will append). */
 function preWriteParity(ids, extraRows = []) {
   const { run: parityRun } = require('./checks/ledger-parity.cjs');
   const { ruleSince } = require('../dashboard/lib/rules.cjs');
@@ -155,8 +156,8 @@ function preWriteParity(ids, extraRows = []) {
   return { problems: mine(found), notes: mine(info) };
 }
 
-// Закрытие круга (`Core`): --to core-close <NNN…> --note "<основание>" — на каждой названной карточке строка «закрыто — …» и assignee: null.
-// Карточки уже в done/ с assignee "Core"; статус и прочие поля не меняются. Любой неверный номер — стоп до первой записи.
+// Closing the cycle (`Core`): --to core-close <NNN…> --note "<the grounds>" - on every named card the line "closed - …" and assignee: null.
+// The cards are already in done/ with assignee "Core"; the status and the other fields do not change. Any wrong number - a stop before the first write.
 if (to === 'core-close') {
   const words = [];
   for (let i = 0; i < cli.argv.length; i++) {
@@ -165,54 +166,54 @@ if (to === 'core-close') {
     words.push(cli.argv[i]);
   }
   const ids = words.map(cardCode);
-  if (!ids.length || ids.some((x) => !x)) die('core-close: нужны номера карточек — --to core-close NNN [NNN…] --note "<основание>"');
-  if (!note || /[\n]/.test(note)) die('нужен --note "<основание>" в одну строку');
-  if (['kit', 'result', 'session-spend', 'tokens', 'duration-ms', 'agent-id'].some((k) => process.argv.includes('--' + k))) die('core-close: другие флаги расхода и секций не принимаются');
+  if (!ids.length || ids.some((x) => !x)) die(msg('board.card-move.coreclose_need_ids'));
+  if (!note || /[\n]/.test(note)) die(msg('board.card-move.need_note_reason'));
+  if (['kit', 'result', 'session-spend', 'tokens', 'duration-ms', 'agent-id'].some((k) => process.argv.includes('--' + k))) die(msg('board.card-move.coreclose_no_other_flags'));
   const day0 = new Date().toISOString().slice(0, 10);
   const plan = [];
   for (const cid of ids) {
     const found = resolveCardFiles(ROOT, cid);
     if (found.ambiguous) dieAmbiguous(cid, found.ambiguous);
-    if (!found.file) die(`карточки ${cid} нет на доске — ничего не записано`);
-    if (plan.some((p) => p.cid === path.basename(found.file, '.md'))) die(`${cid} назван дважды — ничего не записано`);
+    if (!found.file) die(msg('board.card-move.no_card_nowrite', { cid }));
+    if (plan.some((p) => p.cid === path.basename(found.file, '.md'))) die(msg('board.card-move.twice_nowrite', { cid }));
     const f0 = found.file;
     const cid0 = path.basename(f0, '.md');
     let tx = fs.readFileSync(f0, 'utf8');
     const fm0 = parseFrontmatter(tx);
-    if (fm0.status !== 'done' || fm0.assignee !== 'Core') die(`${cid0}: нужны status "done" и assignee "Core" (сейчас ${fm0.status}/${fm0.assignee}) — ничего не записано`);
+    if (fm0.status !== 'done' || fm0.assignee !== 'Core') die(msg('board.card-move.need_done_core', { cid0, status: fm0.status, assignee: fm0.assignee }));
     const zh = zoneHeadingIn(tx, 'history');
-    if (!zh) die(`${cid0}: нет зоны «История» — ничего не записано`);
+    if (!zh) die(msg('board.card-move.no_history_zone_nowrite', { cid0 }));
     const hAt = tx.indexOf('\n## ' + zh);
     const zr = zoneHeadingIn(tx, 'result');
     const rAt = zr ? tx.indexOf('\n## ' + zr, hAt + 1) : -1;
     const hEnd = rAt === -1 ? tx.length : rAt;
     const hb = tx.slice(hAt, hEnd).replace(/\s*$/, '');
     tx = tx.slice(0, hAt) + hb + '\n- `Core`, ' + day0 + ': closed — ' + note.replace(/\.?\s*$/, '.') + '\n' + (rAt === -1 ? '' : tx.slice(rAt));
-    if (!/^assignee:.*$/m.test(tx)) die(`${cid0}: в frontmatter нет поля assignee — ничего не записано`);
+    if (!/^assignee:.*$/m.test(tx)) die(msg('board.card-move.no_assignee_field_nowrite', { cid0 }));
     tx = tx.replace(/^assignee:.*$/m, 'assignee: null');
     plan.push({ cid: cid0, file: f0, text: tx, before: fs.readFileSync(f0, 'utf8') });
   }
-  // Досрочная проверка паритета — до записи: числовое расхождение останавливает закрытие, «журнал не покрывает» — сведение.
+  // The early parity check - before the write: a numeric drift stops the closing, "the journal does not cover" - a summary.
   {
     const gate = preWriteParity(plan.map((p) => p.cid));
-    if (gate.problems.length) die('закрытие остановлено до записи — паритет расхода:\n' + gate.problems.join('\n'));
+    if (gate.problems.length) die(msg('board.card-move.close_stopped_parity', { problems: gate.problems.join('\n') }));
     if (gate.notes.length) console.error(gate.notes.map((n) => '· ' + n).join('\n'));
   }
   if (flag('dry')) { for (const p of plan) console.log(path.relative(ROOT, p.file).replace(/\\/g, '/') + '\n' + p.text); process.exit(0); }
   for (const p of plan) fs.writeFileSync(p.file, p.text);
   const bad = checkBoard(ROOT).filter((p) => plan.some((q) => p.includes(q.cid)));
-  for (const p of plan) console.log(`ok: ${p.cid} → done/null · закрыто`);
+  for (const p of plan) console.log(msg('board.card-move.closed_ok', { cid: p.cid }));
   if (bad.length) { console.error(bad.join('\n')); process.exit(1); }
   process.exit(0);
 }
 
-if (!id || !to) die(`нужны <card> и --to ${Object.keys(TARGETS).join('|')}`);
-if (!TARGETS[to]) die(`--to "${to}" — нет такого перехода (${Object.keys(TARGETS).join('|')})`);
-if (!note || /[\n]/.test(note)) die('нужен --note "<что сделано>" в одну строку');
+if (!id || !to) die(msg('board.card-move.need_card_to', { targets: Object.keys(TARGETS).join('|') }));
+if (!TARGETS[to]) die(msg('board.card-move.bad_to', { to, targets: Object.keys(TARGETS).join('|') }));
+if (!note || /[\n]/.test(note)) die(msg('board.card-move.need_note'));
 const t = TARGETS[to];
 
 
-/** Тег движка по умолчанию: адаптер с самой свежей стенограммой; иначе единственный адаптер; иначе пусто (нужен --engine). */
+/** The engine tag by default: the adapter with the newest transcript; otherwise the only adapter; otherwise empty (--engine is needed). */
 function activeEngineTag() {
   const E = require('../dashboard/lib/engines.cjs');
   const newest = (dir, depth) => {
@@ -236,22 +237,22 @@ function activeEngineTag() {
   return tags.length === 1 ? tags[0].tag : '';
 }
 
-// Расход: --duration-ms и --agent-id обязательны; --tokens — запасное значение, если стенограммы вызова нет
+// The spend: --duration-ms and --agent-id are required; --tokens - the fallback value when the call's transcript is absent
 const tokens = arg('tokens'), durationMs = arg('duration-ms'), agentId = arg('agent-id');
 const cacheRead = arg('cache-read'), turns = arg('turns'), engine = arg('engine') || activeEngineTag();
 const spendGiven = [tokens, durationMs, agentId].some((v) => v != null);
 if (spendGiven) {
-  if (durationMs == null || agentId == null) die('расход: нужны --duration-ms и --agent-id (--tokens — запасное значение, без него N читается из стенограммы)');
+  if (durationMs == null || agentId == null) die(msg('board.card-move.spend_need_duration_agent'));
   const num = { ...(tokens != null && { tokens }), 'duration-ms': durationMs, ...(cacheRead != null && { 'cache-read': cacheRead }), ...(turns != null && { turns }) };
-  for (const [k, v] of Object.entries(num)) if (!/^\d+$/.test(v)) die(`--${k} "${v}" — нужно целое число`);
-  if (!/^[\w.:-]+$/.test(agentId)) die(`--agent-id "${agentId}" — не похоже на id вызова`);
-  if (!engine) die('не удалось определить движок по адаптерам: передайте --engine <тег>');
-  if (!/^[a-z][\w-]*$/.test(engine)) die(`--engine "${engine}" — не тег движка`);
+  for (const [k, v] of Object.entries(num)) if (!/^\d+$/.test(v)) die(msg('board.card-move.need_int', { k, v }));
+  if (!/^[\w.:-]+$/.test(agentId)) die(msg('board.card-move.bad_agent_id', { agentId }));
+  if (!engine) die(msg('board.card-move.no_engine'));
+  if (!/^[a-z][\w-]*$/.test(engine)) die(msg('board.card-move.bad_engine_tag', { engine }));
 }
-// Без --tokens N, R и O читаются из стенограммы вызова: раскладку и разбор шага знает адаптер движка
-// (`findTranscript` → `findSubagent`/`stepOf` адаптера; без `findSubagent` — раскладка `agent-<id>.jsonl` по сессиям);
-// только чтение. Шаги одной записи дедуплицируются по requestId (иначе завышение).
-// Стенограммы нет — N, R и O остаются unknown с причиной в описании, не ноль.
+// Without --tokens, N, R and O are read from the call's transcript: the adapter of the engine knows the layout and the step parsing
+// (`findTranscript` → the adapter's `findSubagent`/`stepOf`; without `findSubagent` - the `agent-<id>.jsonl` layout over the sessions);
+// read-only. The steps of one record are deduplicated by requestId (otherwise an overstatement).
+// No transcript - N, R and O stay unknown with the reason in the description, not zero.
 function readTranscript(agentId, tag) {
   const { findTranscript } = require('../dashboard/subagent-transcript.cjs');
   if (!/^[A-Za-z0-9_-]+$/.test(agentId)) return null;
@@ -286,33 +287,33 @@ function readTranscript(agentId, tag) {
 let fromTr = null, trWhy = '';
 if (spendGiven && tokens == null) {
   fromTr = readTranscript(agentId, engine);
-  if (!fromTr) trWhy = ' N, R и O неизвестны: стенограмма вызова не найдена, --tokens не передан.';
+  if (!fromTr) trWhy = msg('board.card-move.tr_why');
 }
 
-// Секции: только на «своих» передачах, чтобы текст не попал не в ту зону
+// The sections: only on "their own" handovers, so the text does not land in the wrong zone
 const kitText = arg('kit'), resultText = arg('result');
 for (const [k, v] of [['kit', kitText], ['result', resultText]]) {
-  if (process.argv.includes('--' + k) && (v == null || v === '')) die(`--${k}: пустое значение — нужен текст или «-» (stdin)`);
+  if (process.argv.includes('--' + k) && (v == null || v === '')) die(msg('board.card-move.empty_value', { k }));
 }
-if (kitText != null && to !== 'run') die('--kit пишется только при --to run (комплект передаёт Kit исполнителю)');
-if (resultText != null && to !== 'intent') die('--result пишется только при --to intent (исполнитель возвращает итог на проверку)');
-if (kitText === '-' && resultText === '-') die('stdin один: «-» можно только у одного из --kit / --result');
+if (kitText != null && to !== 'run') die(msg('board.card-move.kit_only_run'));
+if (resultText != null && to !== 'intent') die(msg('board.card-move.result_only_intent'));
+if (kitText === '-' && resultText === '-') die(msg('board.card-move.one_stdin'));
 const zoneBody = (v, what) => {
   const body = v === '-' ? fs.readFileSync(0, 'utf8') : v;
-  if (!String(body).trim()) die(`--${what}: пустой текст — зона не заполняется пустотой`);
-  if (/^##\s/m.test(body)) die(`--${what}: в тексте строка, начинающаяся с «## » — она сломала бы зоны карточки`);
+  if (!String(body).trim()) die(msg('board.card-move.empty_text', { what }));
+  if (/^##\s/m.test(body)) die(msg('board.card-move.heading_line', { what }));
   return String(body).replace(/\r\n/g, '\n').replace(/\s+$/, '');
 };
 const kitBody = kitText != null ? zoneBody(kitText, 'kit') : null;
 const resultBody = resultText != null ? zoneBody(resultText, 'result') : null;
 
-// Расход основной сессии (`Intent`): строки даёт скрипт адаптера движка, ядро путей не знает — ищет в каталоге скриптов адаптеров
+// The main session's spend (`Intent`): the lines come from the engine adapter's script, the core knows no paths - it searches the adapters' scripts directory
 const sessionSpendArg = arg('session-spend');
-if (process.argv.includes('--session-spend') && (sessionSpendArg == null || sessionSpendArg === '')) die('--session-spend: нужен номер карточки NNN');
+if (process.argv.includes('--session-spend') && (sessionSpendArg == null || sessionSpendArg === '')) die(msg('board.card-move.session_need_num'));
 if (sessionSpendArg != null) {
-  if (to !== 'accept' && to !== 'close') die('--session-spend пишется только при --to accept|close (расход Intent дописывается при принятии)');
-  if (!/^\d{1,4}$/.test(sessionSpendArg)) die(`--session-spend "${sessionSpendArg}" — нужен номер карточки NNN`);
-  if (sessionSpendArg.padStart(3, '0') !== id.replace(/^card-0*(\d+)(?:-.+)?$/, (m, d) => d.padStart(3, '0'))) die(`--session-spend ${sessionSpendArg} — не номер карточки ${id}`);
+  if (to !== 'accept' && to !== 'close') die(msg('board.card-move.session_only_accept_close'));
+  if (!/^\d{1,4}$/.test(sessionSpendArg)) die(msg('board.card-move.session_bad_num', { v: sessionSpendArg }));
+  if (sessionSpendArg.padStart(3, '0') !== id.replace(/^card-0*(\d+)(?:-.+)?$/, (m, d) => d.padStart(3, '0'))) die(msg('board.card-move.session_wrong_card', { v: sessionSpendArg, id }));
 }
 function sessionSpendLines(num) {
   const E = require('../dashboard/lib/engines.cjs');
@@ -321,40 +322,40 @@ function sessionSpendLines(num) {
     const f = path.join(ROOT, E.sourcesOf(a).scriptsDir, 'card-session-spend.cjs');
     if (fs.existsSync(f) && (!script || a.spendTag === engine || a.engine === engine)) script = f;
   }
-  if (!script) die('--session-spend: у адаптеров движка нет card-session-spend.cjs');
+  if (!script) die(msg('board.card-move.no_session_script'));
   const r = require('child_process').spawnSync(process.execPath, [script, num], { cwd: ROOT, encoding: 'utf8' });
-  if (r.status !== 0) die(`--session-spend: card-session-spend.cjs ${num} — ${(r.stderr || r.stdout || 'код ' + r.status).trim()}`);
+  if (r.status !== 0) die(msg('board.card-move.session_failed', { num, out: (r.stderr || r.stdout || msg('board.card-move.exit_code', { code: r.status })).trim() }));
   return r.stdout.split(/\r?\n/).filter((l) => l.startsWith('- '));
 }
 
-// 1. Карточка: только живая — единая выборка по точному номеру, fail-closed при неоднозначности
+// 1. The card: only a live one - the unified sampling by the exact number, fail-closed under ambiguity
 const found = resolveCardFiles(ROOT, id);
 if (found.ambiguous) dieAmbiguous(id, found.ambiguous);
-if (!found.file) die(`карточки ${id} нет на доске`);
+if (!found.file) die(msg('board.card-move.no_card', { id }));
 const file = found.file;
-if (path.dirname(file) !== BOARD) die(`${id} лежит в done/ — закрытую карточку не передают`);
+if (path.dirname(file) !== BOARD) die(msg('board.card-move.in_done', { id }));
 const cardId = path.basename(file, '.md');
 
 let text = fs.readFileSync(file, 'utf8');
 const fm = parseFrontmatter(text);
 
-// 2. Кто держит `run` (§7): по метке route-N — короткий маршрут (route-4) исполняет Kit, route-0/1 — Intent
+// 2. Who holds `run` (§7): by the route-N label - the short route (route-4) is executed by Kit, route-0/1 - by Intent
 let assignee = t.assignee;
 if (to === 'run') {
   const labels = labelsOf(text);
   if (labels.includes('route-4')) assignee = 'Kit';
   else if (labels.includes('route-0') || labels.includes('route-1')) assignee = 'Intent';
 }
-// 3. Чья строка: для `intent` — тот, кто исполнял, иначе узел по таблице
+// 3. Whose line: for `intent` - the one who executed, otherwise the node by the table
 const node = arg('node') || (to === 'intent' && ['Run', 'Kit', 'Intent'].includes(fm.assignee) ? fm.assignee : t.by);
-if (!/^[A-Za-z]\w*$/.test(node)) die(`--node "${node}" — не имя узла`);
+if (!/^[A-Za-z]\w*$/.test(node)) die(msg('board.card-move.bad_node', { node }));
 
-// 4. Правка frontmatter: status, assignee, modified (+ completedAt на close)
+// 4. The frontmatter edit: status, assignee, modified (+ completedAt on close)
 const now = new Date().toISOString();
 const day = now.slice(0, 10);
 const setField = (src, key, val) => {
   const re = new RegExp('^' + key + ':.*$', 'm');
-  if (!re.test(src)) die(`в frontmatter нет поля ${key}`);
+  if (!re.test(src)) die(msg('board.card-move.no_field', { key }));
   return src.replace(re, `${key}: ${val}`);
 };
 text = setField(text, 'status', `"${t.status}"`);
@@ -362,12 +363,12 @@ text = setField(text, 'assignee', `"${assignee}"`);
 text = setField(text, 'modified', `"${now}"`);
 if (to === 'close') text = setField(text, 'completedAt', `"${now}"`);
 
-// 4б. Тело зоны «Комплект» / «Результат» — заголовок ищется по якорю или по словарю, на любом языке карточки
+// 4b. The body of the "Kit" / "Result" zone - the heading is searched by the anchor or by the dictionary, in any card language
 const setZone = (src, key, body) => {
   const head = i18n.headingRe('zone.' + key, '');
   const lines = src.split('\n');
   const i = lines.findIndex((l) => head.test(l.replace(/\r$/, '')));
-  if (i < 0) die(`в карточке нет зоны «${key}»`);
+  if (i < 0) die(msg('board.card-move.no_zone', { key }));
   let end = lines.findIndex((l, k) => k > i && l.startsWith('## '));
   if (end < 0) end = lines.length;
   return lines.slice(0, i + 1).concat(['', ...body.split('\n'), ''], lines.slice(end)).join('\n');
@@ -375,11 +376,11 @@ const setZone = (src, key, body) => {
 if (kitBody != null) text = setZone(text, 'kit', kitBody);
 if (resultBody != null) text = setZone(text, 'result', resultBody);
 
-// 5. Строка этапа — в конец зоны «История» (перед зоной результата)
+// 5. The stage line - to the end of the "History" zone (before the result zone)
 const projectMd = fs.readFileSync(projectFile(ROOT, 'PROJECT.md'), 'utf8');
 const zoneHist = zoneHeadingIn(text, 'history');
 const zoneRes = zoneHeadingIn(text, 'result');
-if (!zoneHist) die('в карточке нет зоны «История»');
+if (!zoneHist) die(msg('board.card-move.no_history_zone'));
 const line = `- \`${node}\`, ${day}: stage ${t.stage} — ${note.replace(/\.?\s*$/, '.')}`;
 const histAt = text.indexOf('\n## ' + zoneHist);
 const resAt = zoneRes ? text.indexOf('\n## ' + zoneRes, histAt + 1) : -1;
@@ -392,31 +393,31 @@ const spend = !spendGiven ? '' : formatSpendLine({
   cache_read: cacheRead != null ? Number(cacheRead) : (fromTr ? fromTr.cacheRead : null),
   tokens_out: fromTr ? fromTr.output : undefined,
   duration_s: Math.round(Number(durationMs) / 1000), turns: turns != null ? Number(turns) : undefined,
-  call_id: agentId, engine, desc: n + (cacheRead != null || fromTr || trWhy ? '' : ' cache-read движок не вернул.') + trWhy,
+  call_id: agentId, engine, desc: n + (cacheRead != null || fromTr || trWhy ? '' : msg('board.card-move.cache_read_unknown')) + trWhy,
 }).replace(/^/, '- ') + '\n';
 const sessionLines = sessionSpendArg == null ? '' : sessionSpendLines(sessionSpendArg.padStart(3, '0'))
   .filter((l) => !text.includes(l.split(' — ')[0])).map((l) => l + '\n').join('');
 text = text.slice(0, histAt) + body + '\n' + spend + sessionLines + line + '\n' + (resAt === -1 ? '' : text.slice(resAt));
 
-// 5в. Досрочная проверка паритета расхода — до записи и до --dry: числовое расхождение строки с журналом
-// останавливает передачу до мутации статуса (exit не после записи); «журнал не покрывает» — сведение, не преграда.
+// 5c. The early spend-parity check - before the write and before --dry: a numeric drift of the line from the journal
+// stops the handover before the status mutation (the exit not after the write); "the journal does not cover" - a summary, not a barrier.
 {
   const extraRows = [];
   if (spend) extraRows.push({ file: cardId + '.md', line: spend });
   for (const l of sessionLines.split('\n').filter(Boolean)) extraRows.push({ file: cardId + '.md', line: l });
   const gate = preWriteParity([cardId], extraRows);
-  if (gate.problems.length) die('передача остановлена до записи — паритет расхода:\n' + gate.problems.join('\n'));
+  if (gate.problems.length) die(msg('board.card-move.move_stopped_parity', { problems: gate.problems.join('\n') }));
   if (gate.notes.length) console.error(gate.notes.map((n) => '· ' + n).join('\n'));
 }
 
-// 6. Запись; на close файл уходит в done/ (расширение доски делает это само, без него — мы)
+// 6. The write; on close the file goes to done/ (the board extension does it itself, without it - we)
 const target = to === 'close' ? path.join(BOARD, 'done', cardId + '.md') : file;
 if (flag('dry')) { console.log(path.relative(ROOT, target).replace(/\\/g, '/') + '\n' + text); process.exit(0); }
 if (target !== file) { fs.mkdirSync(path.dirname(target), { recursive: true }); fs.renameSync(file, target); }
 fs.writeFileSync(target, text);
 console.log(path.relative(ROOT, target).replace(/\\/g, '/'));
 
-// 6б. Инвалидация / пересчет кэша дашборда при обновлении карточки
+// 6b. The dashboard cache invalidation / recalculation at a card update
 try {
   const cacheFile = path.join(ROOT, '.forma', 'dashboard', '.cache', 'data.json');
   if (fs.existsSync(cacheFile)) {
@@ -442,7 +443,7 @@ try {
   }
 } catch {}
 
-// 7. Проверка по этой карточке
+// 7. The check over this card
 const mine = checkBoard(ROOT).filter((p) => p.includes(cardId));
 if (mine.length) { console.error(mine.join('\n')); process.exit(1); }
 console.log(`ok: ${cardId} → ${t.status}/${assignee} · stage ${t.stage}`);
@@ -466,7 +467,7 @@ if (to === 'close') {
         } catch {}
       }
     }
-    const note = count >= cycleVol ? 'Пора Core.' : 'Накопление в done/Core продолжается.';
-    console.log(`Круг по эпику "${epic}": ${count}/${cycleVol} карточек. ${note}`);
+    const note = count >= cycleVol ? msg('board.card-move.cycle_time') : msg('board.card-move.cycle_accumulating');
+    console.log(msg('board.card-move.cycle_line', { epic, count, vol: cycleVol, note }));
   }
 }
