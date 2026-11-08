@@ -163,8 +163,9 @@ function codexDormant() { try { return JSON.parse(fs.readFileSync('.forma/engine
 
 // pre-commit проекта: любой коммит, и обычный git commit, переносит Claude → Gemini/Codex
 // и берёт их файлы в тот же коммит. Перенос в исходник протокола и версия — по-прежнему forma-commit.
+// Первым в хуке — гейт заморозки версий (goal-freeze.cjs): перезапись хука этой константой гейт восстанавливает сама.
 const HOOK = path.join(root, '.git', 'hooks', 'pre-commit');
-const HOOK_BODY = '#!/bin/sh\n# forma: проверка ядра и адаптеров перед коммитом (forma-commit.cjs)\nexec node .forma/protocol/scripts/forma-commit.cjs --sync-staged\n';
+const HOOK_BODY = '#!/bin/sh\n# forma: гейт заморозки версий (goal-freeze.cjs) — замороженные файлы без записи «human approved» коммит не проходят\nnode .forma/board/checks/goal-freeze.cjs --staged || exit 1\n# forma: проверка ядра и адаптеров перед коммитом (forma-commit.cjs)\nexec node .forma/protocol/scripts/forma-commit.cjs --sync-staged\n';
 function installHook() {
   fs.writeFileSync(HOOK, HOOK_BODY);
   try { fs.chmodSync(HOOK, 0o755); } catch { /* ФС без chmod (Windows) — git запустит хук и так */ }
