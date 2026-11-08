@@ -149,8 +149,10 @@ and **no unknown** left. Before the transcript reader existed, the same lines re
 **The limit that stays:** a call whose transcript cannot be found keeps `null` and reads
 `unknown` — never zero.
 
-**Limit named:** the shared formatter whitelists the engine tags `claude-code`, `codex`, `gemini`.
-Until the core learns `minimax`, the board check `engine-tag` flags the line. Card to the core.
+**No limit here:** the shared formatter reads the engine tags from the adapters themselves
+(`engines.spendTags(root)` — `spendTag`, `engine` and `id` of every loaded adapter), so this engine's
+`minimax` is known to the core the moment this adapter is loaded; the board check `engine-tag`
+accepts the line. The old core-side whitelist of three fixed tags is gone.
 
 ## Deletion guard (§1, §2) (Contract 6: constructive)
 
@@ -219,9 +221,10 @@ core's format, and this engine is the one that writes them.
 engine's journal (see Contract 5), so a card of this engine is checked by the same rules as any
 other.
 
-**Limit named:** the engine tag of the spend line is `minimax:`, and the shared formatter's
-whitelist of tags (`claude-code`, `codex`, `gemini`) does not yet know it. Until the core learns
-the fourth tag, the check `engine-tag` flags this engine's lines. Card to the core.
+**No limit here:** the engine tag of the spend line is `minimax:`, and the shared formatter
+knows it — it reads the tags from the loaded adapters rather than from a fixed list, and
+`canonicalTag` folds this engine's own alias (`minimax-code`) onto `minimax`. The check
+`engine-tag` accepts this engine's lines.
 
 ## Models per node
 
