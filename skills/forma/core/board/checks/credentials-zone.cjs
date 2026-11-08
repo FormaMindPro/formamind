@@ -325,7 +325,7 @@ function selftest() {
       { rel: 'outside/server.pem', text: '-----BEGIN RSA PRIVATE KEY-----\nMIIB\n-----END RSA PRIVATE KEY-----\n', expect: 'caught' },
       { rel: 'outside/config.yaml', text: 'password = "' + pwd + '"\n', expect: 'caught' },
       { rel: 'outside/jwt.txt', text: 'Authorization: Bearer ' + jwt + '\n', expect: 'caught' },
-      { rel: 'outside/db-url.txt', text: 'доступ: postgres://admin:S3cr3tP4ss@db.example.internal:5432/base\n', expect: 'caught' },
+      { rel: 'outside/db-url.txt', text: 'доступ: postgres://admin:S3cr3tP4' + 'ss' + String.fromCharCode(64) + 'db.example' + '.internal:5432/base\n', expect: 'caught' },
       { rel: '.env', text: 'DEEPSEEK_API_KEY=' + sk + '\nAPP_PASSWORD=' + pwd + '\n', expect: 'allowed' },
       {
         rel: 'project/VARS/credentials.md',
