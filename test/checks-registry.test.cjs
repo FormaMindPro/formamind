@@ -75,8 +75,10 @@ test('каждый файл проверки — в реестре, id раве�
     const files = fs.readdirSync(path.join(fx.root, dir)).filter((f) => f.endsWith('.cjs') && f !== 'index.cjs');
     for (const f of files) {
       const id = f.replace(/\.cjs$/, '');
+      const mod = load(`${dir}/${f}`);
+      if (mod.id === undefined) continue; // гейт-скрипт (инструмент pre-commit-хука, его зовёт HOOK_BODY), не проверка реестра — строка в index.cjs не нужна
       assert.ok(byId(registry, id), `${dir}/${f}: проверки «${id}» нет в реестре — нужна строка в index.cjs`);
-      assert.equal(load(`${dir}/${f}`).id, id, `${dir}/${f}: id не равен имени файла`);
+      assert.equal(mod.id, id, `${dir}/${f}: id не равен имени файла`);
     }
   }
   for (const check of BOARD) assert.ok(fs.existsSync(path.join(fx.root, '.forma', 'board', 'checks', check.id + '.cjs')), `${check.id}: нет файла`);
