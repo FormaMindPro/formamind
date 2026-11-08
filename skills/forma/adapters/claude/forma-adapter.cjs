@@ -77,7 +77,7 @@ module.exports = {
   skillsDir: '.claude/skills',
   // Умения, что поставляет шаблон (адаптер Claude + интервью ядра): по ним вкладка «Проект» отличает ядро от проекта.
   // Список едет с адаптером — в установленном проекте клона .forma/protocol/ нет; сверка с шаблоном — forma-adapter.test.cjs.
-  templateSkills: ['engine-switch', 'excalidraw-diagrams', 'forma-grill-with-ui', 'graph-build', 'graphify', 'grilling', 'human-register', 'project-knowledge', 'skill-authoring'],
+  templateSkills: ['engine-switch', 'excalidraw-diagrams', 'forma-grill-with-ui', 'graph-build', 'graphify', 'grilling', 'human-register', 'law-shrink', 'project-knowledge', 'skill-authoring'],
   syncScript: '.claude/scripts/sync-engines.cjs',
 
   // Расход диалога: скрипт пишет .forma/dashboard/.cache/session-current.json.

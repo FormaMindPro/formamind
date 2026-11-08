@@ -17,9 +17,9 @@
  *
  * Коды возврата: 0 — ЗЕЛЁНАЯ (декларация полна); 1 — КРАСНАЯ (чего-то из трёх нет — названо,
  * по адресу); 2 — ошибка исполнения (PROJECT.md не найден, самопроба не сошлась).
- * Модуль: require('./thresholds-declared.cjs') → { id: 'thresholds-declared', since: null, run,
- * runProject, selftest } — форма реестра проверок; включение одной строкой в index.cjs —
- * решение принимающего, по умолчанию гейт вызывается явно (--project).
+ * Модуль: require('./thresholds-declared.cjs') → { run, runProject, selftest } — гейт-скрипт без id
+ * (не строка реестра): включение стоящей проверкой в index.cjs — отдельное решение принимающего,
+ * по умолчанию гейт вызывается явно (--project).
  * Часть ядра: следов проекта не несёт (запрет 16).
  */
 
@@ -201,7 +201,7 @@ function run(ctx = {}) {
   return r.lines.filter((l) => l.status === 'red').map((l) => 'thresholds-declared: ' + l.fact);
 }
 
-module.exports = { id: 'thresholds-declared', since: null, run, runProject, selftest };
+module.exports = { run, runProject, selftest };
 
 // ---- CLI ----------------------------------------------------------------------------------------
 
