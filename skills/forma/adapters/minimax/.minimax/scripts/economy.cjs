@@ -1,31 +1,35 @@
 'use strict';
 
 /**
- * Экономика движка MiniMax: разбор стенограммы, вес инструктажа, каталог стенограмм.
+ * The MiniMax engine economy: the transcript parsing, the instruction weight, the transcript directory.
  *
- * Три функции, которые ядро спрашивает у адаптера (форма — `.forma/dashboard/lib/engines.cjs`):
- *   parseUsage(step)      → { tokens_in, tokens_out, cache_read, cache_write }
- *   transcriptsDir(root)  → каталог стенограмм проекта | null
- *   instructionWeight()   → сколько токенов закона и роли грузится в узел на КАЖДЫЙ шаг
+ * Three functions the core asks the adapter for (the shape - `.forma/dashboard/lib/engines.cjs`):
+ *   parseUsage(step)      -> { tokens_in, tokens_out, cache_read, cache_write }
+ *   transcriptsDir(root)  -> the project's transcript directory | null
+ *   instructionWeight()   -> how many tokens of the law and the role are loaded into a node on EVERY step
  *
- * Стенограммы моего движка пишет хук плагина в `.minimax/.transcripts/` — по одной
- * JSONL-строке на шаг. Формат шага терпимый: принимаются и общие поля
- * (`tokens_in`/`tokens_out`/`cache_read`), и форма Claude (`usage.input_tokens`).
- * Неизвестное остаётся `null`, а не нулём: §3 запрещает писать ноль числом.
+ * My engine's transcripts are written by the plugin's hook into `.minimax/.transcripts/` - one
+ * JSONL line per step. The step format is tolerant: both the common fields
+ * (`tokens_in`/`tokens_out`/`cache_read`) and the Claude form (`usage.input_tokens`) are accepted.
+ * The unknown stays `null`, not zero: §3 forbids writing zero as a number.
  */
 
 const fs = require('fs');
 const path = require('path');
+// Data labels come from the core dictionary: English key in code, ru value as data.
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const TRANSCRIPTS = path.join(ROOT, '.minimax', '.transcripts');
 
-// Байт на токен: кириллица в UTF-8 — два байта на букву и дробится чаще латиницы.
+// Bytes per token: Cyrillic in UTF-8 is two bytes per letter and splits more often than Latin.
 const BYTES_PER_TOKEN_LATIN = 4.1;
 const BYTES_PER_TOKEN_CYRILLIC = 2.2;
 
 function estimateTokens(text) {
-  const cyrillicChars = (text.match(/[Ѐ-ӿ]/g) || []).length;
+  // The Cyrillic block U+0400..U+04FF, as \u escapes: the source stays ASCII, the class matches the same characters.
+  const cyrillicChars = (text.match(/[\u0400-\u04ff]/g) || []).length;
   const cyrillicBytes = cyrillicChars * 2;
   const totalBytes = Buffer.byteLength(text, 'utf8');
   const latinBytes = Math.max(0, totalBytes - cyrillicBytes);
@@ -36,7 +40,7 @@ function num(v) {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
-/** Шаг стенограммы → расход шага. Любое неизвестное поле — null, не 0. */
+/** A transcript step -> the step's spend. Any unknown field - null, not 0. */
 function parseUsage(step) {
   if (!step || typeof step !== 'object') return null;
   const u = step.usage || step;
@@ -48,16 +52,16 @@ function parseUsage(step) {
   return { tokens_in: tokensIn, tokens_out: tokensOut, cache_read: cacheRead, cache_write: cacheWrite };
 }
 
-/** Каталог стенограмм проекта. Нет каталога — нет стенограмм (null), а не пустой каталог. */
+/** The project's transcript directory. No directory - no transcripts (null), not an empty directory. */
 function transcriptsDir(root = ROOT) {
   const dir = path.join(root, '.minimax', '.transcripts');
   return fs.existsSync(dir) ? dir : null;
 }
 
-// Общая часть моего контекста: закон (читается нативно) + мой §8.
+// The common part of my context: the law (read natively) + my §8.
 const COMMON = ['AGENTS.md', '.minimax/rules/minimax-8.md'];
 
-// Файл роли на узел. On-demand роли сюда не входят: они грузятся по требованию.
+// The role file per node. On-demand roles are not here: they are loaded on demand.
 const ROLE_FILE = {
   Intent: '.minimax/agents/intent.md',
   Spec: '.minimax/agents/spec.md',
@@ -89,15 +93,14 @@ function instructionWeight() {
   }
   return {
     estimate: true,
-    note:
-      'Оценка по эвристике «байт на токен», не измерение. Системный промпт рантайма и ' +
-      'описания инструментов сюда не входят — настоящий вес шага больше.',
+    // The note travels into the dashboard's data - its ru wording is dictionary data, as before.
+    note: msg('spend.minimax-economy.weight_note'),
     common: { tokens: commonTokens, files: common },
     byNode,
   };
 }
 
-/** Число шагов агента по кэш-чтению захода. Верхняя оценка — см. оговорку выше. */
+/** The agent steps of a call by its cache-read. An upper estimate - see the caveat above. */
 function stepsFromCacheRead(cacheRead, perStep) {
   if (!cacheRead || !perStep) return null;
   return Number((cacheRead / perStep).toFixed(1));

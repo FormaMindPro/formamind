@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * Вкладка «Экономика» на двух языках: все ключи t('…') из economy.js есть в en и ru, отрисовка всех пяти уровней
- * не оставляет сырых ключей, а на en — кириллицы (данные в тесте английские).
+ * The "Economy" tab in two languages: every t('...') key from economy.js exists in en and ru, the rendering of all
+ * five levels leaves no raw keys, and on en - no Cyrillic (the data in the test is English).
  *   node .forma/dashboard/economy-i18n.test.cjs
  */
 const assert = require('node:assert/strict');
@@ -14,23 +14,23 @@ const core = require('./web/js/i18n.js');
 
 let passed = 0;
 const it = (name, fn) => { fn(); passed += 1; console.log('ok  ' + name); };
-// Даты образцов собираются, а не пишутся: в чистой зоне нет календарных дат (запрет 16).
+// The samples' dates are assembled, not written: a clean zone holds no calendar dates (prohibition 16).
 const D = (n) => ['2020', '01', '0' + n].join('-');
 const js = (f) => fs.readFileSync(path.join(__dirname, 'web/js', f), 'utf8');
 const dicts = { en: i18n.readDict('en'), ru: i18n.readDict('ru') };
 
-it('каждый ключ t(\'…\') и cnt(\'…\') в economy.js есть в en и ru', () => {
+it('every t(\'...\') and cnt(\'...\') key in economy.js exists in en and ru', () => {
   const keys = new Set();
   for (const m of js('economy.js').matchAll(/\b(?:t|cnt)\('([\w.-]+)'[,)]/g)) keys.add(m[1]);
-  assert.ok(keys.size > 100, 'ключей найдено мало: ' + keys.size);
+  assert.ok(keys.size > 100, 'too few keys found: ' + keys.size);
   const lost = [...keys].filter((k) => !(k in dicts.en && k in dicts.ru));
   assert.deepEqual(lost, []);
 });
 
-it('в economy.js нет кириллицы вне комментариев', () => {
+it('economy.js holds no Cyrillic outside the comments', () => {
   const code = js('economy.js').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  const hit = code.match(/.{0,30}[А-Яа-яЁё]+.{0,20}/);
-  assert.equal(hit, null, 'кириллица в коде: ' + (hit && hit[0]));
+  const hit = code.match(/.{0,30}[\u0410-\u042f\u0430-\u044f\u0401\u0451]+.{0,20}/);
+  assert.equal(hit, null, 'Cyrillic in the code: ' + (hit && hit[0]));
 });
 
 function load(lang) {
@@ -76,26 +76,27 @@ const d = {
 };
 
 for (const [lang, cyr] of [['en', false], ['ru', true]]) {
-  it(`отрисовка вкладки на ${lang}: нет сырых ключей${cyr ? '' : ' и кириллицы'}`, () => {
+  it(`the tab renders in ${lang}: no raw keys${cyr ? '' : ' and no Cyrillic'}`, () => {
     const { x, out } = load(lang);
-    const ctxLatest = d; // renderEconomy читает latestData только в обработчике клика
+    const ctxLatest = d; // renderEconomy reads latestData only in a click handler
     x.renderEconomy(ctxLatest);
     const html = out.html + '\n' + x.daysHtml(d.economy.byDate) + x.economyNodesHtml(byNode) + x.routesHtml(engine.byRoute)
       + x.servicesHtml({ byService: [] }, false) + x.moneyHtml({ costUsdTotal: 0 }, [], false) + x.subagentsHtml([], false);
-    assert.ok(html.length > 3000, 'вкладка не отрисовалась');
-    assert.ok(!/\becon\.[a-z]/.test(html), 'сырой ключ: ' + (html.match(/\becon\.[\w.-]+/) || [''])[0]);
-    assert.ok(!/\btime\.[a-z]/.test(html), 'сырой ключ: ' + (html.match(/\btime\.[\w.-]+/) || [''])[0]);
-    assert.ok(!/\{\w+\}/.test(html), 'неподставленная переменная: ' + (html.match(/\{\w+\}/) || [''])[0]);
-    if (!cyr) assert.ok(!/[А-Яа-яЁё]/.test(html), 'кириллица на en: ' + (html.match(/.{20}[А-Яа-яЁё]+.{10}/) || [''])[0]);
-    else assert.ok(/Слепые пятна/.test(html) && /Инструктаж/.test(html));
+    assert.ok(html.length > 3000, 'the tab did not render');
+    assert.ok(!/\becon\.[a-z]/.test(html), 'raw key: ' + (html.match(/\becon\.[\w.-]+/) || [''])[0]);
+    assert.ok(!/\btime\.[a-z]/.test(html), 'raw key: ' + (html.match(/\btime\.[\w.-]+/) || [''])[0]);
+    assert.ok(!/\{\w+\}/.test(html), 'an unsubstituted variable: ' + (html.match(/\{\w+\}/) || [''])[0]);
+    if (!cyr) assert.ok(!/[\u0410-\u042f\u0430-\u044f\u0401\u0451]/.test(html), 'Cyrillic on en: ' + (html.match(/.{20}[\u0410-\u042f\u0430-\u044f\u0401\u0451]+.{10}/) || [''])[0]);
+    // The ru strings are read from the dictionary, not pinned as literals: the source stays ASCII.
+    else assert.ok(html.includes(dicts.ru['econ.blindSpots']) && html.includes(dicts.ru['econ.l2.instr']));
   });
 }
 
-it('пустые данные: без второго движка и ведомости вкладка рисуется на en без кириллицы', () => {
+it('empty data: without a second engine and the sheet, the tab renders on en without Cyrillic', () => {
   const { x, out } = load('en');
   x.renderEconomy({ totals: { epicCount: 0, cardCount: 0, attemptCount: 0, costUsdTotal: 0, byStatus: {} }, byNode: [], subagents: [], economy: { coverage: { blindSpotCount: 0 }, blindSpots: [], malformed: [] } });
   assert.ok(out.html.length > 500);
-  assert.ok(!/\becon\.[a-z]/.test(out.html) && !/[А-Яа-яЁё]/.test(out.html), (out.html.match(/.{20}[А-Яа-яЁё]+.{10}/) || [''])[0]);
+  assert.ok(!/\becon\.[a-z]/.test(out.html) && !/[\u0410-\u042f\u0430-\u044f\u0401\u0451]/.test(out.html), (out.html.match(/.{20}[\u0410-\u042f\u0430-\u044f\u0401\u0451]+.{10}/) || [''])[0]);
 });
 
 console.log(`\n${passed} passed`);

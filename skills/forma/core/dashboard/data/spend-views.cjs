@@ -1,12 +1,12 @@
 'use strict';
 
 /**
- * Разрезы расхода по набору карточек: по узлам и «экономика» — сколько стоила работа и что об этом вообще известно.
- * Функции чистые: карточки и вес инструктажа приходят снаружи, файлов здесь не читают.
+ * The spend slices over a set of cards: by the nodes and "the economy" - what the work cost and what is known
+ * about it at all. The functions are pure: the cards and the instruction weight come from outside, no files are read here.
  *
- * Главное правило: рядом с каждой величиной идёт её ПОКРЫТИЕ. Записано 26 заходов на 138 карточек —
- * и без пометки об этом дашборд уверенно скажет «`Spec` дешёвый» там, где правда в том, что `Spec` почти
- * не записывал. Цифра без покрытия опаснее отсутствия цифры: по ней принимают решения.
+ * The main rule: next to every figure goes its COVERAGE. 26 attempts recorded over 138 cards - and without that
+ * note the dashboard would confidently say "`Spec` is cheap" where the truth is that `Spec` barely recorded
+ * anything. A number without coverage is more dangerous than the absence of a number: decisions are made by it.
  */
 
 const { UNKNOWN } = require('../lib/engines.cjs');
@@ -14,7 +14,7 @@ const { NODE_ORDER } = require('./nodes.cjs');
 
 const sum = (arr, f) => arr.reduce((s, x) => s + (f(x) || 0), 0);
 
-// ---- по узлам -----------------------------------------------------------------------------------
+// ---- by the nodes -------------------------------------------------------------------------------
 
 function newNodeAcc(node) {
   return {
@@ -30,8 +30,8 @@ function addAttempt(n, z, cardId) {
   n.costUsdTotal += z.costUsd;
   n.attemptCount += 1;
   if (z.costUsd > 0 || z.provider) n.externalAttemptCount += 1;
-  // Суммируем только записанное. Заход без поля не считается заходом с нулём —
-  // иначе среднее поедет вниз и неполнота записи будет выглядеть как дешевизна узла.
+  // Only what is recorded is summed. An attempt without the field is not counted as an attempt with zero -
+  // else the average drifts down and the incompleteness of the record looks like the node's cheapness.
   if (z.seconds != null) { n.secondsTotal += z.seconds; n.withSeconds += 1; }
   if (z.cacheRead != null) { n.cacheReadTotal += z.cacheRead; n.workTotal += z.work; n.withCacheRead += 1; }
   if (z.cacheReadUnknown) n.cacheReadUnknown += 1;
@@ -72,37 +72,37 @@ function nodeRow(n, w) {
     cacheReadTotal: n.cacheReadTotal,
     workTotal: n.workTotal,
     withCacheRead: n.withCacheRead,
-    // Заходы, где кэш-чтение названо неизвестным: величина сама по себе, не ноль и не пробел (ECONOMY.md, «The `unknown` marker»).
+    // The attempts where the cache-read was named unknown: a figure of its own, not zero and not a blank (ECONOMY.md, "The `unknown` marker").
     cacheReadUnknown: n.cacheReadUnknown,
-    // Заходы с `unknown tokens` — в числе заходов, но не в сумме и не в среднем.
+    // The attempts with `unknown tokens` - among the attempts, but not in the sum and not in the average.
     tokensUnknown: n.tokensUnknown,
-    // Средние — по числу заходов, где поле записано, а не по всем заходам узла.
+    // The averages - over the attempts where the field is recorded, not over all the node's attempts.
     avgTokens: known ? Math.round(n.tokensTotal / known) : null,
     avgSeconds: n.withSeconds ? Math.round(n.secondsTotal / n.withSeconds) : null,
-    // Доля инструктажа: сколько из токенов ушло на загрузку закона и роли, а не на работу.
+    // The instruction share: how much of the tokens went to loading the law and the role, not to the work.
     instructionShare: n.withCacheRead && (n.cacheReadTotal + n.workTotal)
       ? Number((n.cacheReadTotal / (n.cacheReadTotal + n.workTotal)).toFixed(3))
       : null,
-    // Вес закона и роли на ОДИН шаг вызова (оценка по файлам, не по метаданным).
+    // The weight of the law and the role per ONE step of a call (an estimate by the files, not by the metadata).
     instructionPerStep: w.instrWeight === null ? UNKNOWN : (step ? step.perStep : null),
-    // Шагов агента в среднем за заход: кэш-чтение, делённое на вес шага. Верхняя оценка: в настоящий input
-    // входит ещё системный промпт движка, значит настоящий вес шага больше, а шагов — меньше.
+    // The agent's steps on average per attempt: the cache-read divided by the step's weight. An upper estimate:
+    // the engine's own system prompt is also part of the real input, so the real step weight is larger and the steps fewer.
     avgSteps: !w.weightKnown ? UNKNOWN : (n.withCacheRead && step
       ? w.stepsOf(Math.round(n.cacheReadTotal / n.withCacheRead), step.perStep)
       : null),
   };
 }
 
-/** Разрез по узлам: кто из пяти сколько токенов/денег потратил и на скольких заходах/карточках. */
+/** The slice by the nodes: which of the five spent how many tokens/money and on how many attempts/cards. */
 function nodeSpend(cards, w) {
   return foldNodes(cards).map((n) => nodeRow(n, w)).sort(compareNodes);
 }
 
-// ---- экономика ----------------------------------------------------------------------------------
+// ---- the economy --------------------------------------------------------------------------------
 
 /**
- * Слепые пятна — карточки, где работа шла, а расход не записан: они объясняют разрыв между «сделано» и
- * «посчитано». `backlog` сюда не входит: там работы ещё не было.
+ * The blind spots - the cards where work was done but the spend not recorded: they explain the gap between
+ * "done" and "counted". `backlog` is not included here: no work has happened there yet.
  */
 function blindSpotsOf(cards) {
   return cards
@@ -114,7 +114,7 @@ function coverageOf(cards, allAttempts, blindSpotCount) {
   return {
     cardsTotal: cards.length,
     cardsWithAttempts: cards.filter((c) => c.attempts.length > 0).length,
-    // Карточки, где работа шла (не backlog) — знаменатель, по которому честно считать долю.
+    // The cards where work happened (not backlog) - the denominator the share is honestly counted by.
     cardsWorked: cards.filter((c) => c.status && c.status !== 'backlog').length,
     attemptsTotal: allAttempts.length,
     attemptsWithSeconds: allAttempts.filter((z) => z.seconds != null).length,
@@ -136,14 +136,14 @@ function totalsOf(allAttempts) {
     cacheRead: sum(withCacheRead, (z) => z.cacheRead),
     work: sum(withCacheRead, (z) => z.work),
   };
-  // Доля инструктажа по проекту целиком — только если есть на чём считать.
+  // The instruction share over the whole project - only if there is something to count it by.
   totals.instructionShare = totals.cacheRead + totals.work
     ? Number((totals.cacheRead / (totals.cacheRead + totals.work)).toFixed(3))
     : null;
   return totals;
 }
 
-/** Дороже всего обошедшиеся карточки — где искать, что оптимизировать. */
+/** The costliest cards - where to look for what to optimize. */
 function topCardsOf(attemptsCards) {
   return [...attemptsCards]
     .sort((a, b) => b.tokensTotal - a.tokensTotal)
@@ -158,14 +158,14 @@ function topCardsOf(attemptsCards) {
 }
 
 /**
- * Эффективность — «токенов на закрытую карточку» по датам: единственная шкала, на которой видно, растёт
- * выгода или нет. Выгода — ЗАКРЫТАЯ КАРТОЧКА, а не потраченные на неё токены.
+ * The efficiency - "tokens per closed card" by dates: the only scale where one can see whether the benefit
+ * grows or not. The benefit is a CLOSED CARD, not the tokens spent on it.
  *
- * Две оговорки, обе записаны и в отображении:
- *  1. Дата закрытия — `closedDate` (её пишет доска или `Core`); нет — дата ПОСЛЕДНЕГО ЗАХОДА, и тогда
- *     это приблизительно: день, когда работа кончилась, а не когда вынесено решение.
- *  2. Карточки с нулём токенов исключены. Ноль здесь — «в заходах не записаны числа», а не «обошлась даром»:
- *     включив их, плохой учёт выглядел бы ростом эффективности.
+ * Two caveats, both recorded in the display too:
+ *  1. The closing date is `closedDate` (the board or `Core` writes it); without it - the date of the LAST
+ *     ATTEMPT, and then it is approximate: the day the work ended, not the day the decision was made.
+ *  2. The cards with zero tokens are excluded. Zero here means "no numbers recorded in the attempts",
+ *     not "cost nothing": including them, bad accounting would look like growing efficiency.
  */
 function efficiencyByDate(closedWithSpend) {
   const byDateMap = {};
@@ -187,10 +187,10 @@ function efficiencyOf(attemptsCards) {
   const efficiency = {
     byDate: efficiencyByDate(closedWithSpend),
     cardsCounted: closedWithSpend.length,
-    // Сколько закрытых карточек с заходами выброшено из-за нулей — без этого «посчитано по 5 карточкам»
-    // неотличимо от «посчитано по всем закрытым».
+    // How many closed cards with attempts were dropped because of zeros - without this, "counted over 5 cards"
+    // is indistinguishable from "counted over all the closed ones".
     cardsDroppedZero: attemptsCards.filter((c) => c.status === 'done' && !c.tokensTotal).length,
-    // Сколько карточек отнесено к ТОЧНОЙ дате закрытия; пока никто не пишет строку закрытия, здесь ноль.
+    // How many cards were attributed to the EXACT closing date; until anyone writes a closing line, this is zero.
     cardsWithClosedDate: closedWithSpend.filter((c) => c.closedDate).length,
     tokensTotal: sum(closedWithSpend, (c) => c.tokensTotal),
   };
@@ -201,9 +201,9 @@ function efficiencyOf(attemptsCards) {
 }
 
 /**
- * Внешние сервисы. Группа — пара «сервис + единица», а не один сервис: один поставщик может считать в разных
- * единицах (кредиты за генерацию, минуты за рендер), и складывать их в одно число — получить несуществующую
- * величину. Обе формы записи: сегмент внутри захода узла и отдельная строка `Сервис,`.
+ * The external services. A group is a "service + unit" pair, not one service: one provider may count in different
+ * units (credits per generation, minutes per render), and summing them into one number yields a quantity
+ * that does not exist. Both record forms: a segment inside a node's attempt and a separate `Service,` line.
  */
 function serviceEvents(allAttempts, cards) {
   return [
@@ -243,7 +243,7 @@ function byServiceOf(allAttempts, cards) {
       cardCount: g.cardIds.size,
       firstDate: g.firstDate,
       lastDate: g.lastDate,
-      // Дороже всего обошедшиеся операции — где у сервиса утекает больше всего.
+      // The costliest operations - where the service leaks the most.
       operations: Object.entries(g.operations)
         .map(([operation, amount]) => ({ operation, amount }))
         .sort((a, b) => b.amount - a.amount)
@@ -266,8 +266,9 @@ function byDateOf(allAttempts) {
 }
 
 /**
- * Строки, где стоит слово «заход», а чисел нет вовсе — расход был, запись не удалась. Держатся ОТДЕЛЬНО
- * от законных нулей: смешивать их значит обвинять в небрежности ту работу, где §3 расхода и не требует.
+ * The lines where the attempt word stands but there are no numbers at all - the spend happened, the record failed.
+ * They are held APART from the legitimate zeros: mixing them means accusing of sloppiness the work where §3
+ * does not require a spend record.
  */
 function malformedOf(cards) {
   return cards
@@ -280,7 +281,7 @@ function economyView(cards, w) {
   const attemptsCards = cards.filter((c) => c.attempts.length > 0);
   const blindSpots = blindSpotsOf(cards);
   return {
-    // Покрытие — первое, что читается, и потому стоит первым полем.
+    // The coverage - the first thing read, and so the first field.
     coverage: coverageOf(cards, allAttempts, blindSpots.length),
     totals: totalsOf(allAttempts),
     topCards: topCardsOf(attemptsCards),
@@ -289,16 +290,16 @@ function economyView(cards, w) {
     blindSpots: blindSpots.slice(0, 40),
     efficiency: efficiencyOf(attemptsCards),
     malformed: malformedOf(cards),
-    // Вес инструктажа — единственная величина, посчитанная из файлов, а не прочитанная из записи; отсюда
-    // `estimate: true` внутри: отображение обязано назвать её оценкой.
+    // The instruction weight - the only figure computed from the files rather than read from a record; hence
+    // `estimate: true` inside: the display must name it an estimate.
     instruction: w.instrWeight === null ? UNKNOWN : w.instrWeight,
   };
 }
 
 /**
- * Разрезы расхода по набору карточек: зовётся на весь корпус (поля без токенов — покрытие, слепые пятна,
- * сервисы) и на каждый тег движка отдельно (всё, где токены): токены разных движков в одну сумму не идут.
- * `w` — вес инструктажа (`weightContext` в `spend.cjs`).
+ * The spend slices over a set of cards: called on the whole corpus (the fields without tokens - the coverage,
+ * the blind spots, the services) and on each engine tag separately (everything where tokens are): the tokens
+ * of different engines do not go into one sum. `w` - the instruction weight (`weightContext` in `spend.cjs`).
  */
 function spendViews(cards, w) {
   return { byNode: nodeSpend(cards, w), economy: economyView(cards, w) };

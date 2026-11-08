@@ -31,7 +31,7 @@ process.stdin.on('end', () => {
       fs.mkdirSync(ledgerDir, { recursive: true });
       const ledgerFile = path.join(ledgerDir, 'calls.jsonl');
 
-      // Если передан transcriptPath, сканируем новые шаги
+      // With a transcriptPath given, scan the new steps
       if (payload.transcriptPath && fs.existsSync(payload.transcriptPath)) {
         recordFromTranscript(payload.transcriptPath, ledgerFile, payload.conversationId);
       }
@@ -48,7 +48,7 @@ function recordFromTranscript(transcriptPath, ledgerFile, conversationId) {
   const content = fs.readFileSync(transcriptPath, 'utf8');
   const lines = content.trim().split('\n').filter(Boolean);
 
-  // Считываем уже записанные шаги
+  // Read the already recorded steps
   const seenKeys = new Set();
   if (fs.existsSync(ledgerFile)) {
     const existing = fs.readFileSync(ledgerFile, 'utf8').trim().split('\n').filter(Boolean);
@@ -66,7 +66,7 @@ function recordFromTranscript(transcriptPath, ledgerFile, conversationId) {
     try {
       const step = JSON.parse(lines[i]);
 
-      // Интересуют вызовы invoke_subagent или ответы модели с метриками токенов
+      // Of interest: invoke_subagent calls, or model answers carrying token metrics
       let hasSubagent = false;
       let subagentCall = null;
 
@@ -91,7 +91,7 @@ function recordFromTranscript(transcriptPath, ledgerFile, conversationId) {
             }
           } catch {}
         }
-        if (!subConvId) continue; // Без успешно созданного субагента запись не создаётся
+        if (!subConvId) continue; // no successfully spawned subagent - no record
 
         const key = `${subConvId}:${step.step_index}`;
         if (seenKeys.has(key)) continue;

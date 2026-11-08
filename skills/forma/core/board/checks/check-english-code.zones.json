@@ -1,6 +1,5 @@
 {
   "allowList": [
-    "hooks-spend",
     "adapters-installers",
     "tests-fixtures",
     "skill-scripts"
@@ -9,6 +8,11 @@
     "board-core": {
       "prefixes": [
         "skills/forma/core/board/"
+      ]
+    },
+    "tests-fixtures": {
+      "prefixes": [
+        "test/"
       ]
     },
     "hooks-spend": {
@@ -28,11 +32,6 @@
       ],
       "names": [
         "*gen-roles*"
-      ]
-    },
-    "tests-fixtures": {
-      "prefixes": [
-        "test/"
       ]
     },
     "skill-scripts": {

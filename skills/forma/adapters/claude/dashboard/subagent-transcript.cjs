@@ -2,67 +2,72 @@
 'use strict';
 
 /**
- * Стенограмма захода субагента — источник `R`.
+ * The transcript of a subagent call - the source of `R`.
  *
- * Полгода строка захода стояла без кэш-чтения, потому что возврат Agent-вызова его
- * не отдаёт: в `<usage>` приходят `subagent_tokens`, `tool_uses`, `duration_ms` — и всё.
- * Развилку сняла находка: у события `SubagentStop` есть поле
- * `agent_transcript_path`, то есть у КАЖДОГО захода субагента своя стенограмма на диске:
+ * For half a year the call line stood without cache-read, because the return of an Agent call
+ * does not give it: `<usage>` carries `subagent_tokens`, `tool_uses`, `duration_ms` - and that is all.
+ * The fork was resolved by a find: the `SubagentStop` event has the field
+ * `agent_transcript_path`, that is EVERY subagent call has its own transcript on disk:
  *
- *   <каталог стенограмм проекта>/<sessionId>/subagents/agent-<agent_id>.jsonl
- *   <каталог стенограмм проекта>/<sessionId>/subagents/agent-<agent_id>.meta.json
+ *   <the project's transcript directory>/<sessionId>/subagents/agent-<agent_id>.jsonl
+ *   <the project's transcript directory>/<sessionId>/subagents/agent-<agent_id>.meta.json
  *
- * Раскладка принадлежит адаптеру движка: объявленный у него `findSubagent(agentId, root)` возвращает файл
- * сам (хост может класть стенограммы по-своему), а его же `stepOf(line)` — usage, requestId, модель и время
- * шага; ядро ведёт дедупликацию и суммы, имён полей движка не знает.
+ * The layout belongs to the engine adapter: its declared `findSubagent(agentId, root)` returns the file
+ * itself (a host may keep transcripts its own way), and its `stepOf(line)` - the usage, requestId, model
+ * and time of a step; the core keeps the deduplication and the sums, and knows no engine field names.
  *
- * `.meta.json` несёт `agentType`, `description`, `toolUseId`, `spawnDepth`.
- * В `.jsonl` — обычные записи с `message.usage`, оттуда и берутся четыре поля.
+ * `.meta.json` carries `agentType`, `description`, `toolUseId`, `spawnDepth`.
+ * The `.jsonl` holds ordinary records with `message.usage`; the four fields are taken from there.
  *
- * ТРИ ВЕЩИ, НА КОТОРЫХ ЗДЕСЬ ЛЕГКО ОШИБИТЬСЯ МОЛЧА — те же, что в
- * `session-economy.cjs` адаптера, где метод уже отлажен и сверен с бухгалтерией
- * движка (расхождение 0.25%). Здесь они повторены не из вежливости, а потому что
- * каждая из них однажды дала неверное число:
+ * THREE THINGS IT IS EASY TO GET SILENTLY WRONG HERE - the same as in the adapter's
+ * `session-economy.cjs`, where the method is already debugged and checked against the engine's
+ * bookkeeping (a 0.25% deviation). They are repeated here not out of politeness but because
+ * each of them once produced a wrong number:
  *
- * 1. ДЕДУПЛИКАЦИЯ ПО `requestId` — условие верности, а не оптимизация. Одна и та же
- *    запись usage лежит в файле многократно (пересборка веток разговора). На общей
- *    сессии отсутствие дедупликации завышало счёт вдесятеро, и по правдоподобию числа
- *    этого не видно. Замер на `agent-a3f3f8bf86f7eae4f.jsonl`: 24 строки с
- *    `cache_read_input_tokens`, уникальных `requestId` — 11. Одиннадцать и есть шаги.
- * 2. ОТСУТСТВИЕ СТЕНОГРАММЫ — ЭТО НЕ НОЛЬ. Стенограммы живут при сессии: сорок прошлых
- *    заходов их не имеют и не получат никогда. Функция возвращает `null`, и ни один
- *    путь отсюда не возвращает нулей: ведущий ноль читается глазами как «почти
- *    бесплатно» — ровно та ошибка, ради которой заведён знаменатель.
- * 3. ТОЛЬКО ЧТЕНИЕ. Каталог стенограмм движка — чужой. Здесь не пишут ничего.
+ * 1. DEDUPLICATION BY `requestId` - a correctness condition, not an optimization. One and the same
+ *    usage record sits in the file many times (conversation branches are rebuilt). On the shared
+ *    session the lack of deduplication inflated the count tenfold, and the plausibility of the number
+ *    does not show it. A measurement on `agent-a3f3f8bf86f7eae4f.jsonl`: 24 lines with
+ *    `cache_read_input_tokens`, unique `requestId` - 11. Eleven is the steps.
+ * 2. THE ABSENCE OF A TRANSCRIPT IS NOT ZERO. Transcripts live with the session: forty past calls
+ *    do not have them and never will. The function returns `null`, and no path out of here returns
+ *    zeros: a leading zero reads to the eye as "almost free" - exactly the error the denominator
+ *    exists for.
+ * 3. READ ONLY. The engine's transcript directory belongs to another. Nothing is written here.
  */
 
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+// Labels come from the core dictionary: English key in code, ru value as data (the same ru words as
+// before the translation - the constant is consumed by the spend scripts and asserted by tests).
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 const economy = require('./economy.cjs');
-// Каталог стенограмм и разбор шага `message.usage` в канонические переменные — у адаптера движка
-// (граница ядро — адаптер: `lib/engines.cjs`). Нет адаптера — стенограммы нет, это не ноль.
+// The transcript directory and the parsing of a step's `message.usage` into canonical variables - the
+// engine adapter's knowledge (the core-adapter boundary: `lib/engines.cjs`). No adapter - no transcript,
+// which is not zero.
 const engines = require('./lib/engines.cjs');
 
-/** Слова, которыми называется отсутствие стенограммы. Одно место на весь проект —
- *  чтобы «ноль» не просочился ни в лог, ни в отчёт, ни в строку захода. */
-const NO_TRANSCRIPT = 'стенограмма не найдена';
+/** The words naming the absence of a transcript. One place for the whole project - so that a "zero"
+ *  leaks neither into a log, nor into a report, nor into a call line. */
+const NO_TRANSCRIPT = msg('spend.transcript.missing');
 
-/** Каталоги стенограмм проекта по тегу движка — как в `card-move.cjs` (`readTranscript`): `[{ tag, dir, parseUsage }]`
- *  через `engines.transcriptDirs`. С `tag` — только этого движка; без тега — всех адаптеров (берётся свежайший файл).
- *  Первый адаптер не выбирается: стенограмма принадлежит тому движку, чей тег в строке захода.
- *  Зашивать сюда путь проекта значит сделать скрипт непереносимым ровно в тот день,
- *  когда плагин «Форма» уедет на другой проект. */
+/** The project's transcript directories by engine tag - as in `card-move.cjs` (`readTranscript`): `[{ tag, dir, parseUsage }]`
+ *  through `engines.transcriptDirs`. With a tag - only that engine's; without - all adapters' (the freshest file wins).
+ *  No adapter is picked: a transcript belongs to the engine whose tag stands in the call line.
+ *  Hardcoding a project path here would make the script unportable on the very day
+ *  the "Forma" plugin moves to another project. */
 function transcriptDirs(root = PROJECT_ROOT, tag = null) {
   return engines.transcriptDirs(root).filter((d) => !tag || d.tag === tag);
 }
 
-/** Ищет стенограмму захода по id среди движков (`tag`) или всех. Раскладку знает адаптер: у движка с
- *  `findSubagent(agentId, root)` — её ответ (`{ file, sessionId? }`), у прочих — раскладка `agent-<id>.jsonl`
- *  по сессиям каталога. Сессия не задаётся снаружи: вызывающий знает `agent_id` из возврата вызова и не знает
- *  `sessionId`. Нет каталога у тега — `null`. */
+/** Seeks a call transcript by id among the engines (`tag`) or all. The adapter knows the layout: an engine with
+ *  `findSubagent(agentId, root)` - its answer (`{ file, sessionId? }`); the others - the `agent-<id>.jsonl`
+ *  layout over the sessions of the directory. The session is not given from outside: the caller knows the
+ *  `agent_id` from the call's return and does not know the `sessionId`. No directory for the tag - `null`. */
 function findTranscript(agentId, root = PROJECT_ROOT, tag = null) {
   if (!agentId || !/^[A-Za-z0-9_-]+$/.test(agentId)) return null;
   let newest = null;
@@ -74,8 +79,8 @@ function findTranscript(agentId, root = PROJECT_ROOT, tag = null) {
       let st;
       try { st = fs.statSync(f.file); } catch { continue; }
       if (!st.isFile()) continue;
-      /* Один и тот же id теоретически может встретиться в двух сессиях. Берём свежайший:
-         строка захода пишется сразу после возврата, то есть про последний заход. */
+      /* The same id may theoretically occur in two sessions. The freshest wins:
+         the call line is written right after the return, that is, about the last call. */
       if (!newest || st.mtimeMs > newest.mtimeMs) {
         newest = { file: f.file, mtimeMs: st.mtimeMs, sessionId: f.sessionId || null, tag: d.tag, parseUsage: d.parseUsage, stepOf: d.stepOf };
       }
@@ -89,8 +94,8 @@ function findTranscript(agentId, root = PROJECT_ROOT, tag = null) {
       let st;
       try { st = fs.statSync(file); } catch { continue; }
       if (!st.isFile()) continue;
-      /* Один и тот же id теоретически может встретиться в двух сессиях. Берём свежайший:
-         строка захода пишется сразу после возврата, то есть про последний заход. */
+      /* The same id may theoretically occur in two sessions. The freshest wins:
+         the call line is written right after the return, that is, about the last call. */
       if (!newest || st.mtimeMs > newest.mtimeMs) {
         newest = { file, mtimeMs: st.mtimeMs, sessionId: s.name, tag: d.tag, parseUsage: d.parseUsage, stepOf: d.stepOf };
       }
@@ -105,13 +110,13 @@ function readMeta(jsonlFile) {
 }
 
 /**
- * Разбор стенограммы потоком. Файл захода невелик (десятки-сотни строк), но метод
- * тот же, что на гигабайтном корпусе общей сессии: дешёвый отсев подстрокой до
- * `JSON.parse`, дедупликация по `requestId`.
+ * Parsing a transcript as a stream. A call file is small (tens-hundreds of lines), but the method
+ * is the same as on the gigabyte corpus of the shared session: a cheap substring pre-filter before
+ * `JSON.parse`, deduplication by `requestId`.
  *
  * @returns {Promise<null|{agentId, sessionId, file, tag, agentType, description, toolUseId,
  *   spawnDepth, steps, cacheRead, cacheCreate, input, output, models, first, last}>}
- *   `null` — стенограммы нет. Это НЕ ноль, см. пункт 2 в шапке.
+ *   `null` - no transcript. That is NOT zero, see point 2 in the header.
  */
 async function readSubagentTranscript(agentId, root = PROJECT_ROOT, tag = null) {
   const found = findTranscript(agentId, root, tag);
@@ -128,10 +133,10 @@ async function readSubagentTranscript(agentId, root = PROJECT_ROOT, tag = null) 
     crlfDelay: Infinity,
   });
   for await (const line of rl) {
-    if (!found.stepOf && !line.includes('cache_read_input_tokens')) continue; // отсев до разбора
+    if (!found.stepOf && !line.includes('cache_read_input_tokens')) continue; // the pre-parse filter
     let j;
     try { j = JSON.parse(line); } catch { continue; }
-    // Шаг разбирает адаптер (stepOf: usage, requestId, время), если объявил; иначе — раскладка message.usage.
+    // The step is parsed by the adapter (stepOf: usage, requestId, time), if it declared one; otherwise - the message.usage layout.
     let u, key, ts;
     if (typeof found.stepOf === 'function') {
       let st = null;
@@ -142,18 +147,18 @@ async function readSubagentTranscript(agentId, root = PROJECT_ROOT, tag = null) 
     } else {
       u = j.message && j.message.usage;
       if (!u || u.cache_read_input_tokens == null) continue;
-      key = j.requestId || j.uuid; // см. пункт 1 в шапке
+      key = j.requestId || j.uuid; // see point 1 in the header
       ts = j.timestamp;
     }
-    if (key != null) { if (seen.has(key)) continue; seen.add(key); } // без ключа у движка шаги не схлопываются
+    if (key != null) { if (seen.has(key)) continue; seen.add(key); } // without a key an engine's steps do not collapse
 
     economy.addUsage(t, parseUsage(u));
     if (j.message && j.message.model) models.add(j.message.model);
     if (ts) { if (!first) first = ts; last = ts; }
   }
 
-  // Файл есть, но ни одного шага с usage — это не «ноль расхода», а нечитаемая
-  // стенограмма. Называется так же, как её отсутствие, и по той же причине.
+  // The file exists but not a single step with usage - that is not "zero spend" but an unreadable
+  // transcript. It is named the same as its absence, and for the same reason.
   if (!t.calls) return null;
 
   const meta = readMeta(found.file) || {};
@@ -191,15 +196,19 @@ if (require.main === module) {
     for (const id of ids) {
       const r = await readSubagentTranscript(id);
       if (!r) {
-        // Ни числа, ни нуля — только слова.
+        // Neither a number nor a zero - only words.
         console.log(`${id}  ${NO_TRANSCRIPT}`);
         continue;
       }
-      console.log(
-        `${id}  узел=${r.agentType || '?'}  шагов=${r.steps}  ` +
-        `R=${groups(r.cacheRead)}  создание=${groups(r.cacheCreate)}  ` +
-        `ввод=${groups(r.input)}  выход=${groups(r.output)}`
-      );
+      console.log(msg('spend.transcript.cli_row', {
+        id,
+        node: r.agentType || '?',
+        steps: r.steps,
+        read: groups(r.cacheRead),
+        create: groups(r.cacheCreate),
+        input: groups(r.input),
+        output: groups(r.output),
+      }));
     }
   })();
 }

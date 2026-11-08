@@ -45,7 +45,7 @@ const it = (name, fn) => {
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ledger-test-'));
 
 try {
-  it('формирует корректную строку расхода из записи журнала', () => {
+  it('builds a correct spend line from a ledger record', () => {
     const d = ['2000', '01', '02'].join('-');
     const callRecord = {
       timestamp: `${d}T10:00:00.000Z`,
@@ -56,11 +56,11 @@ try {
       duration_s: 5,
     };
 
-    const line = deriveSpendLineForCall(callRecord, 'Run', 'выполнена задача.');
-    assert.match(line, new RegExp('`Run`, ' + d + ': attempt, 1[\\s ]?500 tokens \\(450 cache-read\\), 300 out, 5 s, `conv-test-9999` — gemini: выполнена задача\\.'));
+    const line = deriveSpendLineForCall(callRecord, 'Run', 'task done.');
+    assert.match(line, new RegExp('`Run`, ' + d + ': attempt, 1[\\s ]?500 tokens \\(450 cache-read\\), 300 out, 5 s, `conv-test-9999` — gemini: task done\\.'));
   });
 
-  it('ledger-parity фиксирует расхождения и подтверждает соответствие', () => {
+  it('ledger-parity catches a mismatch and confirms a match', () => {
     const d = ['2000', '01', '02'].join('-');
     const dPast = ['2000', '01', '01'].join('-');
     const cardPrefix = 'c' + 'ard-000';
@@ -69,7 +69,7 @@ try {
     fs.mkdirSync(boardDir, { recursive: true });
     fs.mkdirSync(ledgerDir, { recursive: true });
 
-    // Создаем фикстуру адаптера, чтобы loadAdapters(tmpDir) видел его
+    // Create the adapter fixture so that loadAdapters(tmpDir) sees it
     fs.writeFileSync(
       path.join(tmpDir, '.agents', 'forma-adapter.cjs'),
       "module.exports = { engine: 'gemini' };\n"
@@ -78,7 +78,7 @@ try {
     const cardPath = path.join(boardDir, `${cardPrefix}-test.md`);
     fs.writeFileSync(
       cardPath,
-      `# ${cardPrefix}\n\n## History\n- \`Run\`, ${d}: attempt, 1500 tokens (450 cache-read), 300 out, 5 s, \`conv-test-9999\` — gemini: тест.\n`
+      `# ${cardPrefix}\n\n## History\n- \`Run\`, ${d}: attempt, 1500 tokens (450 cache-read), 300 out, 5 s, \`conv-test-9999\` — gemini: test.\n`
     );
 
     const callsPath = path.join(ledgerDir, 'calls.jsonl');
@@ -90,11 +90,11 @@ try {
       }) + '\n'
     );
 
-    // Паритет 1:1
+    // Parity 1:1
     let problems = run({ root: tmpDir, since: dPast });
     assert.equal(problems.length, 0);
 
-    // Добавляем вызов в журнал без карточки
+    // Add a call to the ledger without a card
     fs.appendFileSync(
       callsPath,
       JSON.stringify({
@@ -108,7 +108,7 @@ try {
     assert.match(problems[0], /conv-orphan-8888/);
   });
 
-  console.log(`\nВсе ${passed} проверок ledger-parity успешно пройдены.`);
+  console.log(`\nAll ${passed} ledger-parity checks passed.`);
 } finally {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }

@@ -1,15 +1,15 @@
-// Вкладка «Экономика»: пять уровней от ключевых метрик к справке, по одобренному макету.
-// Уровень 1 — пять плиток, уровень 2 — динамика и структура, уровень 3 — где уходят токены,
-// уровень 4 — деньги/движки/субагенты (свёрнуто), уровень 5 — справка и аудит (свёрнуто).
-// Блоки уровней 3-5 переиспользуют существующие функции разбора без изменения их тел.
-// Все строки интерфейса — через t()/cnt() из словарей locales/*.json, ключи `econ.*`.
-// Внимание: локальные переменные не называть `t` — это перевод.
+// The "Economy" tab: five levels from the key metrics to the reference, by the approved layout.
+// Level 1 - five tiles, level 2 - the dynamics and the structure, level 3 - where the tokens go,
+// level 4 - the money/the engines/the subagents (collapsed), level 5 - the reference and the audit (collapsed).
+// The level 3-5 blocks reuse the existing parsing functions without changing their bodies.
+// All the interface strings - through t()/cnt() from the dictionaries locales/*.json, the `econ.*` keys.
+// Caution: do not name local variables `t` - that is the translation.
 
 function tilesHtml(tot, dialog){
-  // Три статьи расхода (AGENTS.md §3): узлы по `## История`, диалог Intent ↔ человек
-  // по стенограмме основной сессии (работа без кэш-чтения), и их сумма.
-  // Токены по узлам и «всего» здесь не стоят: они сложены из разных движков —
-  // по движкам см. таблицу выше. Диалог — стенограмма движка, чей адаптер объявил ведомость (`dialog.sessionOwner`).
+  // The three spend items (AGENTS.md §3): the nodes by `## History`, the Intent <-> human dialog
+  // by the main session's transcript (the work without the cache-read), and their sum.
+  // The tokens by the nodes and the "total" do not stand here: they are summed across engines -
+  // for the engines see the table above. The dialog - the transcript of the engine whose adapter declared the sheet (`dialog.sessionOwner`).
   const dlg = dialog && dialog.all ? dialog.all.work : 0;
   const tiles = [
     {num:tot.epicCount, lbl:t('econ.tile.epics')},
@@ -24,9 +24,9 @@ function tilesHtml(tot, dialog){
     </div>`).join('')}</section>`;
 }
 
-// Длинная подсказка `.hint` — пряталась плиткой текста на уровнях 3-4 (карточка
-// раздувалась). Сворачиваем в «?»; на уровне 5 этой обёрткой не пользуемся — там
-// подсказка внутри уже раскрытого блока уместна как есть.
+// The long `.hint` tooltip - it hid as a tile of text on the levels 3-4 (the card
+// ballooned). Collapsed into "?"; on level 5 this wrapper is not used - there
+// the tooltip inside an already expanded block fits as it is.
 function hintFold(bodyHtml){
   return `<details class="hint-fold"><summary>?</summary>${bodyHtml}</details>`;
 }
@@ -122,11 +122,11 @@ function econNodesHtml(byNode, dialog){
   </section>`;
 }
 
-// Компактная панель по образцу трёх панелей Graphify (`graphifyPanelHtml`) — постоянные
-// субагенты (живут сквозь много задач, не по одной карточке, `kit.md`-задача «учёт расхода
-// постоянных субагентов»). Без точного обратного отсчёта по дням — только мягкое
-// предупреждение при простое дольше SUBAGENT_STALE_DAYS-эквивалента (`entry.stale` уже
-// посчитан в generate.js, семантика retention не подтверждена документацией однозначно).
+// A compact panel modeled on the three Graphify panels (`graphifyPanelHtml`) - the resident
+// subagents (they live across many tasks, not per one card, the `kit.md` task "accounting the spend
+// of the resident subagents"). Without an exact day-by-day countdown - only a soft
+// warning when idle longer than a SUBAGENT_STALE_DAYS equivalent (`entry.stale` is already
+// computed in generate.js, the retention semantics is not confirmed by the documentation unambiguously).
 function subagentsHtml(list, bare){
   const heading = bare ? '' : `<h2>${t('econ.subagents')}</h2>`;
   if (!list || !list.length) {
@@ -181,10 +181,10 @@ function moneyHtml(totals, byNode, bare){
   </section>`;
 }
 
-/* --- Уровень 1: ключевые метрики --------------------------------------------
-   Пять плиток, главная — «токенов на закрытую карточку» (мера выгоды, не расхода):
-   выгода — закрытая карточка, токены — цена. Дельта и искра — по `efficiency.byDate`
-   выбранного движка; одна точка или меньше — «—», не ноль (`AGENTS.md` §5 п.2). */
+/* --- Level 1: the key metrics -------------------------------------------------
+   Five tiles, the main one - "tokens per closed card" (a measure of the benefit, not of the spend):
+   the benefit - a closed card, the tokens - the price. The delta and the spark - by `efficiency.byDate`
+   of the selected engine; one point or fewer - "-", not zero (`AGENTS.md` §5 item 2). */
 function heroDeltaHtml(byDate){
   if (!byDate || byDate.length < 2) return '<span class="dim">—</span>';
   const prev = byDate[byDate.length - 2].perCard, last = byDate[byDate.length - 1].perCard;
@@ -192,7 +192,7 @@ function heroDeltaHtml(byDate){
   const diff = last - prev;
   if (diff === 0) return `<span class="dim">${t('econ.noChange')}</span>`;
   const p = Math.round(Math.abs(diff) / prev * 100);
-  // Меньше — лучше: та же карточка обошлась дешевле.
+  // Less is better: the same card cost less.
   return `<span class="delta ${diff < 0 ? 'good' : 'bad'}">${diff < 0 ? '▼' : '▲'} ${t('econ.delta', {p})}</span>`;
 }
 
@@ -244,10 +244,10 @@ function level1Html(d, view){
   </div>`;
 }
 
-/* --- Уровень 2: динамика и структура -----------------------------------------
-   Слева — токены по дням (столбцы) и токены на закрытую карточку по дате закрытия
-   (линия); справа — доля инструктажа/работы (`totals.cacheRead`/`totals.work`) и
-   перечитывания на токен работы (`sessionEconomy.totals.ratio`), тренд — по `byWeek`. */
+/* --- Level 2: the dynamics and the structure ----------------------------------
+   On the left - the tokens by days (the columns) and the tokens per closed card by the closing
+   date (the line); on the right - the instruction/work share (`totals.cacheRead`/`totals.work`) and
+   the re-reads per a work token (`sessionEconomy.totals.ratio`), the trend - by `byWeek`. */
 function trendChartHtml(byDate, effByDate){
   if (!byDate || !byDate.length) {
     return `<div class="nodata">${t('econ.trend.empty')}</div>`;
@@ -302,8 +302,8 @@ function level2Html(view){
     ? (() => {
         const inst = pct(tot.cacheRead, tot.cacheRead + tot.work);
         const work = 100 - inst;
-        // Подпись внутри узкого сегмента обрезалась бы контейнером (overflow:hidden
-        // на `.stack`) — поэтому полные подписи стоят легендой под полосой, а не в ней.
+        // A label inside a narrow segment would be clipped by the container (overflow:hidden
+        // on `.stack`) - so the full labels stand as a legend under the bar, not inside it.
         return `<div class="stack">
             <span style="width:${inst}%;background:var(--st-review)" title="${t('econ.l2.instr')} ${inst}%"></span>
             <span style="width:${work}%;background:var(--st-done)" title="${t('econ.l2.work')} ${work}%"></span>
@@ -330,10 +330,10 @@ function level2Html(view){
   </div>`;
 }
 
-/* --- Уровень 3: где уходят токены --------------------------------------------
-   Переиспользует nodesHtml (переименована в econNodesHtml — коллизия имени с global
-   function nodesHtml в nodes.js, тот же глобальный scope, грузится позже и перетирал её)/
-   topCardsHtml/routesHtml без изменений — только сетка. */
+/* --- Level 3: where the tokens go ---------------------------------------------
+   Reuses nodesHtml (renamed econNodesHtml - a name collision with the global
+   function nodesHtml in nodes.js, the same global scope, loaded later and clobbering it)/
+   topCardsHtml/routesHtml unchanged - only the grid. */
 function level3Html(view, dialog){
   return `<div class="tier"><div class="tier-lab">${t('econ.l3.tier')}</div>
     <div class="erow erow-3">
@@ -344,7 +344,7 @@ function level3Html(view, dialog){
   </div>`;
 }
 
-/* --- Уровень 4: деньги, движки, постоянные субагенты — свёрнуто по умолчанию открыто -- */
+/* --- Level 4: the money, the engines, the resident subagents - collapsed by default, open -- */
 function accDetails(title, body, open){
   return `<details class="e-acc"${open ? ' open' : ''}><summary>${esc(title)}</summary><div class="e-acc-body">${body}</div></details>`;
 }
@@ -360,7 +360,7 @@ function level4Html(d, view){
   </div>`;
 }
 
-/* --- Экономика: тело переиспользуемых блоков уровней 3 и 5 ------------------- */
+/* --- The economy: the body of the reused blocks of the levels 3 and 5 -------- */
 
 const secText = s => s < 60 ? t('time.s', {s}) : hhmm(s);
 
@@ -388,8 +388,8 @@ function economyNodesHtml(byNode){
 function topCardsHtml(list){
   if (!list || !list.length) return '';
   const max = list[0].tokens || 1;
-  // Карточка с нулём токенов — не дешёвая, а незаписанная: в списке «дороже всего»
-  // она читалась бы как достижение. Её место в слепых пятнах, и только там.
+  // A card with zero tokens is not cheap but unrecorded: in the "costliest" list
+  // it would read as an achievement. Its place is the blind spots, and only there.
   list = list.filter(c => c.tokens > 0);
   if (!list.length) return '';
   const rows = list.map(c => `<tr>
@@ -443,9 +443,9 @@ function daysHtml(byDate){
   </div>`;
 }
 
-/* Внешние сервисы — третий род расхода, рядом с токенами и деньгами.
-   Каждый считает в своей единице, поэтому в одну сумму они не сводятся и не должны:
-   «1740 кредитов и 12 минут» — это два разных факта, а не одно число. */
+/* The external services - the third kind of spend, next to the tokens and the money.
+   Each counts in its own unit, so they do not and must not fold into one sum:
+   "1740 credits and 12 minutes" is two different facts, not one number. */
 function servicesHtml(e, bare){
   const heading = bare ? `<div class="e-sub-lbl">${t('econ.svc.sub')}</div>` : `<h3>${t('econ.svc.title')}</h3>`;
   const list = e.byService || [];
@@ -475,13 +475,13 @@ function servicesHtml(e, bare){
     ${blocks}`;
 }
 
-// Расход по маршрутам: тот же счёт, что `tally.cjs --routes`.
+// The spend by the routes: the same count as `tally.cjs --routes`.
 function routesHtml(r){
   if (!r) return '';
   const unk = x => [x.tokensUnknown && t('econ.routes.unkTokens', {n: x.tokensUnknown}), x.cacheUnknown && `cache-read: ${x.cacheUnknown}`,
     x.secondsUnknown && t('econ.routes.unkSec', {n: x.secondsUnknown})].filter(Boolean).join(', ');
-  // Компактно первыми: метка, карточек, токенов, возвратов — остальные колонки
-  // (заходов, cache-read, время, подготовка, unknown) доступны прокруткой вправо.
+  // Compact first: the tag, the cards, the tokens, the returns - the other columns
+  // (the attempts, cache-read, time, preparation, unknown) are reachable by scrolling right.
   const rows = list => list.map(x => `<tr>
     <td><b>${x.key}</b></td>
     <td class="n">${x.cards}</td>
@@ -505,9 +505,9 @@ function routesHtml(r){
   </div>`;
 }
 
-/* Записи, которые заявляют себя расходом и им не являются: форма
-   «ДАТА: заход,» есть, а разбор не проходит. Держатся ОТДЕЛЬНО от законных
-   нулей `Intent` — там ноль верен по §3, здесь расход был и потерян. */
+/* The records that claim themselves a spend and are not: the legacy Russian form
+   (a date, then the Russian "attempt" wording) stands, but the parse does not pass. Held APART
+   from the legitimate zeros of `Intent` - there the zero is right by §3, here the spend happened and was lost. */
 function malformedHtml(e){
   const list = e.malformed || [];
   if (!list.length) return `<div class="nodata">${t('econ.malformed.none')}</div>`;
@@ -523,16 +523,16 @@ function malformedHtml(e){
     </table>`;
 }
 
-/* Вес инструктажа — то, что считается из файлов закона и ролей, а не из записи.
-   Держится отдельным блоком и подписан «оценка» намеренно: рядом стоят факты,
-   снятые с метаданных вызова, и смешивать их с расчётом нельзя — иначе расчёт
-   через неделю станет неотличим от измерения. */
+/* The instruction weight - what is computed from the law and the roles' files, not from a record.
+   It is held as a separate block and labeled an "estimate" deliberately: next to it stand facts
+   taken off the call's metadata, and mixing them with a computation is not allowed - else the
+   computation in a week becomes indistinguishable from a measurement. */
 function instructionWeightHtml(e, byNode){
   const w = e.instruction;
   if (!w || !w.byNode) return `<div class="nodata">${t('econ.weight.unknown')}</div>`;
-  // Строки берутся от ВЕСА, а не от заходов: вес известен у всех пяти узлов,
-  // включая тех, кто ещё ни разу не заходил. Строить от заходов значило бы
-  // прятать `Core` ровно потому, что его пока не звали.
+  // The rows are taken from the WEIGHT, not from the attempts: the weight is known for all five
+  // nodes, including those that have not attempted once yet. Building from the attempts would
+  // hide `Core` precisely because it has not been called yet.
   const spent = Object.fromEntries((byNode || []).map(n => [n.node, n]));
   const rows = Object.entries(w.byNode).map(([node, v]) => {
     const n = spent[node];
@@ -552,9 +552,9 @@ function instructionWeightHtml(e, byNode){
     <p class="hint">${t('econ.weight.foot')}</p>`;
 }
 
-/* --- Экономика сессий: перечитывание против работы ---------------------------
-   Единственное место на вкладке, где величины взяты не из записи в карточке, а из
-   стенограмм самого движка. Считает .claude/scripts/session-economy.cjs; здесь только показ. */
+/* --- The sessions' economy: the re-reading against the work -------------------
+   The only place on the tab where the figures are taken not from a card record but from the
+   engine's own transcripts. .claude/scripts/session-economy.cjs does the counting; only the display here. */
 function sessionAgeText(se){
   return se.ageHours == null ? '—'
     : se.ageHours < 1 ? t('time.lessThanHour')
@@ -572,8 +572,8 @@ function sessionRowsHtml(se){
   </tr>`).join('');
 }
 
-// Ход по времени: одно число не отвечает на вопрос «падает или растёт», а он и есть
-// главный. Неделя без работы стоит пропуском, а не нулём.
+// The course over time: one number does not answer "falling or growing" - and that is the
+// main question. A week without work stands as a gap, not as zero.
 function sessionWeeksHtml(se){
   const weeks = se.byWeek.filter(w => w.ratio != null);
   const wmax = Math.max(...weeks.map(w => w.ratio), 1);
@@ -614,7 +614,7 @@ function sessionVerifyHtml(v){
       : `<div class="nodata">${t('econ.verify.none')}</div>`}`;
 }
 
-/** Уровень 5, «Таблица сессий»: сводка + таблица + ход по неделям — без самосверки (та отдельным блоком). */
+/** Level 5, "the sessions' table": the summary + the table + the course by weeks - without the self-verification (that is a separate block). */
 function sessionTableBlockHtml(se){
   if (!se) return `<div class="nodata">${t('econ.sess.none')}</div>`;
   if (se.error) return `<div class="nodata">${esc(se.error)}</div>`;
@@ -650,14 +650,14 @@ function codexUsageHtml(dialog){
     <table class="etable"><thead><tr><th>${t('econ.codex.thItem')}</th><th class="n">${t('econ.codex.thCalls')}</th><th class="n">${t('econ.th.tokensLc')}</th><th class="n">${t('econ.codex.thCache')}</th><th class="n">${t('econ.codex.thR')}</th></tr></thead><tbody>${row(t('econ.dlg.name'), main)}${row(t('econ.subagents.short'), children)}</tbody></table>`;
 }
 
-/** Владелец ведомости сессий — движок, чей адаптер её объявил; нет такого — `null`. */
+/** The owner of the sessions' sheet - the engine whose adapter declared it; no such - `null`. */
 function sessionOwnerOf(view){ return (view.dialog && view.dialog.sessionOwner) || null; }
 
 function notForEngineHtml(_title, owner, cur){
   return `<div class="nodata" data-not-for="${esc(owner)}">${t('econ.notFor', {engine: esc(engineLabel(cur || '—')), owner: esc(owner)})}</div>`;
 }
 
-/* --- Уровень 5: справка и аудит, всё свёрнуто по умолчанию -------------------- */
+/* --- Level 5: the reference and the audit, everything collapsed by default ---- */
 function level5Html(view){
   const e = view.economy;
   const owner = sessionOwnerOf(view);
@@ -682,7 +682,7 @@ function level5Html(view){
   </div>`;
 }
 
-/* --- Шапка: тег движка + достоверность данных --------------------------------- */
+/* --- The header: the engine tag + the trustworthiness of the data ------------- */
 function trustBadgeHtml(coverage){
   if (!coverage || !coverage.cardsWorked) {
     return `<div class="e-trust"><span class="dim">${t('econ.trust')}</span><b class="mono dim">—</b></div>`;
@@ -693,18 +693,18 @@ function trustBadgeHtml(coverage){
     <b class="mono">${share}%</b></div>`;
 }
 
-/* Экономика по движкам. Токены разных движков в одну
-   сумму не идут: всё, где стоят токены, рисуется по выбранному тегу; общая строка —
-   только заходы, время и принятые карточки. */
+/* The economy by the engines. The tokens of different engines do not go into one
+   sum: everything where tokens stand is drawn by the selected tag; the common row -
+   only the attempts, the time and the accepted cards. */
 let ECON_ENGINE = null;
 const engineLabel = k => k === 'untagged' ? t('econ.untagged') : k;
 function engineTableHtml(b, bare){
   const heading = bare ? '' : `<h3>${t('econ.eng.title')}</h3>`;
   if (!b || !b.keys.length) return `${heading}<div class="nodata">${t('econ.eng.none')}</div>`;
   const col = k => b.columns[k];
-  // Деталь (cache-read/время/id) — в title, не инлайн: длинный id в видимом тексте
-  // ячейки раздувал всю колонку таблицы auto-layout'ом, и короткие числа строк
-  // выше (right-aligned) уезжали за видимый край прокрутки.
+  // The detail (cache-read/time/id) - in the title, not inline: a long id in the visible text
+  // of a cell ballooned the whole table column by the auto-layout, and the short numbers of the
+  // rows above (right-aligned) slid beyond the visible scroll edge.
   const unk = u => {
     const detail = (u.cache_read || u.duration_s || u.call_id)
       ? t('econ.eng.detail', {cr: u.cache_read, time: u.duration_s, id: u.call_id}) : '';
@@ -729,13 +729,13 @@ function engineTableHtml(b, bare){
     </table></div>`;
 }
 
-/* --- Сводка скорости движков: верх вкладки «Экономика» -------------------------
-   Плитка на каждый движок: спидометр «токены out в секунду вызова», кольцо «доля повторов»,
-   три полоски (секунды / токены / $ на закрытую карточку). Место и шкала считаются чистыми
-   функциями ниже (тест: tiles.test.cjs); цвет — по месту среди движков с значением. */
+/* --- The engines' speed summary: the top of the "Economy" tab ------------------
+   A tile per engine: the speedometer "out tokens per a call's second", the ring "the retry share",
+   three stripes (seconds / tokens / $ per a closed card). The place and the scale are computed by
+   the pure functions below (the test: tiles.test.cjs); the color - by the place among the engines with a value. */
 const TILE_MIN_FRAC = 0.04;
 
-/** Место значения среди значений движков: good / mid / bad, либо neutral (значение одно или все равны), null — нет значения. */
+/** The place of a value among the engines' values: good / mid / bad, or neutral (one value or all equal), null - no value. */
 function tilePlace(vals, v, higherBetter){
   if (v == null) return null;
   const xs = vals.filter(x => x != null);
@@ -746,7 +746,7 @@ function tilePlace(vals, v, higherBetter){
   return v === best ? 'good' : v === worst ? 'bad' : 'mid';
 }
 
-/** Доля шкалы 0..1: самое большое значение среди движков — полная шкала; null — нет значения. */
+/** The share of the scale 0..1: the largest value among the engines - the full scale; null - no value. */
 function tileFrac(vals, v){
   if (v == null) return null;
   const max = Math.max(0, ...vals.filter(x => x != null));
@@ -754,7 +754,7 @@ function tileFrac(vals, v){
   return v > 0 ? Math.max(TILE_MIN_FRAC, v / max) : 0;
 }
 
-/** Модель плиток из `speed.summary`: по движку — спидометр, кольцо, три полоски; плюс «Итого». Метрика null — нет данных. */
+/** The model of the tiles from `speed.summary`: per engine - a speedometer, a ring, three stripes; plus the "Total". A null metric - no data. */
 function tileModel(sm){
   const val = x => (x && x.v != null ? x.v : null);
   const tags = sm.tags || [];
@@ -844,7 +844,7 @@ function summaryHtml(e){
     <div class="sum-tiles">${model.tiles.map(engineTileHtml).join('')}</div></div>`;
 }
 
-/* --- Скорость и эффективность по движкам + модель/усилие по узлам ------------- */
+/* --- The speed and the efficiency by the engines + the model/effort by the nodes --- */
 let SPEED_KIND = 'all';
 const speedNum = (v, f) => v == null ? `<span class="dim">—</span>` : f(v);
 function speedHtml(e){

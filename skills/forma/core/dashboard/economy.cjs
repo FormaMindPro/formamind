@@ -1,24 +1,24 @@
 'use strict';
 
 /**
- * Математика экономики — одна для всех движков.
- * Контракт переменных: .forma/manual/en/03-protocol/ECONOMY.md (ru — .forma/manual/ru/03-protocol/ECONOMY.md).
+ * The economy's math - one for all the engines.
+ * The variables' contract: .forma/manual/en/03-protocol/ECONOMY.md (ru - .forma/manual/ru/03-protocol/ECONOMY.md).
  *
- * Модуль читает ТОЛЬКО канонические переменные. Откуда их достать и как назвать
- * поля своего движка — дело адаптера движка (§8 его файла), не этого модуля.
- * Имя движка сюда приходит лишь значением поля `engine` (тег строки) и не сравнивается
- * ни с какой константой.
+ * The module reads ONLY the canonical variables. Where to fetch them from and how to name
+ * one's engine's fields - the engine adapter's business (§8 of its file), not this module's.
+ * The engine's name arrives here only as the value of the `engine` field (the line's tag) and is not
+ * compared against any constant.
  *
- * Три состояния поля — без них неполнота записи неотличима от дешевизны:
- *   число      — записано;
- *   null       — маркер `unknown`: движок не вернул, узел назвал это; считается ОТДЕЛЬНО;
- *   undefined  — поле не записано вовсе (строка старше правила); не считается никак.
+ * The three states of a field - without them, an incomplete record is indistinguishable from cheapness:
+ *   a number    - recorded;
+ *   null        - the `unknown` marker: the engine did not return it, the node named it; counted SEPARATELY;
+ *   undefined   - the field not recorded at all (a line older than the rule); not counted in any way.
  */
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const isUnknown = (v) => v === null;
 
-/** Пустой накопитель по попыткам (строкам карточек). */
+/** The empty accumulator over the attempts (the cards' lines). */
 function emptyAcc() {
   return {
     attempts: 0,
@@ -34,9 +34,9 @@ function emptyAcc() {
 }
 
 /**
- * Одна попытка в накопитель. rec — канонические переменные:
- *   tokens (N, итог), cache_read (R), duration_s (T), turns, call_id, usd, ext_units [{unit, service, amount}].
- * Старое соглашение «R больше N» (N записан без R) приводится: по §3 N включает R.
+ * One attempt into the accumulator. rec - the canonical variables:
+ *   tokens (N, the total), cache_read (R), duration_s (T), turns, call_id, usd, ext_units [{unit, service, amount}].
+ * The old convention "R larger than N" (N recorded without R) is normalized: by §3, N includes R.
  */
 function addAttempt(acc, rec) {
   acc.attempts += 1;
@@ -60,7 +60,7 @@ function addAttempt(acc, rec) {
   return acc;
 }
 
-/** Сумма накопителей (карточка → эпик → цикл: одна и та же операция). */
+/** The sum of the accumulators (card -> epic -> cycle: the same operation). */
 function merge(into, acc) {
   for (const k of Object.keys(into)) {
     if (k === 'services') {
@@ -70,7 +70,7 @@ function merge(into, acc) {
   return into;
 }
 
-/** Разбивка попыток по ключу (узел, карточка, эпик, цикл, тег движка). */
+/** The breakdown of the attempts by a key (a node, a card, an epic, a cycle, an engine tag). */
 function groupBy(records, keyFn) {
   const out = {};
   for (const r of records) {
@@ -80,23 +80,23 @@ function groupBy(records, keyFn) {
   return out;
 }
 
-/** Разбивка по тегу движка. Строка без тега — ключ `untagged`. Токены разных ключей не складываются. */
+/** The breakdown by an engine tag. A line without a tag - the `untagged` key. The tokens of different keys are not summed. */
 const byEngine = (records) => groupBy(records, (r) => r.engine || 'untagged');
 
 /**
- * Доля кэша: R против токенов ТЕХ ЖЕ попыток, у которых R записан.
- * Нет покрытия — null («не записано»), не ноль.
+ * The cache share: R against the tokens of THE SAME attempts whose R is recorded.
+ * No coverage - null ("not recorded"), not zero.
  */
 function cacheShare(acc) {
   return acc.withCacheRead && acc.tokensWithCacheRead ? acc.cacheRead / acc.tokensWithCacheRead : null;
 }
 
-/** Сколько попыток несут маркер `unknown` хоть в одном поле — отдельная величина отчёта. */
+/** How many attempts carry the `unknown` marker in at least one field - a separate figure of the report. */
 const unknownCount = (acc) => ({ tokens: acc.tokensUnknown, cache_read: acc.cacheUnknown, duration_s: acc.secondsUnknown, call_id: acc.idUnknown });
 
 /**
- * Тренд ряда [{key, value}] (value null — пропуск, не ноль): наклон МНК по точкам с числом.
- * Меньше двух точек — null.
+ * The trend of a series [{key, value}] (a null value - a gap, not zero): the least-squares slope over the
+ * points carrying a number. Fewer than two points - null.
  */
 function trend(series) {
   const pts = series.map((p, i) => [i, p.value]).filter(([, v]) => isNum(v));
@@ -108,12 +108,12 @@ function trend(series) {
   return den ? pts.reduce((a, [x, y]) => a + (x - mx) * (y - my), 0) / den : 0;
 }
 
-// ───────── вызовы модели (стенограммы) — те же переменные, по вызову ─────────
+// ───────── model calls (the transcripts) - the same variables, per call ─────────
 
-/** Пустой накопитель по вызовам модели. */
+/** The empty accumulator over the model calls. */
 const emptyUsage = () => ({ calls: 0, tokens_in: 0, tokens_out: 0, cache_read: 0, cache_write: 0 });
 
-/** Один вызов модели: u — канонические tokens_in, tokens_out, cache_read, cache_write. */
+/** One model call: u - the canonical tokens_in, tokens_out, cache_read, cache_write. */
 function addUsage(acc, u) {
   acc.calls += 1;
   acc.tokens_in += u.tokens_in || 0;
@@ -123,11 +123,11 @@ function addUsage(acc, u) {
   return acc;
 }
 
-/** N строки §3: всё, что прошло через окно. */
+/** The N of a §3 line: everything that passed through the window. */
 const usageTokens = (u) => u.tokens_in + u.cache_write + u.cache_read + u.tokens_out;
-/** Работа — всё, кроме кэш-чтения (N − R). */
+/** The work - everything except the cache-read (N − R). */
 const usageWork = (u) => u.tokens_in + u.tokens_out + u.cache_write;
-/** Перечитывание на токен выхода; нет выхода — null. */
+/** The re-reading per an output token; no output - null. */
 const readPerOutput = (u) => (u.tokens_out ? u.cache_read / u.tokens_out : null);
 
 module.exports = {

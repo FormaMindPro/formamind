@@ -2,11 +2,11 @@
 'use strict';
 
 /**
- * sync-ledger.cjs — модуль и CLI для работы с журналом вызовов Gemini (.agents/.ledger/calls.jsonl):
- *  - форматирование строк расхода по контракту ECONOMY.md / AGENTS.md §3;
- *  - проверка паритета между записями журнала и карточками доски (.devtool/features/);
- *  - выгрузка агрегированного расхода в кэш дашборда (.forma/dashboard/.cache/gemini-usage.json);
- *  - создание структуры каталога .agents/.ledger/ в шаблоне поставки.
+ * sync-ledger.cjs - a module and CLI for the Gemini call ledger (.agents/.ledger/calls.jsonl):
+ *  - formatting spend lines by the ECONOMY.md / AGENTS.md §3 contract;
+ *  - checking the parity between the ledger records and the board cards (.devtool/features/);
+ *  - dumping the aggregated spend into the dashboard's cache (.forma/dashboard/.cache/gemini-usage.json);
+ *  - creating the .agents/.ledger/ directory structure in the shipped template.
  */
 
 const fs = require('fs');
@@ -17,6 +17,17 @@ function resolveModule(candidates) {
     if (fs.existsSync(c)) return c;
   }
   return candidates[0];
+}
+
+// The layout differs between the installed copy and the template checkout - the same resolver the
+// spend-line and ledger-parity modules go through.
+function getI18nModule() {
+  const p = resolveModule([
+    path.resolve(__dirname, '../../.forma/i18n/index.cjs'),
+    path.resolve(__dirname, '../../../core/i18n/index.cjs'),
+    path.resolve(process.cwd(), '.forma/i18n/index.cjs'),
+  ]);
+  return require(p);
 }
 
 function getSpendLineModule() {
@@ -39,8 +50,13 @@ function getLedgerParityModule() {
   return require(p);
 }
 
+// Printed and written labels come from the core dictionary: English key in code, ru value as data -
+// the CLI prints the same ru lines as before the translation.
+const i18n = getI18nModule();
+const msg = (code, params) => i18n.message(code, params, 'ru');
+
 /**
- * Гарантирует наличие структуры каталога .agents/.ledger/ и файла calls.jsonl.
+ * Makes sure the .agents/.ledger/ directory structure and the calls.jsonl file exist.
  */
 function ensureLedgerDir(root) {
   const base = root || process.cwd();
@@ -56,7 +72,7 @@ function ensureLedgerDir(root) {
 }
 
 /**
- * Читает записи вызовов из .agents/.ledger/calls.jsonl.
+ * Reads the call records from .agents/.ledger/calls.jsonl.
  */
 function getLedgerCalls(root) {
   const base = root || process.cwd();
@@ -73,7 +89,7 @@ function getLedgerCalls(root) {
 }
 
 /**
- * Формирует нормализованную строку расхода по записи вызова.
+ * Builds a normalized spend line from a call record.
  */
 function deriveSpendLineForCall(call, nodeName, description) {
   const { formatSpendLine } = getSpendLineModule();
@@ -91,12 +107,12 @@ function deriveSpendLineForCall(call, nodeName, description) {
     tokens_out: call.output_tokens ?? null,
     duration_s: call.duration_s ?? null,
     call_id: call.conversationId || 'id unknown',
-    desc: description || 'выполнено.',
+    desc: description || msg('spend.gemini-sync.default_desc'),
   });
 }
 
 /**
- * Проверяет паритет между записями журнала вызовов и карточками.
+ * Checks the parity between the call ledger records and the cards.
  */
 function checkLedgerParity(root, since) {
   const base = root || process.cwd();
@@ -104,12 +120,12 @@ function checkLedgerParity(root, since) {
     const { run } = getLedgerParityModule();
     return run({ root: base, since });
   } catch (err) {
-    return [`Ошибка запуска проверки паритета: ${err.message}`];
+    return [msg('spend.gemini-sync.parity_error', { message: err.message })];
   }
 }
 
 /**
- * Выгружает агрегированный расход сессий в кэш дашборда (.forma/dashboard/.cache/gemini-usage.json).
+ * Dumps the aggregated session spend into the dashboard's cache (.forma/dashboard/.cache/gemini-usage.json).
  */
 function dumpUsageCache(root) {
   const base = root || process.cwd();
@@ -166,13 +182,13 @@ function main() {
 
   if (args.includes('--ensure')) {
     const dir = ensureLedgerDir(root);
-    console.log(`Каталог журнала проверен/создан: ${dir}`);
+    console.log(msg('spend.gemini-sync.ensured', { dir }));
     return;
   }
 
   if (args.includes('--dump-cache') || args.includes('--write-cache')) {
     const file = dumpUsageCache(root);
-    console.log(`Кэш расхода Gemini сохранен: ${file}`);
+    console.log(msg('spend.gemini-sync.cache_saved', { file }));
     return;
   }
 
@@ -184,7 +200,7 @@ function main() {
     const nodeIdx = args.indexOf('--node');
     const node = nodeIdx >= 0 ? args[nodeIdx + 1] : 'Run';
     const descIdx = args.indexOf('--desc');
-    const desc = descIdx >= 0 ? args[descIdx + 1] : 'выполнено.';
+    const desc = descIdx >= 0 ? args[descIdx + 1] : msg('spend.gemini-sync.default_desc');
     console.log(deriveSpendLineForCall(call, node, desc));
     return;
   }
@@ -193,13 +209,13 @@ function main() {
     ensureLedgerDir(root);
     const problems = checkLedgerParity(root);
     if (problems.length > 0) {
-      console.error('Нарушен паритет журнала вызовов и доски:');
+      console.error(msg('spend.gemini-sync.parity_broken'));
       for (const p of problems) {
         console.error(`  — ${p}`);
       }
       process.exit(1);
     }
-    console.log('Паритет журнала вызовов Gemini и доски подтвержден.');
+    console.log(msg('spend.gemini-sync.parity_ok'));
   }
 }
 

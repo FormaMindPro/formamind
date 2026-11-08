@@ -19,7 +19,7 @@
 #      separately and reports them aloud.
 # The only case where the hook is truly silent is when it cannot even append to the file. Then point 1 speaks: a
 # missing or frozen file.
-# (Older logs carry `сессия` and `!ОШИБКА`; the readers accept both.)
+# (Older logs carry the Russian words for `session` and `!ERROR`; the readers accept both.)
 
 cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
 

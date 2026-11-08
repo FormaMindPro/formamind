@@ -1,31 +1,31 @@
 'use strict';
 
 /**
- * Писатель строки расхода основной сессии движка MiniMax Code.
+ * The writer of the main-session spend line of the MiniMax Code engine.
  *
- * Контракт — по `.claude/scripts/card-session-spend.cjs` и `.forma/manual/ru/03-protocol/ECONOMY.md`:
- *   N — полный расход вызова, ВКЛЮЧАЯ кэш-чтение: N = tokens_in + cache_write + cache_read + tokens_out;
- *   R — кэш-чтение; O — выход; T — активное время; id вызова — id сессии; тег — из адаптера (`spendTag`).
- *   Форматтер — общий: `.forma/dashboard/spend-line.cjs`.
+ * The contract - by `.claude/scripts/card-session-spend.cjs` and `.forma/manual/ru/03-protocol/ECONOMY.md`:
+ *   N - the full spend of a call, INCLUDING the cache-read: N = tokens_in + cache_write + cache_read + tokens_out;
+ *   R - cache-read; O - output; T - active time; the call id - the session id; the tag - from the adapter (`spendTag`).
+ *   The formatter is shared: `.forma/dashboard/spend-line.cjs`.
  *
- * Отличия от версии Claude и почему:
- *   - Стенограмма рантайма MiniMax пишет ОДИН ответ API одной записью (`message_id` + `message.usage`),
- *     тогда как журнал Claude дублирует один ответ по блокам на каждый вызов инструмента. Поэтому
- *     дедупликация по `message_id` здесь — страховка, а не необходимость.
- *   - Сессии лежат в общем хранилище рантайма (`~/.minimax/v2/sessions`), а не в папке проекта:
- *     привязка к проекту идёт по тому, что путь карточки внутри сессии ведёт в корень этого проекта.
- *   - Материал карточки живёт в `project/cards/card-NNN/` (§6), поэтому он тоже считается касанием карточки.
+ * The differences from the Claude version, and why:
+ *   - The MiniMax runtime transcript writes ONE API answer as one record (`message_id` + `message.usage`),
+ *     whereas the Claude journal duplicates one answer into blocks per tool call. So the deduplication
+ *     by `message_id` here is a safety net, not a necessity.
+ *   - The sessions sit in the runtime's shared storage (`~/.minimax/v2/sessions`), not in a project folder:
+ *     the binding to a project goes by the card path inside a session leading into this project's root.
+ *   - The card's material lives in `project/cards/card-NNN/` (§6), so it counts as a card touch too.
  *
- * Одна сессия по одной карточке пишется несколькими строками — каждая только за новые ответы.
- * «Уже учтено» определяет граница окна: метка `граница <ISO>` в описании после тире
- * (`spend-line.cjs`, `sessionWindowEnd`). Повторный запуск берёт ответы строго после наибольшей границы.
+ * One session over one card is written by several lines - each only for the new answers.
+ * "Already counted" is decided by the window boundary: the mark `boundary <ISO>` in the description after
+ * the dash (`spend-line.cjs`, `sessionWindowEnd`). A re-run takes the answers strictly after the largest boundary.
  *
- * Запуск:
- *   node .minimax/scripts/card-session-spend.cjs <NNN>            # печатает строку
- *   node .minimax/scripts/card-session-spend.cjs <NNN> --write    # дописывает в `## История` карточки
+ * Run:
+ *   node .minimax/scripts/card-session-spend.cjs <NNN>            # prints the line
+ *   node .minimax/scripts/card-session-spend.cjs <NNN> --write    # appends to the card's `## History`
  *   node .minimax/scripts/card-session-spend.cjs <NNN> --session <id> --idle 300 --from <ISO> --to <ISO>
  *
- * Без --write ничего не пишется: команда только считает и печатает.
+ * Without --write nothing is written: the command only counts and prints.
  */
 
 const fs = require('fs');
@@ -33,14 +33,18 @@ const path = require('path');
 const { formatSpendLine, sessionWindowEnd } = require('../../.forma/dashboard/spend-line.cjs');
 const reader = require('../../miniapps/minimax-engine/scripts/transcripts.cjs');
 const adapter = require('../forma-adapter.cjs');
+// Printed and written labels come from the core dictionary: English key in code, ru value as data -
+// the lines the command prints and writes into cards are the same ru text as before the translation.
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const IDLE_DEFAULT = 300;
 
-// Путь карточки на доске и её материал (§6).
+// The card path on the board and its material (§6).
 const CARD_PATH_RE = /[\\/]\.devtool[\\/]features[\\/](?:done[\\/])?card-(\d{3})-/;
 const CARD_MATERIAL_RE = /[\\/]project[\\/]cards[\\/]card-(\d{3})[\\/]/;
-// Признак записи в файл из командной строки.
+// The mark of a file write from the command line.
 const WRITE_CMD_RE = /(writeFileSync|appendFileSync|Set-Content|Out-File|Add-Content|>\s*['"]?[^|]*\.(md|cjs|json)|tee\b)/i;
 
 const argv = process.argv.slice(2);
@@ -54,16 +58,20 @@ const CARD_ARG = (argv.find((a) => /^\d{3}$/.test(a)) || (argv.find((a) => /^car
 const MANUAL = !!(opt('from') || opt('to'));
 const FROM = opt('from') ? Date.parse(opt('from')) : null;
 const TO = opt('to') ? Date.parse(opt('to')) : null;
-// Граница «уже учтено», заданная человеком: ответы строго после неё. Нужна, когда в карточке есть
-// строка этой сессии без метки `граница` (старая форма) — иначе счёт задвоится.
+// The "already counted" boundary set by a human: the answers strictly after it. Needed when the card
+// holds a line of this session without the `boundary` mark (the old form) - else the count doubles.
 const AFTER = opt('after') ? Date.parse(opt('after')) : null;
 const IDLE = Number(opt('idle')) || IDLE_DEFAULT;
 const ONLY_SESSION = opt('session');
 
+// The ru heading of the card's History zone, as before the translation: the label is dictionary data
+// (keys.json), not a literal in the code.
+const HISTORY_HEADING = '\n## ' + i18n.KEYS.labels['zone.history'].ru[0];
+
 const sp = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const hm = (ms) => new Date(ms).toISOString().slice(11, 16);
 
-/** Файл карточки на доске: `.devtool/features/card-NNN-*.md`. */
+/** The card file on the board: `.devtool/features/card-NNN-*.md`. */
 function cardFile(num) {
   for (const dir of [path.join(ROOT, '.devtool', 'features'), path.join(ROOT, '.devtool', 'features', 'done')]) {
     if (!fs.existsSync(dir)) continue;
@@ -74,7 +82,7 @@ function cardFile(num) {
   return null;
 }
 
-/** Сессии рантайма с их файлами стенограмм. */
+/** The runtime sessions with their transcript files. */
 function allSessions() {
   const out = [];
   const root = reader.sessionsRoot();
@@ -106,7 +114,7 @@ function allSessions() {
   return out;
 }
 
-/** Строки стенограммы: ответы ассистента с расходом и реплики человека. */
+/** The transcript lines: assistant answers with spend and the human's remarks. */
 function readRows(file) {
   const rows = [];
   let raw;
@@ -135,7 +143,7 @@ function readRows(file) {
   return rows;
 }
 
-/** Чью карточку трогает вызов инструмента; нет — null. */
+/** Whose card a tool call touches; none - null. */
 function toolOwner(call) {
   const args = call.arguments || {};
   const name = String(call.name || '');
@@ -151,14 +159,16 @@ function toolOwner(call) {
         if (hit) return hit[1];
       }
     }
-    if ((m = /(?:git commit|forma-commit)[\s\S]*?[Кк]арточк[аи] (\d{3})/.exec(command))) return m[1];
+    // The "Card NNN" wording of a commit message (Cyrillic in the written form; \u escapes keep the
+    // source ASCII while the pattern matches the same characters).
+    if ((m = /(?:git commit|forma-commit)[\s\S]*?[\u041a\u043a]\u0430\u0440\u0442\u043e\u0447\u043a[\u0430\u0438] (\d{3})/.exec(command))) return m[1];
   }
-  // Вызов субагента по карточке — работа Intent по координации этой карточки.
+  // A subagent call on a card - Intent's work on coordinating that card.
   if (/^task$/i.test(name) && (m = /card-(\d{3})(?!\d)/.exec(String(args.prompt || '')))) return m[1];
   return null;
 }
 
-/** Карточка, которой принадлежит ответ: первая найденная касающаяся карточка. */
+/** The card an answer belongs to: the first touching card found. */
 function ownerOf(row) {
   if (row.type !== 'assistant') return null;
   for (const b of row.content) {
@@ -169,7 +179,7 @@ function ownerOf(row) {
   return null;
 }
 
-/** Касается ли ответ проекта: путь ведёт в корень этого проекта. */
+/** Does the answer touch the project: a path leads into this project's root. */
 function touchesProject(row) {
   for (const b of row.content || []) {
     if (!b || b.type !== 'toolCall') continue;
@@ -181,7 +191,7 @@ function touchesProject(row) {
   return false;
 }
 
-/** Записи окна по событиям карточки: от реплики человека после прошлого события до самого события. */
+/** The window's records by the card's events: from the human remark after the past event up to the event itself. */
 function eventWindow(rows, num) {
   const ev = [];
   rows.forEach((e, i) => {
@@ -201,11 +211,11 @@ function eventWindow(rows, num) {
   return rows.map((e, k) => ({ e, k })).filter(({ k }) => mine.has(k));
 }
 
-/** Записи окна, заданного --from/--to. */
+/** The records of a window set by --from/--to. */
 const manualWindow = (rows) =>
   rows.map((e, k) => ({ e, k })).filter(({ e }) => e.ts >= (FROM ?? 0) && e.ts <= (TO ?? Infinity));
 
-/** Сумма окна за ответы строго позже `after` (мс; null — все). */
+/** The sum of the window over the answers strictly later than `after` (ms; null - all). */
 function sumWindow(rows, inWin, after) {
   const isNew = ({ e }) => after == null || e.ts > after;
   const counted = inWin.filter(isNew);
@@ -231,7 +241,7 @@ function sumWindow(rows, inWin, after) {
   return s.calls ? s : null;
 }
 
-/** До какого момента ответы сессии `id` уже записаны в карточку (наибольшая граница), мс. */
+/** Up to what moment the answers of session `id` are recorded in the card already (the largest boundary), ms. */
 function accountedUntil(cardText, id) {
   let until = null;
   for (const line of cardText.split(/\r?\n/)) {
@@ -242,7 +252,7 @@ function accountedUntil(cardText, id) {
   return until;
 }
 
-/** Строки этой сессии в карточке без метки границы: их окно команда не знает — возможен двойной счёт. */
+/** This session's lines in the card without a boundary mark: their window the command does not know - a double count is possible. */
 function linesWithoutBoundary(cardText, id) {
   let n = 0;
   for (const line of cardText.split(/\r?\n/)) {
@@ -252,11 +262,11 @@ function linesWithoutBoundary(cardText, id) {
   return n;
 }
 
-/** Строка расхода сессии за окно `r`. */
+/** The spend line of a session over window `r`. */
 function spendLine(r) {
   const N = r.input + r.cacheWrite + r.cacheRead + r.output;
-  const window = `окно ${hm(r.from)}–${hm(r.to)} UTC`;
-  const edge = MANUAL ? '' : `, граница ${new Date(r.to).toISOString()}`;
+  const window = msg('spend.card-session.window', { from: hm(r.from), to: hm(r.to) });
+  const edge = MANUAL ? '' : msg('spend.card-session.edge', { iso: new Date(r.to).toISOString() });
   return (
     '- ' +
     formatSpendLine({
@@ -270,25 +280,24 @@ function spendLine(r) {
       engine: adapter.spendTag,
       desc: '',
     }) +
-    `расход основной сессии по стенограмме (card-session-spend): ${r.calls} ответов, ${window}, ` +
-    `выход ${sp(r.output)}, запись в кеш ${sp(r.cacheWrite)}${edge}.`
+    msg('spend.minimax-session.desc', { calls: r.calls, window, out: sp(r.output), cache_write: sp(r.cacheWrite), edge })
   );
 }
 
-/** Дописать строку в конец зоны `## История` карточки. */
+/** Append the line to the end of the card's `## History` zone. */
 function appendHistory(cardFilePath, line) {
   const text = fs.readFileSync(cardFilePath, 'utf8');
-  const heading = text.indexOf('\n## История');
+  const heading = text.indexOf(HISTORY_HEADING);
   if (heading === -1) {
-    // Зоны нет — создаём её в конце файла, а не перед первым заголовком.
-    fs.writeFileSync(cardFilePath, text.replace(/\s+$/, '') + '\n\n## История\n- ' + line + '\n', 'utf8');
+    // No zone - create it at the end of the file, not before the first heading.
+    fs.writeFileSync(cardFilePath, text.replace(/\s+$/, '') + '\n' + HISTORY_HEADING + '\n- ' + line + '\n', 'utf8');
     return;
   }
-  const bodyStart = heading + '\n## История'.length;
+  const bodyStart = heading + HISTORY_HEADING.length;
   const nextHeading = text.indexOf('\n## ', bodyStart);
   const body = text.slice(bodyStart, nextHeading === -1 ? text.length : nextHeading).replace(/\s+$/, '');
   const tail = nextHeading === -1 ? '\n' : text.slice(nextHeading);
-  // Строка уже начинается с «- » (её так печатает `spendLine`) — лишнюю черту не добавляем.
+  // The line already starts with "- " (that is how `spendLine` prints it) - no extra dash is added.
   fs.writeFileSync(cardFilePath, text.slice(0, bodyStart) + body + '\n' + line + '\n' + tail, 'utf8');
 }
 
@@ -299,7 +308,7 @@ function main() {
   }
   const file = cardFile(CARD_ARG);
   if (!file) {
-    console.log('карточка card-' + CARD_ARG + ' не найдена на доске');
+    console.log(msg('spend.minimax-session.card_missing', { num: CARD_ARG }));
     process.exit(1);
   }
   let cardText = fs.readFileSync(file, 'utf8');
@@ -311,11 +320,11 @@ function main() {
     if (!rows.length) continue;
     const inWin = MANUAL ? manualWindow(rows) : eventWindow(rows, CARD_ARG);
     if (!inWin.length) continue;
-    // Сессия принадлежит этому проекту, если хоть одно её касание карточки ведёт в корень проекта.
+    // The session belongs to this project if at least one of its card touches leads into the project root.
     if (!rows.some(touchesProject)) continue;
     const after = MANUAL ? null : (AFTER != null ? Math.max(AFTER, accountedUntil(cardText, s.id) ?? -Infinity) : accountedUntil(cardText, s.id));
     if (AFTER == null && !MANUAL && linesWithoutBoundary(cardText, s.id) > 0) {
-      console.error('внимание: в карточке есть строки этой сессии без метки «граница» — их окно команда не знает; уточните границу через --after <ISO>, иначе счёт задвоится');
+      console.error(msg('spend.minimax-session.boundary_warning'));
     }
     const spend = sumWindow(rows, inWin, after);
     if (!spend) continue;
@@ -327,8 +336,8 @@ function main() {
       written += 1;
     }
   }
-  if (flag('write')) console.log('записано строк: ' + written);
-  else if (!written) console.log('нового расхода нет — ничего не записано');
+  if (flag('write')) console.log(msg('spend.minimax-session.written_count', { count: written }));
+  else if (!written) console.log(msg('spend.minimax-session.no_new'));
 }
 
 if (require.main === module) main();

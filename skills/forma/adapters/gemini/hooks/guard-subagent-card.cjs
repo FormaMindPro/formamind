@@ -9,6 +9,17 @@
  * Outputs { decision: "deny" | "allow", reason?: string } on stdout.
  */
 
+/** Message from the core dictionary by its English key, fixed ru language (the labels the hook has
+ * always printed); English fallback when the dictionary is absent. The hook file runs from the
+ * installed layout only, where the dictionary sits two levels up at .forma/i18n. */
+function msg(code, params, fallback) {
+  try {
+    return require('../../.forma/i18n/index.cjs').message(code, params, 'ru');
+  } catch {
+    return fallback;
+  }
+}
+
 let inputData = '';
 
 process.stdin.setEncoding('utf8');
@@ -31,16 +42,17 @@ process.stdin.on('end', () => {
         const role = String(toolArgs.Role || '');
         const typeName = String(toolArgs.TypeName || '');
 
-        // 1. Проверка наличия номера карточки (card-NNN) в prompt или role
+        // 1. A card number (card-NNN) must be named in the prompt or the role
         const cardMatch = (prompt + ' ' + role).match(/\b(card-\d{1,4})\b/i);
         if (!cardMatch) {
           decision = {
             decision: 'deny',
-            reason: 'Блокировка invoke_subagent (AGENTS.md §6): любой вызов субагента должен быть привязан к карточке. Укажите номер карточки (например: "Card: card-NNN" или "card-NNN") в параметре Prompt.',
+            reason: msg('hook.subagent_no_card', {},
+              'Blocked invoke_subagent (AGENTS.md §6): every subagent call must be tied to a card. Name the card (for example: "Card: card-NNN" or "card-NNN") in the Prompt parameter.'),
           };
         }
 
-        // 2. Проверка роли Run на соответствие каталогу (предупреждение в stderr)
+        // 2. A Run role must follow the catalog convention (a warning on stderr)
         if (decision.decision === 'allow' && (typeName.toLowerCase() === 'run' || role.toLowerCase().startsWith('run'))) {
           const knownRunRoles = [
             'run-site-build', 'run-site-php', 'run-image', 'run-image-series',
@@ -49,7 +61,8 @@ process.stdin.on('end', () => {
           ];
           const isCatalog = knownRunRoles.some(r => role.toLowerCase().includes(r) || typeName.toLowerCase().includes(r));
           if (!isCatalog && !role.toLowerCase().startsWith('run-')) {
-            process.stderr.write(`[guard-subagent-card warning] Роль "${role}" не соответствует каталогу .agents/plugins/forma/agents/run/ (рекомендуется: run-site-php, run-image и т.д.).\n`);
+            process.stderr.write(msg('hook.subagent_role_uncataloged', { role },
+              `[guard-subagent-card warning] Role "${role}" does not follow the catalog .agents/plugins/forma/agents/run/ (expected: run-site-php, run-image, etc.).`) + '\n');
           }
         }
       }

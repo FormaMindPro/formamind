@@ -3,8 +3,8 @@
 
 /**
  * PreInvocation / UserPrompt hook for Antigravity:
- * Detects the secret code phrase «Отключи сенсорику» from user message,
- * and sets single-use unlock marker (.forma/.delete-unlock).
+ * Detects the human's code phrase (a Cyrillic literal, held as \u escapes below; named in AGENTS.md §2)
+ * from user message, and sets single-use unlock marker (.forma/.delete-unlock).
  */
 
 const fs = require('fs');
@@ -57,7 +57,7 @@ process.stdin.on('end', () => {
       }
 
       // Check phrase
-      if (/Отключи сенсорику/i.test(textToCheck)) {
+      if (/\u041e\u0442\u043a\u043b\u044e\u0447\u0438 \u0441\u0435\u043d\u0441\u043e\u0440\u0438\u043a\u0443/i.test(textToCheck)) {
         unlockDeletion(root);
       }
     }

@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * Экономика и расход для дашборда: корпус целиком (поля без токенов) и разрезы по движкам.
- * Считает `spend-views.cjs`; здесь — вес инструктажа от адаптера и чтение `tally.cjs` (маршруты, движки).
+ * The economy and the spend for the dashboard: the whole corpus (the fields without tokens) and the slices by engines.
+ * `spend-views.cjs` does the counting; here - the instruction weight from the adapter and the reading of `tally.cjs` (routes, engines).
  */
 
 const fs = require('fs');
@@ -13,8 +13,8 @@ const { spendViews } = require('./spend-views.cjs');
 const { buildSpeed, buildSummary } = require('./speed.cjs');
 
 /**
- * Вес инструктажа от адаптера. Нет адаптера или поля веса — величины 'unknown', не null и не 0
- * (`weightKnown` — можно ли считать шаги).
+ * The instruction weight from the adapter. No adapter or weight field - the 'unknown' value, not null and not 0
+ * (`weightKnown` - whether the steps can be counted).
  */
 function weightContext(projectRoot) {
   const weightOf = engines.first(projectRoot, 'instructionWeight');
@@ -28,14 +28,14 @@ function weightContext(projectRoot) {
   };
 }
 
-/** Разрез по меткам маршрутов для одного движка; `tally.cjs` не читается — `null`. */
+/** The slice by route tags for one engine; `tally.cjs` unreadable - `null`. */
 function readByRoute(projectRoot, engine) {
   try {
     return require('../tally.cjs').byRoute([boardDir(projectRoot)], engine, engines.canonicalTag(projectRoot));
-  } catch { return null; } // нет разбора — вкладка покажет «нет данных», а не ноль
+  } catch { return null; } // no parse - the tab will show "no data", not zero
 }
 
-/** Журналы вызовов адаптеров: { основная метка движка: [записи] } из <каталог адаптера>/.ledger/calls.jsonl; нет файла или битая строка — пропуск. */
+/** The adapters' call ledgers: { the engine's canonical tag: [records] } from <the adapter's directory>/.ledger/calls.jsonl; a missing file or a broken line - skipped. */
 function readLedgers(projectRoot, canon) {
   const out = {};
   for (const a of engines.loadAdapters(projectRoot)) {
@@ -48,25 +48,25 @@ function readLedgers(projectRoot, canon) {
   return out;
 }
 
-/** Принятые карточки — файлы `done/` (нет каталога — 0). */
+/** The accepted cards - the files of `done/` (no directory - 0). */
 function countAccepted(projectRoot) {
   try {
     return fs.readdirSync(path.join(boardDir(projectRoot), 'done')).filter((f) => f.endsWith('.md')).length;
-  } catch { return 0; } // нет done/ — принятых нет
+  } catch { return 0; } // no done/ - no accepted cards
 }
 
 /**
- * Разрез по движкам: колонка на тег, токены разных движков не складываются. Общая строка — только общие
- * поля: заходы, время, принятые карточки.
+ * The slice by engines: a column per tag, the tokens of different engines are not summed. The common row - only
+ * the common fields: attempts, time, accepted cards.
  */
-/** Движки проекта по адаптерам (`engines.engineTags`). */
+/** The project's engines by the adapters (`engines.engineTags`). */
 const adapterEngines = (projectRoot) => engines.engineTags(projectRoot);
 
 function readByEngine(projectRoot) {
   try {
     const t = require('../tally.cjs').tally([boardDir(projectRoot)], engines.canonicalTag(projectRoot));
     const columns = { ...t.byEngine };
-    // Движок с адаптером получает колонку от самой папки движка, даже без единой строки расхода.
+    // An engine with an adapter gets its column from the engine's folder itself, even without a single spend line.
     for (const { tag, aliases } of adapterEngines(projectRoot)) {
       if (aliases.some((x) => x in columns)) continue;
       columns[tag] = { attempts: 0, tokens: 0, cacheRead: 0, withCacheRead: 0, seconds: 0, withSeconds: 0, usd: 0, cards: 0, unknown: require('../economy.cjs').unknownCount(require('../economy.cjs').emptyAcc()) };
@@ -79,10 +79,10 @@ function readByEngine(projectRoot) {
       common.withSeconds += v.withSeconds; common.secondsUnknown += v.unknown.duration_s;
     }
     return { keys, columns, common };
-  } catch { return null; } // нет разбора — вкладка покажет «нет данных»
+  } catch { return null; } // no parse - the tab will show "no data"
 }
 
-/** Карточки только с заходами одного движка (токены и деньги пересчитаны). */
+/** The cards holding only one engine's attempts (the tokens and the money re-counted). */
 function cardsOfEngine(cards, engine) {
   return cards.map((c) => {
     const a = c.attempts.filter((z) => z.engine === engine);
@@ -90,7 +90,7 @@ function cardsOfEngine(cards, engine) {
   });
 }
 
-/** Токенные разрезы — по движку: корпусные поля токенов сложены из разных движков и на вкладке не показываются. */
+/** The token slices - per engine: the corpus token fields are summed across engines and are not shown on the tab. */
 function engineViews(projectRoot, cards, w) {
   const out = {};
   const seen = new Set(cards.flatMap((c) => c.attempts.map((z) => z.engine)));
@@ -107,11 +107,11 @@ function engineViews(projectRoot, cards, w) {
 }
 
 /**
- * Расход: `byNode` и `economy` корпуса — только поля без токенов (покрытие, сервисы, слепые пятна, неисправные
- * строки) — плюс `economy.byEngine` и `economy.engines[тег]`.
+ * The spend: the corpus's `byNode` and `economy` - only the fields without tokens (the coverage, the services, the
+ * blind spots, the malformed lines) - plus `economy.byEngine` and `economy.engines[tag]`.
  */
 function buildSpend(projectRoot, rawCards) {
-  // Алиасы тега одного движка сводятся в одну колонку; строки расхода в карточках не переписываются.
+  // The aliases of one engine's tag fold into one column; the spend lines in the cards are not rewritten.
   const canon = engines.canonicalTag(projectRoot);
   const cards = rawCards.map((c) => ({ ...c, attempts: c.attempts.map((z) => ({ ...z, engine: canon(z.engine) })) }));
   const w = weightContext(projectRoot);
@@ -125,9 +125,9 @@ function buildSpend(projectRoot, rawCards) {
   for (const k of ['totals', 'topCards', 'byDate', 'efficiency']) delete economy[k];
   economy.byEngine = readByEngine(projectRoot);
   economy.engines = engineViews(projectRoot, cards, w);
-  // Скорость и эффективность по движкам и модель/усилие по узлам из контракта адаптера (`nodeModels`) — для каждого движка.
+  // The speed and the efficiency per engines, and the model/effort per nodes from the adapter's contract (`nodeModels`) - for each engine.
   const tables = engines.nodeModelTables(projectRoot);
-  // Модель попытки — по таблице узел-модель адаптера её движка; нет таблицы или узла в ней — `unknown` в срезе.
+  // An attempt's model - by the node-model table of its engine's adapter; no table or the node absent from it - `unknown` in the slice.
   const modelOf = (engine, node) => {
     const t = tables.find((x) => canon(x.tag) === engine);
     const row = t && t.nodeModels && t.nodeModels[node];

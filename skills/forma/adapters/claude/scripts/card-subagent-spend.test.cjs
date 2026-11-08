@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * card-subagent-spend.cjs: строка расхода субагента в карточку — суммы из фикстуры стенограммы
- * (дедуп по requestId, тег движка-владельца), unknown-ветка с причиной и тегом из --engine,
- * идемпотентность по id вызова, без --write — только печать.
+ * card-subagent-spend.cjs: a subagent spend line into the card - the sums from a transcript fixture
+ * (dedup by requestId, the owner engine's tag), the unknown branch with a reason and the tag from
+ * --engine, idempotency by the call id, without --write - print only.
  *   node .claude/scripts/card-subagent-spend.test.cjs
  *
- * Имена файлов карточек в фикстурах собираются динамически: литерал с номером в исходнике чистой
- * зоны ловит проверка следов проекта (запрет 16).
+ * Card file names in the fixtures are built dynamically: a numbered literal in a clean-zone source
+ * is caught by the project-trace check (prohibition 16).
+ * The expected ru labels are read from the core dictionary (fixed ru) and from the transcript
+ * reader's constant: the script under test prints the same ru text as before the translation, and
+ * the assertion must not pin its own copy of the string.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -17,7 +20,10 @@ const { spawnSync } = require('node:child_process');
 
 const SCRIPT = path.join(__dirname, 'card-subagent-spend.cjs');
 const { SPEND_SOURCE } = require('../../.forma/dashboard/spend-line.cjs');
-const SPEND_RE = new RegExp(SPEND_SOURCE); // SPEND_SOURCE экспортируется строкой-паттерном
+const SPEND_RE = new RegExp(SPEND_SOURCE); // SPEND_SOURCE is exported as a pattern string
+const { NO_TRANSCRIPT } = require('../../.forma/dashboard/subagent-transcript.cjs');
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 let passed = 0;
 const tests = [];
@@ -28,18 +34,18 @@ const AGENT = 'a1b2c3d4e5f6';
 const GHOST = '0f9e8d7c6b5a';
 const step = (id, ts, u) => JSON.stringify({ requestId: id, completedAt: ts, response: { usage: u } });
 
-/** Временная доска с одной карточкой; имя файла — динамическое. */
+/** A temporary board with one card; the file name is dynamic. */
 function boardFixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cardsb-'));
   const dir = path.join(root, '.devtool', 'features');
   fs.mkdirSync(dir, { recursive: true });
   const num = String(100 + Math.floor(Math.random() * 899));
   const card = path.join(dir, `card-${num}-probe.md`);
-  fs.writeFileSync(card, `---\nid: "card-${num}-probe"\nstatus: "in-progress"\n---\n# probe\n\n## Task\n\nпроба\n\n## Kit\n\n## History\n\n## Result\n`);
+  fs.writeFileSync(card, `---\nid: "card-${num}-probe"\nstatus: "in-progress"\n---\n# probe\n\n## Task\n\nprobe\n\n## Kit\n\n## History\n\n## Result\n`);
   return { root, card, num };
 }
 
-/** Фикстура rollout: два шага (requestId-дубль схлопывается), N = 10 550, R = 9 000, out = 150, окно 30 s. */
+/** The rollout fixture: two steps (a requestId duplicate collapses), N = 10 550, R = 9 000, out = 150, window 30 s. */
 function rolloutFixture() {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cardsb-roll-'));
   const dir = path.join(home, 'cli', 'rollout');
@@ -52,59 +58,59 @@ function rolloutFixture() {
   return home;
 }
 
-it('стенограмма найдена: строка §3 в History с каноническими суммами и тегом движка-владельца', async () => {
+it('transcript found: a §3 line in History with the canonical sums and the owner engine tag', async () => {
   const { root, card, num } = boardFixture();
   const home = rolloutFixture();
   try {
     const r = run([num, AGENT, '--node', 'Run', '--write'], { CLAUDE_SPEND_ROOT: root, ZCODE_HOME: home });
-    assert.equal(r.status, 0, 'выход не 0: ' + (r.stderr || r.stdout));
+    assert.equal(r.status, 0, 'exit is not 0: ' + (r.stderr || r.stdout));
     const text = fs.readFileSync(card, 'utf8');
     const line = text.split(/\r?\n/).find((l) => l.includes('attempt,'));
-    assert.ok(line, 'строка расхода не в карточке');
-    assert.ok(line.includes('attempt, 10 550 tokens (9 000 cache-read), 150 out, 30 s,'), 'суммы не сошлись: ' + line);
-    assert.ok(line.includes('`' + AGENT + '`'), 'id вызова не в строке');
-    assert.ok(line.includes('— zcode:'), 'тег движка-владельца не поставлен');
-    assert.ok(SPEND_RE.test(line), 'строка не разбирается каноном §3');
-    // Идемпотентность: повтор с тем же id — «уже записано», второй строки нет.
+    assert.ok(line, 'no spend line in the card');
+    assert.ok(line.includes('attempt, 10 550 tokens (9 000 cache-read), 150 out, 30 s,'), 'the sums do not match: ' + line);
+    assert.ok(line.includes('`' + AGENT + '`'), 'the call id is not in the line');
+    assert.ok(line.includes('— zcode:'), 'the owner engine tag is not set');
+    assert.ok(SPEND_RE.test(line), 'the line does not parse by the §3 canon');
+    // Idempotency: a re-run with the same id - "already recorded", no second line.
     const again = run([num, AGENT, '--node', 'Run', '--write'], { CLAUDE_SPEND_ROOT: root, ZCODE_HOME: home });
     assert.equal(again.status, 0);
-    assert.ok(again.stdout.includes('уже записано'), 'повтор не распознан: ' + again.stdout);
-    assert.equal((fs.readFileSync(card, 'utf8').match(/attempt,/g) || []).length, 1, 'строка задублирована');
+    assert.ok(again.stdout.includes(msg('spend.card-subagent.already', { id: AGENT })), 'the re-run is not recognized: ' + again.stdout);
+    assert.equal((fs.readFileSync(card, 'utf8').match(/attempt,/g) || []).length, 1, 'the line is duplicated');
   } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
 });
 
-it('стенограммы нет: unknown с причиной и тегом из --engine, не ноль; без --engine — выход 2', async () => {
+it('no transcript: unknown with a reason and the tag from --engine, not zero; without --engine - exit 2', async () => {
   const { root, card, num } = boardFixture();
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cardsb-empty-'));
   fs.mkdirSync(path.join(home, 'cli', 'rollout'), { recursive: true });
   try {
     const bare = run([num, GHOST], { CLAUDE_SPEND_ROOT: root, ZCODE_HOME: home });
-    assert.equal(bare.status, 2, 'без --engine должно отказывать, а не писать без тега');
+    assert.equal(bare.status, 2, 'without --engine it must refuse, not write without a tag');
     const r = run([num, GHOST, '--engine', 'zcode', '--write'], { CLAUDE_SPEND_ROOT: root, ZCODE_HOME: home });
-    assert.equal(r.status, 0, 'выход не 0: ' + (r.stderr || r.stdout));
+    assert.equal(r.status, 0, 'exit is not 0: ' + (r.stderr || r.stdout));
     const text = fs.readFileSync(card, 'utf8');
     const line = text.split(/\r?\n/).find((l) => l.includes('attempt,'));
-    assert.ok(line, 'unknown-строка не в карточке');
-    assert.ok(line.includes('attempt, unknown tokens (cache-read unknown), out unknown, unknown s,'), 'маркеры unknown не канонические: ' + line);
-    assert.ok(line.includes('стенограмма не найдена'), 'причина не названа: ' + line);
-    assert.ok(line.includes('— zcode:'), 'тег из --engine не поставлен');
-    assert.ok(!/\b0\s*tokens/.test(line), 'ноль просочился в строку');
-    assert.ok(SPEND_RE.test(line), 'unknown-строка не разбирается каноном §3');
+    assert.ok(line, 'no unknown line in the card');
+    assert.ok(line.includes('attempt, unknown tokens (cache-read unknown), out unknown, unknown s,'), 'the unknown markers are not canonical: ' + line);
+    assert.ok(line.includes(NO_TRANSCRIPT), 'the reason is not named: ' + line);
+    assert.ok(line.includes('— zcode:'), 'the tag from --engine is not set');
+    assert.ok(!/\b0\s*tokens/.test(line), 'a zero leaked into the line');
+    assert.ok(SPEND_RE.test(line), 'the unknown line does not parse by the §3 canon');
   } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
 });
 
-it('без --write строка только печатается, карточка не тронута', async () => {
+it('without --write the line is only printed, the card is not touched', async () => {
   const { root, card, num } = boardFixture();
   const home = rolloutFixture();
   try {
     const r = run([num, AGENT], { CLAUDE_SPEND_ROOT: root, ZCODE_HOME: home });
-    assert.equal(r.status, 0, 'выход не 0: ' + (r.stderr || r.stdout));
-    assert.ok(r.stdout.includes('attempt, 10 550 tokens'), 'печати строки нет');
-    assert.ok(!fs.readFileSync(card, 'utf8').includes('attempt,'), 'карточка изменена без --write');
+    assert.equal(r.status, 0, 'exit is not 0: ' + (r.stderr || r.stdout));
+    assert.ok(r.stdout.includes('attempt, 10 550 tokens'), 'no line printed');
+    assert.ok(!fs.readFileSync(card, 'utf8').includes('attempt,'), 'the card changed without --write');
   } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); }
 });
 
-/** Фикстура brain Gemini: два шага, N = 11 400, R = 5 000, out = 200, окно 25 s. */
+/** The Gemini brain fixture: two steps, N = 11 400, R = 5 000, out = 200, window 25 s. */
 function geminiBrainFixture() {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cardsb-brain-'));
   const logDir = path.join(home, AGENT, '.system_generated', 'logs');
@@ -116,19 +122,19 @@ function geminiBrainFixture() {
   return home;
 }
 
-it('стенограмма найдена (gemini): строка §3 в History с каноническими суммами и тегом gemini', async () => {
+it('transcript found (gemini): a §3 line in History with the canonical sums and the gemini tag', async () => {
   const { root, card, num } = boardFixture();
   const brain = geminiBrainFixture();
   try {
     const r = run([num, AGENT, '--node', 'Run', '--write'], { CLAUDE_SPEND_ROOT: root, GEMINI_BRAIN_DIR: brain });
-    assert.equal(r.status, 0, 'выход не 0: ' + (r.stderr || r.stdout));
+    assert.equal(r.status, 0, 'exit is not 0: ' + (r.stderr || r.stdout));
     const text = fs.readFileSync(card, 'utf8');
     const line = text.split(/\r?\n/).find((l) => l.includes('attempt,'));
-    assert.ok(line, 'строка расхода не в карточке');
-    assert.ok(line.includes('attempt, 11 400 tokens (5 000 cache-read), 200 out, 25 s,'), 'суммы не сошлись: ' + line);
-    assert.ok(line.includes('`' + AGENT + '`'), 'id вызова не в строке');
-    assert.ok(line.includes('— gemini:'), 'тег gemini не поставлен');
-    assert.ok(SPEND_RE.test(line), 'строка не разбирается каноном §3');
+    assert.ok(line, 'no spend line in the card');
+    assert.ok(line.includes('attempt, 11 400 tokens (5 000 cache-read), 200 out, 25 s,'), 'the sums do not match: ' + line);
+    assert.ok(line.includes('`' + AGENT + '`'), 'the call id is not in the line');
+    assert.ok(line.includes('— gemini:'), 'the gemini tag is not set');
+    assert.ok(SPEND_RE.test(line), 'the line does not parse by the §3 canon');
   } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(brain, { recursive: true, force: true }); }
 });
 
@@ -138,5 +144,5 @@ it('стенограмма найдена (gemini): строка §3 в History 
     passed += 1;
     console.log('ok  ' + name);
   }
-  console.log(`\n${passed} проверок пройдено`);
+  console.log(`\n${passed} checks passed`);
 })().catch((e) => { console.error(e && e.message || e); process.exit(1); });

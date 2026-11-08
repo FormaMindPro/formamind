@@ -2,8 +2,8 @@
 # PreToolUse (Bash|PowerShell): blocks commands that delete or overwrite the protected directories/files of the
 # scheme unless a one-time permission marker sits beside them.
 #
-# The marker is set by the UserPromptSubmit hook unlock-delete.sh, on seeing the literal code phrase
-# "Отключи сенсорику" in the human's message - and only then. This hook lets the next destructive call through
+# The marker is set by the UserPromptSubmit hook unlock-delete.sh, on seeing the human's code phrase
+# (a Cyrillic literal, held there as \u escapes) in the human's message - and only then. This hook lets the next destructive call through
 # and removes the marker in the same pass: the next deletion is blocked again by default, the permission never lingers.
 #
 # Protected paths: .claude/, .agents/, .codex/, .devtool/, .forma/manual/, .forma/living/, VARS/, AGENTS.md,

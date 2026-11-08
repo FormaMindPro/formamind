@@ -1,40 +1,44 @@
 #!/usr/bin/env node
-// Расход основной сессии (`Intent`) по карточке — из журналов движка, чья сессия работала.
+// Main-session (`Intent`) spend per card - from the logs of the engine whose session did the work.
 //
 //   node .claude/scripts/card-session-spend.cjs <NNN> [--write] [--from ISO] [--to ISO] [--session <id>] [--idle 300]
 //
-// Разметка журнала основной сессии по карточкам. Событие записи — Write/Edit файла карточки,
-// Bash/PowerShell-команда, пишущая в файл карточки (`.devtool/features/card-NNN-*`: sed -i, tee, `>`, Set-Content…),
-// или коммит (`git commit` либо `node .forma/protocol/scripts/forma-commit.cjs`) с «Карточка NNN». Каждая запись журнала отходит карточке ближайшего
-// следующего события (работа предшествует записи); отрезок после события другой карточки
-// начинается с ближайшей реплики человека. Ни один ответ не делится между карточками.
-// В окне суммируются ответы ассистента: дедупликация по ключу ответа, без субагентских
-// журналов (расход субагентов уже в карточке — их строки пишет вызывающий по `<usage>`).
-// N tokens = tokens_in + cache_write + cache_read + tokens_out (economy.usageTokens); R = cache_read (как у субагентов: work = N − R).
-// T — активное время: промежутки между соседними записями, каждый обрезан по --idle (сек, по умолчанию 300),
-//     чтобы ожидание человека не шло в счёт.
-// --auto — режим хука SessionEnd (ниже, `auto()`): без номера, все касания сессии, молчаливый отказ.
-// Без --write печатает; с --write дописывает в `## История` строку формата §3 (id вызова = id сессии).
-// --from/--to задают окно вручную (UTC ISO); --session ограничивает одним журналом.
+// Marking the main-session log up by cards. A write event is a Write/Edit of the card file,
+// a Bash/PowerShell command writing into the card file (`.devtool/features/card-NNN-*`: sed -i, tee, `>`, Set-Content...),
+// or a commit (`git commit` or `node .forma/protocol/scripts/forma-commit.cjs`) with "Card NNN" (the card word matched
+// through the i18n dictionary). Every log record goes to the card of the nearest next event (work precedes the
+// write); a stretch after another card's event starts with the nearest human remark. No answer is ever
+// split between cards.
+// The window sums assistant answers: deduplication by the answer key, no subagent logs
+// (subagent spend is already in the card - the caller writes their lines from `<usage>`).
+// N tokens = tokens_in + cache_write + cache_read + tokens_out (economy.usageTokens); R = cache_read (as with subagents: work = N − R).
+// T is active time: the gaps between neighbouring records, each cut off at --idle (seconds, default 300),
+//     so the human's waiting does not count in.
+// --auto is the SessionEnd hook mode (below, `auto()`): no number, all touches of the session, silent refusal.
+// Without --write it prints; with --write it appends a §3-format line to `## History` (call id = session id).
+// --from/--to set the window by hand (UTC ISO); --session restricts to one log.
 //
-// ИСТОЧНИКИ — через адаптеры движков (граница ядро — адаптер, `lib/engines.cjs`): движок объявляет
-// `mainSessions(root)` (какие файлы — его раскладка; субагентские не входят) и `mainStepOf(line, prev)` —
-// нормализованный шаг `{ ts, key, usage, toolCalls, human, model }`: время, ключ ответа для дедупа
-// (у Claude message.id, у ZCode requestId), сырой usage (разбор — `parseUsage` адаптера), вызовы
-// инструментов ответа, признак реплики человека. Формат журнала (у Claude `message.*`, у ZCode
-// rollout `response.*`) сюда не просачивается: скрипт знает только нормализованный шаг. Журналы
-// читаются всех движков проекта — работа над карточкой могла идти в любом; тег движка в строке —
-// тег источника. Шаги без ключа расход не дают: у каждого источника с usage ключ есть.
+// SOURCES - through the engine adapters (the core-adapter boundary, `lib/engines.cjs`): an engine declares
+// `mainSessions(root)` (which files are its layout; subagent logs excluded) and `mainStepOf(line, prev)` -
+// a normalized step `{ ts, key, usage, toolCalls, human, model }`: time, the answer key for dedup
+// (message.id for Claude, requestId for ZCode), the raw usage (parsing is the adapter's `parseUsage`), the answer's
+// tool calls, the human-remark flag. The log format (Claude's `message.*`, ZCode rollout's
+// `response.*`) does not leak in here: the script knows only the normalized step. The logs of
+// all engines of the project are read - work on a card could run in any of them; the engine tag in the line is
+// the source's tag. Steps without a key yield no spend: every source with usage has a key.
 //
-// Одна сессия по одной карточке — несколько строк, каждая только за новые ответы. «Уже учтено» определяет
-// граница окна: точная метка `граница <ISO>` в описании после тире (spend-line.cjs, sessionWindowEnd) — время
-// последней записи журнала, вошедшей в строку. Повторный запуск берёт ответы строго после наибольшей границы
-// строк этой сессии в карточке; сумма N, R и T по строкам равна одному чтению всего журнала (промежуток через
-// границу идёт в новую строку — записи-якоря на границе не теряются). Строка старого вида, без метки
-// (накопительная, до этого правила), даёт границу по концу окна «окно ЧЧ:ММ–ЧЧ:ММ UTC» с точностью до минуты:
-// конец той минуты. Ответы в ней после реального конца окна не попадут ни в старую строку, ни в новую.
-// Строки с окном `--from/--to` (в описании «задано --from/--to») границу не двигают, а при ручном окне
-// «уже учтено» не применяется: окно задал человек. Нового расхода нет — ничего не пишется, код выхода 0.
+// One session over one card - several lines, each only for the new answers. "Already counted" is decided by
+// the window boundary: the exact mark `boundary <ISO>` in the description after the dash (spend-line.cjs,
+// sessionWindowEnd) - the time of the last log record that made it into the line. A re-run takes the answers
+// strictly after the largest boundary of this session's lines in the card; the sum of N, R and T over the lines
+// equals one read of the whole log (a gap across a boundary goes into the new line - anchor records on the
+// boundary are not lost). An old-style line without the mark (cumulative, from before this rule) yields a
+// boundary from the end of its "window HH:MM-HH:MM UTC" (Cyrillic in the legacy written form, matched through
+// \u escapes) to the minute: the end of that minute. Answers in it after the real end of the window fall into
+// neither the old line nor the new one.
+// Lines with a `--from/--to` window (the mark "set via --from/--to" in the description, in ru as before) do not
+// move the boundary, and at a manual window "already counted" does not apply: a human set the window. No new
+// spend - nothing is written, exit code 0.
 
 const fs = require('fs');
 const path = require('path');
@@ -42,15 +46,18 @@ const economy = require('../../.forma/dashboard/economy.cjs');
 const { formatSpendLine, sessionWindowEnd } = require('../../.forma/dashboard/spend-line.cjs');
 const { makeCli } = require('../../.forma/dashboard/lib/cli.cjs');
 const i18n = require('../../.forma/i18n/index.cjs');
+// Printed and written labels come from the core dictionary: English key in code, ru value as data - the
+// lines the hook prints and writes into cards are the same ru text as before the translation.
+const msg = (code, params) => i18n.message(code, params, 'ru');
 const { cardFiles, HISTORY_HEADING_RE } = require('../../.forma/dashboard/lib/card.cjs');
-// Журналы всех движков проекта через их адаптеры (ядро путей не знает).
+// The logs of all engines of the project through their adapters (the core knows no paths).
 const engines = require('../../.forma/dashboard/lib/engines.cjs');
 
 const cli = makeCli();
 const arg = cli.value;
 const AUTO = process.argv.includes('--auto');
 let num = process.argv[2] && /^\d{1,4}$/.test(process.argv[2]) ? process.argv[2].padStart(3, '0') : null;
-if (!num && !AUTO) { console.error('card-session-spend: нужен номер карточки, напр. 074'); process.exit(2); }
+if (!num && !AUTO) { console.error(msg('spend.card-session.need_num')); process.exit(2); }
 const WRITE = cli.flag('write');
 const IDLE = Number(arg('idle', 300)) * 1000;
 const FROM = arg('from') ? Date.parse(arg('from')) : null;
@@ -60,16 +67,18 @@ const MANUAL = FROM != null || TO != null;
 
 const root = process.env.CLAUDE_SPEND_ROOT || path.resolve(__dirname, '..', '..');
 
-// Язык записи — проектный (ru), как в строках History карточек и LEGACY_WINDOW_RE;
-// читатели (i18n.hasPhrase, sessionWindowEnd через i18n.alt) принимают оба языка.
-const MANUAL_MARK = 'задано --from/--to';
-const LEGACY_WINDOW_RE = /окно \d{2}:\d{2}–(\d{2}):(\d{2}) UTC/;
+// The written language of a line - the project's (ru), as in the cards' History lines and LEGACY_WINDOW_RE;
+// the readers (i18n.hasPhrase, sessionWindowEnd through i18n.alt) accept both languages.
+const MANUAL_MARK = msg('spend.card-session.manual_mark');
+// Parser of the legacy written form "window HH:MM-HH:MM UTC" ("window" is Cyrillic in old lines; \u escapes
+// keep the source ASCII while the pattern matches the same characters).
+const LEGACY_WINDOW_RE = /\u043e\u043a\u043d\u043e \d{2}:\d{2}\u2013(\d{2}):(\d{2}) UTC/;
 const LINE_DAY_RE = /(\d{4}-\d{2}-\d{2}):\s*attempt,/;
 
 const ts = (e) => Date.parse(e.ts);
 
-/** Источники журналов основной сессии: свой адаптер (его перекрытия окружения — пробы) первым,
- *  затем адаптеры всех движков проекта; дубль по файлу отсеивается. Пусто — журналов нет. */
+/** Main-session log sources: the own adapter (its environment overrides - trials) first,
+ *  then the adapters of all engines of the project; a duplicate by file is dropped. Empty - no logs. */
 function sources() {
   const own = require('../forma-adapter.cjs');
   const out = [];
@@ -92,14 +101,14 @@ function sources() {
   return out;
 }
 
-/** Нормализованные записи журнала `src` с местом в файле. */
+/** Normalized records of the `src` log with their place in the file. */
 function readRows(file, src) {
   const rows = [];
   let prev = null;
   for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
     if (!line) continue;
     let j;
-    try { j = JSON.parse(line); } catch { continue; } // оборванная строка журнала — не запись
+    try { j = JSON.parse(line); } catch { continue; } // a truncated log line is not a record
     let row = null;
     try { row = src.stepOf(j, prev); } catch { row = null; }
     prev = j;
@@ -108,14 +117,14 @@ function readRows(file, src) {
   return rows;
 }
 
-// Файл карточки в команде: путь или шаблон с номером (`.devtool/features/card-NNN-*`, в том числе `done/`).
+// A card file in the command: a path or a template with the number (`.devtool/features/card-NNN-*`, including `done/`).
 const CARD_PATH_RE = /\.devtool[\\/]features[\\/](?:done[\\/])?card-(\d{3})[-*]/;
-// Команда пишет, а не читает: правка на месте, tee, командлеты записи PowerShell, запись из скрипта.
+// The command writes rather than reads: an in-place edit, tee, PowerShell write cmdlets, a write from a script.
 const WRITE_CMD_RE = /\bsed\s+(?:-\w*i|--in-place)|\bperl\s+-\w*i|\btee\b|\b(?:Set|Add|Clear)-Content\b|\bOut-File\b|\b(?:write|append)FileSync\b/;
-// Чтение карточки — не касание: запись — перенаправление `>`/`>>` прямо в файл карточки.
+// Reading a card is not a touch: a write is a `>`/`>>` redirection straight into the card file.
 const REDIRECT_TO_CARD_RE = /(?:^|[^>&\d])>{1,2}\s*["']?[^\s"'|&;]*\.devtool[\\/]features[\\/](?:done[\\/])?card-(\d{3})[-*]/;
 
-/** Карточка, в чей файл пишет команда Bash/PowerShell; нет записи — null. */
+/** The card into whose file a Bash/PowerShell command writes; no write - null. */
 function shellWriteTarget(cmd) {
   const redirect = REDIRECT_TO_CARD_RE.exec(cmd);
   if (redirect) return redirect[1];
@@ -124,21 +133,21 @@ function shellWriteTarget(cmd) {
   return m ? m[1] : null;
 }
 
-/** Номер карточки, которой принадлежит вызов инструмента `c`; нет — null. */
+/** The number of the card a tool call `c` belongs to; none - null. */
 function toolOwner(c) {
   const inp = c.input || {};
   const command = String(inp.command || '');
   let m = /[\\/]\.devtool[\\/]features[\\/](?:done[\\/])?card-(\d{3})-/.exec(String(inp.file_path || ''));
   if (m && /^(Write|Edit)$/.test(c.name)) return m[1];
-  // Коммит: `git commit` напрямую или через `node .forma/protocol/scripts/forma-commit.cjs`; номер — в сообщении.
+  // A commit: `git commit` directly or through `node .forma/protocol/scripts/forma-commit.cjs`; the number is in the message.
   if ((m = new RegExp('(?:git commit|forma-commit)[\\s\\S]*?(?:' + i18n.alt('hist.card') + ') (\\d{3})', 'i').exec(command))) return m[1];
   if (/^(Bash|PowerShell)$/.test(c.name)) return shellWriteTarget(command);
-  // Вызов субагента по карточке — работа Intent по координации этой карточки.
+  // A subagent call on a card - Intent's work on coordinating that card.
   if ((c.name === 'Agent' || c.name === 'Task') && (m = /card-(\d{3})(?!\d)/.exec(String(inp.prompt || '')))) return m[1];
   return null;
 }
 
-/** Чью карточку касается запись журнала: Write/Edit или Bash/PowerShell-запись файла карточки, коммит «Карточка NNN» (git или forma-commit), вызов субагента с `card-NNN` в задании. */
+/** Whose card a log record touches: a Write/Edit or a Bash/PowerShell write of the card file, a "Card NNN" commit (git or forma-commit), a subagent call with `card-NNN` in the assignment. */
 function ownerOf(e) {
   if (!Array.isArray(e.toolCalls)) return null;
   for (const c of e.toolCalls) {
@@ -149,12 +158,12 @@ function ownerOf(e) {
   return null;
 }
 
-/** Записи окна по событиям карточки: `[{ e, k }]`, k — место в журнале. */
+/** The window's records by the card's events: `[{ e, k }]`, k - the place in the log. */
 function eventWindow(rows) {
   const ev = [];
   rows.forEach((e, i) => { const c = ownerOf(e); if (c) ev.push({ i, c }); });
-  // Отрезок события — от первой реплики человека после предыдущего события до самого события:
-  // разговор без записи в карточку после последнего события никому не отходит.
+  // A stretch of an event - from the first human remark after the previous event up to the event itself:
+  // talk without a card write after the last event belongs to nobody.
   const mine = new Set();
   let prev = -1;
   ev.forEach((x, n) => {
@@ -168,16 +177,17 @@ function eventWindow(rows) {
   return rows.map((e, k) => ({ e, k })).filter(({ k }) => mine.has(k));
 }
 
-/** Записи окна, заданного --from/--to. */
+/** The records of a window set by --from/--to. */
 const manualWindow = (rows) => rows.map((e, k) => ({ e, k }))
   .filter(({ e }) => ts(e) >= (FROM ?? 0) && ts(e) <= (TO ?? Infinity));
 
 /**
- * Сумма окна за записи строго позже `after` (мс; null — все). Один ответ API пишется в журнал несколькими
- * записями с общим ключом (`src.stepOf` даёт его: message.id у Claude, requestId у ZCode): его расход — по
- * первой записи, иначе два параллельных вызова субагентов по разным карточкам унесли бы его дважды. Время —
- * только внутри своих отрезков (промежуток через чужой ответ не считается); промежуток к первой новой записи
- * от записи-якоря на границе идёт в новую сумму. Нечего суммировать — null.
+ * The sum of the window over records strictly later than `after` (ms; null - all). One API answer is written
+ * into the log by several records with a shared key (`src.stepOf` yields it: message.id for Claude, requestId
+ * for ZCode): its spend counts by the first record, else two parallel subagent calls on different cards would
+ * carry it twice. Time counts only inside one's own stretches (a gap across another's answer does not count);
+ * the gap to the first new record from an anchor record on the boundary goes into the new sum. Nothing to
+ * sum - null.
  */
 function sumWindow(rows, inWin, after, parse) {
   const isNew = ({ e }) => after == null || ts(e) > after;
@@ -194,7 +204,7 @@ function sumWindow(rows, inWin, after, parse) {
   return s.calls ? s : null;
 }
 
-/** `{ spend, accounted }`: расход сессии за неучтённое; `accounted` — окно есть, но всё в нём уже записано. */
+/** `{ spend, accounted }`: the session's spend over the uncounted; `accounted` - a window exists but everything in it is recorded already. */
 function scan(file, src, after) {
   const rows = readRows(file, src);
   const inWin = MANUAL ? manualWindow(rows) : eventWindow(rows);
@@ -203,7 +213,7 @@ function scan(file, src, after) {
   return { spend, accounted: !spend && after != null && !MANUAL };
 }
 
-/** Граница строки расхода, мс: точная метка; у строки старого вида — конец минуты конца окна; нет — null. */
+/** The boundary of a spend line, ms: the exact mark; an old-style line - the end of the minute its window ends at; none - null. */
 function lineBoundary(line) {
   const exact = sessionWindowEnd(line);
   if (exact != null) return exact;
@@ -212,7 +222,7 @@ function lineBoundary(line) {
   return win && day ? Date.parse(`${day[1]}T${win[1]}:${win[2]}:59.999Z`) : null;
 }
 
-/** До какого момента ответы сессии `id` уже записаны в карточку (наибольшая граница), мс; строк нет — null. */
+/** Up to what moment the answers of session `id` are recorded in the card already (the largest boundary), ms; no lines - null. */
 function accountedUntil(cardText, id) {
   let until = null;
   for (const line of cardText.split(/\r?\n/)) {
@@ -226,44 +236,42 @@ function accountedUntil(cardText, id) {
 const sp = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const hm = ms => new Date(ms).toISOString().slice(11, 16);
 
-/** Строка расхода сессии за окно `r` (описание — на языке карточки, как прежде; тег — движок источника). */
+/** The spend line of a session over window `r` (the description - in the card's language, as before; the tag - the source engine's). */
 function spendLine(r) {
-  const window = MANUAL ? `окно ${hm(r.from)}–${hm(r.to)} UTC (${MANUAL_MARK})` : `окно ${hm(r.from)}–${hm(r.to)} UTC`;
-  const edge = MANUAL ? '' : `, граница ${new Date(r.to).toISOString()}`;
+  const window = MANUAL ? msg('spend.card-session.window_manual', { from: hm(r.from), to: hm(r.to), mark: MANUAL_MARK }) : msg('spend.card-session.window', { from: hm(r.from), to: hm(r.to) });
+  const edge = MANUAL ? '' : msg('spend.card-session.edge', { iso: new Date(r.to).toISOString() });
   return '- ' + formatSpendLine({ node: 'Intent', date: new Date(r.to).toISOString().slice(0, 10), tokens: economy.usageTokens(r),
     cache_read: r.cache_read, tokens_out: r.tokens_out, duration_s: Math.round(r.active / 1000), call_id: r.id, engine: r.tag, desc: '' }) +
-    `расход основной сессии по журналу (card-session-spend): ${r.calls} ответов, ${window}, ` +
-    `выход ${sp(r.tokens_out)}, запись в кеш ${sp(r.cache_write)}${edge}.`;
+    msg('spend.card-session.desc', { calls: r.calls, window, out: sp(r.tokens_out), cache_write: sp(r.cache_write), edge });
 }
 
-/** Строка `--mark-unknown`: журналы прочитаны, доли карточки в них нет — исключение §3 с пометками и причиной. */
+/** The `--mark-unknown` line: the logs were read, the card's share is not in them - the §3 exception with marks and a reason. */
 const unknownLine = (srcs) => {
   const dirs = [...new Set(srcs.map((s) => path.dirname(s.file)))].map((d) => path.basename(d)).join(', ');
   return '- ' + formatSpendLine({ node: 'Intent', date: new Date().toISOString().slice(0, 10), tokens: null,
     cache_read: null, duration_s: 0, call_id: null, engine: require('../forma-adapter.cjs').spendTag, desc: '' }) +
-    `расход основной сессии не найден (card-session-spend): в журналах основной сессии (${dirs}) ` +
-    `нет записи карточки, коммита или вызова субагента по ней — журнал удалён, работа шла в другом движке или без записи в карточку.`;
+    msg('spend.card-session.unknown_desc', { dirs });
 };
 
-/** Дописывает строки в конец `## История` карточки. */
+/** Appends lines to the end of the card's `## History`. */
 function appendToHistory(card, text, lines) {
   const fresh = lines.filter(l => !text.includes(l.split(' — ')[0]));
-  if (!fresh.length) { console.log('уже записано'); return; }
+  if (!fresh.length) { console.log(msg('spend.card-session.already')); return; }
   const nl = text.includes('\r\n') ? '\r\n' : '\n';
   const rows = text.split(/\r?\n/);
   const h = rows.findIndex(r => HISTORY_HEADING_RE.test(r));
-  if (h < 0) { console.error('нет зоны «История»'); if (AUTO) return; process.exit(1); }
+  if (h < 0) { console.error(msg('spend.card-session.no_history')); if (AUTO) return; process.exit(1); }
   let end = rows.findIndex((r, i) => i > h && /^## /.test(r));
   if (end < 0) end = rows.length;
   while (end > h + 1 && !rows[end - 1].trim()) end--;
   rows.splice(end, 0, ...fresh);
   fs.writeFileSync(card, rows.join(nl));
-  console.log(`записано в ${path.relative(root, card)}: ${fresh.length}`);
+  console.log(msg('spend.card-session.written', { file: path.relative(root, card), count: fresh.length }));
 }
 
 function main() {
   const srcs = sources().filter((s) => !ONLY || s.id.startsWith(ONLY));
-  if (!srcs.length) { console.error('card-session-spend: нет каталогов журналов основной сессии (адаптеры движков не дали файлов)'); process.exit(AUTO ? 0 : 2); }
+  if (!srcs.length) { console.error(msg('spend.card-session.no_dirs')); process.exit(AUTO ? 0 : 2); }
   const card = cardFiles(root, (name) => name.startsWith(`card-${num}-`))[0];
   const text = card ? fs.readFileSync(card, 'utf8') : '';
   const results = [];
@@ -276,26 +284,28 @@ function main() {
   }
   if (!results.length && accounted.length) {
     const last = new Date(Math.max(...accounted.map(a => a.until))).toISOString();
-    console.log(`card-${num}: нового расхода нет — ответы сессии до ${last} уже записаны`);
+    console.log(msg('spend.card-session.no_new', { num, until: last }));
     return;
   }
   if (!results.length && !cli.flag('mark-unknown')) {
-    console.error(`card-${num}: в журналах основной сессии касаний не найдено`);
+    console.error(msg('spend.card-session.no_touch', { num }));
     process.exit(1);
   }
   const lines = results.length ? results.sort((a, b) => a.from - b.from).map(spendLine) : [unknownLine(srcs)];
   console.log(lines.join('\n'));
   if (!WRITE) return;
-  if (!card) { console.error(`card-${num}: файл карточки не найден`); process.exit(1); }
+  if (!card) { console.error(msg('spend.card-session.no_card_file', { num })); process.exit(1); }
   appendToHistory(card, text, lines);
 }
 
 /**
- * `--auto` (хук SessionEnd): все карточки, которых Intent касался в журнале этой сессии, — по строке на карточку
- * за непосчитанные ответы. Сессия — `session_id` из JSON хука на stdin, иначе `--session <id>`, иначе свежайший
- * журнал всех источников. Дедуп с ручным `card-move --session-spend` и со вторым запуском — граница окна
- * `граница <ISO>` в описании строки: берутся ответы строго после наибольшей границы строк этой сессии в карточке;
- * нечего писать — не пишется. Любая ошибка — код выхода 0 (хук не блокирует), причина в stderr.
+ * `--auto` (the SessionEnd hook): every card Intent touched in this session's log - one line per card
+ * for the uncounted answers. The session is the `session_id` from the hook's JSON on stdin, else
+ * `--session <id>`, else the freshest log of all sources. Dedup against a manual `card-move
+ * --session-spend` and against a second run - the window boundary `boundary <ISO>` in the line's
+ * description: the answers strictly after the largest boundary of this session's lines in the card are
+ * taken; nothing to write - nothing is written. Any error - exit code 0 (the hook does not block), the
+ * reason on stderr.
  */
 function auto() {
   let id = ONLY;
@@ -304,7 +314,7 @@ function auto() {
   let src = srcs.find((s) => id && s.id === id);
   if (!src && !id) src = srcs.map((s) => { let st; try { st = fs.statSync(s.file); } catch { return null; } return { s, t: st.mtimeMs }; })
     .filter(Boolean).sort((a, b) => b.t - a.t)[0]?.s;
-  if (!src) { console.error('card-session-spend --auto: журнал сессии не найден'); return; }
+  if (!src) { console.error(msg('spend.card-session.auto_no_log')); return; }
   const rows = readRows(src.file, src);
   const touched = [...new Set(rows.map(ownerOf).filter(Boolean))].sort();
   for (const n of touched) {

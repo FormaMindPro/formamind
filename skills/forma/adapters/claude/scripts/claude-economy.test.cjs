@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * Соответствие адаптера Claude контракту (.forma/manual/en/03-protocol/ECONOMY.md): строки, собранные
- * адаптером, читаются tally.cjs в те же канонические суммы; отсутствующее у Claude — unknown, не 0.
- * Общий тест контракта — .forma/dashboard/economy.test.cjs, этот идёт вместе с ним.
+ * The Claude adapter against the contract (.forma/manual/en/03-protocol/ECONOMY.md): the lines the
+ * adapter assembles are read by tally.cjs into the same canonical sums; what Claude lacks - unknown, not 0.
+ * The shared contract test is .forma/dashboard/economy.test.cjs; this one runs alongside it.
  *   node .claude/scripts/claude-economy.test.cjs
  */
 const assert = require('node:assert/strict');
@@ -24,11 +24,11 @@ const tallyLines = (lines) => {
 };
 const line = (rec) => formatSpendLine({ node: 'Run', date: D, engine: 'claude-code', desc: 'x.', ...rec });
 
-it('<usage> + стенограмма → N, R, T, id; tally читает те же числа', () => {
+it('<usage> + transcript -> N, R, T, id; tally reads the same numbers', () => {
   const rec = fromAgentResult({ agent_id: 'a1b2', subagent_tokens: 52339, tool_uses: 7, duration_ms: 120499 },
     { cacheRead: 40000, cacheCreate: 900, input: 10, output: 300 });
   assert.deepEqual([rec.tokens, rec.cache_read, rec.duration_s, rec.call_id, rec.tool_uses], [41210, 40000, 120, 'a1b2', 7]);
-  assert.equal(rec.tokens_basis, 'sum'); // N = 10 + 900 + 40000 + 300, не subagent_tokens (размер контекста)
+  assert.equal(rec.tokens_basis, 'sum'); // N = 10 + 900 + 40000 + 300, not subagent_tokens (the context size)
   const n = tallyLines([line(rec)]).byNode.Run;
   assert.equal(n.tokens, 41210);
   assert.equal(n.cacheRead, 40000);
@@ -36,14 +36,14 @@ it('<usage> + стенограмма → N, R, T, id; tally читает те ж
   assert.equal(n.tokensUnknown + n.cacheUnknown + n.secondsUnknown + n.idUnknown, 0);
 });
 
-it('нет стенограммы: cache_read и cache_write — unknown (null), не 0; tally считает отдельно', () => {
+it('no transcript: cache_read and cache_write - unknown (null), not 0; tally counts them separately', () => {
   const rec = fromAgentResult({ agent_id: 'a1b2', subagent_tokens: 100, duration_ms: 5000 }, null);
-  // Падает, если адаптер вернёт 0: `<usage>` Claude не несёт ни R, ни cache_write.
+  // Fails if the adapter returned 0: Claude's `<usage>` carries neither R nor cache_write.
   assert.equal(rec.cache_read, null);
   assert.equal(rec.cache_write, null);
   assert.equal(rec.tokens_in, null);
   assert.equal(rec.tool_uses, null);
-  assert.equal(rec.tokens, 100); // запасное значение из <usage>
+  assert.equal(rec.tokens, 100); // the fallback value from <usage>
   assert.equal(rec.tokens_basis, 'context');
   const s = line(rec);
   assert.match(s, /\(cache-read unknown\)/);
@@ -52,19 +52,19 @@ it('нет стенограммы: cache_read и cache_write — unknown (null),
   assert.equal(n.withCacheRead, 0);
 });
 
-it('пустые поля <usage> → unknown tokens / unknown s / id unknown', () => {
+it('empty <usage> fields -> unknown tokens / unknown s / id unknown', () => {
   const s = line(fromAgentResult({}, null));
   assert.match(s, /attempt, unknown tokens \(cache-read unknown\), out unknown, unknown s, `id unknown` —/);
   const n = tallyLines([s]).byNode.Run;
   assert.deepEqual([n.tokensUnknown, n.cacheUnknown, n.secondsUnknown, n.idUnknown], [1, 1, 1, 1]);
 });
 
-it('шаг транскрипта: поле отсутствует — null, присутствует 0 — 0', () => {
+it('a transcript step: the field absent - null, present 0 - 0', () => {
   const u = claudeUsage({ input_tokens: 0, output_tokens: 5, cache_read_input_tokens: 9 });
   assert.deepEqual(u, { tokens_in: 0, tokens_out: 5, cache_read: 9, cache_write: null });
 });
 
-it('сегмент «O out»: новая строка несёт его, старая читается как out unknown и не меняется', () => {
+it('the "O out" segment: a new line carries it, an old one reads as out unknown and is not changed', () => {
   const { outTokens } = require('../../.forma/dashboard/spend-line.cjs');
   const withOut = line({ tokens: 900, cache_read: 100, tokens_out: 2500, duration_s: 5, call_id: 'abcdef123456' });
   assert.match(withOut, /\(100 cache-read\), 2 500 out, 5 s,/);
@@ -73,10 +73,10 @@ it('сегмент «O out»: новая строка несёт его, ста�
   const old = '`Run`, ' + D + ': attempt, 900 tokens (100 cache-read), 5 s, `second-call-id` — claude-code: x.';
   assert.equal(outTokens(old), null);
   const n = tallyLines([withOut, old]).byNode.Run;
-  assert.equal(n.tokens, 1800); // обе строки читаются разбором расхода
+  assert.equal(n.tokens, 1800); // both lines are read by the spend parser
 });
 
-it('журнал основной сессии: mainStepOf нормализует запись, isSidechain — не запись', () => {
+it('the main-session log: mainStepOf normalizes a record, isSidechain is not a record', () => {
   const { mainStepOf, mainSessions } = require('./claude-economy.cjs');
   const row = mainStepOf({ type: 'assistant', timestamp: '2000-01-02T10:00:00.000Z',
     message: { id: 'msg_1', model: 'claude-sonnet-5-5', content: [{ type: 'tool_use', name: 'Edit', input: {} }],
@@ -86,7 +86,7 @@ it('журнал основной сессии: mainStepOf нормализуе�
   assert.equal(row.human, false);
   assert.equal(row.model, 'claude-sonnet-5-5');
   assert.equal(row.usage.input_tokens, 10);
-  const human = mainStepOf({ type: 'user', timestamp: '2000-01-02T10:01:00.000Z', message: { role: 'user', content: 'сделай' } });
+  const human = mainStepOf({ type: 'user', timestamp: '2000-01-02T10:01:00.000Z', message: { role: 'user', content: 'do it' } });
   assert.equal(human.human, true);
   assert.equal(human.key, null);
   assert.equal(mainStepOf({ type: 'user', isMeta: true, timestamp: '2000-01-02T10:02:00.000Z', message: { content: 'x' } }).human, false);
@@ -104,4 +104,4 @@ it('журнал основной сессии: mainStepOf нормализуе�
   } finally { delete process.env.CLAUDE_SPEND_PROJECTS; fs.rmSync(home, { recursive: true, force: true }); }
 });
 
-console.log(`\n${passed} проверок пройдено`);
+console.log(`\n${passed} checks passed`);

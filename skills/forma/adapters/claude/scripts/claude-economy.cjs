@@ -2,41 +2,45 @@
 'use strict';
 
 /**
- * Адаптер экономики Claude Code: транскрипт / результат вызова Claude → каноническая запись
- * (.forma/manual/en/03-protocol/ECONOMY.md). Таблица «переменная → источник» — `.claude/agents/on-demand/spend-line.md`.
+ * The Claude Code economy adapter: a transcript / the result of a Claude call -> the canonical record
+ * (.forma/manual/en/03-protocol/ECONOMY.md). The "variable -> source" table - `.claude/agents/on-demand/spend-line.md`.
  *
- * Единственное место, где имена полей Claude (`input_tokens`, `subagent_tokens`, `duration_ms`…)
- * переводятся в канонические. Пользователи: subagent-transcript.cjs, card-session-spend.cjs,
- * session-economy.cjs; строку собирает .forma/dashboard/spend-line.cjs (`formatSpendLine`).
+ * The only place where the Claude field names (`input_tokens`, `subagent_tokens`, `duration_ms`...)
+ * are translated into the canonical ones. Users: subagent-transcript.cjs, card-session-spend.cjs,
+ * session-economy.cjs; the line is assembled by .forma/dashboard/spend-line.cjs (`formatSpendLine`).
  *
- * Чего источник не дал — `null` (маркер `unknown`), никогда 0.
+ * What the source did not give - `null` (the `unknown` marker), never 0.
  *
- * CLI — строка расхода вызова субагента по его `<usage>`:
+ * CLI - the spend line of a subagent call from its `<usage>`:
  *   node .claude/scripts/claude-economy.cjs line --node Run --agent-id <agent_id> \
  *     --tokens <subagent_tokens> --duration-ms <duration_ms> [--tool-uses <tool_uses>] \
- *     [--date YYYY-MM-DD] [--desc "<что сделано>"] [--split K --share I] [--write card-NNN]
- *   --write card-NNN — дописать строку с префиксом «- » в конец `## History` карточки (как хук SubagentStop);
- *   повтор с тем же agent_id по той же карточке строку не дублирует (печатается пометка, файл не меняется).
- *   N и R читаются из стенограммы захода (N = Σ in+write+read+out; `--tokens` — запасное значение);
- *   нет стенограммы — `(cache-read unknown)`, N из `--tokens` с пометкой «размер контекста» в описании.
+ *     [--date YYYY-MM-DD] [--desc "<what was done>"] [--split K --share I] [--write card-NNN]
+ *   --write card-NNN - append the line with a "- " prefix to the end of the card's `## History` (as the
+ *   SubagentStop hook does); a re-run with the same agent_id on the same card does not duplicate the line
+ *   (a note is printed, the file is not changed).
+ *   N and R are read from the call's transcript (N = Σ in+write+read+out; `--tokens` is the fallback value);
+ *   no transcript - `(cache-read unknown)`, N from `--tokens` with a "context size" note in the description.
  *
- *   --split K --share I (1..K) — один вызов `Spec`/`Kit` снаряжает или режет K карточек разом
- *   (пакет, AGENTS.md §3, «Любой заход к субагенту привязан к карточке»): расход вызова делится
- *   на K карточек, не приписывается каждой целиком и не считается по ней в полном объёме (это и
- *   было бы двойным счётом при сложении по доске). Доля — целочисленная, без остатка: N (и R, и T)
- *   делятся на K, первые (N mod K) карточек получают на 1 больше — сумма долей по всем K карточкам
- *   равна исходному N/R/T без приближения. agent_id у всех K строк один и тот же (это один вызов,
- *   не K); `tally.cjs` не схлопывает их в дубль, потому что числа каждой строки свои — дедуп по
- *   [id, tokens, cache, seconds] расходится. Описание получает пометку `batch I/K`.
+ *   --split K --share I (1..K) - one `Spec`/`Kit` call kits up or slices K cards at once
+ *   (a batch, AGENTS.md §3, "Any reach to a subagent is tied to a card"): the call's spend is divided
+ *   over K cards, not attributed to each whole and not counted on it in full (that would be double
+ *   counting when the board sums the lines). The share is integral, without a remainder: N (and R, and T)
+ *   are divided by K, the first (N mod K) cards get 1 more - the sum of the shares over all K cards
+ *   equals the original N/R/T without approximation. The agent_id of all K lines is the same (it is one
+ *   call, not K); `tally.cjs` does not collapse them into a duplicate, because every line's numbers are
+ *   its own - the dedup by [id, tokens, cache, seconds] diverges. The description gets a `batch I/K` mark.
  */
 
 const { formatSpendLine } = require('../../.forma/dashboard/spend-line.cjs');
 const { makeCli } = require('../../.forma/dashboard/lib/cli.cjs');
+// Printed and written labels come from the core dictionary: English key in code, ru value as data.
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const has = (o, k) => o != null && o[k] != null && Number.isFinite(Number(o[k]));
 const pick = (o, k) => (has(o, k) ? Number(o[k]) : null);
 
-/** Один шаг транскрипта: `message.usage` Claude → tokens_in, tokens_out, cache_read, cache_write. */
+/** One transcript step: Claude's `message.usage` -> tokens_in, tokens_out, cache_read, cache_write. */
 function claudeUsage(u) {
   return {
     tokens_in: pick(u, 'input_tokens'),
@@ -47,17 +51,17 @@ function claudeUsage(u) {
 }
 
 /**
- * Результат Agent-вызова (+ стенограмма, если есть) → каноническая запись строки карточки.
+ * The result of an Agent call (+ a transcript, if any) -> the canonical card-line record.
  * @param usage { agent_id, subagent_tokens|tokens, tool_uses, duration_ms }
- * @param transcript результат readSubagentTranscript или null
+ * @param transcript the result of readSubagentTranscript or null
  */
 function fromAgentResult(usage, transcript) {
   const u = usage || {};
   const ms = pick(u, 'duration_ms');
   const t = transcript || null;
-  // `subagent_tokens` из `<usage>` — размер контекста на последнем шаге, не расход (замер по
-  // стенограммам: совпадает с ним, расходится с Σ в 10–40 раз). N по контракту — Σ in+write+read+out
-  // по шагам, её даёт только стенограмма; без стенограммы остаётся контекст из `<usage>`.
+  // `subagent_tokens` from `<usage>` - the context size at the last step, not the spend (measured
+  // against transcripts: it matches them, and diverges from Σ by 10-40x). N by the contract is
+  // Σ in+write+read+out over the steps; only a transcript yields it; without one the context from `<usage>` remains.
   const sum = t ? [t.input, t.cacheCreate, t.cacheRead, t.output] : null;
   const fromTranscript = sum && sum.every((x) => x != null && Number.isFinite(Number(x)));
   const tokens = fromTranscript ? sum.reduce((a, x) => a + Number(x), 0)
@@ -66,23 +70,23 @@ function fromAgentResult(usage, transcript) {
     tokens,
     tokens_basis: fromTranscript ? 'sum' : (tokens == null ? null : 'context'),
     cache_read: t ? t.cacheRead : null,
-    // В `<usage>` нет — только из стенограммы.
+    // Not in `<usage>` - only from a transcript.
     cache_write: t ? t.cacheCreate : null,
     tokens_in: t ? t.input : null,
     tokens_out: t ? t.output : null,
     duration_s: ms == null ? null : Math.round(ms / 1000),
     call_id: u.agent_id ? String(u.agent_id) : null,
     tool_uses: pick(u, 'tool_uses'),
-    // Свидетельство источника сумм: шаги стенограммы и её движок-владелец (null — стенограммы не было).
+    // The witness of the sums' source: the transcript's steps and its owner engine (null - there was no transcript).
     steps: t ? (t.steps == null ? null : t.steps) : null,
     transcript_tag: t ? (t.tag || null) : null,
   };
 }
 
 /**
- * Доля карточки I (1..K) от общего количества `total`, целым числом, без остатка:
- * первые (total mod K) долей на 1 больше остальных — сумма всех K долей равна `total`.
- * `null`/`undefined` (unknown) остаётся как есть — делить нечего, доля тоже unknown.
+ * The share of card I (1..K) of the `total`, as an integer, without a remainder:
+ * the first (total mod K) shares are 1 larger than the rest - the sum of all K shares equals `total`.
+ * `null`/`undefined` (unknown) stays as it is - there is nothing to divide, the share is unknown too.
  */
 function batchShare(total, k, i) {
   if (total == null) return total;
@@ -91,7 +95,7 @@ function batchShare(total, k, i) {
   return base + (i <= extra ? 1 : 0);
 }
 
-/** Запись вызова → запись одной из K карточек пакета (поля экономики делятся, call_id общий). */
+/** A call record -> the record of one of the K cards of a batch (the economy fields divide, call_id shared). */
 function splitForBatch(rec, k, i) {
   return {
     ...rec,
@@ -104,17 +108,17 @@ function splitForBatch(rec, k, i) {
   };
 }
 
-// ───────── журнал основной сессии (`Intent`) — раскладку и формат знает адаптер ─────────
+// ───────── the main-session log (`Intent`) - the layout and format are the adapter's knowledge ─────────
 
 const fs = require('fs');
 const path = require('path');
 const { transcriptsDir } = require('./dashboard-view.cjs');
 
 /**
- * Журналы основной сессии этого проекта: `~/.claude/projects/<slug>/*.jsonl` — по записи на файл,
- * `{ id, file }` (id — имя файла без .jsonl). Правило раскладки — `dashboard-view.transcriptsDir`
- * (кодировка slug и отход по регистру); `CLAUDE_SPEND_PROJECTS` перекрывает каталог (проба на
- * синтетике). Каталога нет — пустой список: журналов нет, это не ноль.
+ * The main-session logs of this project: `~/.claude/projects/<slug>/*.jsonl` - one record per file,
+ * `{ id, file }` (id - the file name without .jsonl). The layout rule - `dashboard-view.transcriptsDir`
+ * (the slug encoding and the case fallback); `CLAUDE_SPEND_PROJECTS` overrides the directory (a trial
+ * on synthetic data). No directory - an empty list: no logs, which is not zero.
  */
 function mainSessions(root = process.cwd()) {
   const dir = process.env.CLAUDE_SPEND_PROJECTS || transcriptsDir(root);
@@ -125,14 +129,14 @@ function mainSessions(root = process.cwd()) {
 }
 
 /**
- * Одна запись журнала основной сессии Claude → нормализованный шаг
+ * One record of a Claude main-session log -> a normalized step
  * `{ ts, key, usage, toolCalls, human, model }`:
- *   ts — время записи; key — message.id (один ответ API пишется несколькими записями, расход — по
- *   первой); usage — `message.usage` (разбор — claudeUsage); toolCalls — блоки tool_use;
- *   human — реплика человека (user, не isMeta, с текстом); model — модель ответа.
- *   isSidechain (ветки субагентов — их расход пишет вызывающий по `<usage>`) и записи без
- *   времени — null: не запись. `prev` — предыдущая строка журнала; формату claude не нужна,
- *   сигнатура общая с адаптерами других движков.
+ *   ts - the record's time; key - message.id (one API answer is written by several records, the spend
+ *   counts by the first); usage - `message.usage` (parsed by claudeUsage); toolCalls - the tool_use blocks;
+ *   human - a human remark (user, not isMeta, with text); model - the answer's model.
+ *   isSidechain (subagent branches - the caller writes their spend from `<usage>`) and records without
+ *   a time - null: not a record. `prev` - the previous line of the log; the claude format does not need it,
+ *   the signature is shared with the other engines' adapters.
  */
 function mainStepOf(line) {
   if (!line || line.isSidechain || !line.timestamp) return null;
@@ -164,32 +168,33 @@ if (require.main === module) {
   const { readSubagentTranscript, NO_TRANSCRIPT } = require('../../.forma/dashboard/subagent-transcript.cjs');
   (async () => {
     const id = arg('agent-id');
-    // Стенограмма ищется у ВСЕХ адаптеров движков: файл принадлежит движку, который исполнял вызов,
-    // а у части движков он временен — жив, пока жив вызов. Тег строки ставит вызывающий, как прежде.
+    // The transcript is sought across ALL engine adapters: the file belongs to the engine that executed
+    // the call, and with some engines it is temporary - alive while the call lives. The line's tag is set
+    // by the caller, as before.
     const tr = id ? await readSubagentTranscript(id, undefined, null) : null;
     let rec = fromAgentResult({ agent_id: id, tokens: arg('tokens'), duration_ms: arg('duration-ms'), tool_uses: arg('tool-uses') }, tr);
     const k = arg('split'), i = arg('share');
     let batchNote = '';
     if (k != null) {
-      if (i == null) { console.error('--split K требует --share I (1..K)'); process.exit(2); }
+      if (i == null) { console.error(msg('spend.claude-economy.split_needs_share')); process.exit(2); }
       rec = splitForBatch(rec, Number(k), Number(i));
       batchNote = ` (batch ${i}/${k})`;
     }
     const why = [];
-    if (rec.cache_read == null) why.push(`R неизвестно: ${NO_TRANSCRIPT}`);
-    if (rec.tokens == null) why.push('N не передан');
-    else if (rec.tokens_basis === 'context') why.push('N — размер контекста из <usage>, не сумма: стенограммы нет');
-    if (rec.duration_s == null) why.push('T не передано');
-    if (rec.call_id == null) why.push('id не передан');
-    // Пометка различимого источника: суммы сняты со стенограммы живого вызова, а не из <usage>.
+    if (rec.cache_read == null) why.push(msg('spend.claude-economy.r_unknown', { no_transcript: NO_TRANSCRIPT }));
+    if (rec.tokens == null) why.push(msg('spend.claude-economy.n_missing'));
+    else if (rec.tokens_basis === 'context') why.push(msg('spend.claude-economy.n_context'));
+    if (rec.duration_s == null) why.push(msg('spend.claude-economy.t_missing'));
+    if (rec.call_id == null) why.push(msg('spend.claude-economy.id_missing'));
+    // The mark of a distinguishable source: the sums were taken from the live call's transcript, not from <usage>.
     const marks = [];
     if (rec.tokens_basis === 'sum') {
       const parts = ['N'];
       if (rec.cache_read != null) parts.push('R');
       if (rec.tokens_out != null) parts.push('out');
-      marks.push(`${parts.join(', ')} — суммы живой стенограммы (шагов: ${rec.steps == null ? '?' : rec.steps})`);
+      marks.push(msg('spend.claude-economy.live_sums', { fields: parts.join(', '), steps: rec.steps == null ? '?' : rec.steps }));
     }
-    const desc = (arg('desc') || 'сделано.') + batchNote
+    const desc = (arg('desc') || msg('spend.claude-economy.default_desc')) + batchNote
       + (why.length ? ` (${why.join('; ')}.)` : '')
       + (marks.length ? ` (${marks.join('; ')}).` : '');
     const line = formatSpendLine({

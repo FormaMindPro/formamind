@@ -1,30 +1,30 @@
 'use strict';
 
 /**
- * Журнал вызовов движка MiniMax: сырой факт — единственный источник строки расхода (§3).
+ * The call ledger of the MiniMax engine: the raw fact is the only source of a spend line (§3).
  *
- * Контракт 5, честно: СТРОКА выводится, а не пишется руками, — `deriveSpendLineForCall`
- * превращает запись журнала в строку через общий форматтер `.forma/dashboard/spend-line.cjs`.
- * Ядро сверяет журнал с карточкой проверкой `.forma/board/checks/ledger-parity.cjs` — она
- * находит журнал по конвенции: `<каталог адаптера>/.ledger/calls.jsonl`; для моей зоны это
- * `.minimax/.ledger/calls.jsonl`.
+ * Contract 5, honestly: the LINE is derived, not written by hand, - `deriveSpendLineForCall` turns a
+ * ledger record into a line through the shared formatter `.forma/dashboard/spend-line.cjs`.
+ * The core reconciles the ledger with the card by the check `.forma/board/checks/ledger-parity.cjs` -
+ * it finds the ledger by the convention: `<the adapter's directory>/.ledger/calls.jsonl`; for my zone
+ * that is `.minimax/.ledger/calls.jsonl`.
  *
- * ЗАПИСЬ — платформенная: её пишет хук пакета плагина (`SubagentStop`), а числа берутся
- * из стенограммы сессии рантайма, где они настоящие. До появления пакета запись писал сам
- * узел командой `--append` — тогда сверка ядра сравнивала слово узла со словом узла.
- * Что это меняет, — в §8 зоны, контракт 5.
+ * The WRITE is platform-side: the plugin package's hook (`SubagentStop`) writes it, and the numbers
+ * are taken from the runtime's session transcript, where they are real. Before the package appeared,
+ * the node itself wrote the record with the `--append` command - then the core's check compared the
+ * node's word with the node's word. What that changes - in the zone's §8, contract 5.
  *
- * Пока платформа не пишет запись, в неё кладётся только то, что узел действительно прочитал
- * в возврате вызова; непрочитанное остаётся `unknown`, а не нулём и не догадкой.
+ * While the platform does not write the record, only what the node actually read from the call's
+ * return is put into it; the unread stays `unknown`, not zero and not a guess.
  *
- * Формат записи журнала (общий с зеркалом Gemini):
+ * The ledger record format (shared with the Gemini mirror):
  *   { "timestamp": "2000-01-02T10:00:00.000Z", "conversationId": "…",
  *     "input_tokens": 1200, "output_tokens": 300, "cache_read_tokens": 450, "duration_s": 5 }
  *
- * Запуск:
- *   node .minimax/scripts/sync-ledger.cjs --append '<json-запись>'
- *   node .minimax/scripts/sync-ledger.cjs --derive  '<json-запись>' 'Spec' 'описание'
- *   node .minimax/scripts/sync-ledger.cjs --derive-all 'описание'
+ * Run:
+ *   node .minimax/scripts/sync-ledger.cjs --append '<json record>'
+ *   node .minimax/scripts/sync-ledger.cjs --derive  '<json record>' 'Spec' 'description'
+ *   node .minimax/scripts/sync-ledger.cjs --derive-all 'description'
  *   node .minimax/scripts/sync-ledger.cjs --backfill
  *   node .minimax/scripts/sync-ledger.cjs --list
  */
@@ -32,12 +32,15 @@
 const fs = require('fs');
 const path = require('path');
 const { formatSpendLine, ATTEMPT_FORMAT_RE, toInt } = require('../../.forma/dashboard/spend-line.cjs');
+// Printed and written labels come from the core dictionary: English key in code, ru value as data.
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const LEDGER = path.join(ROOT, '.minimax', '.ledger', 'calls.jsonl');
 const ENGINE_TAG = 'minimax';
 
-/** Файл карточки на доске по номеру. */
+/** The card file on the board by number. */
 function cardFile(num) {
   for (const dir of [path.join(ROOT, '.devtool', 'features'), path.join(ROOT, '.devtool', 'features', 'done')]) {
     if (!fs.existsSync(dir)) continue;
@@ -49,9 +52,9 @@ function cardFile(num) {
 }
 
 /**
- * Уже записано в карточке по этому вызову: сумма N, R и O по строкам с его id.
- * Вызов может продолжаться (Contract 4): тогда полная стенограмма больше снимка, и новая
- * строка должна нести только ДЕЛЬТУ — иначе карточка посчитает один и тот же расход дважды.
+ * Already recorded in the card under this call: the sum of N, R and O over the lines with its id.
+ * The call may continue (Contract 4): then the full transcript is larger than the snapshot, and the
+ * new line must carry only the DELTA - else the card would count the same spend twice.
  */
 function accountedInCard(file, callId) {
   if (!file || !fs.existsSync(file)) return null;
@@ -97,19 +100,19 @@ function appendCall(rec, file = LEDGER) {
 }
 
 /**
- * Запись журнала → строка расхода §3. Числа приходят из вызова; неизвестное остаётся
- * маркером `unknown` (не нулём) — форматтер общего ядра так и устроен.
+ * A ledger record -> a §3 spend line. The numbers come from the call; the unknown stays the `unknown`
+ * marker (not zero) - the shared core's formatter is built that way.
  *
- * Канон ECONOMY.md: N — полный расход вызова, ВКЛЮЧАЯ кэш-чтение:
- *   N = tokens_in + cache_write + cache_read + tokens_out, а работа = N − R.
- * N без кэша ядро читает как «N записано без кэша» и прибавляет R — но только когда R > N.
- * При R ≤ N итог занижался бы, и «работа» (N − R) считалась бы неверно.
+ * The ECONOMY.md canon: N - the full spend of a call, INCLUDING the cache-read:
+ *   N = tokens_in + cache_write + cache_read + tokens_out, and the work = N − R.
+ * The core reads N without the cache as "N recorded without the cache" and adds R - but only when R > N.
+ * At R ≤ N the total would be understated, and the "work" (N − R) counted wrongly.
  *
- * ЗАПИСЬ ЖУРНАЛА — снимок на момент `SubagentStop`: стенограмма вызова дописывается после
- * остановки, и запись журнала остаётся той, что увидел хук. Поэтому строка расхода берёт
- * числа из ПОЛНОЙ стенограммы вызова, а не из снимка: так стоит весь вызов.
- * Старые записи журнала и строки карточек не переписываются (запрет 5) — расхождение
- * «снимок против полного» проверяется тестом как свойство, а не как ошибка.
+ * THE LEDGER RECORD is a snapshot at the moment of `SubagentStop`: the call's transcript is appended
+ * after the stop, and the ledger record stays what the hook saw. So the spend line takes the numbers
+ * from the FULL transcript of the call, not from the snapshot: that is what the whole call costs.
+ * Old ledger records and card lines are not rewritten (prohibition 5) - the "snapshot against full"
+ * divergence is checked by a test as a property, not as an error.
  */
 function fullUsage(rec) {
   const id = rec.conversationId || rec.call_id;
@@ -124,7 +127,7 @@ function fullUsage(rec) {
       cache_read_tokens: u.cache_read,
       cache_write_tokens: u.cache_write,
       model: u.model,
-      note: 'числа — из полной стенограммы вызова; запись журнала осталась снимком на момент SubagentStop',
+      note: msg('spend.minimax-sync.full_note'),
     };
   } catch {
     return null;
@@ -146,11 +149,11 @@ function deriveSpendLineForCall(rec, node, desc, options = {}) {
   let r = cacheRead;
   let o = output;
   if (options.accounted) {
-    // Вызов продолжался: строка несёт только дельту против уже записанного в карточке.
+    // The call continued: the line carries only the delta against what the card has recorded already.
     n = tokens == null ? null : Math.max(0, tokens - options.accounted.tokens);
     r = cacheRead == null ? null : Math.max(0, cacheRead - options.accounted.cache);
     o = output == null ? null : Math.max(0, output - options.accounted.out);
-    if (!n && !r && !o) return null; // нового расхода нет
+    if (!n && !r && !o) return null; // no new spend
   }
   return formatSpendLine({
     node,
@@ -174,7 +177,7 @@ function main() {
   if (argv[0] === '--append') {
     const rec = JSON.parse(argv[1]);
     appendCall(rec);
-    console.log('запись добавлена: ' + JSON.stringify(rec));
+    console.log(msg('spend.minimax-sync.appended', { record: JSON.stringify(rec) }));
     return;
   }
   if (argv[0] === '--derive') {
@@ -186,15 +189,15 @@ function main() {
       if (acc) options.accounted = acc;
     }
     const line = deriveSpendLineForCall(rec, argv[2] || 'Run', argv[3] || '', options);
-    console.log(line || 'нового расхода нет — строка не выводится');
+    console.log(line || msg('spend.minimax-sync.no_new'));
     return;
   }
   if (argv[0] === '--derive-record') {
-    // Запись берётся из журнала по id вызова — без перекладывания JSON через командную строку.
+    // The record is taken from the ledger by the call id - without passing the JSON through the command line.
     const id = argv[1];
     const rec = readLedger().find((r) => r.conversationId === id);
     if (!rec) {
-      console.log('записи с таким id в журнале нет');
+      console.log(msg('spend.minimax-sync.no_such_id'));
       return;
     }
     const options = {};
@@ -204,21 +207,21 @@ function main() {
       if (acc) options.accounted = acc;
     }
     const line = deriveSpendLineForCall(rec, argv[2] || rec.node || 'Run', argv[3] || '', options);
-    console.log(line || 'нового расхода нет — строка не выводится');
+    console.log(line || msg('spend.minimax-sync.no_new'));
     return;
   }
   if (argv[0] === '--derive-all') {
-    // Строки расхода по всему журналу: платформенные записи без ручного набора JSON.
+    // Spend lines over the whole ledger: the platform records without a manual JSON typing.
     for (const rec of readLedger()) {
       console.log(deriveSpendLineForCall(rec, rec.node || 'Run', argv[1] || ''));
     }
     return;
   }
   if (argv[0] === '--backfill') {
-    // Достроить числа записей, у которых они неизвестны. Источник — стенограмма сессии
-    // рантайма, тот же, что читает хук: ничего не выдумывается, только подставляется то,
-    // что платформа уже посчитала. Заодно пишется нормированная стенограмма — её читает
-    // дашборд (пол окна и разрезы по моделям).
+    // Fill in the numbers of the records where they are unknown. The source is the runtime's session
+    // transcript, the same one the hook reads: nothing is invented, only what the platform has already
+    // counted is put in. A normalized transcript is written along the way - the dashboard reads it
+    // (the window half and the slices by models).
     const reader = require(path.join(ROOT, 'miniapps', 'minimax-engine', 'scripts', 'transcripts.cjs'));
     const transcriptsDir = path.join(ROOT, '.minimax', '.transcripts');
     const recs = readLedger();
@@ -232,10 +235,10 @@ function main() {
           fs.mkdirSync(transcriptsDir, { recursive: true });
           const call = String(rec.conversationId).replace(/[^\w.-]/g, '_');
           fs.writeFileSync(path.join(transcriptsDir, call + '.jsonl'), lines + '\n', 'utf8');
-          // Раскладка, которую читает ядро (`card-move.cjs --agent-id` → `readTranscript`):
-          // <каталог стенограмм>/<вызов>/subagents/agent-<вызов>.jsonl. Ключ дедупликации —
-          // `requestId` — на шаг, иначе ядро, считая один ответ API несколькими строками,
-          // возьмёт только первый шаг хода.
+          // The layout the core reads (`card-move.cjs --agent-id` -> `readTranscript`):
+          // <the transcripts directory>/<the call>/subagents/agent-<the call>.jsonl. The deduplication
+          // key - `requestId` - per step, else the core, counting one API answer as several lines,
+          // would take only the first step of the turn.
           const core = reader.coreLines ? reader.coreLines(steps) : lines;
           const nested = path.join(transcriptsDir, call, 'subagents', `agent-${call}.jsonl`);
           fs.mkdirSync(path.dirname(nested), { recursive: true });
@@ -251,13 +254,13 @@ function main() {
       rec.cache_read_tokens = u.cache_read;
       rec.cache_write_tokens = u.cache_write;
       rec.model = u.model;
-      rec.note = 'числа — из стенограммы сессии рантайма (достроено)';
+      rec.note = msg('spend.minimax-sync.backfill_note');
       filled += 1;
     }
     if (filled) {
       fs.writeFileSync(LEDGER, recs.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf8');
     }
-    console.log(`достроено записей: ${filled} из ${recs.length}; стенограмм записано: ${written}`);
+    console.log(msg('spend.minimax-sync.backfilled', { filled, total: recs.length, written }));
     return;
   }
   if (argv[0] === '--list') {

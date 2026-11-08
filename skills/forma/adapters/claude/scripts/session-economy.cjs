@@ -1,60 +1,64 @@
 #!/usr/bin/env node
 /**
- * Экономика сессий: перечитывание против работы.
+ * Session economy: re-reading versus work.
  *
- * Запуск: node .claude/scripts/session-economy.cjs  →  .forma/dashboard/.cache/session-economy.json
- *         node .claude/scripts/session-economy.cjs --print   (ещё и ведомость в консоль)
+ * Run: node .claude/scripts/session-economy.cjs  ->  .forma/dashboard/.cache/session-economy.json
+ *      node .claude/scripts/session-economy.cjs --print   (also the report to the console)
  *
- * Считает по стенограммам `~/.claude/projects/<проект>/*.jsonl` — тем самым записям,
- * которые движок ведёт сам. Модель не вызывается ни разу: это арифметика по файлам.
+ * Counts over the transcripts of `~/.claude/projects/<project>/*.jsonl` - the very records
+ * the engine keeps itself. The model is never called: this is arithmetic over files.
  *
- * Три вещи, на которых здесь легко ошибиться молча, и потому они закреплены в коде:
+ * Three things that are easy to get silently wrong here, and are therefore pinned in code:
  *
- * 1. ДЕДУПЛИКАЦИЯ ПО `requestId` — условие верности, а не оптимизация. Одна и та же
- *    запись usage лежит в стенограмме многократно (пересборка веток разговора). Без
- *    дедупликации счёт завышается ровно вдесятеро, и по правдоподобию числа этого не
- *    видно. Поэтому ниже есть самосверка с записью `cost-state` — чужой бухгалтерией
- *    движка, — и она печатает расхождение ВСЕГДА, а не только когда всё сошлось.
- * 2. ПОТОКОВОЕ ЧТЕНИЕ. Самый большой файл — под гигабайт, весь корпус 1.7 ГБ. Ни один
- *    файл не читается целиком в память, и до `JSON.parse` стоит дешёвый отсев подстрокой:
- *    нужных строк — проценты, а разбор каждой строки стоит минуты.
- * 3. ТОЛЬКО ЧТЕНИЕ. Каталог `~/.claude/projects/` — чужой, это стенограммы сессий.
- *    Скрипт не пишет и не удаляет там ничего; единственная запись — свой кэш в
- *    `.forma/dashboard/.cache/`.
+ * 1. DEDUPLICATION BY `requestId` - a correctness condition, not an optimization. One and the
+ *    same usage record sits in the transcript many times (conversation branches are rebuilt).
+ *    Without deduplication the count is inflated exactly tenfold, and the plausibility of the
+ *    number does not show it. So below there is a self-check against the `cost-state` record -
+ *    the engine's own bookkeeping - and it prints the deviation ALWAYS, not only when all matched.
+ * 2. STREAMING READ. The largest file is near a gigabyte, the whole corpus 1.7 GB. No file is
+ *    read whole into memory, and before `JSON.parse` there is a cheap substring pre-filter:
+ *    the needed lines are percents, and parsing every line costs minutes.
+ * 3. READ ONLY. The `~/.claude/projects/` directory belongs to another: those are session
+ *    transcripts. The script writes and deletes nothing there; the only write is its own cache
+ *    in `.forma/dashboard/.cache/`.
  */
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const readline = require('readline');
 const economy = require('../../.forma/dashboard/economy.cjs');
-// Адаптер Claude Code: поля `usage` движка → канонические переменные (.forma/manual/en/03-protocol/ECONOMY.md).
+// The Claude Code adapter: the engine's `usage` fields -> canonical variables (.forma/manual/en/03-protocol/ECONOMY.md).
 const { claudeUsage, mainSessions: claudeMainSessions } = require('./claude-economy.cjs');
 const { readJson } = require('../../.forma/dashboard/lib/fs.cjs');
 const { makeCli } = require('../../.forma/dashboard/lib/cli.cjs');
-// Журналы основных сессий всех движков проекта — через адаптеры (ядро путей не знает).
+// Main-session logs of every engine of the project - through the adapters (the core knows no paths).
 const engines = require('../../.forma/dashboard/lib/engines.cjs');
+// Printed labels come from the core dictionary: English key in code, ru value as data - the
+// report prints the same ru lines as before the translation.
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const CACHE_DIR = path.join(ROOT, '.forma/dashboard', '.cache');
 const OUT_FILE = path.join(CACHE_DIR, 'session-economy.json');
 
-/* Версия метода. Меняется вместе с арифметикой — по ней кэш отличает своё от чужого.
-   Забыть её поднять при правке счёта — единственный способ получить здесь смесь
-   старых и новых чисел, и потому она стоит первой строкой настроек. */
+/* Method version. Changes together with the arithmetic - by it the cache tells its own from
+   another's. Forgetting to raise it on a counting edit is the only way to get a mix of old
+   and new numbers here, which is why it stands as the first line of the settings. */
 const METHOD_VERSION = 3;
 
-// Считаются все сессии, любого размера: короткая сессия — тоже расход.
+// Every session counts, any size: a short session is spend too.
 const MIN_SIZE = 0;
-// Расхождение с `cost-state` выше этого — подозрительное, помечается на экране.
+// A deviation from `cost-state` above this is suspicious, flagged on screen.
 const SUSPECT_PCT = 2;
-// Неделя с выходом меньше этого — не показание, а шум одной короткой сессии.
+// A week with output below this is not a reading but the noise of one short session.
 const WEEK_MIN_OUTPUT = 10000;
-// Файл, тронутый недавно, считаем живой сессией: её числа неполны по определению.
+// A file touched recently counts as a live session: its numbers are incomplete by definition.
 const LIVE_WINDOW_MS = 30 * 60 * 1000;
 
-/* Тариф API на токен. Выведен из уравнения записи `cost-state` для `opus` и сошёлся
-   с её же фактом на 0.0067%. Это ОЦЕНКА и запасной путь: где у сессии есть `cost-state`,
-   деньги берутся оттуда — у движка они точные, и выдумывать их незачем. */
+/* The API price per token. Derived from the `cost-state` record's equation for `opus` and matched
+   its own fact to 0.0067%. This is an ESTIMATE and a fallback path: where a session has a
+   `cost-state`, the money is taken from there - the engine's are exact, inventing them is pointless. */
 const PRICE = {
   opus:   { cr: 0.5e-6, cc: 10e-6,   in: 5e-6, out: 25e-6 },
   sonnet: { cr: 0.3e-6, cc: 3.75e-6, in: 3e-6, out: 15e-6 },
@@ -67,9 +71,9 @@ const priceOf = (model) => {
   return PRICE.opus;
 };
 
-/** Каталог стенограмм этого проекта. Имя движок строит из пути: всё, что не буква и
- *  не цифра, становится дефисом. Правило не документировано, поэтому есть отход:
- *  если точного совпадения нет — ищем без учёта регистра среди существующих. */
+/** The transcript directory of this project. The engine builds the name from the path: everything
+ *  that is not a letter or a digit becomes a hyphen. The rule is undocumented, so there is a
+ *  fallback: with no exact match, search case-insensitively among the existing ones. */
 function transcriptDir() {
   const base = path.join(os.homedir(), '.claude', 'projects');
   if (!fs.existsSync(base)) return null;
@@ -84,32 +88,32 @@ function transcriptDir() {
   return found ? path.join(base, found) : null;
 }
 
-/** Состояние разбора одной стенограммы: суммы по сессии, дедупликация, след вызовов и точка сверки. */
+/** The parse state of one transcript: sums over the session, deduplication, the trail of calls and the anchor. */
 function newParseState() {
   return {
     seen: new Set(),
     total: economy.emptyUsage(),
     first: null, last: null,
-    // Срез на момент последней `cost-state`: копится параллельно, замораживается на строке.
+    // The snapshot at the moment of the last `cost-state`: accumulates in parallel, frozen on the line.
     anchor: null,
     byModel: {},
-    /* Поштучный след вызовов — только (время, R, создание, выход), несколько тысяч чисел
-       на сессию. Он нужен ради сверки: `cost-state` считает от своего `startTime`, а в
-       стенограмме перед ним лежат вызовы, унаследованные от прошлой сессии (продолжение
-       после сжатия копирует историю вместе с их `requestId`). Сверять с ними значило бы
-       обвинять движок в недосчёте там, где расходятся границы отсчёта, а не числа. */
+    /* The per-call trail - only (time, R, creation, output), a few thousand numbers per session.
+       It exists for the sake of the check: `cost-state` counts from its own `startTime`, and the
+       transcript carries calls inherited from the previous session before it (continuing after a
+       compaction copies the history together with their `requestId`). Checking against those would
+       accuse the engine of undercounting where the counting boundaries differ, not the numbers. */
     trail: [],
   };
 }
 
-/** Срез на строке `cost-state`: наш счёт по следу и счёт движка. Пустая запись
- *  (сессия ничего не потратила) точкой сверки быть не может — тогда null. */
+/** The snapshot at a `cost-state` line: our count over the trail and the engine's count. An empty
+ *  record (the session spent nothing) cannot be an anchor - then null. */
 function costStateAnchor(j, trail) {
   const mu = j.modelUsage || {};
   const sum = (k) => Object.values(mu).reduce((a, m) => a + (m[k] || 0), 0);
   const cr = sum('cacheReadInputTokens');
   if (!(cr > 0)) return null;
-  // Наш счёт до этой строки, но от той же точки отсчёта, что у движка.
+  // Our count up to this line, but from the same starting point as the engine's.
   const startedAt = Number(j.startTime) || 0;
   const mine = { cr: 0, cc: 0, out: 0, calls: 0, inherited: 0 };
   for (const c of trail) {
@@ -119,7 +123,7 @@ function costStateAnchor(j, trail) {
   return {
     startedAt,
     mine,
-    // Счёт движка на той же строке.
+    // The engine's count on the same line.
     theirs: {
       cr,
       cc: sum('cacheCreationInputTokens'),
@@ -129,11 +133,11 @@ function costStateAnchor(j, trail) {
   };
 }
 
-/** Запись с usage: в суммы сессии и модели (один раз на `requestId`), во след вызовов. */
+/** A record with usage: into the session and model sums (once per `requestId`), into the trail of calls. */
 function addCall(st, j) {
   const u = j.message && j.message.usage;
   if (!u || u.cache_read_input_tokens == null) return;
-  const key = j.requestId || j.uuid; // см. пункт 1 в шапке
+  const key = j.requestId || j.uuid; // see point 1 in the header
   if (st.seen.has(key)) return;
   st.seen.add(key);
 
@@ -151,15 +155,15 @@ function addCall(st, j) {
   });
 }
 
-/** Одна строка стенограммы в состояние разбора. */
+/** One transcript line into the parse state. */
 function readTranscriptLine(st, line) {
-  // Дешёвый отсев до разбора — см. пункт 2 в шапке.
+  // Cheap pre-parse filter - see point 2 in the header.
   const hasUsage = line.includes('cache_read_input_tokens');
   const hasCost = line.includes('"cost-state"');
   if (!hasUsage && !hasCost) return;
 
   let j;
-  try { j = JSON.parse(line); } catch { return; /* оборванная строка */ }
+  try { j = JSON.parse(line); } catch { return; /* a truncated line */ }
 
   if (j.type === 'cost-state') {
     const anchor = costStateAnchor(j, st.trail);
@@ -169,7 +173,7 @@ function readTranscriptLine(st, line) {
   addCall(st, j);
 }
 
-/** Оценка по тарифу — помодельно, иначе сессия на sonnet считалась бы по opus. */
+/** The price-table estimate - per model, else a sonnet session would be priced as opus. */
 function estimateUsd(byModel) {
   return Object.entries(byModel).reduce((a, [m, v]) => {
     const p = priceOf(m);
@@ -177,7 +181,7 @@ function estimateUsd(byModel) {
   }, 0);
 }
 
-/** Сверка с чужой бухгалтерией: печатается всегда, в том числе когда всё сошлось. */
+/** The check against another's bookkeeping: printed always, including when everything matched. */
 function reconcile(anchor) {
   if (!(anchor && anchor.theirs.cr)) return null;
   const rel = (mine, theirs) => (theirs ? ((mine - theirs) / theirs) * 100 : null);
@@ -190,13 +194,13 @@ function reconcile(anchor) {
     outPct: outPct == null ? null : Number(outPct.toFixed(2)),
     mine: anchor.mine,
     theirs: anchor.theirs,
-    // Сколько вызовов в файле старше точки отсчёта движка — унаследованная история.
+    // How many calls in the file are older than the engine's starting point - inherited history.
     inheritedCalls: anchor.mine.inherited,
     suspect: Math.abs(crPct) > SUSPECT_PCT,
   };
 }
 
-/** Строка сессии из состояния разбора. */
+/** A session row from the parse state. */
 function sessionRow(st) {
   const t = st.total;
   const { anchor } = st;
@@ -206,12 +210,12 @@ function sessionRow(st) {
     cacheCreate: t.cache_write,
     input: t.tokens_in,
     output: t.tokens_out,
-    // «Работа» здесь — выход модели: произведённые токены. Это та самая величина,
-    // против которой меряется перечитывание; названа на экране прямо, чтобы её
-    // не спутали с «всё, что не кэш-чтение».
+    // "Work" here is the model's output: the tokens produced. It is the very quantity against
+    // which re-reading is measured; named on screen directly so it is not confused with
+    // "everything that is not cache-read".
     ratio: t.tokens_out ? Number(economy.readPerOutput(t).toFixed(1)) : null,
     estUsd: Number(estimateUsd(st.byModel).toFixed(4)),
-    // Деньги движка — точные; наша оценка остаётся рядом, видно расхождение.
+    // The engine's money is exact; our estimate stays beside it, the deviation is visible.
     costUsd: anchor ? Number(anchor.theirs.costUsd.toFixed(4)) : null,
     models: Object.keys(st.byModel).sort(),
     first: st.first, last: st.last,
@@ -219,8 +223,8 @@ function sessionRow(st) {
   };
 }
 
-/** Разбор одной стенограммы потоком. Возвращает суммы по сессии и, отдельно, срез
- *  на строке последней записи `cost-state` — он и есть точка сверки. */
+/** Parsing one transcript as a stream. Returns the sums over the session and, separately, the
+ *  snapshot at the line of the last `cost-state` record - that snapshot is the anchor. */
 async function parseSession(file) {
   const st = newParseState();
   const rl = readline.createInterface({
@@ -231,8 +235,8 @@ async function parseSession(file) {
   return sessionRow(st);
 }
 
-/** Неделя по ISO — ключ вида 2031-W38. Ход по времени показывается по неделям:
- *  по дням шум сессий забивает тренд, одним числом тренда не видно вовсе. */
+/** An ISO week - a key like 2031-W38. The time trend is shown by weeks: by days the noise of
+ *  sessions drowns the trend, and one number shows no trend at all. */
 function isoWeek(iso) {
   const d = new Date(iso);
   const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -243,16 +247,16 @@ function isoWeek(iso) {
   return `${t.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
-/** Строка сессии из кэша (тот же размер и mtime) или свежим разбором; null — файл не разобрался. */
+/** A session row from the cache (same size and mtime) or a fresh parse; null - the file did not parse. */
 async function cachedOrParsed(full, name, stat, hit) {
   if (hit && hit.size === stat.size && hit.mtimeMs === stat.mtimeMs) return { row: hit.row, cached: true };
   try { return { row: await parseSession(full), cached: false }; } catch (e) {
-    console.error(`пропуск ${name}: ${e.message}`);
+    console.error(msg('spend.session-economy.skip', { name, message: e.message }));
     return null;
   }
 }
 
-/** Все файлы каталога → строки сессий, обновлённый кэш и счётчики прогона. */
+/** All files of the directory -> session rows, the updated cache and the run counters. */
 async function collectSessions(dir, files, cache, now) {
   const out = { sessions: [], nextCache: {}, parsed: 0, fromCache: 0, skipped: 0 };
   for (const f of files) {
@@ -267,7 +271,7 @@ async function collectSessions(dir, files, cache, now) {
     if (!got.row.calls) continue;
     out.sessions.push({
       sessionId,
-      // Живая сессия считается до последней записи на диске — её числа неполны.
+      // A live session is counted up to the last record on disk - its numbers are incomplete.
       live: now - st.mtimeMs < LIVE_WINDOW_MS,
       sizeBytes: st.size,
       ...got.row,
@@ -286,18 +290,18 @@ function sumTotals(sessions) {
     input: S('input'),
     output: S('output'),
     estUsd: Number(S('estUsd').toFixed(2)),
-    // Деньги движка — только по тем сессиям, где `cost-state` есть; складывать их с
-    // оценкой в одно число нельзя, поэтому рядом стоит покрытие этой величины.
+    // The engine's money - only over the sessions where a `cost-state` exists; summing it with
+    // the estimate into one number is not allowed, so the coverage of this quantity stands beside.
     costUsd: Number(sessions.reduce((a, s) => a + (s.costUsd || 0), 0).toFixed(2)),
     costUsdSessions: sessions.filter((s) => s.costUsd != null).length,
-    // Лучшее, что известно про каждую сессию: факт движка, а где его нет — оценка.
+    // The best known fact about every session: the engine's figure, and where it is absent - the estimate.
     bestUsd: Number(sessions.reduce((a, s) => a + (s.costUsd != null ? s.costUsd : s.estUsd), 0).toFixed(2)),
   };
   totals.ratio = totals.output ? Number((totals.cacheRead / totals.output).toFixed(1)) : null;
   return totals;
 }
 
-// Ход по неделям — ответ на вопрос «падает или растёт», которого одно число не даёт.
+// The weekly trend - the answer to "falling or growing", which one number does not give.
 function weeklyTrend(sessions) {
   const weeks = {};
   for (const s of sessions) {
@@ -309,9 +313,9 @@ function weeklyTrend(sessions) {
   }
   return Object.values(weeks)
     .sort((a, b) => a.week.localeCompare(b.week))
-    /* Неделя, где работы почти не было (открыли сессию и закрыли), даёт соотношение,
-       которое выглядит как показание, а показанием не является. Такая неделя стоит в
-       ходе как пропуск — по правилу вкладки: отсутствие данных показано как отсутствие. */
+    /* A week where there was almost no work (a session opened and closed) yields a ratio that
+       looks like a reading and is not one. Such a week stands in the trend as a gap - by the
+       tab's rule: missing data is shown as missing. */
     .map((w) => ({
       ...w,
       estUsd: Number(w.estUsd.toFixed(2)),
@@ -325,7 +329,7 @@ function verifyAgainstCostState(sessions) {
   return {
     sessionsChecked: checked.length,
     sessionsTotal: sessions.length,
-    // Худшее расхождение — то, по чему судят о методе; среднее спрятало бы выброс.
+    // The worst deviation - the one the method is judged by; the average would hide an outlier.
     worstCrPct: checked.length ? checked.reduce((a, s) => (Math.abs(s.check.crPct) > Math.abs(a) ? s.check.crPct : a), 0) : null,
     suspectCount: checked.filter((s) => s.check.suspect).length,
     suspectThresholdPct: SUSPECT_PCT,
@@ -336,13 +340,13 @@ function verifyAgainstCostState(sessions) {
 async function build() {
   const dir = transcriptDir();
   if (!dir) {
-    return { error: 'Каталог стенограмм не найден — ведомость не собрана.', sessions: [] };
+    return { error: msg('spend.session-economy.dir_missing'), sessions: [] };
   }
 
-  // Кэш по sessionId + размер файла (и mtime): пересобирается только изменившееся.
+  // Cache by sessionId + file size (and mtime): only what changed is rebuilt.
   let cache = {};
-  // Кэш верен только для той же версии метода: изменилась арифметика — сохранённые
-  // строки посчитаны по-старому, и молча пережить правку они не должны. Нет кэша — соберём заново.
+  // The cache holds only for the same method version: the arithmetic changed - the stored rows
+  // were counted the old way, and silently carrying an edit over they must not. No cache - rebuild.
   const prev = readJson(OUT_FILE, null);
   if (prev && prev.method === METHOD_VERSION) cache = prev.cache || {};
 
@@ -366,9 +370,9 @@ async function build() {
 function print(data) {
   if (data.error) { console.log(data.error); return; }
   const n = (x) => Math.round(x).toLocaleString('ru-RU');
-  console.log(`разобрано ${data.run.parsed} из ${data.run.parsed + data.run.fromCache}, остальные из кэша (${data.run.fromCache})`);
+  console.log(msg('spend.session-economy.parsed', { parsed: data.run.parsed, total: data.run.parsed + data.run.fromCache, cached: data.run.fromCache }));
   console.log('');
-  console.log('дата        вызовов   R(млн)  выход(тыс)  R/выход      $  живая');
+  console.log(msg('spend.session-economy.table_header'));
   for (const s of data.sessions) {
     console.log(
       String(s.first || '?').slice(0, 10).padEnd(12) +
@@ -377,38 +381,45 @@ function print(data) {
       (s.output / 1e3).toFixed(0).padStart(11) +
       String(s.ratio ?? '—').padStart(9) +
       ('$' + (s.costUsd ?? s.estUsd).toFixed(0)).padStart(7) +
-      (s.live ? '   да' : '     '));
+      (s.live ? msg('spend.session-economy.live_yes') : '     '));
   }
   console.log('-'.repeat(64));
-  console.log('ИТОГО       ' + String(data.totals.calls).padStart(7) +
+  console.log(msg('spend.session-economy.total_row') + String(data.totals.calls).padStart(7) +
     (data.totals.cacheRead / 1e6).toFixed(0).padStart(9) +
     (data.totals.output / 1e3).toFixed(0).padStart(11) +
     String(data.totals.ratio).padStart(9) +
     ('$' + n(data.totals.bestUsd)).padStart(7));
-  console.log(`деньги движка у ${data.totals.costUsdSessions} из ${data.totals.sessions} сессий, остальные — оценка по тарифу`);
+  console.log(msg('spend.session-economy.money_coverage', { covered: data.totals.costUsdSessions, total: data.totals.sessions }));
   console.log('');
-  console.log('ход по неделям (перечитывания на токен выхода):');
-  for (const w of data.byWeek) console.log(`  ${w.week}  ${String(w.ratio ?? '—').padStart(6)}   сессий ${w.sessions}${w.thin ? '  (мало работы, не показание)' : ''}`);
+  console.log(msg('spend.session-economy.weekly_header'));
+  for (const w of data.byWeek) console.log(`  ${w.week}  ${String(w.ratio ?? '—').padStart(6)}   ${msg('spend.session-economy.week_sessions', { sessions: w.sessions })}${w.thin ? msg('spend.session-economy.thin_week') : ''}`);
   console.log('');
   const v = data.verification;
-  console.log(`самосверка с cost-state: сессий с точкой сверки ${v.sessionsChecked} из ${v.sessionsTotal}`);
+  console.log(msg('spend.session-economy.check_header', { checked: v.sessionsChecked, total: v.sessionsTotal }));
   for (const r of v.rows) {
-    console.log(`  ${r.date}  R ${r.crPct > 0 ? '+' : ''}${r.crPct}%  создание ${r.ccPct > 0 ? '+' : ''}${r.ccPct}%  выход ${r.outPct > 0 ? '+' : ''}${r.outPct}%  унаследовано вызовов ${r.inheritedCalls}${r.suspect ? '   ПОДОЗРИТЕЛЬНО' : ''}`);
+    console.log(msg('spend.session-economy.check_row', {
+      date: r.date,
+      cr: (r.crPct > 0 ? '+' : '') + r.crPct,
+      cc: (r.ccPct > 0 ? '+' : '') + r.ccPct,
+      out: (r.outPct > 0 ? '+' : '') + r.outPct,
+      inherited: r.inheritedCalls,
+      suspect: r.suspect ? msg('spend.session-economy.suspect') : '',
+    }));
   }
-  console.log(`худшее расхождение по R: ${v.worstCrPct}% (порог подозрения ${v.suspectThresholdPct}%)`);
+  console.log(msg('spend.session-economy.worst', { worst: v.worstCrPct, threshold: v.suspectThresholdPct }));
 }
 
-/* Статья «Intent ↔ человек, текущая сессия» (AGENTS.md §3). Только журналы основной
-   сессии верхнего уровня всех движков проекта — каждый адаптер отдаёт свои (`mainSessions`,
-   субагентские в них не входят: их расход уже записан в `## История` карточек, второй раз
-   он не считается). Свой движок (claude) разбирается с точкой сверки cost-state, чужие —
-   через адаптер (`mainStepOf` + `parseUsage`). «Текущая» — живая, тронутая за
-   LIVE_WINDOW_MS: сессий, открытых параллельно, может быть несколько, и выбрать одну по
-   mtime значило бы угадать. `--session <id>` — одна явно. Кэш и порог MIN_SIZE здесь не
-   участвуют: файлы живые и небольшие. */
+/* The "Intent <-> human, current session" item (AGENTS.md §3). Only the top-level main-session
+   logs of every engine of the project - each adapter yields its own (`mainSessions`, subagent
+   logs are not among them: their spend is already written into the cards' `## History`, and is
+   not counted twice). The own engine (claude) parses with the cost-state anchor, others - through
+   their adapter (`mainStepOf` + `parseUsage`). "Current" - live, touched within LIVE_WINDOW_MS:
+   several sessions may be open in parallel, and picking one by mtime would be a guess.
+   `--session <id>` - one, explicitly. The cache and the MIN_SIZE threshold do not participate
+   here: the files are live and small. */
 const CURRENT_FILE = path.join(CACHE_DIR, 'session-current.json');
 
-/** Источники живых журналов: свой адаптер (claude, разбор с cost-state) первым, затем остальные движки. */
+/** Sources of live logs: the own adapter (claude, parsed with the cost-state anchor) first, then the other engines. */
 function currentSources() {
   const own = require('../forma-adapter.cjs');
   const out = [];
@@ -426,7 +437,7 @@ function currentSources() {
   return out;
 }
 
-/** Разбор журнала чужого движка через его адаптер: шаг — `mainStepOf`, дедуп по ключу шага, суммы — `parseUsage`. */
+/** Parsing another engine's log through its adapter: a step is `mainStepOf`, dedup by the step key, sums - `parseUsage`. */
 async function parseNeutral(file, src) {
   const st = { seen: new Set(), total: economy.emptyUsage(), byModel: {}, first: null, last: null, prev: null };
   const rl = readline.createInterface({ input: fs.createReadStream(file), crlfDelay: Infinity });
@@ -448,7 +459,7 @@ async function parseNeutral(file, src) {
     }
   }
   const t = st.total;
-  // Контракт строки — как у legacy parseSession: buildCurrent читает estUsd/costUsd (usd = costUsd ?? estUsd).
+  // The row contract is the legacy parseSession's: buildCurrent reads estUsd/costUsd (usd = costUsd ?? estUsd).
   return {
     calls: t.calls, input: t.tokens_in, output: t.tokens_out,
     cacheCreate: t.cache_write, cacheRead: t.cache_read,
@@ -467,7 +478,7 @@ async function buildCurrent(id) {
     if (id && id !== 'current' ? src.id !== id : now - mtime >= LIVE_WINDOW_MS) continue;
     live.push(src);
   }
-  if (!live.length && !currentSources().length) return { error: 'Каталоги журналов основной сессии не найдены.', sessions: [] };
+  if (!live.length && !currentSources().length) return { error: msg('spend.session-economy.current_dirs_missing'), sessions: [] };
   const sessions = [];
   for (const src of live) {
     const row = src.legacy ? await parseSession(src.file) : await parseNeutral(src.file, src);
@@ -477,7 +488,7 @@ async function buildCurrent(id) {
       engine: src.tag,
       calls: row.calls, input: row.input, output: row.output,
       cacheCreate: row.cacheCreate, cacheRead: row.cacheRead,
-      // Работа — всё, кроме кэш-чтения; тот же раздел, что `N tokens (R cache-read)` в §3.
+      // Work - everything except cache-read; the same item as `N tokens (R cache-read)` in §3.
       work: economy.usageWork({ tokens_in: row.input, tokens_out: row.output, cache_write: row.cacheCreate }),
       usd: row.costUsd != null ? row.costUsd : row.estUsd,
       usdExact: row.costUsd != null,
@@ -501,7 +512,7 @@ async function buildCurrent(id) {
     fs.mkdirSync(CACHE_DIR, { recursive: true });
     fs.writeFileSync(CURRENT_FILE, JSON.stringify(data, null, 2), 'utf8');
     const n = (x) => Math.round(x).toLocaleString('ru-RU');
-    for (const s of data.sessions) console.log(`${s.engine ? '[' + s.engine + '] ' : ''}${s.sessionId}  вызовов ${s.calls}  работа ${n(s.work)}  кэш-чтение ${n(s.cacheRead)}  $${s.usd.toFixed(2)}${s.usdExact ? '' : ' (оценка)'}`);
+    for (const s of data.sessions) console.log(`${s.engine ? '[' + s.engine + '] ' : ''}${s.sessionId}  ${msg('spend.session-economy.current_row', { calls: s.calls, work: n(s.work), cacheRead: n(s.cacheRead), usd: s.usd.toFixed(2), mark: s.usdExact ? '' : msg('spend.session-economy.estimated') })}`);
     if (data.error) console.log(data.error);
     console.log(`→ ${path.relative(ROOT, CURRENT_FILE)}`);
     return;
@@ -510,9 +521,9 @@ async function buildCurrent(id) {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   fs.writeFileSync(OUT_FILE, JSON.stringify(data, null, 2), 'utf8');
   if (!data.error) {
-    console.log(`разобрано ${data.run.parsed} из ${data.run.parsed + data.run.fromCache}, остальные из кэша (${data.run.fromCache})`);
+    console.log(msg('spend.session-economy.parsed', { parsed: data.run.parsed, total: data.run.parsed + data.run.fromCache, cached: data.run.fromCache }));
     const v = data.verification;
-    console.log(`самосверка: ${v.sessionsChecked} из ${v.sessionsTotal} сессий, худшее расхождение по R ${v.worstCrPct}%, подозрительных ${v.suspectCount} (порог ${v.suspectThresholdPct}%)`);
+    console.log(msg('spend.session-economy.check_summary', { checked: v.sessionsChecked, total: v.sessionsTotal, worst: v.worstCrPct, suspect: v.suspectCount, threshold: v.suspectThresholdPct }));
   }
   if (cli.flag('print')) { console.log(''); print(data); }
   console.log(`→ ${path.relative(ROOT, OUT_FILE)}`);

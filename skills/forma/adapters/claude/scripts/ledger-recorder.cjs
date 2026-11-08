@@ -2,27 +2,32 @@
 'use strict';
 
 /**
- * Автозапись расхода вызова субагента Claude Code: хук `SubagentStop` → журнал → строка в карточку.
- * Контракт — .forma/manual/en/03-protocol/ECONOMY.md, «Automatic recording (adapter duty)».
+ * The automatic spend recording of a Claude Code subagent call: the `SubagentStop` hook -> ledger -> a line into the card.
+ * The contract - .forma/manual/en/03-protocol/ECONOMY.md, "Automatic recording (adapter duty)".
  *
- * Вход — JSON хука на stdin (ожидаемо: agent_id, agent_type, agent_transcript_path, session_id, cwd; поля не гарантированы).
- * 1. Читает стенограмму вызова (путь из события, иначе поиск по agent_id как в subagent-transcript.cjs):
- *    шаги дедуплицируются по requestId; N = in + write + read + out; T = от первой до последней записи, целые секунды.
- * 2. Дописывает запись в `.claude/.ledger/calls.jsonl`: { timestamp, conversationId: agent_id, engine: 'claude-code',
+ * The input is the hook's JSON on stdin (expected: agent_id, agent_type, agent_transcript_path, session_id, cwd; fields are not guaranteed).
+ * 1. Reads the call transcript (the path from the event, else the search by agent_id as in subagent-transcript.cjs):
+ *    the steps deduplicate by requestId; N = in + write + read + out; T = from the first to the last record, whole seconds.
+ * 2. Appends a record to `.claude/.ledger/calls.jsonl`: { timestamp, conversationId: agent_id, engine: 'claude-code',
  *    node: agent_type, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, duration_s, cards }.
- *    Числа записи — нарастающие итоги стенограммы. Запись несёт `until` — метку последнего учтённого шага; T продолжения (`active_s`, в карточку) — время только записей после неё. Повторный SubagentStop того же agent_id (SendMessage-продолжение) —
- *    новая запись с continuation: true; тот же итог без прироста — не пишется.
- * Запись несёт `first_response_s` — секунды от сообщения-промпта до первой записи ассистента (у продолжения — от сообщения-продолжения до первой новой записи); null, если не удаётся.
- * 3. В `## История` каждой карточки из cards (номера `card-NNN` из первого сообщения пользователя стенограммы (правило — `cardsIn`)), найденной на
- *    доске или в done/, дописывает строку §3 через formatSpendLine. K>1 найденных карточек — N, R, O, T делятся
- *    (splitForBatch, пометка `batch I/K`). В карточку идёт доля минус уже учтённое по этому call id (продолжение — дельта);
- *    у не-продолжения строка с этим call id уже в карточке (записана рукой) — не дублируется.
- * Любая ошибка → exit 0, причина в stderr и `.claude/.ledger/errors.log`. Хук никогда не блокирует.
- * CLAUDE_LEDGER_DEBUG=1 — сырой вход в `.claude/.ledger/raw-last.json`. CLAUDE_LEDGER_ROOT — корень проекта (тесты).
+ *    The record's numbers are the transcript's running totals. The record carries `until` - the mark of the last counted
+ *    step; the continuation's T (`active_s`, into the card) - the time of the records after it only. A repeated
+ *    SubagentStop of the same agent_id (a SendMessage continuation) - a new record with continuation: true; the same totals
+ *    without growth - not written.
+ * The record carries `first_response_s` - the seconds from the prompt message to the first assistant record (for a
+ * continuation - from the continuation message to the first new record); null when it cannot be told.
+ * 3. Into the `## History` of every card from cards (the `card-NNN` numbers from the transcript's first user message
+ *    (the rule - `cardsIn`)) found on the board or in done/, appends a §3 line through formatSpendLine. K>1 found cards -
+ *    N, R, O, T are divided (splitForBatch, a `batch I/K` mark). The card gets the share minus what is counted already
+ *    under this call id (a continuation - the delta); a non-continuation with this call id already in the card (written
+ *    by hand) - not duplicated.
+ * Any error -> exit 0, the reason on stderr and in `.claude/.ledger/errors.log`. The hook never blocks.
+ * CLAUDE_LEDGER_DEBUG=1 - the raw input into `.claude/.ledger/raw-last.json`. CLAUDE_LEDGER_ROOT - the project root (tests).
  *
- * Строка продолжения несёт `attempt,` (как требует разбор доски) и пометку `продолжение` в описании после тире.
+ * A continuation line carries `attempt,` (as the board's parsing requires) and a `continuation` mark in the description
+ * after the dash (the ru wording from the dictionary, as before the translation).
  *
- * Запуск: node .claude/scripts/ledger-recorder.cjs < событие.json
+ * Run: node .claude/scripts/ledger-recorder.cjs < event.json
  */
 
 const fs = require('fs');
@@ -33,13 +38,16 @@ const economy = require('../../.forma/dashboard/economy.cjs');
 const { findTranscript } = require('../../.forma/dashboard/subagent-transcript.cjs');
 const { cardFiles } = require('../../.forma/dashboard/lib/card.cjs');
 const i18n = require('../../.forma/i18n/index.cjs');
+// Printed and written labels come from the core dictionary: English key in code, ru value as data.
+const msg = (code, params) => i18n.message(code, params, 'ru');
 const { claudeUsage, splitForBatch, batchShare } = require('./claude-economy.cjs');
 
 const ENGINE_TAG = 'claude-code';
 const DEFAULT_ROOT = path.resolve(__dirname, '..', '..');
 
 const NODE_BY_TYPE = { kit: 'Kit', spec: 'Spec', core: 'Core', intent: 'Intent', 'plumb-haiku': 'Plumb', 'plumb-glmflash': 'Plumb' };
-/** agent_type → имя узла в строке: kit→Kit, spec→Spec, core→Core, intent→Intent, run*→Run, plumb-haiku и plumb-glmflash→Plumb (встроенный исполнитель Plumb назван по малой модели своего движка); иное — как есть. */
+/** agent_type -> the node name in a line: kit->Kit, spec->Spec, core->Core, intent->Intent, run*->Run, plumb-haiku and
+ *  plumb-glmflash->Plumb (the built-in Plumb executor is named after its engine's small model); anything else - as is. */
 function nodeOf(agentType) {
   const t = String(agentType || '').trim();
   if (!t) return 'unknown';
@@ -50,8 +58,8 @@ function nodeOf(agentType) {
 
 function ledgerDir(root) { return path.join(root, '.claude', '.ledger'); }
 
-function logError(root, msg) {
-  const text = `[ledger-recorder] ${msg}`;
+function logError(root, message) {
+  const text = `[ledger-recorder] ${message}`;
   try { process.stderr.write(text + '\n'); } catch {}
   try {
     fs.mkdirSync(ledgerDir(root), { recursive: true });
@@ -59,13 +67,13 @@ function logError(root, msg) {
   } catch {}
 }
 
-/** Стенограмма вызова: шаги по requestId, время по первой и последней записи, первое сообщение пользователя. */
+/** The call transcript: steps by requestId, the time by the first and last record, the first user message. */
 function readCall(file) {
   const seen = new Set();
   const t = economy.emptyUsage();
   let first = null, last = null, prompt = null, lastStep = null;
   const stamps = [];
-  const prompts = [], replies = []; // метки сообщений пользователя (не результатов инструментов) и записей ассистента
+  const prompts = [], replies = []; // the stamps of user messages (not tool results) and assistant records
   for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
     if (!line.trim()) continue;
     let j;
@@ -104,9 +112,9 @@ function readCall(file) {
 }
 
 /**
- * Задержка до первого ответа, целые секунды: от сообщения пользователя до первой записи ассистента после него.
- * Первый вызов (`after` нет) — от первого сообщения (промпта вызова); продолжение — от первого сообщения после
- * метки `after` (границы прошлой записи журнала). Не нашлось сообщения или ответа — null.
+ * The delay to the first answer, whole seconds: from the user message to the first assistant record after it.
+ * The first call (no `after`) - from the first message (the call's prompt); a continuation - from the first message
+ * after the `after` mark (the boundary of the ledger's past record). No message or answer found - null.
  */
 function firstResponse(call, after = null) {
   if (!call) return null;
@@ -121,7 +129,7 @@ function readLedger(file) {
   return fs.readFileSync(file, 'utf8').split(/\r?\n/).filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
 }
 
-/** Уже учтено в карточке по call id: Σ N, R, O, T по строкам расхода с этим id. */
+/** Already counted in the card by call id: Σ N, R, O, T over the spend lines with this id. */
 function accountedInCard(text, callId) {
   const re = new RegExp(ATTEMPT_FORMAT_RE.source, 'g');
   const acc = { tokens: 0, cache: 0, out: 0, seconds: 0, lines: 0 };
@@ -140,7 +148,7 @@ function accountedInCard(text, callId) {
   return acc;
 }
 
-/** Строку — в конец зоны «История» (перед зоной результата), как card-move.cjs. */
+/** The line - to the end of the "History" zone (before the result zone), as card-move.cjs does. */
 function insertIntoHistory(text, spendLine) {
   const lines = text.split('\n');
   const head = i18n.headingRe('zone.history', '');
@@ -155,9 +163,10 @@ function insertIntoHistory(text, spendLine) {
 }
 
 /**
- * Обслуженная карточка — только та, чей номер стоит (а) в строке «Карточка: …» / «Card: …» или (б) в пути файла
- * `.devtool/features/card-NNN-…` / `done/card-NNN-…` из промпта. Прочие упоминания (`after-card-NNN`, «см. card-NNN»,
- * «после card-NNN») не считаются. Не нашлось ни одной — [].
+ * A card served - only the one whose number stands (a) in a "Card: ..." line (the label matched through the
+ * i18n dictionary, both languages) or (b) in a file path `.devtool/features/card-NNN-...` / `done/card-NNN-...`
+ * of the prompt. Other mentions (`after-card-NNN`, "see card-NNN", "after card-NNN") do not count.
+ * None found - [].
  */
 function cardsIn(prompt) {
   const set = new Set();
@@ -174,7 +183,7 @@ function record(payload, opts = {}) {
   const root = opts.root || process.env.CLAUDE_LEDGER_ROOT || DEFAULT_ROOT;
   const result = { recorded: false, lines: [], skipped: [] };
   const agentId = payload && payload.agent_id ? String(payload.agent_id) : '';
-  if (!/^[A-Za-z0-9_-]+$/.test(agentId)) throw new Error('в событии нет пригодного agent_id');
+  if (!/^[A-Za-z0-9_-]+$/.test(agentId)) throw new Error(msg('spend.ledger-recorder.bad_agent_id'));
 
   let file = payload.agent_transcript_path && fs.existsSync(payload.agent_transcript_path) ? payload.agent_transcript_path : null;
   if (!file) { const f = findTranscript(agentId, root, ENGINE_TAG); file = f ? f.file : null; }
@@ -198,7 +207,8 @@ function record(payload, opts = {}) {
     until: call && call.until != null ? new Date(call.until).toISOString() : null,
     first_response_s: firstResponse(call),
   };
-  // T продолжения — время только новых записей стенограммы (после границы `until` прошлой записи), без простоя между остановками.
+  // A continuation's T - the time of the transcript's new records only (after the `until` boundary of the
+  // past record), without the idle time between the stops.
   let activeNew = null;
   if (continuation) {
     rec.continuation = true;
@@ -211,18 +221,18 @@ function record(payload, opts = {}) {
     }
     rec.first_response_s = Number.isFinite(pu) ? firstResponse(call, pu) : null;
     const same = ['input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens'].every((k) => p[k] === rec[k]);
-    if (same && call) { result.skipped.push('нет прироста против последней записи журнала'); return result; }
+    if (same && call) { result.skipped.push(msg('spend.ledger-recorder.no_growth')); return result; }
   }
   fs.mkdirSync(ledgerDir(root), { recursive: true });
   fs.appendFileSync(ledgerFile, JSON.stringify(rec) + '\n', 'utf8');
   result.recorded = true;
 
-  // Карточки, которые нашлись на доске или в done/.
+  // The cards found on the board or in done/.
   const found = [];
   for (const num of cards) {
     const f = cardFiles(root, (n) => n.startsWith(`card-${num}-`) && n.endsWith('.md'))[0];
     if (f) found.push({ num, file: f });
-    else result.skipped.push(`card-${num}: карточки нет на доске — только журнал`);
+    else result.skipped.push(msg('spend.ledger-recorder.card_absent', { num }));
   }
   const total = call ? {
     tokens: call.tokens_in + call.cache_write + call.cache_read + call.tokens_out,
@@ -235,22 +245,22 @@ function record(payload, opts = {}) {
     const acc = accountedInCard(text, agentId);
     let { tokens, cache_read: r, tokens_out: o, duration_s: s } = share;
     if (acc.lines) {
-      if (!continuation) { result.skipped.push(`card-${c.num}: строка с этим call id уже есть`); return; }
-      if (tokens == null || tokens - acc.tokens <= 0) { result.skipped.push(`card-${c.num}: нового расхода нет`); return; }
+      if (!continuation) { result.skipped.push(msg('spend.ledger-recorder.line_exists', { num: c.num })); return; }
+      if (tokens == null || tokens - acc.tokens <= 0) { result.skipped.push(msg('spend.ledger-recorder.no_new_spend', { num: c.num })); return; }
       const d = (v, a) => (v == null ? null : Math.max(0, v - a));
       tokens = d(tokens, acc.tokens); r = d(r, acc.cache); o = d(o, acc.out);
       s = activeNew != null ? (K > 1 ? batchShare(activeNew, K, idx + 1) : activeNew) : d(s, acc.seconds);
     }
     const what = (meta.description || '').replace(/\s+/g, ' ').trim();
-    const desc = (acc.lines ? 'продолжение вызова — ' : '') + 'автозапись хуком SubagentStop'
+    const desc = (acc.lines ? msg('spend.ledger-recorder.desc_cont') : '') + msg('spend.ledger-recorder.desc_base')
       + (what ? ` (${what.replace(/—/g, '-')})` : '') + (K > 1 ? ` (batch ${idx + 1}/${K})` : '') + '.'
-      + (call ? '' : ' (стенограмма вызова не найдена: N, R, O, T неизвестны.)');
+      + (call ? '' : msg('spend.ledger-recorder.desc_no_call'));
     const line = '- ' + formatSpendLine({
       node, date: nowIso.slice(0, 10), tokens, cache_read: r, tokens_out: o, duration_s: s,
       call_id: agentId, engine: ENGINE_TAG, desc,
     });
     const next = insertIntoHistory(text, line);
-    if (next == null) { result.skipped.push(`card-${c.num}: нет зоны «История»`); return; }
+    if (next == null) { result.skipped.push(msg('spend.ledger-recorder.no_history', { num: c.num })); return; }
     fs.writeFileSync(c.file, next, 'utf8');
     result.lines.push({ card: c.num, line });
   });

@@ -2,25 +2,26 @@
 'use strict';
 
 /**
- * card-subagent-spend.cjs — строка расхода §3 субагентского вызова в карточку, одной командой
- * после возврата (фоновой вызов — можно и раньше, пока он жив: у части движков стенограмма
- * существует только пока вызов жив).
+ * card-subagent-spend.cjs - a §3 spend line of a subagent call into the card, one command
+ * after the return (a background call - earlier is fine too, while it is alive: with some
+ * engines the transcript exists only while the call lives).
  *
- * Механизм — команда вызывающего, не хук: у движков без доказанного пакета хуков пишущего нет;
- * рука вызывающего выходит из контура набора чисел, но не из контура команды. Суммы — канонические,
- * из стенограммы вызова через `subagent-spend.cjs` (spendOf: адаптеры движков, дедуп по requestId);
- * N = Σ in+write+read+out. Стенограммы нет — маркеры unknown с причиной, никогда ноль: файл мог
- * быть удалён по завершении вызова, это норма, не сбой чтения.
+ * The mechanism is the caller's command, not a hook: with engines without a proven hook package
+ * there is no writer; the caller's hand leaves the loop of collecting the numbers but not the
+ * loop of the command. The sums are canonical, from the call's transcript through
+ * `subagent-spend.cjs` (spendOf: engine adapters, dedup by requestId); N = Σ in+write+read+out.
+ * No transcript - the unknown markers with a reason, never zero: the file may have been deleted
+ * when the call ended; that is the norm, not a read failure.
  *
- *   node .claude/scripts/card-subagent-spend.cjs <NNN|путь к карточке> <agent_id> [--node Run] [--engine <tag>] [--write] [--desc "..."]
+ *   node .claude/scripts/card-subagent-spend.cjs <NNN|card path> <agent_id> [--node Run] [--engine <tag>] [--write] [--desc "..."]
  *
- * Печатает строку формата §3; без --write — только печать, с --write — дописывает в конец зоны
- * ## History карточки (CLAUDE_SPEND_ROOT — корень проекта, по умолчанию — где лежит скрипт).
- * Повторный запуск с тем же id вызова — «уже записано», выход 0 (идемпотентность).
- * Стенограмма не найдена — нужен --engine <тег движка вызвавшего>: тег строки, найденная
- * стенограмма несёт тег своего владельца сама, а у отсутствующей взять его неоткуда.
+ * Prints a §3-format line; without --write - print only, with --write - appends to the end of the
+ * card's ## History zone (CLAUDE_SPEND_ROOT - the project root, by default where the script sits).
+ * A re-run with the same call id - "already recorded", exit 0 (idempotency).
+ * The transcript is not found - `--engine <the calling engine's tag>` is required: the tag of the
+ * line; a found transcript carries its owner's tag itself, and an absent one has no source for it.
  *
- * Выход: 0 — строка есть или уже была; 1 — у карточки нет зоны History; 2 — карточка или аргументы.
+ * Exit: 0 - a line exists or existed already; 1 - the card has no History zone; 2 - the card or the arguments.
  */
 
 const fs = require('fs');
@@ -29,6 +30,9 @@ const { spendOf } = require('./subagent-spend.cjs');
 const { formatSpendLine, CLAIM_LINE_RE } = require('../../.forma/dashboard/spend-line.cjs');
 const { NO_TRANSCRIPT } = require('../../.forma/dashboard/subagent-transcript.cjs');
 const { cardFiles, HISTORY_HEADING_RE } = require('../../.forma/dashboard/lib/card.cjs');
+// Printed and written labels come from the core dictionary: English key in code, ru value as data.
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const root = process.env.CLAUDE_SPEND_ROOT || path.resolve(__dirname, '..', '..');
 
@@ -37,7 +41,7 @@ const flag = (name) => {
   const i = argv.indexOf('--' + name);
   return i >= 0 ? String(argv[i + 1] || '') : null;
 };
-// Позиционные: всё, что не флаг и не значение именованного флага.
+// Positional: everything that is not a flag and not the value of a named flag.
 const named = ['node', 'engine', 'desc'];
 const positional = argv.filter((a, i) => {
   if (a.startsWith('--')) return false;
@@ -53,11 +57,11 @@ const DESC = flag('desc');
 const WRITE = argv.includes('--write');
 
 if (!ref || !agentId || !/^[A-Za-z0-9_-]+$/.test(agentId)) {
-  console.error('usage: node .claude/scripts/card-subagent-spend.cjs <NNN|путь к карточке> <agent_id> [--node Run] [--engine <tag>] [--write] [--desc "..."]');
+  console.error(msg('spend.card-subagent.usage'));
   process.exit(2);
 }
 
-/** Карточка по номеру (префикс card-NNN-) или прямым путём; нет — null. */
+/** The card by number (the card-NNN- prefix) or by a direct path; none - null. */
 function resolveCard(r) {
   if (/^\d{1,4}$/.test(r)) {
     const num = r.padStart(3, '0');
@@ -67,49 +71,50 @@ function resolveCard(r) {
   return fs.existsSync(abs) ? abs : null;
 }
 
-/** Дописывает строку в конец зоны History (перед следующей зоной), сохраняя перевод строк. */
+/** Appends the line to the end of the History zone (before the next zone), keeping the line endings. */
 function appendToHistory(card, text, line) {
   const nl = text.includes('\r\n') ? '\r\n' : '\n';
   const rows = text.split(/\r?\n/);
   const h = rows.findIndex((row) => HISTORY_HEADING_RE.test(row));
-  if (h < 0) { console.error('card-subagent-spend: нет зоны History'); process.exit(1); }
+  if (h < 0) { console.error(msg('spend.card-subagent.no_history')); process.exit(1); }
   let end = rows.findIndex((row, i) => i > h && /^## /.test(row));
   if (end < 0) end = rows.length;
   while (end > h + 1 && !rows[end - 1].trim()) end--;
   rows.splice(end, 0, line);
   fs.writeFileSync(card, rows.join(nl));
-  console.log(`записано в ${path.relative(root, card)}`);
+  console.log(msg('spend.card-subagent.written', { file: path.relative(root, card) }));
 }
 
 (async () => {
   const card = resolveCard(ref);
-  if (!card) { console.error(`card-subagent-spend: карточка не найдена: ${ref}`); process.exit(2); }
+  if (!card) { console.error(msg('spend.card-subagent.card_missing', { ref })); process.exit(2); }
   const text = fs.readFileSync(card, 'utf8');
 
-  // Идемпотентность: строка расхода с этим id вызова уже в карточке — второй не пишется.
+  // Idempotency: a spend line with this call id is in the card already - a second one is not written.
   const seen = text.split(/\r?\n/).some((l) => CLAIM_LINE_RE.test(l) && l.includes('`' + agentId + '`'));
-  if (seen) { console.log('уже записано: ' + agentId); return; }
+  if (seen) { console.log(msg('spend.card-subagent.already', { id: agentId })); return; }
 
   const s = await spendOf(agentId);
   const date = new Date().toISOString().slice(0, 10);
+  const descSuffix = DESC ? `, ${DESC}` : '';
   let rec;
   if (s) {
     rec = {
       node: NODE, date,
       tokens: s.tokens_n, cache_read: s.cache_read, tokens_out: s.tokens_out, duration_s: s.duration_s,
       call_id: String(agentId), engine: s.engine,
-      desc: `расход субагента по живой стенограмме (card-subagent-spend): шагов ${s.steps}` + (DESC ? `, ${DESC}` : ''),
+      desc: msg('spend.card-subagent.desc_live', { steps: s.steps, desc: descSuffix }),
     };
   } else {
     if (!ENGINE) {
-      console.error(`card-subagent-spend: ${NO_TRANSCRIPT} — задайте --engine <тег движка вызвавшего>: тег строки взять неоткуда`);
+      console.error(msg('spend.card-subagent.need_engine', { no_transcript: NO_TRANSCRIPT }));
       process.exit(2);
     }
     rec = {
       node: NODE, date,
       tokens: null, cache_read: null, tokens_out: null, duration_s: null,
       call_id: String(agentId), engine: ENGINE,
-      desc: `${NO_TRANSCRIPT} — суммы снимают, пока вызов жив; после завершения файл мог быть удалён; неизвестно, не ноль (card-subagent-spend)` + (DESC ? `, ${DESC}` : ''),
+      desc: msg('spend.card-subagent.desc_unknown', { no_transcript: NO_TRANSCRIPT, desc: descSuffix }),
     };
   }
 
