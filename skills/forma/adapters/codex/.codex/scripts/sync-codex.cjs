@@ -30,7 +30,7 @@ const sameText = (a,b) => a.replace(/\r/g,'') === b.replace(/\r/g,'');
 function projectRunProfiles() {
   const projectFile = path.join(ROOT, 'project', 'config', 'PROJECT.md');
   const project = exists(projectFile) ? text(projectFile) : '';
-  const section = /(?:\*\*|^#{1,6}\s*)(?:Профили Run проекта|Project Run profiles)[\s\S]*?(?=^#{1,6}\s|\n\*\*|(?![\s\S]))/m.exec(project)?.[0] || '';
+  const section = /(?:\*\*|^#{1,6}\s*)(?:\u041f\u0440\u043e\u0444\u0438\u043b\u0438 Run \u043f\u0440\u043e\u0435\u043a\u0442\u0430|Project Run profiles)[\s\S]*?(?=^#{1,6}\s|\n\*\*|(?![\s\S]))/m.exec(project)?.[0] || ''; // the ru heading is the project document's section name (data)
   return new Set([...section.matchAll(/\|\s*`(run-[\w-]+)`\s*\|/g)].map(m => m[1]));
 }
 function files(dir, prefix = '') { if (!exists(dir)) return []; return fs.readdirSync(dir,{withFileTypes:true}).flatMap(e => { const rel=path.posix.join(prefix,e.name); return e.isDirectory()?files(path.join(dir,e.name),rel):e.isFile()?[rel]:[]; }).sort(); }

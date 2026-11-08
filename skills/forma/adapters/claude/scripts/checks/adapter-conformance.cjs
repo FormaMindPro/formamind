@@ -1,18 +1,21 @@
 'use strict';
 
-// Адаптер движка найден по файлу §8; готов — если несёт тест соответствия контракту экономики (ECONOMY.md).
-// Не готов — сведение (строка в `ctx.info`, готовая к печати), не нарушение.
+// An engine adapter is found by its §8 file; ready - when it carries a conformance test of the economy contract (ECONOMY.md).
+// Not ready - an info note (a line in `ctx.info`, ready to print), not a violation.
+// Finding labels come from the core dictionary: English key in code, ru value as data.
 
 const fs = require('fs');
 const path = require('path');
 const { runTestFile } = require('../../../.forma/dashboard/lib/checks.cjs');
 const { isDormant } = require('./support/dormant.cjs');
+const i18n = require('../../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
-// Codex не объявляет forma-adapter.cjs — его строка статична; остальные движки берутся из адаптеров проекта.
+// Codex declares no forma-adapter.cjs - its line is static; the other engines come from the project's adapters.
 const STATIC = [{ id: 'codex', name: 'Codex', eight: '.codex/CODEX-8.md', test: '.codex/tests/test-codex-usage.cjs' }];
 const TEST_RE = /^(test-.*(adapter|usage).*\.cjs|.*(economy|adapter)\.test\.cjs)$/;
 
-/** Тест соответствия адаптера: первый подходящий файл в его testsDir, затем в scriptsDir. */
+/** The adapter's conformance test: the first matching file in its testsDir, then in scriptsDir. */
 function findTest(root, src) {
   for (const dir of [src.testsDir, src.scriptsDir]) {
     if (!dir) continue;
@@ -25,10 +28,10 @@ function findTest(root, src) {
   return null;
 }
 
-/** Читаемое имя движка из его тега: `claude-code` -> `Claude Code` (отдельного поля имени в форме адаптера нет). */
+/** A human-readable engine name from its tag: `claude-code` -> `Claude Code` (the adapter shape has no separate name field). */
 const humanName = (tag) => String(tag).split(/[-_]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 
-/** Адаптеры проекта (папка с forma-adapter.cjs) и статичные: [{ id?, name, eight, test }]. */
+/** The project's adapters (a folder with forma-adapter.cjs) and the static ones: [{ id?, name, eight, test }]. */
 function listAdapters(root) {
   const E = require('../../../.forma/dashboard/lib/engines.cjs');
   const found = E.loadAdapters(root)
@@ -37,22 +40,22 @@ function listAdapters(root) {
   return [...found, ...STATIC];
 }
 
-/** Один адаптер: нарушения — в `problems`, сведения — в `info`. Файла §8 нет — адаптер не установлен, молчание. */
+/** One adapter: violations into `problems`, info into `info`. No §8 file - the adapter is not installed, silence. */
 function checkAdapter(root, a, problems, info) {
   if (!fs.existsSync(path.join(root, a.eight))) return;
-  if (a.id && isDormant(root, a.id)) { info.push(`адаптер ${a.name}: спящий режим — тест соответствия не запускается`); return; }
-  if (!a.test) { info.push(`адаптер ${a.name}: не готов — теста соответствия нет, не проверяется`); return; }
-  if (!fs.existsSync(path.join(root, a.test))) { problems.push(`адаптер ${a.name}: нет теста соответствия ${a.test}`); return; }
+  if (a.id && isDormant(root, a.id)) { info.push(msg('adapter-conformance.dormant', { name: a.name })); return; }
+  if (!a.test) { info.push(msg('adapter-conformance.not_ready', { name: a.name })); return; }
+  if (!fs.existsSync(path.join(root, a.test))) { problems.push(msg('adapter-conformance.no_test', { name: a.name, test: a.test })); return; }
   const bad = runTestFile(root, a.test);
-  if (bad) problems.push(`адаптер ${a.name}: ${bad}`);
-  else info.push(`адаптер ${a.name}: тест соответствия пройден`);
+  if (bad) problems.push(msg('adapter-conformance.failed', { name: a.name, bad }));
+  else info.push(msg('adapter-conformance.passed', { name: a.name }));
 }
 
 function run({ root, info }) {
   const problems = [];
   const notes = [];
   for (const a of listAdapters(root)) checkAdapter(root, a, problems, notes);
-  if (!notes.length && !problems.length) problems.push('адаптеров движков нет: ни одного файла §8 не найдено');
+  if (!notes.length && !problems.length) problems.push(msg('adapter-conformance.none'));
   if (info) info.push(...notes.map((l) => '    ✓ ' + l));
   return problems;
 }

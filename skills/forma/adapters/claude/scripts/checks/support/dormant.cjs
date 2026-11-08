@@ -1,8 +1,8 @@
 'use strict';
 
-// Спящие движки: реестр `.forma/engines.json` (`{ "dormant": ["codex"] }`). Спящий движок остаётся в проекте как есть,
-// но не сверяется и не пересобирается; пробуждение — убрать его из списка и выполнить сверку-пересборку движка.
-// Нет файла или он не читается — спящих нет.
+// Sleeping engines: the `.forma/engines.json` registry (`{ "dormant": ["codex"] }`). A sleeping engine stays in
+// the project as is, but is neither reconciled nor rebuilt; waking it - remove it from the list and run the engine's reconcile-rebuild.
+// No file, or an unreadable one - no sleeping engines.
 
 const fs = require('fs');
 const path = require('path');

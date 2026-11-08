@@ -1,32 +1,33 @@
 'use strict';
 
 /**
- * Стенограммы движка: где рантайм пишет настоящие числа расхода и как их достать.
+ * The engine transcripts: where the runtime writes the real spend numbers and how to extract them.
  *
- * Рантайм пишет пошаговый расход в стенограмму сессии: `messages.jsonl`, у каждого сообщения
- * ассистента — `usage: {input, output, cacheRead, cacheWrite, totalTokens}` и имя модели.
- * Это единственное место, где числа настоящие: payload хука их не несёт, поэтому хук без
- * этого ридера пишет в журнал `null`, и строка расхода читается `unknown`.
+ * The runtime writes the step-by-step spend into the session transcript: `messages.jsonl`, every
+ * assistant message carries `usage: {input, output, cacheRead, cacheWrite, totalTokens}` and the
+ * model name. This is the only place where the numbers are real: the hook payload does not carry
+ * them, so a hook without this reader writes `null` into the ledger, and the spend line reads
+ * `unknown`.
  *
- * Как найти стенограмму по идентификатору сессии: имя каталога сессии — это base64 от её
- * `sessionId` с префиксом времени. Никакого обхода всех сессий: `base64(sessionId)` и есть
- * имя. Обход остаётся запасным путём, если каталог назван иначе.
+ * How to find a transcript by the session identifier: the session folder name is the base64 of its
+ * `sessionId` with a time prefix. No walking all sessions: `base64(sessionId)` is the name. The walk
+ * remains the fallback path, if the folder is named otherwise.
  *
- * Модуль общий: хук пакета грузит его из `PLUGIN_ROOT`, скрипты зоны — из исходника пакета
- * в проекте. Одна реализация, две стороны.
+ * The module is shared: the package hook loads it from `PLUGIN_ROOT`, the zone scripts - from the
+ * package source in the project. One implementation, two sides.
  *
- * Только чтение. Пишет только хук — нормированную стенограмму в `.minimax/.transcripts/`.
+ * Read-only. Only the hook writes - the normalized transcript into `.minimax/.transcripts/`.
  */
 
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-/** Профиль рантайма: рантайм задаёт `PLUGIN_DATA`, и по нему профиль восстанавливается точно. */
+/** The runtime profile: the runtime sets `PLUGIN_DATA`, and by it the profile is restored exactly. */
 function profileRoot(env = process.env) {
   const data = env.PLUGIN_DATA;
   if (data) {
-    // <профиль>/v2/plugin-data/hooks/<плагин> → <профиль>: отрезать четыре сегмента.
+    // <profile>/v2/plugin-data/hooks/<plugin> -> <profile>: cut off four segments.
     const parts = path.normalize(data).split(path.sep);
     if (parts.length >= 6 && parts[parts.length - 3] === 'plugin-data' && parts[parts.length - 2] === 'hooks') {
       const profile = parts.slice(0, parts.length - 4).join(path.sep);
@@ -36,24 +37,24 @@ function profileRoot(env = process.env) {
   return path.join(os.homedir(), '.minimax');
 }
 
-/** Корень хранилища сессий рантайма. */
+/** The root of the runtime session storage. */
 function sessionsRoot(env = process.env) {
   return path.join(profileRoot(env), 'v2', 'sessions');
 }
 
-/** Имя каталога сессии: время + base64 от `sessionId`. */
+/** The session folder name: time + base64 of `sessionId`. */
 function sessionDirName(sessionId) {
   return Buffer.from(String(sessionId), 'utf8').toString('base64');
 }
 
-/** Каталог сессии по её идентификатору. Нет — `null` (нет стенограммы, а не ноль). */
+/** The session folder by its identifier. None - `null` (no transcript, not zero). */
 function sessionDir(sessionId, env = process.env) {
   if (!sessionId) return null;
   const root = sessionsRoot(env);
   if (!fs.existsSync(root)) return null;
 
   const b64 = sessionDirName(sessionId);
-  // Сначала быстрый путь: имя каталога содержит base64 идентификатора.
+  // The fast path first: the folder name contains the identifier base64.
   const walk = (dir, depth) => {
     if (depth > 4) return null;
     let entries;
@@ -74,7 +75,7 @@ function sessionDir(sessionId, env = process.env) {
   const byName = walk(root, 0);
   if (byName) return byName;
 
-  // Запасной путь: манифест сессии.
+  // The fallback path: the session manifest.
   const byManifest = walk(root, 0);
   if (byManifest) return byManifest;
   try {
@@ -89,12 +90,12 @@ function sessionDir(sessionId, env = process.env) {
           const m = JSON.parse(fs.readFileSync(manifest, 'utf8'));
           if (m.sessionId === sessionId) return path.join(dayDir, s.name);
         } catch {
-          /* манифест не читается — идём дальше */
+          /* the manifest does not read - go on */
         }
       }
     }
   } catch {
-    /* хранилища нет */
+    /* no storage */
   }
   return null;
 }
@@ -102,7 +103,7 @@ function sessionDir(sessionId, env = process.env) {
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 /**
- * Шаги сессии: сообщения ассистента с расходом.
+ * The session steps: the assistant messages with spend.
  * @returns {Array<{turnId, model, timestamp, input, output, cacheRead, cacheWrite}>}
  */
 function readSteps(sessionId, env = process.env) {
@@ -141,9 +142,9 @@ function readSteps(sessionId, env = process.env) {
 }
 
 /**
- * Расход сессии целиком.
+ * The whole session spend.
  * @returns {null|{input, output, cache_read, cache_write, model, calls}}
- *   `null` — стенограммы нет или в ней нет расхода. Это не ноль.
+ *   `null` - no transcript or no spend in it. This is not zero.
  */
 function readUsage(sessionId, env = process.env) {
   const steps = readSteps(sessionId, env);
@@ -172,8 +173,8 @@ function readUsage(sessionId, env = process.env) {
 }
 
 /**
- * Нормированная стенограмма — в форме, которую читает ядро (`cache_read_input_tokens`,
- * `message.model`, `requestId`): дашборд считает по ней пол окна и разрезы по моделям.
+ * The normalized transcript - in the shape the core reads (`cache_read_input_tokens`,
+ * `message.model`, `requestId`): the dashboard counts the window floor and the cuts by models over it.
  */
 function normalizedLines(steps) {
   return steps
@@ -198,10 +199,10 @@ function normalizedLines(steps) {
 }
 
 /**
- * Нормированная стенограмма для чтения ядром (`card-move.cjs --agent-id`): та же форма,
- * но `requestId` уникален на ШАГ, а не на ход. Ядро дедуплицирует шаги одного ответа по
- * `requestId` (у Claude один ответ API пишется несколькими строками) — значит, один шаг
- * рантайма должен быть одной строкой со своим ключом, иначе ядро посчитает только первый шаг хода.
+ * The normalized transcript for the core reading (`card-move.cjs --agent-id`): the same shape,
+ * but `requestId` is unique per STEP, not per turn. The core deduplicates the steps of one response
+ * by `requestId` (in Claude one API response is written as several lines) - so one runtime step must
+ * be one line with its own key, otherwise the core counts only the first step of a turn.
  */
 function coreLines(steps) {
   return steps

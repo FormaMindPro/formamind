@@ -1,25 +1,29 @@
 'use strict';
 
 /**
- * Адаптер ZCode для ядра «Формы».
- * Ядро находит его само — файл `forma-adapter.cjs` в каталоге корня, чьё имя начинается с точки;
- * форма объекта и замена отсутствующего поля — в шапке `.forma/dashboard/lib/engines.cjs`.
- * Факты движка — `.zcode/rules/zcode-8.md`; соответствие форме проверяет `.zcode/tests/test-zcode-adapter.cjs`.
+ * The ZCode adapter for the Forma core.
+ * The core finds it by itself - the `forma-adapter.cjs` file in a root directory whose name starts with a dot;
+ * the object's shape and the missing-field substitution - in the header of `.forma/dashboard/lib/engines.cjs`.
+ * The engine's facts - `.zcode/rules/zcode-8.md`; the shape fit is checked by `.zcode/tests/test-zcode-adapter.cjs`.
  *
- * Что знает только этот движок:
- *  - transcriptsDir/parseUsage: стенограммы модель-IO пишет сам хост — ~/.zcode/cli/rollout,
- *    `model-io-sess_<id>.jsonl`, шаг несёт `usage: { inputTokens, outputTokens, totalTokens,
- *    cacheReadTokens, cacheWriteTokens }` или провайдерские `input_tokens/output_tokens/
+ * What only this engine knows:
+ *  - transcriptsDir/parseUsage: the model-IO transcripts are written by the host itself - ~/.zcode/cli/rollout,
+ *    `model-io-sess_<id>.jsonl`, the step carries `usage: { inputTokens, outputTokens, totalTokens,
+ *    cacheReadTokens, cacheWriteTokens }` or the provider ones `input_tokens/output_tokens/
  *    cache_read_input_tokens`
- *  - skillsDir `.agents/skills/` — ZCode нативно открывает их как проектные умения
- *  - nodeModels: семейство GLM (Z.AI), уровни размышления low/high/max (среднего нет)
- *  - узлы Формы не зарегистрированы типами агента хоста — маршрут идёт деградированным,
- *    стадии в одном контексте под метками [STAGE] (`.zcode/rules/zcode-8.md`, Contract 2)
+ *  - skillsDir `.agents/skills/` - ZCode opens them natively as the project's skills
+ *  - nodeModels: the GLM family (Z.AI), the thinking levels low/high/max (no middle one)
+ *  - the Forma nodes are not registered as the host's agent types - the route goes degraded,
+ *    the stages in one context under the [STAGE] labels (`.zcode/rules/zcode-8.md`, Contract 2)
+ *
+ * Printed labels come from the core dictionary: English key in code, ru value as data.
  */
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 function resolveModule(candidates) {
   for (const c of candidates) if (fs.existsSync(c)) return c;
@@ -38,7 +42,7 @@ const BYTES_PER_TOKEN_LATIN = 4.1;
 const BYTES_PER_TOKEN_CYRILLIC = 2.2;
 
 function estimateTokens(text) {
-  const cyrillicChars = (text.match(/[Ѐ-ӿ]/g) || []).length;
+  const cyrillicChars = (text.match(/[\u0400-\u04ff]/g) || []).length;
   const cyrillicBytes = cyrillicChars * 2;
   const latinBytes = Math.max(0, Buffer.byteLength(text, 'utf8') - cyrillicBytes);
   return Math.round(latinBytes / BYTES_PER_TOKEN_LATIN + cyrillicBytes / BYTES_PER_TOKEN_CYRILLIC);
@@ -81,7 +85,7 @@ function instructionWeight(root = process.cwd()) {
   return {
     estimate: true,
     model: MODEL,
-    note: 'Оценка по эвристике «байт на токен» для семейства GLM.',
+    note: msg('zad.iw_note'),
     common: { tokens: commonTokens, files: common },
     byNode,
   };
@@ -102,12 +106,12 @@ function transcriptsDir(root = process.cwd()) {
 }
 
 /**
- * Шаг стенограммы модель-IO ZCode: usage в шаге плоско или под `usage`.
- * Поля хоста: inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens;
- * провайдерские: input_tokens, output_tokens, cache_read_input_tokens; принимаем и родовые имена.
- * Поля хоста — ВКЛЮЧАЮЩИЕ: inputTokens несёт весь ввод, cacheReadTokens и cacheWriteTokens внутри
- * него (факт rollout: inputTokens + outputTokens = totalTokens), поэтому «прочий ввод» =
- * inputTokens минус кэш. Провайдерские имена — исключающие, как у Claude: ввод без кэша.
+ * A ZCode model-IO transcript step: the usage in the step flat or under `usage`.
+ * The host's fields: inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens;
+ * the provider ones: input_tokens, output_tokens, cache_read_input_tokens; the generic names are accepted too.
+ * The host's fields are INCLUSIVE: inputTokens carries the whole input, with cacheReadTokens and cacheWriteTokens inside
+ * it (a rollout fact: inputTokens + outputTokens = totalTokens), so "the other input" =
+ * inputTokens minus the cache. The provider names are exclusive, like Claude's: the input without the cache.
  */
 function parseUsage(step) {
   if (!step) return { tokens_in: null, tokens_out: null, cache_read: null, cache_write: null };
@@ -127,8 +131,8 @@ function parseUsage(step) {
     ? hostInput - (cacheRead || 0) - (cacheCreation || 0)
     : pick(['inputOther', 'tokens_in', 'input_tokens', 'promptTokenCount', 'prompt_token_count']);
   return {
-    // Канонический tokens_in — ввод БЕЗ кэша (N = in + write + read + out сходится в totalTokens);
-    // кэш идёт отдельными полями. Чего источник не дал — null, не 0.
+    // The canonical tokens_in - the input WITHOUT the cache (N = in + write + read + out adds up in totalTokens);
+    // the cache goes in separate fields. What the source did not give - null, not 0.
     tokens_in: inputOther,
     tokens_out: pick(['output', 'tokens_out', 'output_tokens', 'outputTokens', 'candidatesTokenCount', 'completion_tokens']),
     cache_read: cacheRead,
@@ -137,8 +141,8 @@ function parseUsage(step) {
 }
 
 /**
- * Стенограмма захода субагента по id: хост кладёт её в rollout рядом с сессиями — плоский файл
- * `model-io-sess_subagent_agent_<id>.jsonl` (id хоста может приходить с префиксом `agent_` — принимаются обе формы).
+// A subagent's visit transcript by id: the host puts it into rollout next to the sessions - a flat file
+// `model-io-sess_subagent_agent_<id>.jsonl` (the host's id may come with the `agent_` prefix - both forms are accepted).
  */
 function findSubagent(agentId, root = process.cwd()) {
   const dir = transcriptsDir(root);
@@ -158,8 +162,8 @@ function findSubagent(agentId, root = process.cwd()) {
 }
 
 /**
- * Шаг стенограммы ZCode (type model_io): usage в `response.usage` (поля хоста), requestId и время на шаге.
- * Шаг без расхода — `null`.
+ * A ZCode transcript step (type model_io): the usage in `response.usage` (the host's fields), requestId and the time on the step.
+ * A step without spend - `null`.
  */
 function stepOf(line) {
   const u = line && line.response && line.response.usage;
@@ -176,10 +180,10 @@ function stepOf(line) {
 }
 
 /**
- * Журналы ОСНОВНОЙ сессии: плоские файлы `model-io-sess_<id>.jsonl` в rollout, по записи на файл
- * `{ id, file }` (id — имя файла без .jsonl). Субагентские (`sess_subagent_*`) и запись без сессии
- * (`model-io-no-session.jsonl`) сюда не входят: расход субагентов пишет вызывающий по `<usage>`,
- * второй счёт дал бы двойной. Каталога нет — пустой список: журналов нет, это не ноль.
+ * The MAIN session's logs: flat files `model-io-sess_<id>.jsonl` in rollout, one record per file
+ * `{ id, file }` (id - the file's name without .jsonl). The subagent ones (`sess_subagent_*`) and the record without a session
+ * (`model-io-no-session.jsonl`) do not enter here: the subagents' spend is written by the caller by `<usage>`,
+ * a second count would double it. No directory - an empty list: no logs, which is not zero.
  */
 function mainSessions(root = process.cwd()) {
   const dir = transcriptsDir(root);
@@ -192,15 +196,15 @@ function mainSessions(root = process.cwd()) {
 }
 
 /**
- * Одна запись журнала основной сессии ZCode → нормализованный шаг
+ * One record of the ZCode main session's log -> a normalized step
  * `{ ts, key, usage, toolCalls, human, model }`:
- *   ts — время (completedAt, иначе startedAt); key — requestId (попытки повтора одного вызова
- *   сходятся); usage — `response.usage` (разбор — parseUsage), без расхода — null;
- *   toolCalls — вызовы инструментов ответа; model — modelId.
- *   human — РЕПЛИКА ЧЕЛОВЕКА в этом журнале не записана (файл несёт только вызовы модели):
- *   границей хода служит новый `turnId` — хост открывает его на сообщение человека (ответ на
- *   AskUserQuestion ход не открывает; компакт и первая запись файла — свои границы).
- *   `prev` — предыдущая строка журнала (нужна для сравнения turnId).
+ *   ts - the time (completedAt, else startedAt); key - requestId (the retry attempts of one call
+ *   add up); usage - `response.usage` (the parse - parseUsage), without spend - null;
+ *   toolCalls - the response's tool calls; model - modelId.
+ *   human - the HUMAN'S REPLICA is not written in this log (the file carries only the model calls):
+ *   the boundary of a turn is a new `turnId` - the host opens it on a human message (an answer to
+ *   AskUserQuestion does not open a turn; the compact and the file's first record are boundaries of their own).
+ *   `prev` - the log's previous line (needed for the turnId comparison).
  */
 function mainStepOf(line, prev) {
   if (!line || !(line.completedAt || line.startedAt)) return null;
@@ -238,7 +242,7 @@ function engineSettings(root = process.cwd()) {
   return {
     present: fs.existsSync(agentsDir),
     env: {},
-    hooks: [], // проектного пакета хуков у ZCode нет — расхождение, см. zcode-8.md (Contract 6)
+    hooks: [], // ZCode has no project hook package - a divergence, see zcode-8.md (Contract 6)
     nodes: readNodes(path.join(agentsDir, 'agents')),
     skills: fs.existsSync(skillsDir)
       ? fs.readdirSync(skillsDir).filter((f) => fs.statSync(path.join(skillsDir, f)).isDirectory()).sort()
@@ -264,7 +268,7 @@ module.exports = {
   id: 'zcode',
   spendTag: 'zcode',
 
-  // Контракт движка (ENGINE-CONTRACT.md): источники, возможности, таблица узел -> модель, зоны записи.
+  // The engine contract (ENGINE-CONTRACT.md): the sources, the capabilities, the node -> model table, the write zones.
   sources: {
     rolesDir: '.zcode/agents',
     onDemandRolesDir: '.zcode/agents/on-demand',
@@ -300,20 +304,20 @@ module.exports = {
   engineSettings,
   formaRoles,
 
-  // Группа дерева «Структура» и подписи каталогов адаптера.
+  // The "Structure" tree group and the adapter directories' captions.
   structure: {
     key: 'model',
-    title: 'Модель · ZCode',
-    note: 'адаптер движка ZCode — §8',
+    title: msg('zad.structure_title'),
+    note: msg('zad.structure_note'),
     roots: ['.zcode'],
     notes: {
-      '.zcode': 'всё, что знает только ZCode',
-      '.zcode/agents': 'роли узлов: Intent, Spec, Kit, Run, Core (зеркало из .claude/agents)',
-      '.zcode/agents/on-demand': 'роли, подгружаемые по случаю',
-      '.zcode/rules': '§8 — архитектура движка в ZCode',
-      '.zcode/scripts': 'скрипты адаптера: генератор зеркала ролей',
-      '.zcode/tests': 'тест соответствия контракту',
-      '.zcode/.state': 'проба возможностей: доказуемые факты хоста',
+      '.zcode': msg('zad.cap_zcode'),
+      '.zcode/agents': msg('zad.cap_agents'),
+      '.zcode/agents/on-demand': msg('zad.cap_on_demand'),
+      '.zcode/rules': msg('zad.cap_rules'),
+      '.zcode/scripts': msg('zad.cap_scripts'),
+      '.zcode/tests': msg('zad.cap_tests'),
+      '.zcode/.state': msg('zad.cap_state'),
     },
   },
 };

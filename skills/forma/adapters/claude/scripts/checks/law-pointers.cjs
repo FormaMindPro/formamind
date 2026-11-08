@@ -8,6 +8,9 @@
 
 const fs = require('fs');
 const path = require('path');
+// Finding labels come from the core dictionary: English key in code, ru value as data.
+const i18n = require('../../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const NOT_ROLE = new Set(['PROJECT.md', 'JOURNAL.md', 'GOAL.md', 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md', 'README.md', 'ECONOMY.md', 'ROUTES.md']);
 
@@ -27,9 +30,9 @@ function verify(text, dirs) {
   const problems = [];
   for (const name of pointers(text)) {
     const dir = dirs.find((d) => fs.existsSync(path.join(d, name)));
-    if (!dir) { problems.push(`указатель закона: \`${name}\` не найден в каталогах ролей`); continue; }
+    if (!dir) { problems.push(msg('law-pointers.missing', { name })); continue; }
     if (!/<!--\s*moved-from-law:/.test(fs.readFileSync(path.join(dir, name), 'utf8'))) {
-      problems.push(`указатель закона: \`${name}\` названа в AGENTS.md, но в файле нет маркера moved-from-law`);
+      problems.push(msg('law-pointers.no_marker', { name }));
     }
   }
   return problems;

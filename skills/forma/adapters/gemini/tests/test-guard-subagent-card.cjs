@@ -21,14 +21,14 @@ function runHook(payload) {
   return JSON.parse(res.stdout.trim());
 }
 
-it('блокирует invoke_subagent без номера карточки', () => {
+it('blocks invoke_subagent without a card number', () => {
   const res = runHook({
     toolCall: {
       name: 'invoke_subagent',
       args: {
         TypeName: 'run',
         Role: 'run-script',
-        Prompt: 'Сделай быструю проверку без карточки',
+        Prompt: 'Do a quick check without a card',
       },
     },
   });
@@ -36,32 +36,32 @@ it('блокирует invoke_subagent без номера карточки', ()
   assert.match(res.reason, /AGENTS\.md §6/);
 });
 
-it('разрешает invoke_subagent с указанием card-NNN в Prompt', () => {
+it('allows invoke_subagent with a card-NNN given in the Prompt', () => {
   const res = runHook({
     toolCall: {
       name: 'invoke_subagent',
       args: {
         TypeName: 'run',
         Role: 'run-site-php',
-        Prompt: `Card: ${CARD_A}. Выполняем аудит.`,
+        Prompt: `Card: ${CARD_A}. Running the audit.`,
       },
     },
   });
   assert.equal(res.decision, 'allow');
 });
 
-it('разрешает invoke_subagent с указанием card-NNN в Role', () => {
+it('allows invoke_subagent with a card-NNN given in the Role', () => {
   const res = runHook({
     toolCall: {
       name: 'invoke_subagent',
       args: {
         TypeName: 'run',
         Role: `run-image (${CARD_B})`,
-        Prompt: 'Генерация баннеров.',
+        Prompt: 'Banner generation.',
       },
     },
   });
   assert.equal(res.decision, 'allow');
 });
 
-console.log(`\nВсе ${passed} проверок guard-subagent-card успешно пройдены.`);
+console.log(`\nAll ${passed} guard-subagent-card checks passed.`);

@@ -1,51 +1,55 @@
 #!/usr/bin/env node
-// Bridge-скрипт: вызов внешней модели (OpenAI-совместимый chat/completions) вместо Agent tool.
-// Текст-в/текст-аут задачи без живого доступа к среде (`vneshnyaya-model-spec-core.md`).
-// Нейтральное имя: мост к любому OpenAI-совместимому провайдеру (DeepSeek, OpenRouter).
+// The bridge script: calling an external model (an OpenAI-compatible chat/completions) instead of the Agent tool.
+// Text-in/text-out of a task without live access to the environment (`vneshnyaya-model-spec-core.md`).
+// A neutral name: a bridge to any OpenAI-compatible provider (DeepSeek, OpenRouter).
 //
-// Использование:
+// Usage:
 //   node .claude/scripts/external-model-bridge.cjs --prompt-file <path> [--provider deepseek|openrouter] [--model ...] [--max-tokens 8192] [--out <path>]
-//   node .claude/scripts/external-model-bridge.cjs --prompt "<текст>" ...
+//   node .claude/scripts/external-model-bridge.cjs --prompt "<text>" ...
 //
-// Запрет 17 (AGENTS.md §5): наружу уходит только скрабленое. CLI-путь чистит --prompt/--prompt-file
-// и --system тем же модулем, что и Отвес (plumb-scrub.cjs): значения из .env и VARS/ → [[имя]],
-// шаблоны (адреса, токены, пути) → метки. Секретоподобный остаток — отказ fail-closed (код 2,
-// сетевой вызов не выполняется); откат — к исполнителю своей семьи (Agent tool), не повтор запроса.
+// Prohibition 17 (AGENTS.md §5): only the scrubbed leaves. The CLI path scrubs --prompt/--prompt-file
+// and --system by the same module as the Plumb (plumb-scrub.cjs): the values from .env and VARS/ -> [[name]],
+// the patterns (addresses, tokens, paths) -> labels. A secret-like residue - a fail-closed refusal (code 2,
+// no network call is made); the fallback - to the executor of one's own family (the Agent tool), not a repeat of the request.
 //
-// Ключ — DEEPSEEK_API_KEY / OPENROUTER_API_KEY, читается из .env в корне проекта (не из процесса/оболочки — запрет 15, AGENTS.md §5).
-// Печатает содержимое ответа модели в stdout (или пишет в --out, если задан); ничего лишнего не добавляет —
-// вызывающий узел разбирает результат сам, как разбирал бы текст субагента.
+// The key - DEEPSEEK_API_KEY / OPENROUTER_API_KEY, read from .env in the project root (not from the process/shell - prohibition 15, AGENTS.md §5).
+// Prints the model's response content to stdout (or writes it to --out, if given); adds nothing extra -
+// the calling node parses the result itself, the way it would parse a subagent's text.
 //
-// Стоимость: для DeepSeek считается по прайсу deepseek-flash (
-// https://api-docs.deepseek.com/quick_start/pricing) — легаси-имена deepseek-chat/deepseek-reasoner
-// принимаются, но обслуживаются той же базовой моделью (подтверждено полем `model` в ответе API),
-// различие между ними — режим мышления, не разные базовые модели.
-// Для OpenRouter — по прайсу конкретной модели (`--model`), таблица ниже; неизвестная модель даёт
-// cost_usd_estimate: null вместо ложной цифры, а не молча использует чужой тариф.
-// Прайс на другую модель/дату сверяй у провайдера заново, не считай эти числа константой навсегда.
+// Cost: for DeepSeek it is counted by the deepseek-flash price (
+// https://api-docs.deepseek.com/quick_start/pricing) - the legacy names deepseek-chat/deepseek-reasoner
+// are accepted but served by the same base model (confirmed by the `model` field in the API response);
+// the difference between them - the thinking mode, not different base models.
+// For OpenRouter - by the price of the concrete model (`--model`), the table below; an unknown model gives
+// cost_usd_estimate: null instead of a made-up figure, and does not silently use someone else's tariff.
+// Re-check the price of another model/date with the provider; never treat these numbers as forever-constants.
+//
+// Error labels come from the core dictionary: English key in code, ru value as data.
 
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const { parseKnown } = require('../../.forma/dashboard/lib/cli.cjs');
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
-// $ за 1 токен (не за 1M — сразу поделено, чтобы не забыть /1e6 в новой строке)
+// $ per 1 token (not per 1M - divided right away, so the /1e6 is not forgotten in a new line)
 const PRICING = {
   deepseek: {
-    // off-peak (пиковые часы 01:00-04:00 и 06:00-10:00 UTC, Пн-Пт — вдвое дороже, не учтено здесь)
+    // off-peak (the peak hours 01:00-04:00 and 06:00-10:00 UTC, Mon-Fri cost twice as much, not accounted here)
     inputCacheMiss: 0.15 / 1e6,
     inputCacheHit: 0.003 / 1e6,
     output: 0.6 / 1e6,
   },
   openrouter: {
-    // Цена — openrouter.ai
+    // The price - openrouter.ai
     'z-ai/glm-5.3-flash': { input: 0.045 / 1e6, output: 0.14 / 1e6 },
     'qwen/qwen3.7-flash': { input: 0.03 / 1e6, output: 0.13 / 1e6 },
-    // Цена — openrouter.ai
+    // The price - openrouter.ai
     'deepseek/deepseek-v4-flash': { input: 0.049 / 1e6, output: 0.097 / 1e6 },
-    // Цена — openrouter.ai/typesafe/jev-1.14: вход $0.042/1M, выход бесплатный (Decisions API
-    // берёт плату только за входные токены — openrouter.ai/docs/guides/community/jev,
-    // «How much does Jev cost?»). Ответ `usage.cost` предпочтительнее этой оценки, см. estimateCostUsd.
+    // The price - openrouter.ai/typesafe/jev-1.14: the input $0.042/1M, the output free (the Decisions API
+    // charges only for the input tokens - openrouter.ai/docs/guides/community/jev,
+    // "How much does Jev cost?"). The `usage.cost` response is preferred over this estimate, see estimateCostUsd.
     'typesafe/jev-1.14': { input: 0.042 / 1e6, output: 0 },
   },
 };
@@ -60,7 +64,7 @@ function estimateCostUsd(provider, model, usage) {
   }
   if (provider === 'openrouter') {
     const p = PRICING.openrouter[model];
-    if (!p) return null; // неизвестная модель — не гадаем цену
+    if (!p) return null; // an unknown model - no guessing the price
     const inTok = usage.prompt_tokens ?? 0;
     const out = usage.completion_tokens ?? 0;
     return inTok * p.input + out * p.output;
@@ -69,23 +73,23 @@ function estimateCostUsd(provider, model, usage) {
 }
 
 function loadEnvKey(name) {
-  // __dirname = .claude/scripts — два уровня вверх до корня проекта, где живёт
-  // единственный .env (запрет 15, AGENTS.md §5: один файл, без копий по движкам).
+  // __dirname = .claude/scripts - two levels up to the project root, where the only
+  // .env lives (prohibition 15, AGENTS.md §5: one file, no copies per engine).
   const envPath = path.join(__dirname, '..', '..', '.env');
   if (!fs.existsSync(envPath)) {
-    throw new Error(`.env не найден в корне проекта (${envPath})`);
+    throw new Error(msg('extbridge.env_not_found', { path: envPath }));
   }
   const text = fs.readFileSync(envPath, 'utf8');
   const re = new RegExp(`^${name}=(.*)$`, 'm');
   const m = text.match(re);
   if (!m || !m[1].trim()) {
-    throw new Error(`${name} пуст или не найден в .env`);
+    throw new Error(msg('extbridge.key_empty', { name }));
   }
   return m[1].trim();
 }
 
-// Та же проверка, но без исключения — для вызывающих, которым отсутствие ключа
-// само по себе не ошибка, а повод откатиться на встроенный исполнитель (plumb-run.cjs).
+// The same check but without an exception - for the callers for whom a missing key
+// is not an error in itself, but a reason to fall back to the built-in executor (plumb-run.cjs).
 function loadEnvKeyOptional(name, root) {
   try {
     const envPath = root ? path.join(root, '.env') : path.join(__dirname, '..', '..', '.env');
@@ -99,8 +103,8 @@ function loadEnvKeyOptional(name, root) {
   }
 }
 
-// Вызов Decisions API (typesafe/jev-1.14) — типизированный выход choice/score/noul напрямую,
-// без прогона через chat/completions (другая форма запроса: questions+state, не messages).
+// The Decisions API call (typesafe/jev-1.14) - a typed choice/score/noul output directly,
+// without a run through chat/completions (a different request shape: questions+state, not messages).
 // openrouter.ai/docs/api/api-reference/alphadecisions/submit-a-decisions-request
 function callDecisions({ apiKey, model, questions, state, timeoutMs }) {
   const body = JSON.stringify({ model, questions, state });
@@ -127,12 +131,12 @@ function callDecisions({ apiKey, model, questions, state, timeoutMs }) {
         try {
           resolve(JSON.parse(data));
         } catch (e) {
-          reject(new Error(`не удалось разобрать ответ decisions API: ${e.message}`));
+          reject(new Error(msg('extbridge.decisions_parse', { err: e.message })));
         }
       });
     });
     req.setTimeout(TIMEOUT_MS, () => {
-      req.destroy(new Error(`decisions API: нет ответа за ${TIMEOUT_MS / 1000} с (таймаут)`));
+      req.destroy(new Error(msg('extbridge.decisions_timeout', { sec: TIMEOUT_MS / 1000 })));
     });
     req.on('error', reject);
     req.write(body);
@@ -140,11 +144,11 @@ function callDecisions({ apiKey, model, questions, state, timeoutMs }) {
   });
 }
 
-// Дефолт (project/config/CONFIG.md #deepseek-extraction-quality):
-// OpenRouter GLM 5.3 Flash — почти втрое дешевле DeepSeek на сопоставимом качестве извлечения.
-// DeepSeek остаётся резервом на случай, когда критично время (--provider deepseek явно).
+// The default (project/config/CONFIG.md #deepseek-extraction-quality):
+// OpenRouter GLM 5.3 Flash - almost three times cheaper than DeepSeek at a comparable extraction quality.
+// DeepSeek stays as the reserve for when time is critical (--provider deepseek explicitly).
 const DEFAULT_PROVIDER = 'openrouter';
-// Для графов — DeepSeek V4 Flash через OpenRouter.
+// For the graphs - DeepSeek V4 Flash via OpenRouter.
 const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
 
 function parseArgs(argv) {
@@ -154,13 +158,13 @@ function parseArgs(argv) {
     '--max-tokens': ['maxTokens', int], '--out': 'out', '--system': 'system',
     '--reasoning-effort': 'reasoningEffort', '--reasoning-max-tokens': ['reasoningMaxTokens', int],
   }, { provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL, maxTokens: 8192 });
-  // переключились на deepseek флагом, но не назвали модель явно — подставляем его дефолт,
-  // не дефолт openrouter (иначе ушли бы в DeepSeek с несуществующей там моделью GLM)
+  // switched to deepseek by the flag but did not name a model explicitly - its default is substituted,
+  // not the openrouter default (otherwise we would enter DeepSeek with the GLM model nonexistent there)
   if (args.provider === 'deepseek' && args.model === DEFAULT_MODEL) {
     args.model = 'deepseek-chat';
   }
-  // GLM по контракту извлечения требует reasoning.effort=low на файлах крупнее ~20K токенов —
-  // ставим низким по умолчанию для дефолтной пары provider+model, если не переопределено явно
+  // GLM by the extraction contract requires reasoning.effort=low on files larger than ~20K tokens -
+  // set low by default for the default provider+model pair, unless overridden explicitly
   if (args.provider === DEFAULT_PROVIDER && args.model === DEFAULT_MODEL && !args.reasoningEffort && !args.reasoningMaxTokens) {
     args.reasoningEffort = 'low';
   }
@@ -183,7 +187,7 @@ function callChatCompletions({ provider, apiKey, model, system, prompt, maxToken
     max_tokens: maxTokens,
     stream: false,
   };
-  // OpenRouter: ограничение бюджета reasoning отдельно от видимого вывода (openrouter.ai/docs/use-cases/reasoning-tokens)
+  // OpenRouter: the reasoning budget limited separately from the visible output (openrouter.ai/docs/use-cases/reasoning-tokens)
   if (provider === 'openrouter' && (reasoningEffort || reasoningMaxTokens)) {
     payload.reasoning = reasoningEffort ? { effort: reasoningEffort } : { max_tokens: reasoningMaxTokens };
   }
@@ -201,9 +205,9 @@ function callChatCompletions({ provider, apiKey, model, system, prompt, maxToken
     },
   };
 
-  // Таймаут на весь запрос — без него зависший коннект (обрыв на стороне провайдера,
-  // сеть) висит вечно, ни успех, ни ошибка не приходят никогда (
-  // сборка графа опыта закрытых карточек зависла на файле 32/53 без единой ошибки).
+  // A timeout over the whole request - without it a hung connection (a drop on the provider's side,
+  // the network) hangs forever, neither success nor error ever arrives (
+  // the closed cards' experience graph build hung on file 32/53 without a single error).
   const TIMEOUT_MS = 120000;
 
   return new Promise((resolve, reject) => {
@@ -219,12 +223,12 @@ function callChatCompletions({ provider, apiKey, model, system, prompt, maxToken
           const json = JSON.parse(data);
           resolve(json);
         } catch (e) {
-          reject(new Error(`Не удалось разобрать ответ ${provider}: ${e.message}\n${data.slice(0, 500)}`));
+          reject(new Error(msg('extbridge.chat_parse', { provider, err: e.message }) + '\n' + data.slice(0, 500)));
         }
       });
     });
     req.setTimeout(TIMEOUT_MS, () => {
-      req.destroy(new Error(`${provider} API: нет ответа за ${TIMEOUT_MS / 1000} с (таймаут)`));
+      req.destroy(new Error(msg('extbridge.chat_timeout', { provider, sec: TIMEOUT_MS / 1000 })));
     });
     req.on('error', reject);
     req.write(body);
@@ -232,8 +236,8 @@ function callChatCompletions({ provider, apiKey, model, system, prompt, maxToken
   });
 }
 
-// Скраб исходящего текста (запрет 17): секреты .env/VARS → [[имя]], остаток — отказ с кодом 2.
-// Отказ происходит до загрузки ключа и до любого сетевого вызова.
+// The scrub of the outgoing text (prohibition 17): the .env/VARS secrets -> [[name]], the residue - a refusal with code 2.
+// The refusal happens before the key is loaded and before any network call.
 function scrubOutgoing(text) {
   const { loadSecrets, scrub, residue } = require('./plumb-scrub.cjs');
   const siteHosts = new Set();
@@ -241,7 +245,7 @@ function scrubOutgoing(text) {
   const { text: scrubbed } = scrub(text, secrets, siteHosts);
   const why = residue(scrubbed, secrets);
   if (why.length) {
-    console.error(`scrub-refused: текст не прошёл скраб (${why.join('; ')}) — вызов внешней модели отменён (запрет 17), используйте исполнителя своей семьи.`);
+    console.error(msg('extbridge.scrub_refused', { why: why.join('; ') }));
     process.exit(2);
   }
   return scrubbed;
@@ -250,15 +254,15 @@ function scrubOutgoing(text) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.prompt && !args.promptFile) {
-    console.error('Нужен --prompt "<текст>" или --prompt-file <path>');
+    console.error(msg('extbridge.need_prompt'));
     process.exit(1);
   }
   if (!PROVIDER_HOSTS[args.provider]) {
-    console.error(`Неизвестный --provider "${args.provider}" (deepseek|openrouter)`);
+    console.error(msg('extbridge.unknown_provider', { provider: args.provider }));
     process.exit(1);
   }
   if (args.provider === 'openrouter' && !args.model) {
-    console.error('Для --provider openrouter нужен явный --model (например z-ai/glm-5.3-flash)');
+    console.error(msg('extbridge.need_model'));
     process.exit(1);
   }
   const prompt = scrubOutgoing(args.prompt || fs.readFileSync(args.promptFile, 'utf8'));
@@ -280,7 +284,7 @@ async function main() {
 
   const text = result.choices?.[0]?.message?.content ?? '';
   const usage = result.usage || {};
-  // OpenRouter отдаёт реальную стоимость в usage.cost — точнее собственного расчёта по прайсу, предпочитаем её
+  // OpenRouter returns the real cost in usage.cost - more precise than our own price-based estimate; we prefer it
   const costUsd = typeof usage.cost === 'number' ? usage.cost : estimateCostUsd(args.provider, args.model, usage);
 
   const report = {
@@ -301,7 +305,7 @@ async function main() {
 
   if (args.out) {
     fs.writeFileSync(args.out, JSON.stringify(report, null, 2), 'utf8');
-    console.log(`Записано: ${args.out}`);
+    console.log(msg('extbridge.written', { file: args.out }));
   } else {
     console.log(JSON.stringify(report, null, 2));
   }
@@ -309,7 +313,7 @@ async function main() {
 
 if (require.main === module) {
   main().catch((err) => {
-    console.error('Ошибка bridge-скрипта:', err.message);
+    console.error(msg('extbridge.bridge_error', { err: err.message }));
     process.exit(1);
   });
 }

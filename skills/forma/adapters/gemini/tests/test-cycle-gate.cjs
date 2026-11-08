@@ -1,7 +1,10 @@
 'use strict';
 
 /**
- * test-cycle-gate.cjs — тест гейта накопления цикла Core и парсинга k:volume для адаптера Gemini.
+ * test-cycle-gate.cjs - a test of the Core cycle accumulation gate and the k:volume parsing for the Gemini adapter.
+ *
+ * The ru literals below are pins on the ru output of the cycle-status/guard-core-cycle libs, or ru
+ * fixtures of the project document's labels (data) - held as-is, the escape pass turns them into \u sequences.
  */
 
 const assert = require('node:assert/strict');
@@ -57,13 +60,13 @@ const { checkCoreCycleGuard } = require(resolveGuardCoreCycle());
 let passed = 0;
 const it = (name, fn) => { fn(); passed += 1; console.log('ok  ' + name); };
 
-it('parseVolume парсит якорь k:volume и варианты названий объема', () => {
-  assert.equal(parseVolume('| Объём цикла, карточек (на эпик) <!-- k:volume --> | 25 |'), 25);
-  assert.equal(parseVolume('| Объём круга | 25 |'), 25);
+it('parseVolume parses the k:volume anchor and the label variants', () => {
+  assert.equal(parseVolume('| \u041e\u0431\u044a\u0451\u043c \u0446\u0438\u043a\u043b\u0430, \u043a\u0430\u0440\u0442\u043e\u0447\u0435\u043a (\u043d\u0430 \u044d\u043f\u0438\u043a) <!-- k:volume --> | 25 |'), 25);
+  assert.equal(parseVolume('| \u041e\u0431\u044a\u0451\u043c \u043a\u0440\u0443\u0433\u0430 | 25 |'), 25);
   assert.equal(parseVolume('| Cycle volume | 25 |'), 25);
 });
 
-it('checkCoreCycleGuard блокирует invoke_subagent Core при N < 25', () => {
+it('checkCoreCycleGuard blocks the Core invoke_subagent at N < 25', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cycle-gate-'));
   try {
     const configDir = path.join(tmpDir, 'project', 'config');
@@ -76,7 +79,7 @@ it('checkCoreCycleGuard блокирует invoke_subagent Core при N < 25', 
       root: tmpDir,
     });
     assert.equal(denied.decision, 'deny');
-    assert.match(denied.reason, /Отказ: В эпике накоплено 0\/25 карточек\./);
+    assert.match(denied.reason, /\u041e\u0442\u043a\u0430\u0437: \u0412 \u044d\u043f\u0438\u043a\u0435 \u043d\u0430\u043a\u043e\u043f\u043b\u0435\u043d\u043e 0\/25 \u043a\u0430\u0440\u0442\u043e\u0447\u0435\u043a\./);
 
     const forced = checkCoreCycleGuard({
       toolName: 'invoke_subagent',
@@ -90,13 +93,13 @@ it('checkCoreCycleGuard блокирует invoke_subagent Core при N < 25', 
   }
 });
 
-it('PreToolUse hook guard-core-cycle.cjs отвечает JSON-контрактом deny/allow', () => {
+it('the PreToolUse hook guard-core-cycle.cjs answers by the deny/allow JSON contract', () => {
   const candidates = [
     path.join(root, '.agents', 'hooks', 'guard-core-cycle.cjs'),
     path.resolve(__dirname, '../hooks/guard-core-cycle.cjs'),
   ];
   const hookScript = candidates.find((c) => fs.existsSync(c));
-  assert.ok(hookScript, 'скрипт хука должен существовать');
+  assert.ok(hookScript, 'the hook script must exist');
 
   const payloadDeny = JSON.stringify({
     toolCall: {
@@ -110,12 +113,12 @@ it('PreToolUse hook guard-core-cycle.cjs отвечает JSON-контракт�
   assert.equal(resDeny.status, 0);
   const outDeny = JSON.parse(resDeny.stdout);
   assert.equal(outDeny.decision, 'deny');
-  assert.match(outDeny.reason, /Отказ: В эпике накоплено \d+\/25 карточек\./);
+  assert.match(outDeny.reason, /\u041e\u0442\u043a\u0430\u0437: \u0412 \u044d\u043f\u0438\u043a\u0435 \u043d\u0430\u043a\u043e\u043f\u043b\u0435\u043d\u043e \d+\/25 \u043a\u0430\u0440\u0442\u043e\u0447\u0435\u043a\./);
 
   const payloadForce = JSON.stringify({
     toolCall: {
       name: 'invoke_subagent',
-      args: { TypeName: 'core', Prompt: 'досрочное закрытие --force' },
+      args: { TypeName: 'core', Prompt: 'early closure --force' },
     },
     workspacePaths: [root],
   });
@@ -126,4 +129,4 @@ it('PreToolUse hook guard-core-cycle.cjs отвечает JSON-контракт�
   assert.equal(outForce.decision, 'allow');
 });
 
-console.log(`\nВсе ${passed} проверок cycle-gate успешно пройдены.`);
+console.log(`\nAll ${passed} cycle-gate checks passed.`);

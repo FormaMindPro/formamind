@@ -32,5 +32,6 @@ test('fail: missing file and file without marker', () => {
   const p = lp.verify(LAW, [d]);
   assert.strictEqual(p.length, 2);
   assert.match(p[0], /kit\.md.*moved-from-law/);
-  assert.match(p[1], /spec\.md.*не найден/);
+  // the ru finding is pinned byte-exact as \u escapes (ASCII file by construction)
+  assert.match(p[1], /spec\.md.*\u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d/);
 });

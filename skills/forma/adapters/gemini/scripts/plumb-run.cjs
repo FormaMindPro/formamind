@@ -2,9 +2,9 @@
 'use strict';
 
 /**
- * .agents/scripts/plumb-run.cjs — Форвардер Plumb-драйвера внешнего исполнителя для Gemini.
- * Делегирует исполнение общему драйверу .forma/plumb/plumb-run.cjs,
- * передавая каталог профилей ролей Gemini (.agents/plugins/forma/agents/run).
+ * .agents/scripts/plumb-run.cjs - the forwarder of the external executor's Plumb driver for Gemini.
+ * Delegates the execution to the shared driver .forma/plumb/plumb-run.cjs,
+ * passing the Gemini roles' profiles directory (.agents/plugins/forma/agents/run).
  */
 
 const fs = require('fs');

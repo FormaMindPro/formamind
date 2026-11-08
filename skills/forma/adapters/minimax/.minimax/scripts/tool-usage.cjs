@@ -1,27 +1,29 @@
 'use strict';
 
 /**
- * Журнал инструментов движка MiniMax: объявленный арсенал роли (фронтматтер) и запись хука.
+ * The MiniMax engine's tool log: a role's declared arsenal (the frontmatter) and the hook's record.
  *
- * Формат журнала — общий с остальными движками (`ts · узел · agent_id · инструмент · путь`),
- * файл журнала — общий с ядром: `.forma/dashboard/tool-usage.log`. Пишет его хук плагина
- * этого движка; пока плагин не установлен, журнала нет — и это поломка, а не тишина:
- * `alive: false` означает «хук не отработал ни разу».
+ * The log's format - shared with the other engines (`ts · node · agent_id · tool · path`),
+ * the log's file - shared with the core: `.forma/dashboard/tool-usage.log`. The plugin hook
+ * of this engine writes it; while the plugin is not installed, there is no log - and that is a breakage, not silence:
+ * `alive: false` means "the hook has never run".
  */
 
+const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
+const msg = (code, params) => i18n.message(code, params, 'ru');
 const fs = require('fs');
 const path = require('path');
 
 const LOG = path.join('.forma', 'dashboard', 'tool-usage.log');
-const HOOK_ERROR = ['!ERROR', '!ОШИБКА'];
+const HOOK_ERROR = ['!ERROR', '!\u041e\u0428\u0418\u0411\u041a\u0410']; // the ru marker is a parse pattern (data), the escape pass holds it as \u sequences
 
-/** Голое имя инструмента: `Bash(node x *)` → `Bash`. */
+/** A tool's bare name: `Bash(node x *)` -> `Bash`. */
 function baseName(decl) {
   const i = String(decl).indexOf('(');
   return (i === -1 ? String(decl) : String(decl).slice(0, i)).trim();
 }
 
-/** Разбор списка через запятую с оглядкой на скобки: `Bash(node x, y)` — один элемент. */
+/** A comma-separated list parse with a look at the brackets: `Bash(node x, y)` - one element. */
 function splitTools(line) {
   const out = [];
   let depth = 0;
@@ -38,7 +40,7 @@ function splitTools(line) {
   return out;
 }
 
-/** Объявленный арсенал ролей: имя роли → { file, decls }. Только из фронтматтера, не из памяти. */
+/** The roles' declared arsenal: a role's name -> { file, decls }. Only from the frontmatter, not from memory. */
 function readDeclared(agentsDir) {
   const roles = new Map();
   let entries = [];
@@ -60,7 +62,7 @@ function readDeclared(agentsDir) {
   return roles;
 }
 
-/** Разбор журнала. Нет файла — хук не отработал ни разу. */
+/** The log's parse. No file - the hook has never run. */
 function readLog(logFile = LOG) {
   if (!fs.existsSync(logFile)) return { alive: false, rows: [], errors: [] };
   const lines = fs.readFileSync(logFile, 'utf8').split(/\r?\n/);
@@ -71,7 +73,7 @@ function readLog(logFile = LOG) {
     if (!s || s.startsWith('#')) continue;
     const parts = s.split('·').map((p) => p.trim());
     if (parts.length < 4) {
-      errors.push({ ts: '?', reason: `строка не разобрана: ${s}` });
+      errors.push({ ts: '?', reason: msg('mlog.unparsed', { line: s }) });
       continue;
     }
     const [ts, node, agentId, tool, file] = parts;

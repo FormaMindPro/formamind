@@ -1,32 +1,32 @@
 'use strict';
 
-// Генератор зеркала ролей эталонного движка в движок-приёмник (папки ролей — из adapters, engines.cjs).
-// Правила выведены байт-в-байт из текущего (уже синхронного) зеркала.
-// Фронтматтер (model/effort/tools/skills) не генерируется: он инженерный выбор под возможности
-// движка, role-parity.cjs сам исключает его из сверки (normalizeText режет `^---...---\n`).
-// Генератор трогает только тело файла и сохраняет фронтматтер, уже стоящий в файле назначения.
+// Generator of the base engine's role mirror into the sink engine (the roles folders - from adapters, engines.cjs).
+// The rules are derived byte-for-byte from the current (already synced) mirror.
+// The frontmatter (model/effort/tools/skills) is not generated: it is an engineering choice per the
+// engine's capabilities; role-parity.cjs itself excludes it from the reconciliation (normalizeText cuts `^---...---\n`).
+// The generator touches only the file's body and keeps the frontmatter already standing in the destination file.
 
 const fs = require('fs');
 const path = require('path');
 const roots = require('./engine-roots.cjs');
 const { ROLE_EQUIVALENCE } = require('./role-parity.cjs');
 
-// Источник — движок, в чьей папке лежит этот скрипт; приёмник — движок зеркала (по id адаптера).
-// Папки ролей и скиллов обоих берутся из `sources` их адаптеров (engines.cjs); нет адаптера — зеркала нет, план пуст.
+// The source - the engine in whose folder this script lies; the sink - the mirror engine (by the adapter's id).
+// Both engines' roles and skills folders come from the `sources` of their adapters (engines.cjs); no adapter - no mirror, an empty plan.
 const TARGET_ID = 'gemini';
 
-/** Контекст зеркала для проекта: { from, to, roleTransforms, onDemandTransforms, protectedLiterals } или null. */
+/** The project's mirror context: { from, to, roleTransforms, onDemandTransforms, protectedLiterals }, or null. */
 function ctxOf(root) {
   const from = roots.own(root);
   const to = roots.find(root, TARGET_ID);
   if (!from || !to || !from.src.rolesDir || !to.src.rolesDir) return null;
-  const rel = path.posix.basename(to.src.rolesDir); // как зеркало называет свою папку ролей изнутри
+  const rel = path.posix.basename(to.src.rolesDir); // how the mirror names its own roles folder from inside
   const re = (s, tail = '') => new RegExp(roots.escapeRe(s) + tail, 'g');
   const R = from.src.rolesDir;
   const K = from.src.skillsDir;
   const tick = '`';
-  // Роль (с фронтматтером `model:`) получает суффикс заголовка « (Gemini Engine)» и полный набор
-  // подстановок путей. On-demand (без фронтматтера) получает только подстановку собственной папки.
+  // A role (with the `model:` frontmatter) gets the header suffix " (Gemini Engine)" and the full set
+  // of path substitutions. On-demand (no frontmatter) gets only the substitution of its own folder.
   const onDemand = [[re(`${R}/on-demand/`), `${rel}/on-demand/`]];
   const roleTransforms = [
     ...onDemand,
@@ -35,9 +35,9 @@ function ctxOf(root) {
     [re(`${R}/`, '(?=[,`\s)]|$)'), `${rel}/`],
     [re(`${K}/`), `${to.src.skillsDir}/`],
   ];
-  // Строки-исключения: ссылка на конкретный файл (не на «мою папку ролей» вообще) или документация
-  // самого устройства двух зеркал сразу — регекс не умеет отличить это от общей ссылки на папку,
-  // поэтому исключение явное, по файлу и точной подстроке. Расширять только по найденному в diff.
+  // Protected literals: a reference to a concrete file (not to "my roles folder" in general) or documentation
+  // of the two mirrors' construction itself - a regex cannot tell this from a general folder reference,
+  // so the exception is explicit, by file and exact substring. Extend only by what a diff reveals.
   const protectedLiterals = {
     'core.md': [`${tick}${K}/*/SKILL.md${tick}`],
     'spec.md': [`agents in ${tick}${R}/${tick}, skills in ${tick}${K}/${tick}`],
@@ -46,8 +46,8 @@ function ctxOf(root) {
   return { from, to, roleTransforms, onDemandTransforms: onDemand, protectedLiterals };
 }
 
-// on-demand файл, который сам документирует устройство зеркала (оба реальных пути названы рядом) —
-// копируется побайтово, без единой подстановки.
+// An on-demand file that itself documents the mirror's construction (both real paths named side by side) -
+// copied byte-for-byte, with not a single substitution.
 const ON_DEMAND_EXCLUDE = new Set(['intent-housekeeping.md']);
 
 function splitFrontmatter(text) {
@@ -87,7 +87,7 @@ function transformBody(body, transforms, addTitleSuffix, literals) {
   return out;
 }
 
-/** Список файлов-ролей (относительно каталога ролей источника): корневые шесть + `run/*.md`. */
+/** The list of role files (relative to the source's roles directory): the root six + `run/*.md`. */
 function listRoleFiles(root, ctx) {
   const base = path.join(root, ctx.from.src.rolesDir);
   const top = fs.readdirSync(base).filter((f) => f.endsWith('.md'));
@@ -99,13 +99,13 @@ function listRoleFiles(root, ctx) {
   return [...topPaired, ...run];
 }
 
-/** Список on-demand файлов (относительно `on-demand/` каталога ролей источника). */
+/** The list of on-demand files (relative to the source's roles-directory `on-demand/`). */
 function listOnDemandFiles(root, ctx) {
   const dir = path.join(root, ctx.from.src.rolesDir, 'on-demand');
   return fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.md')) : [];
 }
 
-/** Сгенерированное тело для одной роли; фронтматтер берётся из текущего файла назначения (не создаётся). */
+/** The generated body for one role; the frontmatter is taken from the current destination file (never created). */
 function renderRole(root, relFile, ctx = ctxOf(root)) {
   const claudeAbs = path.join(root, ctx.from.src.rolesDir, relFile);
   const geminiAbs = path.join(root, ctx.to.src.rolesDir, relFile);
@@ -121,7 +121,7 @@ function renderRole(root, relFile, ctx = ctxOf(root)) {
   return { ok: true, content: destFm + genBody };
 }
 
-/** Сгенерированный on-demand файл: либо побайтовая копия (файл в исключениях), либо с подстановкой пути. */
+/** The generated on-demand file: either a byte-for-byte copy (a file in the exclusions) or with the path substitution. */
 function renderOnDemand(root, file, ctx = ctxOf(root)) {
   const claudeAbs = path.join(root, ctx.from.src.rolesDir, 'on-demand', file);
   const claudeRaw = fs.readFileSync(claudeAbs, 'utf8').replace(/\r\n/g, '\n');
@@ -130,10 +130,10 @@ function renderOnDemand(root, file, ctx = ctxOf(root)) {
   return { ok: true, content };
 }
 
-/** Все пары с их генерируемым содержимым и состоянием относительно диска. `kind`: role|on-demand. */
+/** All the pairs with their generated content and their state against disk. `kind`: role|on-demand. */
 function planAll(root) {
   const ctx = ctxOf(root);
-  if (!ctx) return []; // нет адаптера источника или приёмника — зеркала нет
+  if (!ctx) return []; // no source or sink adapter - no mirror
   const plan = [];
   for (const relFile of listRoleFiles(root, ctx)) {
     const destRel = path.join(ctx.to.src.rolesDir, relFile);
@@ -148,7 +148,7 @@ function planAll(root) {
   return plan;
 }
 
-/** Статус одной записи плана против диска: synced|drift|would_create|problem. */
+/** The status of one plan entry against disk: synced|drift|would_create|problem. */
 function statusOf(root, entry) {
   if (!entry.gen.ok) return { status: 'problem', detail: entry.gen.reason };
   const destAbs = path.join(root, entry.destRel);
@@ -157,14 +157,14 @@ function statusOf(root, entry) {
   return destRaw === entry.gen.content ? { status: 'synced' } : { status: 'drift' };
 }
 
-/** `--check`: отчёт без записи. */
+/** `--check`: a report without writes. */
 function checkAll(root) {
   const plan = planAll(root);
   return plan.map((entry) => ({ entry, res: statusOf(root, entry) }));
 }
 
-/** Перевод стиля конца строки файла назначения назад на `\r\n`, если он уже так хранился — запись
- * не навязывает `\n` файлу, который до этого был `\r\n`; содержимое (без учёта EOL) не меняется. */
+/** Translating the destination file's line-ending style back to `\r\n` when it was stored that way - the write
+ * does not impose `\n` on a file that was `\r\n` before; the content (EOL-insensitive) does not change. */
 function matchEol(content, destAbs) {
   if (!fs.existsSync(destAbs)) return content;
   const existing = fs.readFileSync(destAbs, 'utf8');
@@ -172,7 +172,7 @@ function matchEol(content, destAbs) {
   return hadCrlf ? content.replace(/\n/g, '\r\n') : content;
 }
 
-/** `--apply`: пишет расходящиеся файлы (кроме `problem`), остальные не трогает. Идемпотентна. */
+/** `--apply`: writes the drifting files (except `problem`), leaves the rest untouched. Idempotent. */
 function applyAll(root, { dryRun = false } = {}) {
   const plan = planAll(root);
   const written = [];

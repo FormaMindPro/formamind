@@ -1,10 +1,12 @@
 'use strict';
 
 /**
- * Адаптер Claude Code для ядра «Формы»: то, что знает только этот движок.
- * Ядро находит его само — файл `forma-adapter.cjs` в каталоге корня, чьё имя начинается с точки;
- * форма объекта и замена отсутствующего поля — в шапке `.forma/dashboard/lib/engines.cjs`.
- * Соответствие форме проверяет `.claude/scripts/forma-adapter.test.cjs`.
+ * The Claude Code adapter for the Forma core: what only this engine knows.
+ * The core finds it by itself - the `forma-adapter.cjs` file in the root directory whose name starts
+ * with a dot; the object shape and the missing-field replacement - in the header of
+ * `.forma/dashboard/lib/engines.cjs`.
+ * The conformance to the shape is checked by `.claude/scripts/forma-adapter.test.cjs`.
+ * Dashboard labels come from the core dictionary: English key in code, ru value as data.
  */
 
 const instruction = require('./scripts/instruction-weight.cjs');
@@ -12,8 +14,10 @@ const toolUsage = require('./scripts/tool-usage.cjs');
 const { claudeUsage, mainSessions, mainStepOf } = require('./scripts/claude-economy.cjs');
 const view = require('./scripts/dashboard-view.cjs');
 const { readMdCatalog } = require('../.forma/dashboard/lib/forma-roles.cjs');
+const i18n = require('../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
-/** Срез ролей для вкладки «Форма»: узлы и каталог Run из .claude/agents, плагины — данные движка. */
+/** The roles slice for the "Forma" tab: the nodes and the Run catalog from .claude/agents, the plugins - engine data. */
 function formaRoles(root) {
   const cat = readMdCatalog(root, {
     title: 'Claude Code',
@@ -32,7 +36,7 @@ module.exports = {
   id: 'claude',
   spendTag: 'claude-code',
 
-  // Контракт движка (ENGINE-CONTRACT.md): источники, возможности, таблица узел -> модель, зоны записи.
+  // The engine contract (ENGINE-CONTRACT.md): the sources, the capabilities, the node -> model table, the write zones.
   sources: {
     rolesDir: '.claude/agents',
     onDemandRolesDir: '.claude/agents/on-demand',
@@ -51,11 +55,11 @@ module.exports = {
   },
   writeZones: ['.claude', '.devtool/features'],
 
-  // Вес инструкций на шаг вызова и число шагов по кэш-чтению.
+  // The instruction weight per call step and the step count by cache read.
   instructionWeight: instruction.instructionWeight,
   stepsFromCacheRead: instruction.stepsFromCacheRead,
 
-  // Журнал инструментов: разбор объявленных в ролях и записанных хуком.
+  // The tool log: parsing of what the roles declare and the hook records.
   toolUsage: {
     source: '.claude/scripts/tool-usage.cjs',
     readDeclared: toolUsage.readDeclared,
@@ -63,24 +67,24 @@ module.exports = {
     baseName: toolUsage.baseName,
   },
 
-  // Расход вызова: каталог стенограмм и разбор одного шага `message.usage`;
-  // журнал основной сессии — раскладка (~/.claude/projects/<slug>) и нормализованный шаг записи.
+  // The call spend: the transcript catalog and the parsing of one `message.usage` step;
+  // the main-session log - the layout (~/.claude/projects/<slug>) and the normalized record step.
   parseUsage: claudeUsage,
   transcriptsDir: view.transcriptsDir,
   mainSessions,
   mainStepOf,
 
-  // Файлы ролей, §8 и скиллов; скрипты сверки и графа сделанных карточек.
+  // The role files, §8 and skills; the reconciliation scripts and the graph of done cards.
   rolesDir: '.claude/agents',
   onDemandRolesDir: '.claude/agents/on-demand',
   engineRulesFile: '.claude/rules/claude-8.md',
   skillsDir: '.claude/skills',
-  // Умения, что поставляет шаблон (адаптер Claude + интервью ядра): по ним вкладка «Проект» отличает ядро от проекта.
-  // Список едет с адаптером — в установленном проекте клона .forma/protocol/ нет; сверка с шаблоном — forma-adapter.test.cjs.
+  // The skills the template delivers (the Claude adapter + the core interview): by them the "Project" tab tells the core from a project.
+  // The list rides with the adapter - an installed project has no .forma/protocol/ clone; the check against the template - forma-adapter.test.cjs.
   templateSkills: ['engine-switch', 'excalidraw-diagrams', 'forma-grill-with-ui', 'graph-build', 'graphify', 'grilling', 'human-register', 'law-shrink', 'project-knowledge', 'skill-authoring'],
   syncScript: '.claude/scripts/sync-engines.cjs',
 
-  // Расход диалога: скрипт пишет .forma/dashboard/.cache/session-current.json.
+  // The conversation spend: the script writes .forma/dashboard/.cache/session-current.json.
   usageRefresh: [
     { script: '.claude/scripts/session-economy.cjs', args: ['--session', 'current'], cache: 'session-current.json' },
   ],
@@ -89,22 +93,22 @@ module.exports = {
   engineSettings: view.engineSettings,
   formaRoles,
 
-  // Группа дерева «Структура» и подписи каталогов адаптера.
+  // The "Structure" tree group and the adapter directory labels.
   structure: {
     key: 'model',
-    title: 'Модель · Claude Code',
-    note: 'адаптер движка Claude Code — §8',
+    title: msg('adapter.claude.st.title'),
+    note: msg('adapter.claude.st.note'),
     roots: ['.claude'],
     notes: {
-      '.claude': 'всё, что знает только Claude Code',
-      '.claude/agents': 'роли узлов: Intent, Spec, Kit, Run, Core',
-      '.claude/agents/on-demand': 'роли, подгружаемые по случаю',
-      '.claude/rules': '§8 — архитектура движка в Claude Code',
-      '.claude/hooks': 'хуки: старт сессии, защита удаления, проверка карточек',
-      '.claude/scripts': 'скрипты адаптера: экономика, графы, сайт',
-      '.claude/skills': 'арсенал скиллов',
-      '.claude/settings.json': 'хуки, права, окружение',
-      '.forma/skills': 'интервью-скиллы ядра, доставляются в .claude/skills',
+      '.claude': msg('adapter.claude.node.root'),
+      '.claude/agents': msg('adapter.claude.node.agents'),
+      '.claude/agents/on-demand': msg('adapter.claude.node.on_demand'),
+      '.claude/rules': msg('adapter.claude.node.rules'),
+      '.claude/hooks': msg('adapter.claude.node.hooks'),
+      '.claude/scripts': msg('adapter.claude.node.scripts'),
+      '.claude/skills': msg('adapter.claude.node.skills'),
+      '.claude/settings.json': msg('adapter.claude.node.settings'),
+      '.forma/skills': msg('adapter.claude.node.forma_skills'),
     },
   },
 };

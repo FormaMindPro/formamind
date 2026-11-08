@@ -1,20 +1,23 @@
 'use strict';
 
-// Среда: Kimi Code. Тест соответствия адаптера контракту экономии гоняет adapter-conformance сам (находит его
-// по testsDir адаптера); эта проверка — строение зоны kimi, как codex.cjs для Codex: §8 опирается на AGENTS.md
-// и не держит своей копии §1–7, нативные агенты шести ролей и хуки на месте. Находки — сведения (ctx.info),
-// не нарушения; проверка ничего не возвращает как нарушение.
+// The environment: Kimi Code. The adapter's economy-contract conformance test is run by adapter-conformance itself
+// (it finds the test by the adapter's testsDir); this check is the kimi zone's construction, as codex.cjs is for
+// Codex: §8 leans on AGENTS.md and holds no copy of §1-7 of its own, the native agents of the six roles and the
+// hooks are in place. Findings are info notes (ctx.info), not violations; the check never returns a violation.
+// Finding labels come from the core dictionary: English key in code, ru value as data.
 
 const fs = require('fs');
 const path = require('path');
 const { isDormant } = require('./support/dormant.cjs');
 const roots = require('./support/engine-roots.cjs');
+const i18n = require('../../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ENGINE_ID = 'kimi';
 const AGENT_NAMES = ['intent', 'spec', 'kit', 'run', 'core', 'extractor'];
 const HOOK_FILES = ['kimi-ledger.cjs', 'kimi-session-start.cjs'];
 
-/** Пути проверки — из адаптера kimi; адаптера нет, но папка есть — по соглашению. null — среда не подключена. */
+/** The check's paths - from the kimi adapter; no adapter but the folder exists - by convention. null - the environment is not wired. */
 function ctxOf(root) {
   const mine = roots.find(root, ENGINE_ID);
   const dir = mine ? mine.dir : '.' + ENGINE_ID;
@@ -30,41 +33,41 @@ function ctxOf(root) {
   };
 }
 
-/** §8 не подменяет закон и опирается на AGENTS.md — тот же контракт, что у codex.cjs. */
+/** §8 does not replace the law and leans on AGENTS.md - the same contract as codex.cjs. */
 function eightProblems(root, c) {
   const abs = path.join(root, c.eight);
-  if (!fs.existsSync(abs)) return [`${c.eight}: нет §8 этой среды — роли ссылаются в пустоту`];
+  if (!fs.existsSync(abs)) return [msg('kimi.no_8', { eight: c.eight })];
   const eight = fs.readFileSync(abs, 'utf8');
   const problems = (eight.match(/^#{1,3}\s*(§?\s*)?[1-7][.\s·]/gm) || [])
-    .map((m) => `${c.eight}: похоже на собственную копию раздела закона («${m.trim()}») — §1–7 живут только в AGENTS.md`);
+    .map((m) => msg('kimi.own_law_copy', { eight: c.eight, found: m.trim() }));
   if (!/AGENTS\.md/.test(eight)) {
-    problems.push(`${c.eight}: не ссылается на AGENTS.md — §8 обязан опираться на общий закон, а не стоять сам по себе`);
+    problems.push(msg('kimi.no_law_reference', { eight: c.eight }));
   }
   return problems;
 }
 
-/** Нативно обнаруживаемые агенты шести ролей — то, что extra_agent_dirs подаёт движку (синхронность — тест адаптера). */
+/** Natively discoverable agents of the six roles - what extra_agent_dirs serves the engine (the sync - the adapter test). */
 function agentsCodeProblems(root, c) {
   return AGENT_NAMES
     .filter((name) => !fs.existsSync(path.join(root, c.agentsCode, `${name}.md`)))
-    .map((name) => `${c.agentsCode}/${name}.md: нет нативного агента роли`);
+    .map((name) => msg('kimi.no_agent', { path: `${c.agentsCode}/${name}.md` }));
 }
 
 function hooksProblems(root, c) {
   return HOOK_FILES
     .filter((f) => !fs.existsSync(path.join(root, c.hooks, f)))
-    .map((f) => `${c.hooks}/${f}: нет файла хука`);
+    .map((f) => msg('kimi.no_hook', { path: `${c.hooks}/${f}` }));
 }
 
 function run({ root, info }) {
-  // Среды нет — проверять нечего: Kimi Code может не использоваться, это норма.
+  // No environment - nothing to check: Kimi Code may be unused, that is the norm.
   const c = ctxOf(root);
   if (!c) return [];
-  // Спящий режим (`.forma/engines.json`): среда на месте, но не сверяется.
-  if (isDormant(root, c.id)) { if (info) info.push(`    · ${c.name}: спящий режим — не сверяется (реестр .forma/engines.json)`); return []; }
+  // Sleeping mode (`.forma/engines.json`): the environment is in place but not reconciled.
+  if (isDormant(root, c.id)) { if (info) info.push(msg('kimi.dormant', { name: c.name })); return []; }
   const notes = [...eightProblems(root, c), ...agentsCodeProblems(root, c), ...hooksProblems(root, c)];
-  if (!fs.existsSync(path.join(root, c.skillsDir))) notes.push(`${c.skillsDir}: нет общего каталога умений (Kimi Code открывает его нативно)`);
-  if (info) info.push(...notes.map((l) => `    · ${c.name} (сведение, не нарушение): ` + l));
+  if (!fs.existsSync(path.join(root, c.skillsDir))) notes.push(msg('kimi.no_skills_dir', { dir: c.skillsDir }));
+  if (info) info.push(...notes.map((l) => msg('kimi.info_line', { name: c.name }) + l));
   return [];
 }
 

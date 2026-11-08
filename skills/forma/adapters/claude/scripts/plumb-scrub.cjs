@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const MIN_SECRET_LEN = 4;
 const TRIVIAL = new Set(['true', 'false', 'null', 'none', 'yes', 'no', 'on', 'off']);
@@ -122,7 +123,7 @@ function residue(text, secrets) {
   const why = [];
   for (const value of secrets.keys()) if (text.includes(value)) { why.push('secret value remains'); break; }
   if (/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/.test(text)) why.push('e-mail remains');
-  if (/\b(?:password|passwd|pwd|token|secret|api[_-]?key|пароль|ключ)\b\s*[:=]\s*[^\s\[]/i.test(text)) why.push('credential assignment remains');
+  if (/\b(?:password|passwd|pwd|token|secret|api[_-]?key|\u043f\u0430\u0440\u043e\u043b\u044c|\u043a\u043b\u044e\u0447)\b\s*[:=]\s*[^\s\[]/i.test(text)) why.push('credential assignment remains');
   for (const m of text.matchAll(/\b[A-Za-z0-9]{24,}\b/g)) {
     if (/\d/.test(m[0]) && /[A-Za-z]/.test(m[0])) { why.push('long token-like string remains'); break; }
   }
@@ -135,7 +136,7 @@ function main() {
   let md;
   try { md = fs.readFileSync(a.card, 'utf8'); } catch (e) { console.error(`cannot read card: ${e.code || e.message}`); process.exit(1); }
   const task = extractTask(md);
-  if (!task) { console.error('refused: card has no ## Task / ## Задача zone'); process.exit(2); }
+  if (!task) { console.error(msg('plumb.scrub_no_task')); process.exit(2); }
 
   const siteHosts = new Set(a.site);
   const secrets = loadSecrets(a.root, siteHosts);

@@ -1,68 +1,72 @@
 #!/usr/bin/env node
-// Учёт расхода постоянных субагентов — companion к AGENTS.md §3 «заход» в карточке,
-// но сквозь всю жизнь субагента, не по одной задаче (`kit.md`-задача «учёт расхода
-// постоянных субагентов», память project_kit_subagent_infra_housekeeping.md).
+// The spend accounting of standing subagents - a companion to AGENTS.md §3 "the call" in the card,
+// but across the subagent's whole life, not per one task (the `kit.md` task "the spend accounting
+// of standing subagents", the memory project_kit_subagent_infra_housekeeping.md).
 //
-// Критический факт: subagent_tokens в <usage> —
-// нарастающий итог за всю жизнь субагента (текущий размер контекста), не расход за
-// вызов. Поэтому каждая запись хранит и использует ДЕЛЬТУ (текущее сырое значение минус
-// предыдущее сохранённое), не само сырое число — иначе расход задваивается на весь
-// предыдущий контекст. См. .forma/dashboard/subagents.log — формат там же, подробно.
+// The critical fact: subagent_tokens in <usage> is
+// a running total over the subagent's whole life (the current context size), not the spend of a
+// call. So every record stores and uses the DELTA (the current raw value minus the previously
+// stored one), not the raw number itself - otherwise the spend double-counts the whole
+// previous context. See .forma/dashboard/subagents.log - the format is described there, in detail.
 //
-// Пишет тот же узел, что и так пишет строку в ## History карточки — не отдельный
-// процесс: одна операция сразу после возврата из Agent-вызова.
+// The same node that writes the call line into the card's ## History writes this too - not a separate
+// process: one operation right after the return from the Agent call.
 //
-// КЭШ-ЧТЕНИЕ (R, AGENTS.md §3) добавлен позже. Про cache_read_input_tokens
-// НЕЛЬЗЯ повторять на веру то, что установлено про subagent_tokens. Измерено
-// По живой стенограмме сессии (12 последовательных шагов узла):
-// пошаговое cache_read_input_tokens — НЕ нарастающая сумма прежних чтений
-// (28049 → 72904, а сумма двух первых дала бы 56098), а размер закэшированного
-// префикса на этом шаге, ровно cr(n+1) = cr(n) + cc(n), шесть пар подряд без
-// исключений. Отсюда следует ровно одно, и не больше: поле не сбрасывается и не
-// убывает в течение жизни субагента.
+// CACHE READ (R, AGENTS.md §3) was added later. About cache_read_input_tokens one must NOT
+// repeat on faith what was established about subagent_tokens. Measured
+// on a live session transcript (12 consecutive node steps):
+// the per-step cache_read_input_tokens is NOT a running sum of the earlier reads
+// (28049 -> 72904, while the sum of the first two would give 56098) but the size of the cached
+// prefix at that step, exactly cr(n+1) = cr(n) + cc(n), six pairs in a row without
+// exceptions. Exactly one thing follows, and no more: the field neither resets nor
+// decreases over the subagent's life.
 //
-// Чем это НЕ является: доказательством, что величина R целого Agent-вызова —
-// снимок (тогда верна дельта, как у токенов) или сумма по шагам (тогда верно сырое
-// число). Изнутри узла <usage> собственного вызова не виден, и выдумывать здесь
-// нечего. Поэтому природа не объявляется, а устанавливается данными:
-//   • по умолчанию считается дельта — как у токенов;
-//   • отрицательная дельта у поля, которое измеренно не убывает, — это ДОКАЗАТЕЛЬСТВО
-//     того, что величина вызова позаходная, а не снимок. Тогда запись не молчит и не
-//     клэмпит в ноль: природа фиксируется в реестре как `позаходное`, расходом
-//     засчитывается сырое число, и строка лога это говорит.
-// Пока двух записей нет, природа честно стоит как `не установлена`.
+// What this is NOT: a proof that the R value of a whole Agent call is
+// a snapshot (then the delta holds, as with tokens) or a sum over steps (then the raw
+// number holds). From inside the node the <usage> of its own call is invisible, and there is
+// nothing to invent here. So the nature is not declared but established by data:
+//   - by default the delta is counted - as with tokens;
+//   - a negative delta of a field that measurably does not decrease is PROOF that the call's
+//     value is per-call, not a snapshot. Then the record neither silences nor clamps to zero:
+//     the nature is fixed in the registry as `per-call`, the raw number counts as the spend,
+//     and the log line says so.
+// Until the two records exist, the nature stands honestly as `not established`.
 //
-// ИСТОЧНИК R. Всё рассуждение выше — про R, добытое из
-// возврата вызова, где его как раз нет. Теперь есть второй путь, и он лучше первого:
-// у каждого захода субагента своя стенограмма на диске (`subagent-transcript.cjs`),
-// и там R лежит по шагам. Сумма по дедуплицированным шагам — это расход ИМЕННО ЭТОГО
-// захода, а не нарастающий итог; значит дельту считать не надо и природу устанавливать
-// не надо — она известна из устройства источника. Путь через `--raw-cache-read`
-// оставлен как был: он не мешает и пригодится, если движок однажды начнёт отдавать поле.
+// THE SOURCE OF R. All the reasoning above is about R mined from
+// the call's return, where it is exactly absent. Now there is a second path, better than the first:
+// each subagent call has its own transcript on disk (`subagent-transcript.cjs`),
+// and R lies there per step. The sum over the deduplicated steps is the spend of THIS
+// call, not a running total; so no delta needs computing and no nature needs establishing -
+// it is known from the source's construction. The `--raw-cache-read` path
+// is kept as it was: it does not interfere and will serve if an engine one day starts giving the field.
 //
-// Отсутствие стенограммы НИКОГДА не становится нулём — ни в логе, ни в реестре, ни в
-// строке §3. Сорок прошлых заходов её не имеют и не получат: стенограммы живут при
-// сессии. Это норма корпуса, а не недоделка, и называется словами.
+// A missing transcript NEVER becomes zero - neither in the log, nor in the registry, nor in the
+// §3 line. The forty past calls do not have it and will not: transcripts live with the
+// session. That is the norm of the corpus, not a shortfall, and it is named in words.
 //
-// CLI:      node .forma/dashboard/subagents-log.cjs record --agent <id> --role "<текст>"
+// CLI:      node .forma/dashboard/subagents-log.cjs record --agent <id> --role "<text>"
 //             --raw-tokens <N> --duration-s <T> [--raw-cache-read <R>] [--from-transcript]
-//             [--card <id>] --summary "<текст>" [--node <Узел>] [--date <ГГГГ-ММ-ДД>]
-// Программно: const { recordSubagentCall, historyLine } = require('./subagents-log.cjs');
+//             [--card <id>] --summary "<text>" [--node <Node>] [--date <YYYY-MM-DD>]
+// Programmatically: const { recordSubagentCall, historyLine } = require('./subagents-log.cjs');
+//
+// Printed labels come from the core dictionary: English key in code, ru value as data.
 
 const fs = require('fs');
 const path = require('path');
 const { readSubagentTranscript, NO_TRANSCRIPT } = require('./subagent-transcript.cjs');
 const { readJson, writeJsonAtomic } = require('./lib/fs.cjs');
 const { parseOptions } = require('./lib/cli.cjs');
+const i18n = require('../i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = __dirname;
 const CACHE_DIR = path.join(ROOT, '.cache');
 const LOG_FILE = path.join(ROOT, 'subagents.log');
 const REGISTRY_FILE = path.join(CACHE_DIR, 'subagents-registry.json');
 
-// Тот же casual-формат времени, что и graphify.log:
-// ГГГГ-ММ-ДД ЧЧ:ММ (срез ISO без строгого учёта часового пояса) — консистентно с
-// .forma/dashboard/generate.js:timeAgo(), который эту же форму и парсит.
+// The same casual time format as graphify.log:
+// YYYY-MM-DD HH:MM (an ISO slice without strict timezone handling) - consistent with
+// .forma/dashboard/generate.js:timeAgo(), which parses this same shape.
 function nowStamp() {
   return new Date().toISOString().slice(0, 16).replace('T', ' ');
 }
@@ -71,63 +75,63 @@ function readRegistry() {
   return readJson(REGISTRY_FILE, {});
 }
 
-// Дельта токенов: первая запись — сырое число, дальше — разность с прошлым сырым.
+// The token delta: the first record - the raw number, afterwards - the difference with the previous raw.
 function tokenDelta(existing, rawTokens) {
   if (!existing) return { first: true, delta: rawTokens, warning: '' };
   const delta = rawTokens - existing.last_raw_subagent_tokens;
   if (!(delta < 0)) return { first: false, delta, warning: '' };
-  // Не должно происходить у живого субагента (только сброс/переиспользование id) —
-  // не выдумываем отрицательный или произвольный расход: дельта 0, честная пометка
-  // в самой строке лога, ничего не скрываем молча.
-  return { first: false, delta: 0, warning: ' (предупреждение: сырое subagent_tokens уменьшилось — дельта обнулена, возможен сброс контекста субагента)' };
+  // Must not happen with a live subagent (only a reset/id reuse) -
+  // no negative or arbitrary spend is invented: the delta is 0, an honest mark
+  // in the log line itself, nothing hidden silently.
+  return { first: false, delta: 0, warning: msg('sublog.token_warning') };
 }
 
-// Сырое cache_read вызова против прошлого сохранённого: дельта, первая запись или
-// доказанная убыванием позаходность. Меняет `r` на месте.
+// The call's raw cache_read against the previous stored one: a delta, a first record, or
+// a per-call nature proven by the decrease. Mutates `r` in place.
 function applyRawCacheRead(r, o, existing) {
   const prev = existing ? existing.last_raw_cache_read : undefined;
   if (!Number.isFinite(prev)) {
     r.cacheFirst = true;
     r.cacheDelta = o.rawCacheRead;
-    // Одной записи мало, чтобы что-то утверждать: природа остаётся неустановленной.
+    // One record proves nothing: the nature stays unset.
   } else if (o.rawCacheRead >= prev) {
     r.cacheDelta = o.rawCacheRead - prev;
-    if (r.cacheNature === 'не установлена') r.cacheNature = 'накопительное (не опровергнуто)';
+    if (r.cacheNature === msg('sublog.nature_unset')) r.cacheNature = msg('sublog.nature_cumulative');
   } else {
-    // Измеренный факт: пошагово это поле не убывает. Значит убывание величины
-    // ВЫЗОВА доказывает, что она позаходная, а не снимок. Не клэмпим в ноль —
-    // это ровно тот «приятный нам» перекос, ради которого карточка заведена.
-    r.cacheNature = 'позаходное (доказано убыванием)';
+    // A measured fact: per step this field does not decrease. So a decrease of the
+    // CALL's value proves it is per-call, not a snapshot. No clamping to zero -
+    // that is exactly the "convenient to us" skew the card was opened for.
+    r.cacheNature = msg('sublog.nature_per_call_proved');
     r.cacheDelta = o.rawCacheRead;
-    r.warning += ` (природа cache_read установлена как позаходная: сырое ${o.rawCacheRead} меньше предыдущего ${prev}, а пошагово это поле не убывает — расходом засчитано сырое число, не дельта)`;
+    r.warning += msg('sublog.cache_warning_proved', { raw: o.rawCacheRead, prev });
   }
 }
 
-// ---- кэш-чтение (R) ----
-// Дельта по умолчанию, но природа поля не объявляется
-// задним числом: её устанавливает первое же наблюдение, которое ей противоречит.
+// ---- cache read (R) ----
+// The delta by default, but the field's nature is not declared
+// retroactively: the first observation contradicting it establishes it.
 function cacheReading(o, existing) {
   const r = {
     cacheDelta: null,
-    cacheNature: (existing && existing.cache_read_nature) || 'не установлена',
+    cacheNature: (existing && existing.cache_read_nature) || msg('sublog.nature_unset'),
     cacheFirst: false,
     warning: '',
-    // Стенограмма даёт R прямо за этот заход — сумму по дедуплицированным шагам.
-    // Природа тут не «устанавливается наблюдением», она следует из устройства источника,
-    // поэтому вся машинерия дельты ниже обходится, а не подправляется.
+    // The transcript gives R directly for this call - the sum over the deduplicated steps.
+    // The nature here is not "established by observation", it follows from the source's
+    // construction, so the whole delta machinery below is bypassed, not patched.
     fromTranscript: Number.isFinite(o.cacheReadFinal),
   };
   r.hasCache = r.fromTranscript || Number.isFinite(o.rawCacheRead);
   if (r.fromTranscript) {
     r.cacheDelta = o.cacheReadFinal;
-    r.cacheNature = 'позаходное (по стенограмме)';
+    r.cacheNature = msg('sublog.nature_per_call_transcript');
   } else if (r.hasCache) {
     applyRawCacheRead(r, o, existing);
   }
   return r;
 }
 
-// Прежнее значение счётчика реестра; нет записи или поля — 0.
+// The registry counter's previous value; no record or field - 0.
 const carried = (existing, key) => (existing && existing[key] ? existing[key] : 0);
 
 function registryEntry(o, existing, { at, role, delta, cache }) {
@@ -140,13 +144,13 @@ function registryEntry(o, existing, { at, role, delta, cache }) {
     last_raw_subagent_tokens: o.rawTokens,
     cache_read_total: carried(existing, 'cache_read_total') + (cache.cacheDelta || 0),
     calls_with_cache_read: carried(existing, 'calls_with_cache_read') + (cache.hasCache ? 1 : 0),
-    // Заход по стенограмме сырого поля не приносит — и не должен затирать прежнее
-    // прочерком: это тот же ноль, только в реестре.
+    // A transcript call brings no raw-field value - and must not overwrite the previous
+    // one with a dash: that is the same zero, only in the registry.
     last_raw_cache_read: Number.isFinite(o.rawCacheRead) ? o.rawCacheRead : (existing ? existing.last_raw_cache_read : undefined),
     cache_read_nature: cache.cacheNature,
-    // Шаги и выход берутся только из стенограммы; заход без неё их не имеет, и
-    // покрытие считается отдельно от числа заходов — иначе неполнота записи снова
-    // станет неотличима от дешевизны.
+    // Steps and output are taken only from the transcript; a call without one has neither, and
+    // coverage is counted apart from the call count - otherwise recording incompleteness again
+    // becomes indistinguishable from cheapness.
     steps_total: carried(existing, 'steps_total') + (Number.isFinite(o.steps) ? o.steps : 0),
     output_total: carried(existing, 'output_total') + (Number.isFinite(o.outputTokens) ? o.outputTokens : 0),
     calls_with_transcript: carried(existing, 'calls_with_transcript') + (cache.fromTranscript ? 1 : 0),
@@ -157,8 +161,8 @@ function appendLogLine(o, { at, role, card, delta, first, cache, warning }) {
   const firstTag = first ? ' | first=true' : '';
   const cacheTag = cache.hasCache
     ? ` | cache_read=${cache.cacheDelta}${cache.cacheFirst ? ' | cache_read_first=true' : ''} | cache_read_nature=${cache.cacheNature}`
-    // Отсутствие R называется словами прямо в строке лога. Пустое место читалось бы
-    // как ноль ровно так же, как цифра 0, — и уже читалось.
+    // The absence of R is named in words right in the log line. Empty space would read
+    // as zero exactly like the digit 0 - and has already been read that way.
     : ` | cache_read=${NO_TRANSCRIPT}`;
   const stepsTag = Number.isFinite(o.steps) ? ` | steps=${o.steps}` : '';
   const outTag = Number.isFinite(o.outputTokens) ? ` | output=${o.outputTokens}` : '';
@@ -167,30 +171,30 @@ function appendLogLine(o, { at, role, card, delta, first, cache, warning }) {
 }
 
 /**
- * Одна операция: считает дельту, дописывает строку в .forma/dashboard/subagents.log,
- * обновляет .forma/dashboard/.cache/subagents-registry.json. Вызывать сразу после того, как
- * тот же узел уже написал строку захода в ## History карточки (AGENTS.md §3).
+ * One operation: computes the delta, appends a line to .forma/dashboard/subagents.log,
+ * updates .forma/dashboard/.cache/subagents-registry.json. Call right after the
+ * same node has already written the call line into the card's ## History (AGENTS.md §3).
  *
  * @param {object} o
- * @param {string} o.agent — id постоянного субагента (напр. "a48ea883239bba084")
- * @param {string} [o.role] — специфика человекочитаемо; обязателен на первой записи,
- *   на последующих — если не передан, сохраняется прежний из реестра
- * @param {number} o.rawTokens — сырое subagent_tokens из этого вызова (нарастающий итог)
- * @param {number} [o.rawCacheRead] — сырое cache_read_input_tokens этого вызова (R, §3)
- * @param {number} [o.cacheReadFinal] — R этого захода, уже посчитанный по стенограмме
- *   (сумма по дедуплицированным шагам). Величина позаходная по устройству источника —
- *   дельта к ней не применяется. Побеждает `rawCacheRead`, если переданы оба.
- * @param {number} [o.steps] — число шагов захода по стенограмме (уникальных requestId)
- * @param {number} [o.outputTokens] — выход модели за заход по стенограмме
- * @param {string} [o.agentId] — опознаватель вызова для строки §3; по умолчанию `o.agent`
- * @param {number} o.durationS — длительность этого вызова, секунды (целое)
- * @param {string} [o.card] — id карточки, если заход привязан к одной; иначе '-'
- * @param {string} o.summary — одна фраза, что сделано
+ * @param {string} o.agent - the standing subagent's id (e.g. "a48ea883239bba084")
+ * @param {string} [o.role] - the specifics, human-readable; mandatory on the first record,
+ *   on the later ones, if not passed, the previous one is kept from the registry
+ * @param {number} o.rawTokens - the raw subagent_tokens of this call (a running total)
+ * @param {number} [o.rawCacheRead] - the raw cache_read_input_tokens of this call (R, §3)
+ * @param {number} [o.cacheReadFinal] - this call's R, already computed from the transcript
+ *   (the sum over the deduplicated steps). The value is per-call by the source's construction -
+ *   no delta is applied to it. `rawCacheRead` wins if both are passed.
+ * @param {number} [o.steps] - the call's step count by the transcript (unique requestIds)
+ * @param {number} [o.outputTokens] - the model's output for the call by the transcript
+ * @param {string} [o.agentId] - the call's identifier for the §3 line; by default `o.agent`
+ * @param {number} o.durationS - this call's duration, seconds (integer)
+ * @param {string} [o.card] - the card id, if the call is bound to one; otherwise '-'
+ * @param {string} o.summary - one phrase of what was done
  * @returns {{delta:number, first:boolean, tokensTotal:number}}
  */
 function recordSubagentCall(o) {
   if (!o || !o.agent || !Number.isFinite(o.rawTokens) || !Number.isFinite(o.durationS) || !o.summary) {
-    throw new Error('recordSubagentCall: обязательны agent, rawTokens (число), durationS (число), summary');
+    throw new Error(msg('sublog.err_required_args'));
   }
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   const registry = readRegistry();
@@ -223,23 +227,22 @@ function recordSubagentCall(o) {
 }
 
 /**
- * Строка `## История` формата AGENTS.md §3, собранная целиком — все четыре величины
- * блока расхода сразу, чтобы ни одну не приходилось дописывать руками и терять
- *:
+ * The `## History` line of the AGENTS.md §3 format, assembled whole - all four values
+ * of the spend block at once, so none has to be appended by hand and lost:
  *
- *   `Node`, YYYY-MM-DD: attempt, N tokens (R cache-read), T s, `agent_id` — что сделано.
+ *   `Node`, YYYY-MM-DD: attempt, N tokens (R cache-read), T s, `agent_id` - what was done.
  *
- * Ключевая часть — всегда по-английски, при любом языке проекта; описание —
- * на языке карточки. `sync-engines --check` называет русскую ключевую часть после дня введения правила.
+ * The key part is always in English, whatever the project's language; the description is
+ * in the card's language. `sync-engines --check` names the Russian key part after the day the rule came in.
  *
- * Порядок полей не вкусовой: `sync-engines.cjs` ждёт опознаватель последним в блоке
- * расхода, вплотную перед тире (`checkAgentId`, HAS_ID = /,\s*`?[0-9a-f]{8,}`?\s*—/),
- * а кэш-чтение — в скобках сразу за токенами (`checkAttemptFormat`). Сдвинуть любое из
- * двух значит пройти глазами и не пройти проверку.
+ * The field order is not taste: `sync-engines.cjs` expects the identifier last in the spend
+ * block, right before the dash (`checkAgentId`, HAS_ID = /,\s*`?[0-9a-f]{8,}`?\s*—/),
+ * and the cache read - in brackets right after the tokens (`checkAttemptFormat`). Moving either
+ * of the two means passing by eye and failing the check.
  *
- * Величины НЕТ — сегмента нет вовсе. Ни нуля, ни прочерка: и то и другое читается как
- * «почти бесплатно», а `tally.cjs` по отсутствию сегмента печатает «не записано».
- * Именно так выглядит заход, чья стенограмма не найдена.
+ * The value is ABSENT - the segment is absent entirely. Neither zero, nor a dash: both read as
+ * "almost free", while `tally.cjs` prints "not recorded" on the missing segment.
+ * That is exactly what a call whose transcript was not found looks like.
  */
 function historyLine({ node, date, tokens, cacheRead, durationS, agentId, summary }) {
   const d = date || new Date().toISOString().slice(0, 10);
@@ -251,13 +254,13 @@ function historyLine({ node, date, tokens, cacheRead, durationS, agentId, summar
 }
 
 /**
- * Записать заход, взяв R, выход и шаги из стенограммы по `agent_id`.
- * Вызывающему остаётся то, что стенограмма не знает: сырые `subagent_tokens`,
- * длительность и одна фраза о сделанном.
+ * Record a call, taking R, the output and the steps from the transcript by `agent_id`.
+ * The caller is left what the transcript does not know: the raw `subagent_tokens`,
+ * the duration and one phrase of what was done.
  *
- * Стенограммы нет — запись всё равно происходит, но БЕЗ выдуманного нуля: R в строку
- * §3 не попадает, лог говорит «стенограмма не найдена», и в возврате стоит
- * `transcriptMissing: true`. Это штатное состояние для ранних заходов.
+ * No transcript - the record still happens, but WITHOUT an invented zero: R does not
+ * reach the §3 line, the log says "transcript not found", and the return carries
+ * `transcriptMissing: true`. That is the normal state of early calls.
  */
 async function recordSubagentCallFromTranscript(o) {
   const t = await readSubagentTranscript(o.agent);
@@ -283,14 +286,14 @@ module.exports = {
 if (require.main === module) {
   const argv = process.argv.slice(2);
   if (argv[0] !== 'record') {
-    console.error('usage: node .forma/dashboard/subagents-log.cjs record --agent <id> --role "<текст>" --raw-tokens <N> --duration-s <T> [--raw-cache-read <R>] [--from-transcript] [--card <id>] --summary "<текст>" [--node <Узел>] [--date <ГГГГ-ММ-ДД>]');
+    console.error(msg('sublog.usage'));
     process.exit(2);
   }
-  // Флаг без значения (`--from-transcript`) не должен проглатывать следующий аргумент:
-  // иначе `--from-transcript --card <код>` молча теряет карточку.
+  // A flag without a value (`--from-transcript`) must not swallow the next argument:
+  // otherwise `--from-transcript --card <id>` silently loses the card.
   const args = parseOptions(argv.slice(1));
   if (!args.agent || args['raw-tokens'] === undefined || args['duration-s'] === undefined || !args.summary) {
-    console.error('Обязательны: --agent --raw-tokens --duration-s --summary');
+    console.error(msg('sublog.cli_missing'));
     process.exit(2);
   }
   const payload = {
@@ -308,30 +311,35 @@ if (require.main === module) {
 
   (async () => {
     try {
-      // По умолчанию R берётся из стенограммы: это единственный путь, который у нас
-      // вообще работает. `--no-transcript` оставлен для случая, когда R передан руками.
+      // By default R comes from the transcript: the only path that works at all.
+      // `--no-transcript` is kept for the case when R is passed by hand.
       const wantTranscript = args['no-transcript'] !== true && args['raw-cache-read'] === undefined;
       const result = wantTranscript
         ? await recordSubagentCallFromTranscript(payload)
         : recordSubagentCall(payload);
 
-      console.log(`Записано: agent=${args.agent} дельта=${result.delta}${result.first ? ' (первая запись)' : ''}, tokens_total=${result.tokensTotal}`);
+      console.log(msg('sublog.recorded', {
+        agent: args.agent, delta: result.delta,
+        first: result.first ? msg('sublog.first_record') : '', total: result.tokensTotal,
+      }));
       if (result.cacheDelta !== null) {
-        console.log(`Кэш-чтение: ${result.cacheDelta}${result.cacheFirst ? ' (первая запись)' : ''}, природа поля: ${result.cacheNature}`);
+        console.log(msg('sublog.cache_line', {
+          delta: result.cacheDelta, first: result.cacheFirst ? msg('sublog.first_record') : '', nature: result.cacheNature,
+        }));
         if (result.steps !== null) {
-          console.log(`По стенограмме: шагов ${result.steps}, выход ${result.outputTokens} токенов.`);
+          console.log(msg('sublog.transcript_line', { steps: result.steps, output: result.outputTokens }));
         }
       } else if (result.transcriptMissing) {
-        // Ровно те слова, и никакого числа рядом: ведущий ноль здесь читался бы как
-        // «заход почти ничего не стоил», а он стоил — просто нечем это прочесть.
-        console.log(`Кэш-чтение: ${NO_TRANSCRIPT} для agent=${args.agent} — сегмент R в строку §3 не попадёт.`);
-        console.log(`В \`tally.cjs --report\` такой заход даёт «не записано», а не ноль.`);
+        // Exactly those words, and no number beside: a leading zero here would read as
+        // "the call cost almost nothing", while it did cost - there is just nothing to read it with.
+        console.log(msg('sublog.cache_missing_transcript', { no_transcript: NO_TRANSCRIPT, agent: args.agent }));
+        console.log(msg('sublog.cache_missing_tally'));
       } else {
-        console.log('Кэш-чтение: не передано (--raw-cache-read) — в строку §3 сегмент не попадёт, и это будет видно как «не записано», не как ноль.');
+        console.log(msg('sublog.cache_not_passed'));
       }
-      if (result.history) console.log('Строка §3 для ## История:\n' + result.history);
+      if (result.history) console.log(msg('sublog.history_header') + result.history);
     } catch (err) {
-      console.error('Ошибка:', err.message);
+      console.error(msg('sublog.error'), err.message);
       process.exit(1);
     }
   })();

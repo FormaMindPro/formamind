@@ -2,20 +2,24 @@
 'use strict';
 
 /**
- * scaffold-engine.cjs — генератор минимального каркаса зоны нового движка.
- * Создает директорию .<engine>/ со всеми обязательными компонентами по ENGINE-CONTRACT.md:
+ * scaffold-engine.cjs - generates the minimal scaffold of a new engine's zone.
+ * Creates the .<engine>/ directory with every mandatory component per ENGINE-CONTRACT.md:
  *  - forma-adapter.cjs
- *  - rules/<engine>-8.md (из шаблона ENGINE-8-TEMPLATE.md)
+ *  - rules/<engine>-8.md (from the ENGINE-8-TEMPLATE.md template)
  *  - tests/test-<engine>-adapter.cjs
  *  - verify-profile.cjs
  *  - hooks/
  *
- * Использование:
- *   node .forma/extensions/scaffold-engine.cjs --name <имя> [--dir <директория>]
+ * Usage:
+ *   node .forma/extensions/scaffold-engine.cjs --name <name> [--dir <directory>]
+ *
+ * Printed labels come from the core dictionary: English key in code, ru value as data.
  */
 
 const fs = require('fs');
 const path = require('path');
+const i18n = require('../skills/forma/core/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const args = process.argv.slice(2);
 let name = null;
@@ -27,7 +31,7 @@ for (let i = 0; i < args.length; i++) {
 }
 
 if (!name) {
-  console.error('Использование: node scaffold-engine.cjs --name <имя> [--dir <директория>]');
+  console.error(msg('scaffold.usage'));
   process.exit(1);
 }
 
@@ -37,11 +41,11 @@ const root = process.cwd();
 const targetDir = path.join(root, dirName);
 
 if (fs.existsSync(targetDir)) {
-  console.error(`Ошибка: директория ${dirName} уже существует.`);
+  console.error(msg('scaffold.dir_exists', { dir: dirName }));
   process.exit(1);
 }
 
-console.log(`Создание зоны движка ${name} в ${dirName}...`);
+console.log(msg('scaffold.creating', { name, dir: dirName }));
 
 fs.mkdirSync(path.join(targetDir, 'rules'), { recursive: true });
 fs.mkdirSync(path.join(targetDir, 'tests'), { recursive: true });
@@ -55,8 +59,8 @@ fs.writeFileSync(path.join(targetDir, '.ledger', 'calls.jsonl'), '', 'utf8');
 const adapterCode = `'use strict';
 
 /**
- * Адаптер движка ${name} для ядра «Формы».
- * Автоматически обнаруживается по наличию forma-adapter.cjs в корневой точечной папке.
+ * Engine adapter of ${name} for the Forma core.
+ * Discovered automatically by the presence of forma-adapter.cjs in the root dot folder.
  */
 
 const path = require('path');
@@ -88,7 +92,7 @@ fs.writeFileSync(path.join(targetDir, 'rules', `${cleanName}-8.md`), tplText, 'u
 const verifyProfileCode = `'use strict';
 
 /**
- * Профиль верификации установки для ${name}.
+ * Installation verification profile for ${name}.
  */
 
 const fs = require('fs');
@@ -99,7 +103,7 @@ function check(ctx) {
   const { root, finding } = ctx;
   const eightFile = path.join(root, '${dirName}', 'rules', '${cleanName}-8.md');
   if (!fs.existsSync(eightFile)) {
-    out.push(finding('${dirName}/rules/${cleanName}-8.md', 'файл §8', 'файл отсутствует'));
+    out.push(finding('${dirName}/rules/${cleanName}-8.md', 'section-8 file', 'file missing'));
   }
   return out;
 }
@@ -119,12 +123,12 @@ const path = require('path');
 const root = path.resolve(__dirname, '../..');
 const eightPath = path.join(root, '${dirName}', 'rules', '${cleanName}-8.md');
 
-assert.ok(fs.existsSync(eightPath), '${cleanName}-8.md должен существовать');
+assert.ok(fs.existsSync(eightPath), '${cleanName}-8.md must exist');
 const txt = fs.readFileSync(eightPath, 'utf8');
-assert.match(txt, /^@AGENTS\\.md/m, 'должен содержать импорт @AGENTS.md');
+assert.match(txt, /^@AGENTS\\.md/m, 'must contain the @AGENTS.md import');
 
-console.log('Тест адаптера ${name} пройден.');
+console.log('Adapter test of ${name} passed.');
 `;
 fs.writeFileSync(path.join(targetDir, 'tests', `test-${cleanName}-adapter.cjs`), testCode, 'utf8');
 
-console.log(`Готово: каркас зоны движка ${name} собран в ${dirName}.`);
+console.log(msg('scaffold.done', { name, dir: dirName }));

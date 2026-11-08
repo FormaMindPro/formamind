@@ -1,10 +1,10 @@
 'use strict';
 
 /**
- * Что дашборд показывает о Claude Code: настройки, MCP-конфиги, каталог стенограмм.
- * Читается адаптером (`.claude/forma-adapter.cjs`); ядро само этих путей не знает.
- * ТОЛЬКО ЧТЕНИЕ. Запрет 15: из `~/.claude.json` и `.mcp.json` — только имена серверов;
- * из `env` — значения, кроме переменных, чьё имя похоже на секрет (у них только имя).
+ * What the dashboard shows about Claude Code: the settings, the MCP configs, the transcripts catalog.
+ * Read by the adapter (`.claude/forma-adapter.cjs`); the core does not know these paths itself.
+ * READ ONLY. Prohibition 15: from `~/.claude.json` and `.mcp.json` - the server names only;
+ * from `env` - the values, except variables whose name looks like a secret (for them the name only).
  */
 
 const fs = require('fs');
@@ -13,21 +13,24 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { readJson } = require('../../.forma/dashboard/lib/fs.cjs');
 const { parseFrontmatter } = require('../../.forma/dashboard/lib/card.cjs');
+// Printed labels come from the core dictionary: English key in code, ru value as data.
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const SECRET = /KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL/i;
 const SYNC_SCRIPT = path.join('.claude', 'scripts', 'sync-engines.cjs');
 
-/** Файлы MCP-серверов по уровням: проектные ездят с репозиторием, пользовательский — с человеком. */
+/** The MCP server files by level: the project ones ride with the repository, the user one - with the human. */
 function mcpConfigs(root) {
   return [
-    { rel: '.mcp.json', file: path.join(root, '.mcp.json'), level: 'проект' },
-    { rel: '.claude/.mcp.json', file: path.join(root, '.claude', '.mcp.json'), level: 'проект' },
-    { rel: '~/.claude.json', file: path.join(os.homedir(), '.claude.json'), level: 'пользователь' },
+    { rel: '.mcp.json', file: path.join(root, '.mcp.json'), level: msg('dashboard-view.level_project') },
+    { rel: '.claude/.mcp.json', file: path.join(root, '.claude', '.mcp.json'), level: msg('dashboard-view.level_project') },
+    { rel: '~/.claude.json', file: path.join(os.homedir(), '.claude.json'), level: msg('dashboard-view.level_user') },
   ];
 }
 
-/** Каталог стенограмм проекта. Слаг движок строит из пути: всё, что не буква и не цифра, — дефис.
- *  Правило не документировано, поэтому есть отход — поиск без учёта регистра среди существующих. */
+/** The project's transcripts catalog. The engine builds the slug from the path: everything that is not a letter or a digit - a dash.
+ *  The rule is undocumented, so there is a fallback - a case-insensitive search among the existing ones. */
 function transcriptsDir(root) {
   const base = path.join(os.homedir(), '.claude', 'projects');
   if (!fs.existsSync(base)) return null;
@@ -85,7 +88,7 @@ function readMcpNames(root) {
   return { project, user, userProject };
 }
 
-/** Строки причин из вывода сверки: пункты `✗` с подпунктами и строки таблицы, не отмеченные `✓`. */
+/** The reason lines from the reconciliation output: the `✗` items with subitems and the table rows not marked `✓`. */
 function syncReasons(out) {
   const lines = out.split(/\r?\n/);
   const reasons = [];
@@ -95,15 +98,15 @@ function syncReasons(out) {
       const sub = [];
       for (let j = i + 1; j < lines.length && /^\s{3,}—/.test(lines[j]); j++) sub.push(lines[j].replace(/^\s*—\s*/, '').trim());
       reasons.push(l.trim() + (sub.length ? ': ' + sub.join('; ') : ''));
-    } else if (/^\|/.test(l) && !/✓|Статус|---/.test(l)) {
+    } else if (/^\|/.test(l) && !/✓|\u0421\u0442\u0430\u0442\u0443\u0441|---/.test(l)) { // \u0421\u0442\u0430\u0442\u0443\u0441 = the ru table's "Status" header, a parse pattern held as escapes
       const c = l.split('|').map((s) => s.trim()).filter(Boolean);
-      reasons.push(c[0] + ' — ' + c[c.length - 1]);
+      reasons.push(c[0] + ' - ' + c[c.length - 1]);
     }
   }
   return reasons;
 }
 
-/** Индикатор сверки: реальный код выхода `sync-engines --check` при каждой сборке. */
+/** The reconciliation indicator: the real exit code of `sync-engines --check` on every build. */
 function runSyncCheck(root) {
   const script = path.join(root, SYNC_SCRIPT);
   if (!fs.existsSync(script)) return { ran: false };
@@ -113,10 +116,10 @@ function runSyncCheck(root) {
 }
 
 /**
- * Находит исполняемый файл `claude` в PATH процесса. На Windows `spawnSync('claude', …)` без
- * `shell: true` не резолвит npm-шим (`claude.cmd`) — CreateProcess не читает PATHEXT сам, это
- * делает только cmd.exe. Поэтому ищем явный путь с расширением один раз при старте (кэш ниже),
- * а не на каждый вызов — «явный путь при старте», не поиск по месту.
+ * Finds the `claude` executable in the process's PATH. On Windows `spawnSync('claude', ...)` without
+ * `shell: true` does not resolve the npm shim (`claude.cmd`) - CreateProcess does not read PATHEXT itself,
+ * only cmd.exe does. So an explicit path with the extension is looked up once at startup (the cache below),
+ * not on every call - "an explicit path at startup", not a search in place.
  */
 function findExecutable(name) {
   const isWin = process.platform === 'win32';
@@ -127,7 +130,7 @@ function findExecutable(name) {
       const candidate = path.join(dir, name + ext.toLowerCase());
       try {
         if (fs.statSync(candidate).isFile()) return candidate;
-      } catch { /* нет файла — пробуем дальше */ }
+      } catch { /* no file - try on */ }
     }
   }
   return null;
@@ -135,23 +138,23 @@ function findExecutable(name) {
 
 const CLAUDE_BIN = findExecutable('claude');
 
-/** Плагины движка: `claude plugin list --json` — id/scope/enabled, без значений секретов (запрет 15). */
+/** The engine's plugins: `claude plugin list --json` - id/scope/enabled, no secret values (prohibition 15). */
 function readPlugins(root) {
   if (!CLAUDE_BIN) {
-    return { ran: false, list: [], reason: 'команда `claude` не найдена в PATH процесса дашборда' };
+    return { ran: false, list: [], reason: msg('dashboard-view.no_claude_bin') };
   }
   const r = spawnSync(CLAUDE_BIN, ['plugin', 'list', '--json'], { cwd: root, encoding: 'utf8', timeout: 15000 });
-  if (r.error) return { ran: false, list: [], reason: 'ошибка запуска: ' + r.error.message };
+  if (r.error) return { ran: false, list: [], reason: msg('dashboard-view.spawn_error', { error: r.error.message }) };
   if (r.status !== 0) {
-    return { ran: false, list: [], reason: 'claude plugin list --json завершился с кодом ' + r.status };
+    return { ran: false, list: [], reason: msg('dashboard-view.plugin_exit', { code: r.status }) };
   }
   let arr;
-  try { arr = JSON.parse(r.stdout); } catch { return { ran: false, list: [], reason: 'ответ не разобрался как JSON' }; }
-  if (!Array.isArray(arr)) return { ran: false, list: [], reason: 'ответ не JSON-массив' };
+  try { arr = JSON.parse(r.stdout); } catch { return { ran: false, list: [], reason: msg('dashboard-view.not_json') }; }
+  if (!Array.isArray(arr)) return { ran: false, list: [], reason: msg('dashboard-view.not_json_array') };
   return { ran: true, list: arr.map((p) => ({ id: p.id, scope: p.scope, enabled: !!p.enabled })) };
 }
 
-/** Вкладка «Движок»: настройки Claude Code, роли узлов, MCP, скиллы, сверка. */
+/** The "Engine" tab: the Claude Code settings, the node roles, MCP, skills, the reconciliation. */
 function engineSettings(root) {
   const st = readJson(path.join(root, '.claude', 'settings.json'));
   return {

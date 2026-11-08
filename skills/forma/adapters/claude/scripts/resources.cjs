@@ -1,31 +1,36 @@
 #!/usr/bin/env node
-// Граф resources: сортировка ресурс/черновик, реестр, подготовка файлов, пачки для описателя.
-// Без модели: описывает файлы агент asset-describer-haiku, а в реестр пишет этот скрипт (apply).
-// ТЗ — project/ops/GRAPHS-STRUCTURE-SITE.md §3. Правила — project/config/resources.rules.json.
+// The resources graph: the resource/draft sort, the registry, the file preparation, the batches for the describer.
+// Without a model: the asset-describer-haiku agent describes the files, and this script writes into the registry (apply).
+// The spec - project/ops/GRAPHS-STRUCTURE-SITE.md §3. The rules - project/config/resources.rules.json.
 //
-//   node .claude/scripts/resources.cjs sort                      -> project/resources/_sort.json, неясное по папкам
-//   node .claude/scripts/resources.cjs inventory                 -> project/resources/_assets.json (ключ sha256)
-//   node .claude/scripts/resources.cjs report                    -> целостность реестра
-//   node .claude/scripts/resources.cjs prepare [--n N]           -> уменьшенные копии/кадры в project/work/prep
-//   node .claude/scripts/resources.cjs batch --n N [--size 512] [--from answers.json] [--out f]     -> манифест пачки для описателя
-//   node .claude/scripts/resources.cjs apply <answers.json> [--card N]  -> ответы описателя в реестр
+//   node .claude/scripts/resources.cjs sort                      -> project/resources/_sort.json, the unclear ones by folders
+//   node .claude/scripts/resources.cjs inventory                 -> project/resources/_assets.json (the sha256 key)
+//   node .claude/scripts/resources.cjs report                    -> the registry's integrity
+//   node .claude/scripts/resources.cjs prepare [--n N]           -> downscaled copies/frames into project/work/prep
+//   node .claude/scripts/resources.cjs batch --n N [--size 512] [--from answers.json] [--out f]     -> the batch manifest for the describer
+//   node .claude/scripts/resources.cjs apply <answers.json> [--card N]  -> the describer's answers into the registry
 //   node .claude/scripts/resources.cjs register <path> --kind K [--card N] [--prompt P] [--model M] [--description D] [--type T] [--tags a,b]
-//   node .claude/scripts/resources.cjs describe [--redo <regex пути>]  -> (--redo пере-описывает записи без model)description и tags текстов/таблиц/схем из заголовков, листов, шапок (без модели; картинки и уже описанное пропускает)
-//   node .claude/scripts/resources.cjs tag-batch --n N [--out f]  -> манифест {domain_tags, items} для записей без semantic_tags (теги ставит главная сессия)
-//   node .claude/scripts/resources.cjs apply-tags <answers.json>  -> [{sha256, tags}]: в semantic_tags и tags идут только теги из domain_tags (до 5)
-//   node .claude/scripts/resources.cjs decide <folder> resource|draft  -> правило папки в правилах
+//   node .claude/scripts/resources.cjs describe [--redo <path regex>]  -> (--redo re-describes the entries without model)
+//       the description and tags of texts/tables/diagrams from the headings, sheets, headers (no model; images and already-described are skipped)
+//   node .claude/scripts/resources.cjs tag-batch --n N [--out f]  -> the {domain_tags, items} manifest for the entries without semantic_tags (the tags are set by the main session)
+//   node .claude/scripts/resources.cjs apply-tags <answers.json>  -> [{sha256, tags}]: only the tags from domain_tags reach semantic_tags and tags (up to 5)
+//   node .claude/scripts/resources.cjs decide <folder> resource|draft  -> the folder's rule into the rules
+//
+// Printed labels come from the core dictionary: English key in code, ru value as data.
 
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const RULES = path.join(ROOT, 'project/config/resources.rules.json');
 const REG_DIR = path.join(ROOT, 'project/resources');
 const REG = path.join(REG_DIR, '_assets.json');
 const SORT = path.join(REG_DIR, '_sort.json');
-let SIZE = 1024;                                       // длинная сторона подготовленной копии, px (--size)
+let SIZE = 1024;                                       // the long side of the prepared copy, px (--size)
 const prepDir = () => path.join(ROOT, 'project/work', SIZE === 1024 ? 'prep' : 'prep-' + SIZE);
 const BOARD = path.join(ROOT, '.devtool/features');
 
@@ -45,12 +50,12 @@ function args() {
   return { pos, opt };
 }
 
-// нормализация слова: NFKC, нижний регистр, повторная сборка, снятие остаточных комбинируемых знаков
+// word normalization: NFKC, lower case, re-assemble, strip of residual combining marks
 function normWord(s) { return String(s).normalize('NFKC').toLowerCase().normalize('NFC').replace(/\p{M}/gu, ''); }
 
 function loadRules() {
   const r = readJson(RULES, null);
-  if (!r) { console.error('нет ' + rel(RULES)); process.exit(2); }
+  if (!r) { console.error(msg('resources.no_rules', { path: rel(RULES) })); process.exit(2); }
   const re = l => (l || []).map(s => new RegExp(s, 'i'));
   return { ...r, draftRe: re(r.draft_paths), draftNameRe: re(r.draft_names), refRe: re(r.reference_paths), kindRe: (r.kind_by_path || []).map(([p, k]) => [new RegExp(p), k]), mediaRe: new RegExp('\\.(' + [...r.media_ext, ...(r.source_ext || []), ...(r.text_ext || [])].join('|') + ')$', 'i'), skipRe: re(r.skip_names), exclRe: re(r.exclude_paths), classRe: Object.entries(r.classes || {}).map(([k, l]) => [k, re(l)]), goalRe: (r.goal_by_path || []).map(([p, g]) => [new RegExp(p), g]), stopSet: new Set((r.stop_words || []).map(normWord)) };
 }
@@ -59,22 +64,22 @@ function walk(dir, rules, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const f = path.join(dir, e.name), r = rel(f);
     if (e.isDirectory()) { if (!rules.skip_dirs.some(s => e.name === s || r === s)) walk(f, rules, out); }
-    else if (f === REG || f === SORT) continue;            // сам реестр и сортировка — не ресурсы
+    else if (f === REG || f === SORT) continue;            // the registry and the sort themselves - not resources
     else if (rules.mediaRe.test(e.name) &&!rules.skipRe.some(x => x.test(e.name)) && !rules.exclRe.some(x => x.test(r))) out.push(f);
   }
   return out;
 }
 
-// --- ссылки из файлов продукта ---------------------------------------------------------
+// --- references from the product's files ------------------------------------------------
 function referenceMap(rules) {
-  const map = new Map();                               // basename (lower) -> Set(файл, который ссылается)
+  const map = new Map();                               // basename (lower) -> Set(the file that references)
   const ext = new Set(rules.use_text_ext);
   const re = new RegExp('[A-Za-z0-9_\\-.%@+~()]+\\.(?:' + rules.media_ext.join('|') + ')', 'gi');
   const visit = f => {
     if (fs.statSync(f).size > 3e6) return;
     const text = fs.readFileSync(f, 'utf8'), me = rel(f);
     for (let m of text.match(re) || []) {
-      try { m = decodeURIComponent(m); } catch { /* оставить как есть */ }
+      try { m = decodeURIComponent(m); } catch { /* keep as is */ }
       const k = m.split('/').pop().toLowerCase();
       if (!map.has(k)) map.set(k, new Set());
       map.get(k).add(me);
@@ -95,7 +100,7 @@ function referenceMap(rules) {
   return map;
 }
 
-// --- размеры без внешних библиотек -------------------------------------------------------
+// --- dimensions without external libraries ----------------------------------------------
 function dims(buf, ext) {
   try {
     if (ext === 'png') return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
@@ -115,32 +120,32 @@ function dims(buf, ext) {
       if (t === 'VP8L') { const b = buf.readUInt32LE(21); return { width: (b & 0x3FFF) + 1, height: ((b >> 14) & 0x3FFF) + 1 }; }
       if (t === 'VP8X') return { width: buf.readUIntLE(24, 3) + 1, height: buf.readUIntLE(27, 3) + 1 };
     }
-  } catch { /* размеры необязательны */ }
+  } catch { /* the dimensions are optional */ }
   return {};
 }
 
-// --- сортировка --------------------------------------------------------------------------
+// --- sorting ----------------------------------------------------------------------------
 function classify(rules, files, refs) {
   const rows = files.map(f => {
     const r = rel(f), buf = fs.readFileSync(f), name = path.basename(f).toLowerCase();
     const decided = Object.entries(rules.folders || {}).filter(([d]) => r.startsWith(d.replace(/\/?$/, '/'))).sort((a, b) => b[0].length - a[0].length)[0];
     const used = [...(refs.get(name) || [])].filter(x => x !== r);
     let cls, reason;
-    if (decided) { cls = decided[1]; reason = 'правило папки ' + decided[0]; }
-    else if (rules.draftRe.some(x => x.test(r)) || rules.draftNameRe.some(x => x.test(path.basename(f)))) { cls = 'draft'; reason = 'путь или имя черновика'; }
-    else if (used.length) { cls = 'resource'; reason = 'ссылка из файла продукта'; }
-    else if (rules.refRe.some(x => x.test(r))) { cls = 'resource'; reason = 'папка референсов'; }
-    else { cls = 'unclear'; reason = 'нет правила'; }
+    if (decided) { cls = decided[1]; reason = msg('resources.reason_folder_rule', { folder: decided[0] }); }
+    else if (rules.draftRe.some(x => x.test(r)) || rules.draftNameRe.some(x => x.test(path.basename(f)))) { cls = 'draft'; reason = msg('resources.reason_draft_path'); }
+    else if (used.length) { cls = 'resource'; reason = msg('resources.reason_used_in'); }
+    else if (rules.refRe.some(x => x.test(r))) { cls = 'resource'; reason = msg('resources.reason_reference_dir'); }
+    else { cls = 'unclear'; reason = msg('resources.reason_no_rule'); }
     const klass = (rules.classRe.find(([, l]) => l.some(x => x.test(r))) || [, 'other'])[0];
     return { klass, path: r, sha256: sha(buf), bytes: buf.length, cls, reason, used_in: used, ext: name.split('.').pop(), buf };
   });
-  // дубли по хешу: ресурсы сливаются в одну запись; из неясных/черновых остаётся один неясный, остальные — черновик
+  // duplicates by hash: the resources merge into one entry; of the unclear/draft ones one unclear stays, the rest become a draft
   const groups = new Map();
   for (const x of rows) (groups.get(x.sha256) || groups.set(x.sha256, []).get(x.sha256)).push(x);
   for (const g of groups.values()) {
     if (g.length < 2 || g.some(x => x.cls === 'resource')) continue;
     const keep = g.filter(x => x.cls === 'unclear').sort((a, b) => a.path.length - b.path.length)[0];
-    for (const x of g) if (x !== keep && x.cls !== 'draft') { x.cls = 'draft'; x.reason = 'дубль по хешу'; }
+    for (const x of g) if (x !== keep && x.cls !== 'draft') { x.cls = 'draft'; x.reason = msg('resources.reason_dup_hash'); }
   }
   return rows;
 }
@@ -158,13 +163,16 @@ function cmdSort() {
     if (x.cls === 'draft') { draftBytes.n++; draftBytes.bytes += x.bytes; }
   }
   writeJson(SORT, { generated: today(), count, files: out, unclear_folders: folders });
-  console.log(`всего ${rows.length}: ресурсов ${count.resource}, черновиков ${count.draft} (${(draftBytes.bytes / 1048576).toFixed(1)} МБ, не удалены), неясных ${count.unclear}`);
+  console.log(msg('resources.sort_summary', {
+    total: rows.length, resources: count.resource, drafts: count.draft,
+    mb: (draftBytes.bytes / 1048576).toFixed(1), unclear: count.unclear,
+  }));
   const f = Object.entries(folders).sort((a, b) => b[1] - a[1]);
-  if (f.length) console.log('неясное по папкам (решает человек: `resources.cjs decide <папка> resource|draft`):\n' + f.map(([d, n]) => `  ${n}\t${d}`).join('\n'));
+  if (f.length) console.log(msg('resources.unclear_by_folders') + f.map(([d, n]) => `  ${n}\t${d}`).join('\n'));
   return rows;
 }
 
-// --- реестр ------------------------------------------------------------------------------
+// --- registry ----------------------------------------------------------------------------
 function cardMeta(card) {
   if (!card) return {};
   const dir = [BOARD, path.join(BOARD, 'done')].filter(fs.existsSync);
@@ -182,7 +190,7 @@ function cardMeta(card) {
 const kindOf = (rules, p) => (rules.kindRe.find(([re]) => re.test(p)) || [, 'source'])[1];
 const cardOf = (p, text = '') => (p.match(/cards\/(card-\d+)\//) || p.match(/(card-\d+)/) || [])[1] || null;
 
-function stateOf(e) { return e.used_in.length ? 'в работе' : (e.card || e.goal) ? 'в запасе' : 'бесхозный'; }
+function stateOf(e) { return e.used_in.length ? msg('resources.state_in_work') : (e.card || e.goal) ? msg('resources.state_in_stock') : msg('resources.state_orphan'); }
 
 function cmdInventory() {
   const rules = loadRules(), rows = cmdSortQuiet(rules);
@@ -198,7 +206,7 @@ function cmdInventory() {
     const used = [...new Set(g.flatMap(x => x.used_in))].sort();
     const e = {
       path: first.path, also: g.slice(1).map(x => x.path), format: first.ext, ...dims(first.buf, first.ext), bytes: first.bytes,
-      class: first.klass, kind: old?.kind || kindOf(rules, first.path), card: card || null, card_note: card ? null : 'нет карточки: ' + first.klass, goal: card ? (old?.goal || meta.goal || null) : ((rules.goalRe.find(([re]) => re.test(first.path)) || [])[1] || old?.goal || null), used_in: used,
+      class: first.klass, kind: old?.kind || kindOf(rules, first.path), card: card || null, card_note: card ? null : msg('resources.no_card', { klass: first.klass }), goal: card ? (old?.goal || meta.goal || null) : ((rules.goalRe.find(([re]) => re.test(first.path)) || [])[1] || old?.goal || null), used_in: used,
       type: old?.type || null, tags: old?.tags || [], description: old?.description || null, prompt: old?.prompt || null, model: old?.model || null,
       described: old?.described || null, ...(old?.semantic_tags ? { semantic_tags: old.semantic_tags } : {}), added: old?.added || today(),
     };
@@ -211,12 +219,14 @@ function cmdInventory() {
   let moved = 0;
   for (const h of Object.keys(reg.entries)) {
     if (live.has(h)) continue;
-    if (livePaths.has(reg.entries[h].path)) { delete reg.entries[h]; moved++; }        // файл на месте, хеш сменился: запись уже заведена под новым ключом (описание сброшено), старая уходит
-    else if (!reg.entries[h].description || !fs.existsSync(path.join(ROOT, reg.entries[h].path))) delete reg.entries[h];   // ушедшие из ресурсов и не описанные, либо без файла на диске
+    if (livePaths.has(reg.entries[h].path)) { delete reg.entries[h]; moved++; }        // the file in place, the hash changed: an entry already exists under the new key (the description reset), the old one goes
+    else if (!reg.entries[h].description || !fs.existsSync(path.join(ROOT, reg.entries[h].path))) delete reg.entries[h];   // gone from the resources and undescribed, or without a file on disk
   }
   reg.generated = today();
   writeJson(REG, reg);
-  console.log(`реестр: записей ${Object.keys(reg.entries).length} (новых ${added}, обновлено ${updated}, перенесено под новый хеш ${moved})`);
+  console.log(msg('resources.inventory_summary', {
+    total: Object.keys(reg.entries).length, added, updated, moved,
+  }));
   return reg;
 }
 
@@ -234,14 +244,16 @@ function cmdReport() {
   const states = {};
   for (const e of Object.values(reg.entries)) states[e.state] = (states[e.state] || 0) + 1;
   const unclear = rows.filter(x => x.cls === 'unclear').length;
-  console.log(`целостность: ресурс без записи ${noEntry.length}, запись без файла ${noFile.length}, без описания ${needDesc.length}, неясных ${unclear}`);
-  console.log('состояния: ' + Object.entries(states).map(([k, v]) => `${k} ${v}`).join(', '));
-  noEntry.slice(0, 5).forEach(p => console.log('  без записи: ' + p));
-  noFile.slice(0, 5).forEach(p => console.log('  без файла: ' + p));
+  console.log(msg('resources.report_summary', {
+    no_entry: noEntry.length, no_file: noFile.length, no_desc: needDesc.length, unclear,
+  }));
+  console.log(msg('resources.states_line') + Object.entries(states).map(([k, v]) => `${k} ${v}`).join(', '));
+  noEntry.slice(0, 5).forEach(p => console.log(msg('resources.no_entry_line') + p));
+  noFile.slice(0, 5).forEach(p => console.log(msg('resources.no_file_line') + p));
   return { noEntry, noFile, needDesc: needDesc.length, unclear, states };
 }
 
-// --- подготовка и пачки ------------------------------------------------------------------
+// --- preparation and batches --------------------------------------------------------------
 function ff(argv) { return spawnSync('ffmpeg', ['-y', '-loglevel', 'error', ...argv], { encoding: 'utf8' }); }
 
 function prepareEntry(h, e) {
@@ -272,12 +284,12 @@ function cmdPrepare(opt) {
   const reg = readJson(REG, { entries: {} });
   let ok = 0, fail = 0;
   for (const [h, e] of pending(reg, opt.n ? +opt.n : 0)) (prepareEntry(h, e).length ? ok++ : fail++);
-  console.log(`подготовлено ${ok}, не удалось ${fail} (project/work/prep)`);
+  console.log(msg('resources.prepare_summary', { ok, fail }));
 }
 
 function cmdBatch(opt) {
   const reg = readJson(REG, { entries: {} }), n = opt.n ? +opt.n : 10, out = [];
-  // --from <json>: взять конкретные sha256 (повторный замер уже описанных), иначе — ещё не описанные
+  // --from <json>: take the concrete sha256 (a re-measure of the already described), otherwise - the not yet described
   const from = opt.from ? (readJson(path.resolve(opt.from), []).map(a => a.sha256)) : null;
   const list = from ? from.filter(h => reg.entries[h]).map(h => [h, reg.entries[h]]) : pending(reg, n, opt.skip ? +opt.skip : 0);
   for (const [h, e] of list) {
@@ -286,32 +298,33 @@ function cmdBatch(opt) {
   }
   const f = path.resolve(ROOT, opt.out || 'project/work/batch.json');
   writeJson(f, { types: loadRules().types, tags: loadRules().tags, items: out });
-  console.log(`пачка: ${out.length} → ${rel(f)}`);
+  console.log(msg('resources.batch_summary', { count: out.length, file: rel(f) }));
 }
 
 function cmdApply(file, opt) {
   const rules = loadRules(), reg = readJson(REG, { entries: {} }), ans = readJson(path.resolve(file), null);
-  if (!ans) { console.error('не прочитан ' + file); process.exit(2); }
+  if (!ans) { console.error(msg('resources.not_read', { file })); process.exit(2); }
   const list = Array.isArray(ans) ? ans : ans.items || ans.answers || [];
   let ok = 0; const bad = [];
   for (const a of list) {
     const e = reg.entries[a.sha256] || Object.entries(reg.entries).find(([h]) => h.startsWith(a.sha256 || '#'))?.[1];
-    if (!e) { bad.push('нет записи: ' + a.sha256); continue; }
-    const tags = (a.tags || a['теги'] || []).filter(t => rules.tags.includes(t));
+    if (!e) { bad.push(msg('resources.no_entry_for', { sha: a.sha256 })); continue; }
+    // \u0442\u0435\u0433\u0438 = "tags" in ru: a legacy key of the answers file, a parse pattern held as escapes
+    const tags = (a.tags || a['\u0442\u0435\u0433\u0438'] || []).filter(t => rules.tags.includes(t));
     const dropped = (a.tags || []).filter(t => !rules.tags.includes(t));
     const type = rules.types.includes(a.type) ? a.type : null;
-    if (!type) bad.push(`${e.path}: тип «${a.type}» не из списка`);
+    if (!type) bad.push(msg('resources.bad_type', { path: e.path, type: a.type }));
     Object.assign(e, { type: type || e.type, tags, description: String(a.description || '').trim() || null, model: a.model || 'claude-haiku-5-5', described: today() });
-    if (dropped.length) bad.push(`${e.path}: теги вне списка отброшены: ${dropped.join(', ')}`);
+    if (dropped.length) bad.push(msg('resources.tags_dropped', { path: e.path, tags: dropped.join(', ') }));
     ok++;
   }
   writeJson(REG, reg);
-  console.log(`записано в реестр: ${ok}` + (bad.length ? `, замечаний ${bad.length}:\n  ` + bad.join('\n  ') : ''));
+  console.log(msg('resources.apply_summary', { ok }) + (bad.length ? msg('resources.apply_notes', { count: bad.length }) + '\n  ' + bad.join('\n  ') : ''));
 }
 
 function cmdRegister(p, opt) {
   const rules = loadRules(), f = path.resolve(ROOT, p);
-  if (!p || !fs.existsSync(f)) { console.error('файл не найден: ' + p); process.exit(2); }
+  if (!p || !fs.existsSync(f)) { console.error(msg('resources.file_not_found', { file: p })); process.exit(2); }
   const buf = fs.readFileSync(f), h = sha(buf), r = rel(f), ext = path.extname(f).slice(1).toLowerCase();
   const reg = readJson(REG, { version: 1, entries: {} }), old = reg.entries[h];
   const card = opt.card ? (String(opt.card).startsWith('card-') ? opt.card : 'card-' + String(opt.card).padStart(3, '0')) : (old?.card || cardOf(r));
@@ -326,14 +339,15 @@ function cmdRegister(p, opt) {
   e.state = stateOf(e);
   reg.entries[h] = e; reg.generated = today();
   writeJson(REG, reg);
-  console.log(`${old ? 'обновлена' : 'добавлена'} запись ${h.slice(0, 12)} · ${e.path} · ${e.state}`);
+  console.log(msg('resources.registered', { updated: old ? msg('resources.entry_updated') : msg('resources.entry_added'), sha: h.slice(0, 12), path: e.path, state: e.state }));
 }
 
-// --- описатель без модели: description и tags из заголовков, листов, шапок, первых строк ----
+// --- the describer without a model: the description and tags from the headings, sheets, headers, first lines ----
 const zlib = require('zlib');
-const STOP = new Set('это как для что при или также если быть чтобы который которые только можно нужно the and for with from that this are not you your'.split(' '));
+// The stop words include the ru ones (descriptions hold ru text): a filtering pattern, held as \u escapes.
+const STOP = new Set(('\u044d\u0442\u043e \u043a\u0430\u043a \u0434\u043b\u044f \u0447\u0442\u043e \u043f\u0440\u0438 \u0438\u043b\u0438 \u0442\u0430\u043a\u0436\u0435 \u0435\u0441\u043b\u0438 \u0431\u044b\u0442\u044c \u0447\u0442\u043e\u0431\u044b \u043a\u043e\u0442\u043e\u0440\u044b\u0439 \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u0442\u043e\u043b\u044c\u043a\u043e \u043c\u043e\u0436\u043d\u043e \u043d\u0443\u0436\u043d\u043e the and for with from that this are not you your').split(' '));
 
-function zipEntries(buf) {                                // минимальный чтец zip: имя -> () => Buffer
+function zipEntries(buf) {                                // a minimal zip reader: name -> () => Buffer
   const out = {};
   let e = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65600); i--) if (buf.readUInt32LE(i) === 0x06054b50) { e = i; break; }
@@ -374,14 +388,15 @@ function describeParts(f, ext) {                          // -> { heads, body, s
   } else if (ext === 'drawio') {
     const t = txt();
     let x = t;
-    const d = t.match(/<diagram[^>]*>([^<]+)<\/diagram>/);                     // сжатый вариант
-    if (d) { try { x = decodeURIComponent(zlib.inflateRawSync(Buffer.from(d[1], 'base64')).toString('utf8')); } catch { /* оставить */ } }
+    const d = t.match(/<diagram[^>]*>([^<]+)<\/diagram>/);                     // the compressed variant
+    if (d) { try { x = decodeURIComponent(zlib.inflateRawSync(Buffer.from(d[1], 'base64')).toString('utf8')); } catch { /* keep */ } }
     r.heads = [...t.matchAll(/<diagram[^>]*\sname="([^"]*)"/g)].map(m => unxml(m[1]));
     r.cols = [...x.matchAll(/\svalue="([^"]*)"/g)].map(m => clean(unxml(unxml(m[1]).replace(/<[^>]+>/g, ' ')))).filter(Boolean).slice(0, 14);
   } else if (ext === 'docx') {
     const z = zipEntries(buf), doc = z['word/document.xml'] && z['word/document.xml']().toString('utf8');
     if (doc) {
-      const paras = [...doc.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)].map(m => ({ h: /<w:pStyle w:val="(?:Heading|Title|Заголовок)/i.test(m[0]), t: xmlTexts(m[0], 'w:t').join('') })).filter(p => p.t);
+      // \u0417\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a = the ru Word "Heading" style, a parse pattern held as escapes
+      const paras = [...doc.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)].map(m => ({ h: /<w:pStyle w:val="(?:Heading|Title|\u0417\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a)/i.test(m[0]), t: xmlTexts(m[0], 'w:t').join('') })).filter(p => p.t);
       r.heads = paras.filter(p => p.h).map(p => p.t).slice(0, 5);
       r.body = (paras.find(p => !p.h) || {}).t || '';
     }
@@ -408,13 +423,13 @@ function describeParts(f, ext) {                          // -> { heads, body, s
 function describeEntry(e) {
   const ext = (e.format || '').toLowerCase(), name = path.basename(e.path, path.extname(e.path)).replace(/[-_]+/g, ' ');
   let p = { heads: [], body: '', sheets: [], cols: [] };
-  try { p = describeParts(path.join(ROOT, e.path), ext); } catch { /* описание из имени и класса */ }
+  try { p = describeParts(path.join(ROOT, e.path), ext); } catch { /* the description from the name and the class */ }
   const parts = [];
-  if (p.sheets.length) parts.push('Листы: ' + p.sheets.join(', '));
-  if (p.cols.length) parts.push((ext === 'drawio' ? 'Подписи узлов: ' : ext === 'json' ? 'Ключи: ' : 'Колонки: ') + p.cols.join(', '));
-  if (p.heads.length) parts.push((ext === 'pptx' ? 'Слайды: ' : ext === 'drawio' ? 'Схема: ' : 'Заголовки: ') + p.heads.join(' / '));
+  if (p.sheets.length) parts.push(msg('resources.part_sheets') + p.sheets.join(', '));
+  if (p.cols.length) parts.push((ext === 'drawio' ? msg('resources.part_node_labels') : ext === 'json' ? msg('resources.part_keys') : msg('resources.part_columns')) + p.cols.join(', '));
+  if (p.heads.length) parts.push((ext === 'pptx' ? msg('resources.part_slides') : ext === 'drawio' ? msg('resources.part_diagram') : msg('resources.part_headings')) + p.heads.join(' / '));
   if (p.body) parts.push(clean(p.body));
-  let d = `${name} (${ext}). ` + (parts.length ? parts.join('. ') : `${e.class || 'файл'}, описание из имени`);
+  let d = `${name} (${ext}). ` + (parts.length ? parts.join('. ') : msg('resources.description_fallback', { klass: e.class || msg('resources.generic_file') }));
   d = d.replace(/\s+/g, ' ');
   if (d.length > 300) d = d.slice(0, 299).replace(/[\s,;:.\/]+\S*$/, '') + '…';
   if (d.length > 300) d = d.slice(0, 300);
@@ -428,21 +443,21 @@ function describeEntry(e) {
 
 function cmdDescribe(opt = {}) {
   const reg = readJson(REG, { entries: {} });
-  const redo = typeof opt.redo === 'string' ? new RegExp(opt.redo) : null;   // --redo <regex пути>: пере-описать записи, описанные скриптом (без model)
+  const redo = typeof opt.redo === 'string' ? new RegExp(opt.redo) : null;   // --redo <path regex>: re-describe the entries described by the script (without a model)
   let done = 0, kept = 0, skipped = 0;
   for (const e of Object.values(reg.entries)) {
     const again = redo && redo.test(e.path) && !e.model;
-    if (e.description && !again) { kept++; continue; }                     // уже описано (в т.ч. описателем-моделью)
+    if (e.description && !again) { kept++; continue; }                     // already described (including by the model describer)
     if (e.class === 'generated' || ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'mp4', 'webm', 'mov'].includes(e.format)) { skipped++; continue; }
     const r = describeEntry(e);
     Object.assign(e, { description: r.description, tags: r.tags, described: today() });
     done++;
   }
   writeJson(REG, reg);
-  console.log(`описано без модели: ${done}, оставлено (уже есть описание): ${kept}, пропущено (картинки/кадры): ${skipped}`);
+  console.log(msg('resources.describe_summary', { done, kept, skipped }));
 }
 
-// --- смысловые теги: второй проход, модель вызывает главная сессия ----------------------------
+// --- semantic tags: the second pass, the model is called by the main session ----------------------------
 const SEM_CLASSES = ['source', 'reference', 'doc', 'data', 'config', 'script'];
 
 function cmdTagBatch(opt) {
@@ -451,12 +466,12 @@ function cmdTagBatch(opt) {
     .map(([h, e]) => ({ sha256: h, path: e.path, class: e.class, description: e.description || null, tags: e.tags || [] }));
   const f = path.resolve(ROOT, opt.out || 'project/work/tag-batch.json');
   writeJson(f, { domain_tags: rules.domain_tags || [], items });
-  console.log(`пачка смысловых тегов: ${items.length} → ${rel(f)}`);
+  console.log(msg('resources.tag_batch_summary', { count: items.length, file: rel(f) }));
 }
 
 function cmdApplyTags(file) {
   const rules = loadRules(), reg = readJson(REG, { entries: {} }), ans = file ? readJson(path.resolve(file), null) : null;
-  if (!ans) { console.error('не прочитан ' + file); process.exit(2); }
+  if (!ans) { console.error(msg('resources.not_read', { file })); process.exit(2); }
   const dict = new Map((rules.domain_tags || []).map(t => [normWord(t), t]));
   const list = Array.isArray(ans) ? ans : ans.items || ans.answers || [];
   let ok = 0, dropped = 0, missing = 0;
@@ -470,15 +485,15 @@ function cmdApplyTags(file) {
     ok++;
   }
   writeJson(REG, reg);
-  console.log(`смысловые теги записаны: ${ok}, отброшено вне словаря: ${dropped}, нет записи: ${missing}`);
+  console.log(msg('resources.apply_tags_summary', { ok, dropped, missing }));
 }
 
 function cmdDecide(folder, cls) {
-  if (!folder || !['resource', 'draft'].includes(cls)) { console.error('использование: decide <папка> resource|draft'); process.exit(2); }
+  if (!folder || !['resource', 'draft'].includes(cls)) { console.error(msg('resources.decide_usage')); process.exit(2); }
   const r = readJson(RULES, {});
   r.folders = { ...(r.folders || {}), [folder.replace(/\\/g, '/').replace(/\/$/, '')]: cls };
   writeJson(RULES, r);
-  console.log(`решение записано: ${folder} → ${cls}`);
+  console.log(msg('resources.decide_recorded', { folder, cls }));
 }
 
 function main() {
@@ -495,7 +510,7 @@ function main() {
   else if (cmd === 'apply-tags') cmdApplyTags(pos[1]);
   else if (cmd === 'register') cmdRegister(pos[1], opt);
   else if (cmd === 'decide') cmdDecide(pos[1], pos[2]);
-  else { console.error('команды: sort | inventory | report | prepare | batch | apply | register | describe | tag-batch | apply-tags | decide'); process.exit(2); }
+  else { console.error(msg('resources.commands')); process.exit(2); }
 }
 
 if (require.main === module) main();

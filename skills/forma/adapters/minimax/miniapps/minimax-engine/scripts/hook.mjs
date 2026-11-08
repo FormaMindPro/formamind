@@ -1,26 +1,26 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * Обработчик хуков движка MiniMax Code (зона `.minimax/` протокола «Формы»).
+ * The hook handler of the MiniMax Code engine (the `.minimax/` zone of the Forma protocol).
  *
- * Пять обязанностей, по одной на событие:
- *   UserPromptSubmit — ловит кодовую фразу «Отключи сенсорику» и кладёт одноразовый
- *                      разрешающий маркер (фраза — пароль, а не описание; одно действие).
- *   PreToolUse       — охрана удалений: разрушающая команда по защищённому набору → deny.
- *   SessionStart     — доставка роли главной сессии (`Intent`) через additionalContext.
- *   SubagentStart    — запомнить, когда начался вызов узла.
- *   SubagentStop     — журнал вызовов: платформенный идентификатор вызова и его длительность.
+ * Five duties, one per event:
+ *   UserPromptSubmit - catches the human code phrase and lays a one-shot
+ *                      unlock marker (the phrase is a password, not a description; one action).
+ *   PreToolUse       - the deletion guard: a destructive command against the protected set -> deny.
+ *   SessionStart     - the main session (`Intent`) role delivery through additionalContext.
+ *   SubagentStart    - remember when a node call started.
+ *   SubagentStop     - the calls ledger: the platform call identifier and its duration.
  *
- * Формат входа читается терпимо (поле события ищется в нескольких именах): хук, который не
- * понял вход, молчит и ничего не ломает. Формат выхода — ровно один JSON-объект, когда хук
- * влияет на ход; иначе — пустой stdout и код 0.
+ * The input format is read tolerantly (the event field is looked up in several names): a hook that
+ * did not understand the input stays silent and breaks nothing. The output format is exactly one
+ * JSON object when the hook affects the course; otherwise empty stdout and code 0.
  *
- * Хук работает только в проекте протокола: он узнаёт его по `AGENTS.md` и зоне `.minimax/`.
- * Установленный в профиле пакет обслуживает все проекты, и в чужом проекте охранять нечего —
- * там хук молчит.
+ * The hook works only in a protocol project: it recognizes it by `AGENTS.md` and the `.minimax/` zone.
+ * The package installed into the profile serves all projects, and there is nothing to guard in a
+ * foreign project - the hook stays silent there.
  *
- * Числа расхода: payload хука не несёт токенов и кэш-чтения, поэтому в запись журнала они
- * попадают как null — и строка расхода остаётся «unknown», а не выдуманной (AGENTS.md §3).
+ * The spend numbers: the hook payload carries no tokens and no cache read, so they get into the
+ * ledger record as null - and the spend line stays "unknown", not invented (AGENTS.md §3).
  */
 
 import fs from 'node:fs';
@@ -39,8 +39,9 @@ const UNLOCK = path.join(ZONE, 'hooks', '.delete-unlock');
 const STARTED = path.join(DATA, 'started');
 
 /**
- * Ридер стенограмм: настоящие числа расхода лежат там, а не в payload хука.
- * Модуль лежит рядом с хуком в пакете; если его нет — расход остаётся неизвестным, а не нулевым.
+ * The transcript reader: the real spend numbers sit there, not in the hook payload.
+ * The module sits next to the hook in the package; when it is absent the spend stays
+ * unknown, not zero.
  */
 let transcripts = null;
 try {
@@ -49,10 +50,33 @@ try {
   transcripts = null;
 }
 
-/** Кодовая фраза человека: пароль на одно действие, а не описание намерения. */
-const PHRASE = 'Отключи сенсорику';
+/**
+ * The core dictionary of the protocol's languages. A Forma project always has it (installed at
+ * `.forma/i18n/`); outside one the hook stays silent, so the English fallback below only covers
+ * a Forma-shaped project without an installed dictionary (the tests' minimal fixture).
+ */
+let i18n = null;
+try {
+  i18n = require(path.join(PROJECT, '.forma', 'i18n', 'index.cjs'));
+} catch {
+  i18n = null;
+}
+const EN_FALLBACK = {
+  'mhook.deny_reason':
+    'The guard of the Forma protocol: this path is protected (the law, the roles, the cards, the knowledge bases). The phrase «',
+  'mhook.deny_reason_tail': '» lifts the ban for one action.',
+  'mhook.session_start':
+    'The project runs on the Forma protocol. The main session is the `Intent` node. First read the role file ',
+  'mhook.session_role_mid': ' and the session start file ',
+  'mhook.session_start_tail':
+    ', then speak with the human as `Intent`. The law rules are in AGENTS.md, §1–§7.',
+};
+const msg = (code) => (i18n ? i18n.message(code, null, 'ru') : EN_FALLBACK[code] || code);
 
-/** Разрушающие команды: их и только их охрана смотрит. */
+/** The human code phrase: a password for one action, not a description of intent. */
+const PHRASE = '\u041e\u0442\u043a\u043b\u044e\u0447\u0438 \u0441\u0435\u043d\u0441\u043e\u0440\u0438\u043a\u0443';
+
+/** The destructive commands: the guard looks at them and only them. */
 const DESTRUCTIVE = [
   /\brm\b/i,
   /\brmdir\b/i,
@@ -65,7 +89,7 @@ const DESTRUCTIVE = [
   /\bshred\b/i,
 ];
 
-/** Защищённый набор: данные ядра, если они есть, иначе — набор пакета. */
+/** The protected set: the core data, when it is there, otherwise the package set. */
 const FALLBACK_PROTECTED = [
   '.claude', '.agents', '.codex', '.minimax', '.devtool',
   '.forma/manual', '.forma/living', 'miniapps',
@@ -97,7 +121,7 @@ function eventName(payload) {
   return null;
 }
 
-/** Проект протокола «Формы»: закон на месте и зона движка на месте. */
+/** A Forma protocol project: the law in place and the engine zone in place. */
 function isFormaProject() {
   try {
     return fs.existsSync(path.join(PROJECT, 'AGENTS.md')) && fs.existsSync(path.join(ZONE, 'agents', 'intent.md'));
@@ -116,13 +140,13 @@ function protectedList() {
       const list = Array.isArray(data) ? data : data.paths || data.protected || [];
       if (Array.isArray(list) && list.length) return list;
     } catch {
-      /* битый список — берём запасной */
+      /* a broken list - take the fallback */
     }
   }
   return FALLBACK_PROTECTED;
 }
 
-/** Команда бьёт по защищённому набору? Ищем фрагмент как отдельный сегмент пути. */
+/** Does the command hit the protected set? We look for a fragment as a separate path segment. */
 function hitsProtected(command, fragments) {
   const cmd = String(command).replace(/\\/g, '/');
   return fragments.some((frag) => {
@@ -139,7 +163,7 @@ function ensureDir(dir) {
   try {
     fs.mkdirSync(dir, { recursive: true });
   } catch {
-    /* нет места — пишем в никуда, но не падаем */
+    /* no place - write nowhere, but do not fall */
   }
 }
 
@@ -160,7 +184,7 @@ function handleUserPromptSubmit(payload) {
   if (!isFormaProject()) return;
   ensureDir(path.dirname(UNLOCK));
   fs.writeFileSync(UNLOCK, new Date().toISOString(), 'utf8');
-  // Событие-источник: фраза про разрешение — не блокировка промпта, а побочное действие.
+  // The source event: the phrase is about permission - not a prompt block, but a side action.
   process.exit(0);
 }
 
@@ -174,18 +198,16 @@ function handlePreToolUse(payload) {
   if (!isDestructive(command)) return;
   if (!hitsProtected(command, protectedList())) return;
 
-  // Фраза человека снимает запрет на одно действие: маркер одноразовый.
+  // The human phrase lifts the ban for one action: the marker is one-shot.
   if (fs.existsSync(UNLOCK)) {
-    try { fs.unlinkSync(UNLOCK); } catch { /* маркер исчез — пусть и молча */ }
+    try { fs.unlinkSync(UNLOCK); } catch { /* the marker is gone - silently too */ }
     process.exit(0);
   }
   emit({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
-      permissionDecisionReason:
-        'Охрана протокола «Формы»: этот путь защищён (закон, роли, карточки, базы знаний). ' +
-        'Фраза «' + PHRASE + '» снимает запрет на одно действие.',
+      permissionDecisionReason: msg('mhook.deny_reason') + PHRASE + msg('mhook.deny_reason_tail'),
     },
   });
 }
@@ -198,10 +220,9 @@ function handleSessionStart() {
     hookSpecificOutput: {
       hookEventName: 'SessionStart',
       additionalContext:
-        'Проект работает по протоколу «Форма». Главная сессия — узел `Intent`. ' +
-        'Первым делом прочитай файл роли ' + intent +
-        ' и файл начала сессии ' + start +
-        ', затем говори с человеком как `Intent`. Правила закона — в AGENTS.md, §1–§7.',
+        msg('mhook.session_start') + intent +
+        msg('mhook.session_role_mid') + start +
+        msg('mhook.session_start_tail'),
     },
   });
 }
@@ -237,8 +258,8 @@ function handleSubagentStop(payload) {
   ensureDir(path.dirname(LEDGER));
   const agentType = (started && started.agentType) || payload.agent_type || '';
 
-  // Настоящие числа расхода берутся из стенограммы сессии — там рантайм пишет их пошагово.
-  // Нет стенограммы — остаётся null, и строка расхода читается «unknown», а не ноль.
+  // The real spend numbers are taken from the session transcript - the runtime writes them there
+  // step by step. No transcript - null remains, and the spend line reads "unknown", not zero.
   let usage = null;
   let steps = [];
   if (transcripts) {
@@ -249,7 +270,7 @@ function handleSubagentStop(payload) {
       usage = null;
     }
   }
-  // Нормированная стенограмма — для дашборда: пол окна и разрезы по моделям.
+  // The normalized transcript - for the dashboard: the floor of the window and the cuts by models.
   if (transcripts && steps.length) {
     try {
       const lines = transcripts.normalizedLines(steps);
@@ -257,15 +278,15 @@ function handleSubagentStop(payload) {
         ensureDir(TRANSCRIPTS);
         const call = agentId.replace(/[^\w.-]/g, '_');
         fs.writeFileSync(path.join(TRANSCRIPTS, call + '.jsonl'), lines + '\n', 'utf8');
-        // Раскладка, которую читает ядро (`card-move.cjs --agent-id`): <каталог>/<вызов>/subagents/agent-<вызов>.jsonl.
-        // Ключ дедупликации `requestId` — на шаг: один шаг рантайма = один ответ API.
+        // The layout the core reads (`card-move.cjs --agent-id`): <folder>/<call>/subagents/agent-<call>.jsonl.
+        // The `requestId` deduplication key - per step: one runtime step = one API response.
         const core = transcripts.coreLines ? transcripts.coreLines(steps) : lines;
         const nested = path.join(TRANSCRIPTS, call, 'subagents', `agent-${call}.jsonl`);
         ensureDir(path.dirname(nested));
         fs.writeFileSync(nested, core + '\n', 'utf8');
       }
     } catch {
-      /* стенограмма не записалась — расход в журнале всё равно пишется */
+      /* the transcript did not write - the spend is written to the ledger anyway */
     }
   }
 
@@ -281,8 +302,8 @@ function handleSubagentStop(payload) {
     cache_write_tokens: usage ? usage.cache_write : null,
     model: usage ? usage.model : null,
     note: usage
-      ? 'числа — из стенограммы сессии рантайма'
-      : 'payload хука не несёт расхода, стенограмма не найдена — числа остаются unknown (AGENTS.md §3)',
+      ? 'the numbers are from the runtime session transcript'
+      : 'the hook payload carries no spend, no transcript found - the numbers stay unknown (AGENTS.md §3)',
   };
   fs.appendFileSync(LEDGER, JSON.stringify(record) + '\n', 'utf8');
   process.exit(0);
@@ -308,6 +329,6 @@ switch (event) {
     handleSubagentStop(payload);
     break;
   default:
-    // Событие не понято или не наше — молча, код 0.
+    // The event is not understood or not ours - silently, code 0.
     process.exit(0);
 }

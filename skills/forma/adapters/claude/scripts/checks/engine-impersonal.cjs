@@ -1,14 +1,14 @@
 'use strict';
 
-// Чистые зоны (запрет 16): в файлах, что уезжают в другие проекты, нет следов проекта. Зоны, слой 4 и сам поиск
-// следов — support/clean-zone.cjs.
+// Clean zones (prohibition 16): the files that leave for other projects carry no trace of the project. The zones, layer 4 and the
+// search of the traces themselves - support/clean-zone.cjs.
 
 const fs = require('fs');
 const path = require('path');
 const { walk } = require('../../../.forma/dashboard/lib/fs.cjs');
 const { CLEAN_ROOTS, CLEAN_SKIP, cleanOwn, inCleanZone, scanCleanFile } = require('./support/clean-zone.cjs');
 
-/** Обход корня зоны `rel` (файл или каталог); слой 4 и служебные каталоги пропускаются. */
+/** A walk of the `rel` zone's root (a file or a directory); layer 4 and the service directories are skipped. */
 function scanRoot(root, rel, own) {
   const problems = [];
   const abs = path.join(root, rel);

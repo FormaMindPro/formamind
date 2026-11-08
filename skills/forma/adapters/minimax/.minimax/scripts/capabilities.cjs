@@ -1,36 +1,40 @@
 'use strict';
 
 /**
- * Возможности движка MiniMax — факты, а не мнения (контракт 9).
+ * The MiniMax engine's capabilities - facts, not opinions (contract 9).
  *
- * Файл `.minimax/.state/capabilities.json` пишет проба, а не узел. Ядро читает его
- * вместо самоотчёта: гейт изоляции в `.forma/board/new-card.cjs` смотрит на
- * `isolation.available` и не пускает производственный круг в деградированном режиме.
+ * The file `.minimax/.state/capabilities.json` is written by the probe, not by a node. The core reads it
+ * instead of a self-report: the isolation gate in `.forma/board/new-card.cjs` looks at
+ * `isolation.available` and does not let a production cycle run in the degraded mode.
  *
- * Проба честна: что нельзя доказать из файловой системы — помечено `available: null` с причиной;
- * что доказанно отсутствует — `available: false` с причиной; `true` ставится только там, где
- * названо доказательство. Дисциплина, не подменённая конструкцией, объявляется дисциплиной.
+ * The probe is honest: what cannot be proven from the file system is marked `available: null` with a reason;
+ * what is proven absent - `available: false` with a reason; `true` is set only where a proof is named.
+ * A discipline not substituted by a construction is declared a discipline.
  *
- * Запуск: node .minimax/scripts/capabilities.cjs
+ * Printed labels come from the core dictionary: English key in code, ru value as data.
+ *
+ * Run: node .minimax/scripts/capabilities.cjs
  */
 
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const STATE = path.join(ROOT, '.minimax', '.state', 'capabilities.json');
 const LEDGER = path.join(ROOT, '.minimax', '.ledger', 'calls.jsonl');
 const PLUGIN_ID = 'minimax-engine';
-/** Исходник пакета в проекте и установленная копия в профиле рантайма. */
+/** The package's source in the project and the installed copy in the runtime profile. */
 const PLUGIN_SOURCE = path.join(ROOT, 'miniapps', PLUGIN_ID, '.minimax-plugin', 'plugin.json');
 const PLUGIN_PROFILE = path.join(
   process.env.MINIMAX_DATA_DIR || path.join(os.homedir(), '.minimax'),
   'plugins', PLUGIN_ID, '.minimax-plugin', 'plugin.json'
 );
-/** События, которые несёт пакет движка. */
+/** The events the engine's package carries. */
 const PLUGIN_EVENTS = ['PreToolUse', 'UserPromptSubmit', 'SessionStart', 'SubagentStart', 'SubagentStop'];
-/** Свидетель наблюдений сессии: доставка роли и регистрация ролей — из файлов не выводятся. */
+/** The session's observations witness: the role delivery and the roles registration - not derived from files. */
 const WITNESS = path.join(ROOT, '.minimax', '.state', 'observed-runtime.json');
 
 function readWitness() {
@@ -51,7 +55,7 @@ function exists(p) {
   }
 }
 
-/** Путь от корня проекта — в файле фактов не должно быть машинных путей (чистая зона). */
+/** A path from the project root - the facts file must hold no machine paths (a clean zone). */
 function rel(p) {
   return path.relative(ROOT, p).replace(/\\/g, '/');
 }
@@ -59,8 +63,8 @@ function rel(p) {
 function probe() {
   const now = new Date().toISOString();
 
-  // Изоляция: дочерние сессии с отдельным контекстом даёт рантайм (task + продолжение вызова).
-  // Доказательство — реестр агентов рантайма: без него изоляция не заявлена.
+  // Isolation: child sessions with a separate context is given by the runtime (task + the continuation of the call).
+  // The proof - the runtime's agents roster: without it isolation is not claimed.
   const agentsRoot = path.join(os.homedir(), '.minimax', 'agents');
   const roster = fs.existsSync(agentsRoot)
     ? fs.readdirSync(path.join(agentsRoot, '.builtin'), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
@@ -72,30 +76,28 @@ function probe() {
   const isolation = fs.existsSync(agentsRoot)
     ? {
         available: true,
-        mechanism: 'task (дочерняя сессия с отдельным контекстом) + продолжение того же вызова по его task_id',
-        verifiedBy: 'реестр агентов рантайма: ' + (roster.length ? roster.join(', ') : 'пуст') + ' (~/.minimax/agents/.builtin)',
+        mechanism: msg('mcap.mech_task'),
+        verifiedBy: msg('mcap.roster') + (roster.length ? roster.join(', ') : msg('mcap.empty')) + msg('mcap.roster_tail'),
         projectRolesRegistered: seenRegistry ? true : null,
         projectRolesMechanism:
-          'плагин движка ' + PLUGIN_ID + ' регистрирует роли узлов как субагентов: ' + pluginRoles,
+          msg('mcap.plugin_registers') + PLUGIN_ID + msg('mcap.plugin_registers_tail') + pluginRoles,
         projectRolesReason: seenRegistry
-          ? 'делегация разрешилась и узлы отработали в отдельных дочерних сессиях: ' + seenRegistry.what +
-            ' — доказательство: свидетель наблюдения .minimax/.state/observed-runtime.json и платформенные записи в журнале .minimax/.ledger/calls.jsonl'
+          ? msg('mcap.delegation_seen') + seenRegistry.what + msg('mcap.delegation_seen_tail')
           : pluginInstalled
-            ? 'пакет установлен в профиле рантайма, но делегация пока не наблюдалась: ' +
-              'реестр сессии собирается на её старте — нужна сессия, начатая после установки'
-            : 'пакет плагина не установлен в профиле рантайма — роли узлов остаются файлами ролей, а не агентами рантайма',
+            ? msg('mcap.delegation_pending')
+            : msg('mcap.package_absent'),
       }
     : {
         available: false,
-        reason: 'реестр агентов рантайма не найден — изоляция не заявлена',
-        verifiedBy: 'проверка ~/.minimax/agents',
+        reason: msg('mcap.no_roster'),
+        verifiedBy: msg('mcap.check_agents'),
         projectRolesRegistered: false,
-        projectRolesReason: 'реестра нет',
+        projectRolesReason: msg('mcap.no_registry'),
       };
 
-  // Хуки: пакет движка стоит в профиле рантайма и несёт охрану удалений, доставку роли главной
-  // сессии и журнал вызовов. Установлен — значит механизм есть; доставлен ли вывод в живую
-  // сессию — отдельный вопрос, и он помечен честно.
+  // Hooks: the engine's package sits in the runtime profile and carries the deletion guard, the main
+  // session's role delivery and the calls log. Installed - so the mechanism is there; whether the output
+  // reaches a live session is a separate question, and it is marked honestly.
   const pluginSourceExists = exists(PLUGIN_SOURCE);
   const seenHooks = witness && witness.observations && witness.observations.hooks ? witness.observations.hooks : null;
   const hooks = pluginInstalled
@@ -104,70 +106,67 @@ function probe() {
         events: PLUGIN_EVENTS,
         package: PLUGIN_ID,
         source: pluginSourceExists ? rel(PLUGIN_SOURCE) : null,
-        verifiedBy: 'пакет установлен в профиль рантайма; контракт манифеста и симуляция событий — в тесте зоны',
+        verifiedBy: msg('mcap.hooks_verified'),
         observedLive: seenHooks ? seenHooks.observedLive : [],
         observedOnlyInSimulation: seenHooks ? seenHooks.observedOnlyInSimulation : PLUGIN_EVENTS,
         deliveredInSession: seenHooks ? true : null,
         deliveredReason: seenHooks
           ? null
-          : 'ни одна сессия ещё не стартовала с установленным пакетом — вызов хука в живой сессии не наблюдался',
+          : msg('mcap.hook_unobserved'),
       }
     : {
         available: false,
-        reason: 'пакет плагина движка не установлен в профиле рантайма — хуков охраны, доставки роли и журнала нет',
+        reason: msg('mcap.hooks_absent'),
         source: pluginSourceExists ? rel(PLUGIN_SOURCE) : null,
       };
 
-  // Продолжение того же вызова: механизм рантайма (task_append по task_id), из файловой системы
-  // не выводится — доказательство живым вызовом, запись в свидетеле наблюдений сессии.
-  // `null` — честное «не доказано пробой», а не `true` по умолчанию.
+  // The continuation of the same call: a runtime mechanism (task_append by task_id), not derivable
+  // from the file system - the proof is a live call, the record in the session's observations witness.
+  // `null` is an honest "not proven by the probe", not a default `true`.
   const seenContinuation = witness && witness.observations && witness.observations.continuation ? witness.observations.continuation : null;
   const continuation = seenContinuation
     ? {
       available: true,
       reason: null,
-      mechanism: 'task_append по идентификатору дочерней сессии',
+      mechanism: msg('mcap.mech_task_append'),
       what: seenContinuation.what,
       how: seenContinuation.how,
       observedAt: seenContinuation.observedAt || witness.observedAt,
       sessionId: seenContinuation.sessionId || witness.sessionId,
       childSessionId: seenContinuation.childSessionId || null,
-      verifiedBy: 'свидетель наблюдения сессии: .minimax/.state/observed-runtime.json (наблюдение продолжения)',
+      verifiedBy: msg('mcap.witness_continuation'),
     }
     : {
       available: null,
       reason:
-        'продолжение вызова — механизм рантайма (task_append по task_id); из файловой системы ' +
-        'не доказуемо, поэтому проба не утверждает его наличие',
-      mechanism: 'task_append по идентификатору дочерней сессии',
+        msg('mcap.continuation_note'),
+      mechanism: msg('mcap.mech_task_append'),
     };
 
-  // Доставка роли главной сессии: хук SessionStart пакета отдаёт роль в документированной форме
-  // (hookSpecificOutput.additionalContext). Форма проверена запуском хука, доставка — наблюдением
-  // сессии; из файлов ни то, ни другое не выводится, поэтому доказательство — свидетель.
+  // The main session's role delivery: the package's SessionStart hook hands the role over in the documented
+  // form (hookSpecificOutput.additionalContext). The form is verified by a hook run, the delivery - by a session
+  // observation; neither is derivable from files, so the proof is the witness.
   const seenDelivery = witness && witness.observations && witness.observations.roleDelivery ? witness.observations.roleDelivery : null;
   const roleDelivery = seenDelivery
     ? {
         available: true,
         reason: null,
-        method: 'Intent читает .minimax/agents/intent.md первым действием сессии',
+        method: msg('mcap.intent_reads_first'),
         hook: 'SessionStart → hookSpecificOutput.additionalContext',
         what: seenDelivery.what,
         observedAt: witness.observedAt,
         sessionId: witness.sessionId,
-        verifiedBy: 'свидетель наблюдения сессии: .minimax/.state/observed-runtime.json',
+        verifiedBy: msg('mcap.witness'),
       }
     : {
         available: null,
         reason:
-          'хук SessionStart пакета отдаёт роль главной сессии в документированной форме ' +
-          '(hookSpecificOutput.additionalContext) — форма проверена симуляцией; доходит ли вывод до ' +
-          'модели, не наблюдалось: свидетеля наблюдения нет',
-        method: 'Intent читает .minimax/agents/intent.md первым действием сессии',
+          msg('mcap.delivery_form_note'),
+        method: msg('mcap.intent_reads_first'),
         hook: 'SessionStart → hookSpecificOutput.additionalContext',
       };
 
-  // Расход: журнал вызовов — источник строк расхода. Его ведёт хук SubagentStop.
+  // The spend: the calls log is the spend lines' source. The SubagentStop hook keeps it.
   const ledgerExists = exists(LEDGER);
   const ledgerRecords = ledgerExists
     ? fs.readFileSync(LEDGER, 'utf8').split(/\r?\n/).filter((l) => l.trim()).length
@@ -186,21 +185,17 @@ function probe() {
       available: ledgerExists,
       reason: ledgerExists
         ? null
-        : 'журнала вызовов ещё нет: его ведёт хук SubagentStop, а вызовов субагентов движка ещё не было',
+        : msg('mcap.no_ledger_yet'),
       ledger: rel(LEDGER),
       records: ledgerRecords,
       verifiedBy: ledgerExists
-        ? 'журнал вызовов движка: ' + rel(LEDGER) + ' — записи платформенных вызовов, идентификаторы из payload хука'
+        ? msg('mcap.ledger_line') + rel(LEDGER) + msg('mcap.ledger_line_tail')
         : null,
       writer:
-        'хук SubagentStop пакета пишет идентификатор и длительность вызова; числа расхода ' +
-        'берутся из стенограммы сессии рантайма (там платформа считает их пошагово); ' +
-        'нет стенограммы — остаётся unknown, а не ноль',
+        msg('mcap.subagentstop_note'),
     },
     note:
-      'Проба пишет только то, что доказуемо из среды. Поле, которое нельзя доказать, ' +
-      'помечено `available: null` с причиной; поле, доказанно отсутствующее, — `false`. ' +
-      '`true` ставится только там, где доказательство названо.',
+      msg('mcap.honesty_note'),
   };
 }
 
@@ -208,7 +203,7 @@ function main() {
   const cap = probe();
   fs.mkdirSync(path.dirname(STATE), { recursive: true });
   fs.writeFileSync(STATE, JSON.stringify(cap, null, 2) + '\n', 'utf8');
-  console.log('записано: ' + path.relative(ROOT, STATE).replace(/\\/g, '/'));
+  console.log(msg('mcap.written') + path.relative(ROOT, STATE).replace(/\\/g, '/'));
   console.log(JSON.stringify(cap, null, 2));
 }
 

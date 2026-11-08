@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * Адаптер Codex для ядра «Формы»: вкладка «Форма» (роли узлов из .codex/agents/*.toml).
- * Ядро находит его само — файл `forma-adapter.cjs` в каталоге с точкой; форма объекта — в шапке `.forma/dashboard/lib/engines.cjs`.
- * Другие поля формы адаптер не объявляет: ядро подставляет `unknown`.
+ * The Codex adapter for the Forma core: the "Forma" tab (the nodes' roles from .codex/agents/*.toml).
+ * The core finds it by itself - the `forma-adapter.cjs` file in a dotted directory; the object's shape - in the header of `.forma/dashboard/lib/engines.cjs`.
+ * The adapter declares no other shape fields: the core substitutes `unknown`.
  */
 
 const { readTomlCatalog, readMdCatalog } = require('../.forma/dashboard/lib/forma-roles.cjs');
@@ -15,7 +15,7 @@ module.exports = {
     const claude = readMdCatalog(root, { title: 'Claude Run profiles', rolesDir: '.claude/agents', mcpFiles: [] });
     cat.runRoles = claude.runRoles;
     cat.runNote = null;
-    cat.plugins = null; // списка плагинов у движка для вкладки нет
+    cat.plugins = null; // the engine has no plugin list for the tab
     return cat;
   },
 };

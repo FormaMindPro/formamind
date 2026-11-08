@@ -1,17 +1,17 @@
 'use strict';
 
 /**
- * Генератор зеркала ролей Claude → ZCode (`.claude/agents/` → `.zcode/agents/`).
+ * The generator of the Claude -> ZCode roles mirror (`.claude/agents/` -> `.zcode/agents/`).
  *
- * Механика — та же, что у зеркал Gemini (`gen-gemini-roles.cjs`) и MiniMax
- * (`.minimax/scripts/gen-roles.cjs`), с двумя отличиями, обусловленными движком:
- *   • тело роли — копия с перестановкой путей на мои; скиллы движок читает из
- *     общих `.agents/skills/` нативно (как Kimi), поэтому переименования туда нет;
- *   • фронтматтер — мой: модель, усилие и инструменты — инженерный выбор движка,
- *     сверка паритета его не сравнивает (`role-parity.cjs` режет `^---...---\n`).
+ * The mechanics - the same as the Gemini mirrors' (`gen-gemini-roles.cjs`) and MiniMax's
+ * (`.minimax/scripts/gen-roles.cjs`), with two differences caused by the engine:
+ *   - the role's body - a copy with the paths transposed to mine; the engine reads the skills from
+ *     the shared `.agents/skills/` natively (like Kimi), so there is no renaming into there;
+ *   - the frontmatter - mine: the model, the effort and the tools are the engine's engineering choice,
+ *     the parity check does not compare them (`role-parity.cjs` cuts `^---...---\n`).
  *
- * Запуск: node .zcode/scripts/gen-roles.cjs [--check]
- *   --check — ничего не пишет, только сообщает расхождения (роль, где тело разошлось).
+ * Run: node .zcode/scripts/gen-roles.cjs [--check]
+ *   --check - writes nothing, only reports the divergences (a role whose body has drifted).
  */
 
 const fs = require('fs');
@@ -19,22 +19,24 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SRC = path.join(ROOT, '.claude', 'agents');
+const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
+const msg = (code, params) => i18n.message(code, params, 'ru');
 const DST = path.join(ROOT, '.zcode', 'agents');
 
 /**
- * Перестановки путей в теле роли: моя зона — `.zcode/`, закон — `AGENTS.md`.
+ * The path transpositions in a role's body: my zone - `.zcode/`, the law - `AGENTS.md`.
  *
- * Пути пишутся полными (`.agents/skills/`, `.zcode/rules/zcode-8.md`), а не «от папки движка»:
- * сверка паритета движков нормализует именно полные пути (по контракту адаптеров), и только они
- * сходятся с эталоном. Папка ролей — исключение: сверка знает и короткую форму (`agents/…`).
+ * The paths are written full (`.agents/skills/`, `.zcode/rules/zcode-8.md`), not "from the engine's folder":
+ * the engines' parity check normalizes exactly the full paths (by the adapters' contract), and only they
+ * match the reference. The roles folder is the exception: the check knows the short form too (`agents/…`).
  */
 
 /**
- * Имя встроенного исполнителя Plumb — по малой модели зоны, у каждого движка своё
- * (у Gemini — `plumb-gemini`, свой файл). Источник тела один, поэтому карта переименования:
- * файл зеркала, поле `name:` и упоминания в телах ролей. Проводной тег отката jev
- * (`{"fallback":"haiku"}`) и значение `haiku` настройки `plumb` в PROJECT.md не трогаются —
- * это словарь настройки, а не имя агента.
+ * The built-in Plumb executor's name - by the zone's small model, each engine has its own
+ * (Gemini - `plumb-gemini`, its own file). The body's source is one, hence the renaming map:
+ * the mirror file, the `name:` field and the mentions in the roles' bodies. The wired jev fallback tag
+ * (`{"fallback":"haiku"}`) and the `haiku` value of the `plumb` setting in PROJECT.md are not touched -
+ * that is the setting's vocabulary, not an agent's name.
  */
 const EXECUTOR_RENAME = { 'plumb-haiku': 'plumb-glmflash' };
 
@@ -49,21 +51,21 @@ const BODY_TRANSFORMS = [
   [/\bCLAUDE\.md\b/g, 'AGENTS.md'],
 ];
 
-/** Инструменты: имя клона → имя моего рантайма. Порядок важен: длинные первыми. */
+/** The tools: the clone's name -> my runtime's name. The order matters: the long ones first. */
 const TOOL_MAP = [
   [/mcp__chrome-devtools__[a-z_]+/g, 'mcp_browser'],
   [/\bKillShell\b/g, 'TaskStop'],
-  // MCP-сервер site в ZCode не поднят: движок отказывается стартовать агента с недоступным
-  // инструментом целиком. Работать с сайтом роля может через Bash(node .claude/scripts/site.cjs *).
+  // The site MCP server is not up in ZCode: the engine refuses to start an agent with an unavailable
+  // tool altogether. A role can work with the site through Bash(node .claude/scripts/site.cjs *).
   [/mcp__site__mcp-adapter-[a-z-]+/g, ''],
 ];
 
 /**
- * Правила движка: те, что меняют СМЫСЛ, а не путь.
+ * The engine's rules: those that change the MEANING, not the path.
  *
- * Чужой тег движка в моей зоне — не опечатка, а ошибка счёта: ядро принимает `claude-code:`,
- * и попытка ZCode, написанная по чужому шаблону, уехала бы в счёт Клода молча.
- * Правило одно: тег в зоне — мой.
+ * A foreign engine tag in my zone - not a typo but a spend error: the core accepts `claude-code:`,
+ * and a ZCode attempt written by a foreign template would go into Claude's spend silently.
+ * The rule is one: the tag in the zone is mine.
  */
 const FILE_RULES = {
   'on-demand/route-choice.md': [[/claude-code:/g, 'zcode:']],
@@ -71,9 +73,9 @@ const FILE_RULES = {
 };
 
 /**
- * Зоны записи: куда роль кладёт новый файл. Эти места принадлежат движку, поэтому у моей
- * зоны — свои пути. Чтение общих скриптов (`.claude/scripts/*`) остаётся: это зависимость,
- * названная в §8, а не владение.
+ * The write zones: where a role puts a new file. These places belong to the engine, so my
+ * zone has its own paths. Reading the shared scripts (`.claude/scripts/*`) stays: it is a dependency,
+ * named in section 8, not an ownership.
  */
 const WRITE_PATH_RULES = [
   [/project\/extensions\/claude\//g, 'project/extensions/zcode/'],
@@ -82,10 +84,10 @@ const WRITE_PATH_RULES = [
   [/never to `\.claude\/scripts\/`/g, 'never to `.zcode/scripts/`'],
 ];
 
-/** Моя модель: рантайм один, различие «узел / усилие» выражено уровнем размышления. */
+/** My model: one runtime; the "node / effort" distinction is expressed by the thinking level. */
 const MY_MODEL = 'glm-5.3-flash';
 
-/** Усилие по умолчанию и для Run: уровни хоста — low | high | max (среднего нет). */
+/** The default effort, and Run's: the host's levels - low | high | max (no middle one). */
 const MY_EFFORT = 'high';
 const RUN_EFFORT = 'low';
 
@@ -112,7 +114,7 @@ function mapTools(value) {
   if (!value) return value;
   let out = value;
   for (const [re, to] of TOOL_MAP) out = out.replace(re, to);
-  // Разные инструменты клона после переименования схлопнулись в одно имя — дубли вычищаем, порядок держим.
+  // Different clone tools collapsed into one name after the renaming - the duplicates are cleaned out, the order kept.
   const seen = new Set();
   out = out.split(/,\s*/).filter((t) => {
     if (!t || seen.has(t)) return false;
@@ -184,11 +186,11 @@ function generate() {
 const { files, written, drift } = generate();
 if (process.argv.includes('--check')) {
   if (drift.length) {
-    console.error('дрейф зеркала ролей ZCode: ' + drift.join(', '));
-    console.error('пересборка: node .zcode/scripts/gen-roles.cjs');
+    console.error(msg('zgen.drift') + drift.join(', '));
+    console.error(msg('zgen.rebuild'));
     process.exit(1);
   }
-  console.log(`зеркало ролей ZCode синхронно: ${files.length} ролей`);
+  console.log(msg('zgen.in_sync', { count: files.length }));
 } else {
-  console.log(`зеркало ролей ZCode: источник ${files.length}, записано ${written.length}${written.length ? ': ' + written.join(', ') : ' (уже синхронно)'}`);
+  console.log(msg('zgen.summary', { count: files.length, written: written.length }) + (written.length ? ': ' + written.join(', ') : msg('zgen.already_sync')));
 }

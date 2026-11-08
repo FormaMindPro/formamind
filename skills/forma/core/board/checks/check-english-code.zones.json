@@ -1,6 +1,5 @@
 {
   "allowList": [
-    "adapters-installers",
     "tests-fixtures",
     "skill-scripts"
   ],

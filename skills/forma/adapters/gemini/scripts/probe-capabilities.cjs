@@ -2,16 +2,20 @@
 'use strict';
 
 /**
- * probe-capabilities.cjs — проверка фактических возможностей среды Antigravity (Gemini).
- * Определяет:
- *  1. Наличие инструментов изоляции (invoke_subagent, define_subagent, manage_subagents);
- *  2. Поддержку хуков (PreToolUse, PreInvocation, PostInvocation) через .agents/hooks.json;
- *  3. Источник call_id (журнал calls.jsonl);
- *  4. Записывает результат в .agents/.state/capabilities.json.
+ * probe-capabilities.cjs - a check of the Antigravity (Gemini) environment's actual capabilities.
+ * It determines:
+ *  1. The presence of the isolation tools (invoke_subagent, define_subagent, manage_subagents);
+ *  2. The hooks support (PreToolUse, PreInvocation, PostInvocation) via .agents/hooks.json;
+ *  3. The source of call_id (the calls.jsonl log);
+ *  4. Writes the result into .agents/.state/capabilities.json.
+ *
+ * Printed labels come from the core dictionary: English key in code, ru value as data.
  */
 
 const fs = require('fs');
 const path = require('path');
+const i18n = require([path.resolve(__dirname, '../../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 function probeCapabilities(root) {
   const r = root || process.cwd();
@@ -28,9 +32,9 @@ function probeCapabilities(root) {
     } catch {}
   }
 
-  // Проверка изоляции: в рантайме Antigravity Teamwork
-  // определена ли поддержка subagents
-  const isolationAvailable = true; // Mode 2 активен в текущем профиле Teamwork
+  // The isolation check: in the Antigravity Teamwork runtime
+  // whether the subagents support is defined
+  const isolationAvailable = true; // Mode 2 is active in the current Teamwork profile
 
   const capabilities = {
     timestamp: new Date().toISOString(),
@@ -54,7 +58,7 @@ function probeCapabilities(root) {
       decisiveExperiment: {
         plainStdoutToModel: false,
         jsonInjectStepsToModel: true,
-        finding: 'stdout хука доходит до контекста модели только при возврате JSON с ключом injectSteps (systemMessage или ephemeralMessage); неструктурированный stdout игнорируется.',
+        finding: msg('gprobe.hook_stdout_finding'),
       },
     },
     ledger: {

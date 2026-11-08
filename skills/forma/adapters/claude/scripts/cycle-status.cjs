@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// Счёт круга по эпикам (AGENTS.md §3, §7).
-// Круг идёт внутри эпика: `Core` закрывает его, когда принятых карточек эпика (done + assignee "Core")
-// набралось «объём круга» (PROJECT.md), по команде человека или по сроку. Выпуск протокола (dev → main,
-// версия, push) — по объёму выпуска или на закрытии круга.
-//   node .claude/scripts/cycle-status.cjs          — строка отчёта: «Форма 7/10 · … · протокол: K/N коммитов в dev до выпуска»
-//   node .claude/scripts/cycle-status.cjs --json   — то же данными
-// Только чтение. Выход всегда 0.
+// The cycle count by epics (AGENTS.md §3, §7).
+// The cycle runs inside an epic: `Core` closes it when the epic's accepted cards (done + assignee "Core")
+// have reached the "cycle volume" (PROJECT.md), on the human's command or by the deadline. The protocol release
+// (dev -> main, the version, the push) - by the release volume or on a cycle's closure.
+//   node .claude/scripts/cycle-status.cjs          - the report line: "Forma 7/10 · … · protocol: K/N commits in dev before the release"
+//   node .claude/scripts/cycle-status.cjs --json   - the same as data
+// Read only. The exit is always 0.
+// Printed labels come from the core dictionary: English key in code, ru value as data.
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -28,6 +29,7 @@ const { readIfExists, projectFile } = require(resolveLib('fs.cjs'));
 // Installed layout first (.claude/scripts → .forma/i18n); the protocol source keeps it in core/i18n (tests load this file in place).
 const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
 const { cardFiles, frontmatterBlock } = require(resolveLib('card.cjs'));
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 function parseVolume(text) {
   if (!text) return null;
@@ -53,9 +55,9 @@ function getCycleStatus(root = ROOT) {
   let ahead = null;
   const proto = path.join(root, '.forma/protocol');
   if (fs.existsSync(path.join(proto, '.git'))) {
-    // коммиты в dev, ещё не выпущенные в main; ветки dev нет — прежний счёт против upstream
+    // the commits in dev not yet released into main; no dev branch - the old count against upstream
     const cnt = (range, ...o) => +execFileSync('git', ['-C', proto, 'rev-list', '--count', ...o, range], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    try { ahead = cnt('main..dev', '--no-merges'); } catch { try { ahead = cnt('@{u}..HEAD'); } catch { /* нет ветки dev и upstream — счётчик остаётся прежним */ } }
+    try { ahead = cnt('main..dev', '--no-merges'); } catch { try { ahead = cnt('@{u}..HEAD'); } catch { /* no dev branch and no upstream - the counter keeps its previous value */ } }
   }
 
   const epics = [...perEpic].map(([epic, accepted]) => ({ epic, accepted, full: volume != null && accepted >= volume }));
@@ -68,9 +70,9 @@ if (require.main === module) {
     process.stdout.write(JSON.stringify(status) + '\n');
     process.exit(0);
   }
-  const parts = status.epics.map((e) => `${e.epic.replace(/\/.*$/, '')} ${e.accepted}/${status.volume ?? '?'}${e.full ? ' — пора Core' : ''}`);
-  if (status.protocolAhead) parts.push(`протокол: ${status.protocolAhead}/${status.releaseVolume} коммитов в dev до выпуска — выпуск по объёму или на закрытии круга`);
-  if (parts.length) console.log('Круг по эпикам: ' + parts.join(' · '));
+  const parts = status.epics.map((e) => `${e.epic.replace(/\/.*$/, '')} ${e.accepted}/${status.volume ?? '?'}${e.full ? msg('cycle-status.due_core') : ''}`);
+  if (status.protocolAhead) parts.push(msg('cycle-status.protocol_line', { ahead: status.protocolAhead, release: status.releaseVolume }));
+  if (parts.length) console.log(msg('cycle-status.header') + parts.join(' · '));
   process.exit(0);
 }
 

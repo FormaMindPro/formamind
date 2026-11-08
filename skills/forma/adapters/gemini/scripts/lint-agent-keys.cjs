@@ -2,31 +2,33 @@
 'use strict';
 
 /**
- * lint-agent-keys.cjs — линт ключей frontmatter файлов агентов зоны Gemini (.agents):
- * закрытый список по факту зоны, опечатка — ошибка с адресом и именем ключа (exit 1).
+ * lint-agent-keys.cjs - a lint of the frontmatter keys of the Gemini zone's (.agents) agent files:
+ * a closed list by the zone's fact, a typo - an error with the address and the key's name (exit 1).
  *
- *   node .agents/scripts/lint-agent-keys.cjs [каталог]
+ *   node .agents/scripts/lint-agent-keys.cjs [directory]
  *
- * Каталог по умолчанию — агенты зоны Gemini (.agents/plugins/forma/agents, рекурсивно).
- * Ключи frontmatter сверяются с закрытым списком, сверенным по реальным файлам зоны:
+ * The default directory - the Gemini zone's agents (.agents/plugins/forma/agents, recursively).
+ * The frontmatter keys are checked against the closed list, collated with the zone's real files:
  * name, description, model, effort, tier, uses, tools, skills, omitClaudeMd.
- * Неизвестный (опечатанный) ключ — ошибка с адресом файла и именем ключа, выход 1, не молчание.
- * Файл агента без блока frontmatter — ошибка (fail-closed, молчаливый пропуск недопустим).
- * Файлы слоя on-demand (инструкции по требованию без фронтматтера) пропускаются.
- * Чистый набор — выход 0.
+ * An unknown (typoed) key - an error with the file's address and the key's name, exit 1, not silence.
+ * An agent file without a frontmatter block - an error (fail-closed, a silent skip is inadmissible).
+ * The on-demand layer's files (on-demand instructions without a frontmatter) are skipped.
+ * A clean set - exit 0.
  *
- * Выход:
- *   0 — нарушений нет (число проверенных файлов);
- *   1 — найдены ошибки (по строке на каждое нарушение);
- *   2 — каталог не найден.
+ * Exit codes:
+ *   0 - no violations (the number of the checked files);
+ *   1 - errors found (a line per each violation);
+ *   2 - the directory is not found.
  */
 
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
+const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
-/** Закрытый список ключей зоны Gemini, зафиксированный по факту зоны. */
+/** The closed list of the Gemini zone's keys, fixed by the zone's fact. */
 const KEYS = [
   'name',
   'description',
@@ -44,7 +46,7 @@ const KEY_LINE_RE = /^([A-Za-z][A-Za-z0-9_-]*):/;
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---/;
 const ON_DEMAND_RE = /(?:^|[\\/])on-demand(?:[\\/]|$)/;
 
-/** Все .md файлы каталога, рекурсивно, в стабильном порядке: [{ file, rel }]. */
+/** All the .md files of a directory, recursively, in a stable order: [{ file, rel }]. */
 function listMd(dir, base = '') {
   const out = [];
   let entries = [];
@@ -57,18 +59,18 @@ function listMd(dir, base = '') {
   return out;
 }
 
-/** Ошибки одного файла: адрес и имя ключа. */
+/** One file's errors: the address and the key's name. */
 function lintText(rel, text) {
   const m = FRONTMATTER_RE.exec(text);
   if (!m) {
     if (ON_DEMAND_RE.test(rel)) return [];
-    return [`${rel}: нет блока frontmatter — ключи не проверить, молчаливый пропуск недопустим`];
+    return [msg('glint.no_frontmatter', { rel })];
   }
   const bad = [];
   for (const line of m[1].split(/\r?\n/)) {
     const km = KEY_LINE_RE.exec(line);
     if (km && !ALLOWED.has(km[1])) {
-      bad.push(`${rel}: неизвестный ключ «${km[1]}» — вне закрытого списка (${KEYS.join(', ')})`);
+      bad.push(msg('glint.unknown_key', { rel, key: km[1], keys: KEYS.join(', ') }));
     }
   }
   return bad;
@@ -88,7 +90,7 @@ if (require.main === module) {
     : path.join(ROOT, '.agents', 'plugins', 'forma', 'agents');
 
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
-    console.error(`lint-agent-keys: каталог не найден: ${dir}`);
+    console.error(msg('glint.dir_not_found', { dir }));
     process.exit(2);
   }
 
@@ -96,5 +98,5 @@ if (require.main === module) {
   for (const p of problems) console.error(p);
   if (problems.length) process.exit(1);
 
-  console.log(`lint-agent-keys: ${files.length} файлов, ключи в норме (закрытый список: ${KEYS.join(', ')})`);
+  console.log(msg('glint.clean', { count: files.length, keys: KEYS.join(', ') }));
 }

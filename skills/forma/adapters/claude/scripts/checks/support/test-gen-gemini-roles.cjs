@@ -35,7 +35,7 @@ assert(first.written.length === 0 && first.problems.length === 0, 'dry-run on re
 // 3) Drift detection + fix, on a disposable scratch copy (never touches the real mirror).
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gen-gemini-roles-selfcheck-'));
 try {
-  // Папки зеркала — из адаптеров реального проекта; во временной копии адаптеры — заглушки с теми же sources.
+  // The mirror folders - from the real project's adapters; in the temp copy the adapters are stubs with the same sources.
   const ctx = gen.ctxOf(ROOT);
   const claudeDst = path.join(tmp, ctx.from.src.rolesDir);
   const geminiDst = path.join(tmp, ctx.to.src.rolesDir);

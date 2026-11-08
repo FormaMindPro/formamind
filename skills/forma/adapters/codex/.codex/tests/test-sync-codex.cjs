@@ -48,8 +48,9 @@ if (fs.existsSync(registrySource)) {
 // that already have a Codex counterpart.
 const fixtureRunProfiles = path.join(fixture, '.claude', 'agents', 'run');
 const fixtureRegistry = path.join(fixture, 'project', 'config', 'PROJECT.md');
+// The ru heading in the regex is the project document's section name (data).
 const fixtureProjectProfiles = fs.existsSync(fixtureRegistry)
-  ? /(?:\*\*|^#{1,6}\s*)(?:Профили Run проекта|Project Run profiles)[\s\S]*?(?=^#{1,6}\s|\n\*\*|(?![\s\S]))/m.exec(fs.readFileSync(fixtureRegistry, 'utf8'))?.[0] || ''
+  ? /(?:\*\*|^#{1,6}\s*)(?:\u041f\u0440\u043e\u0444\u0438\u043b\u0438 Run \u043f\u0440\u043e\u0435\u043a\u0442\u0430|Project Run profiles)[\s\S]*?(?=^#{1,6}\s|\n\*\*|(?![\s\S]))/m.exec(fs.readFileSync(fixtureRegistry, 'utf8'))?.[0] || ''
   : '';
 if (!fixtureProjectProfiles) {
   for (const rel of files(fixtureRunProfiles).filter(file => file.endsWith('.md'))) {

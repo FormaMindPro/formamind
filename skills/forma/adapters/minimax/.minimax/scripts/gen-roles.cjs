@@ -1,31 +1,33 @@
 'use strict';
 
 /**
- * Генератор зеркала ролей Claude → MiniMax (`.claude/agents/` → `.minimax/agents/`).
+ * The generator of the Claude -> MiniMax roles mirror (`.claude/agents/` -> `.minimax/agents/`).
  *
- * Механика — та же, что у зеркала Gemini (`gen-gemini-roles.cjs`), с двумя отличиями,
- * обусловленными движком:
- *   • тело роли — копия с перестановкой путей и имён инструментов на мои;
- *   • фронтматтер — мой: модель, инструменты и `uses` — инженерный выбор движка,
- *     сверка паритета его не сравнивает (`role-parity.cjs` режет `^---...---\n`).
+ * The mechanics - the same as the Gemini mirror's (`gen-gemini-roles.cjs`), with two differences
+ * caused by the engine:
+ *   - the role's body - a copy with the paths and the tools' names transposed to mine;
+ *   - the frontmatter - mine: the model, the tools and `uses` are the engine's engineering choice,
+ *     the parity check does not compare them (`role-parity.cjs` cuts `^---...---\n`).
  *
- * Запуск: node .minimax/scripts/gen-roles.cjs [--check]
- *   --check — ничего не пишет, только сообщает расхождения (роль, где тело разошлось).
+ * Run: node .minimax/scripts/gen-roles.cjs [--check]
+ *   --check - writes nothing, only reports the divergences (a role whose body has drifted).
  */
 
 const fs = require('fs');
 const path = require('path');
+const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SRC = path.join(ROOT, '.claude', 'agents');
 const DST = path.join(ROOT, '.minimax', 'agents');
 
 /**
- * Перестановки путей в теле роли: моя зона — `.minimax/`, закон — `AGENTS.md`.
+ * The path transpositions in a role's body: my zone - `.minimax/`, the law - `AGENTS.md`.
  *
- * Пути пишутся полными (`.minimax/skills/`, `.minimax/rules/minimax-8.md`), а не «от папки движка»:
- * сверка паритета движков нормализует именно полные пути (по контракту адаптеров), и только они
- * сходятся с эталоном. Папка ролей — исключение: сверка знает и короткую форму (`agents/…`).
+ * The paths are written full (`.minimax/skills/`, `.minimax/rules/minimax-8.md`), not "from the engine's folder":
+ * the engines' parity check normalizes exactly the full paths (by the adapters' contract), and only they
+ * match the reference. The roles folder is the exception: the check knows the short form too (`agents/…`).
  */
 const BODY_TRANSFORMS = [
   [/\.claude\/agents\/on-demand\//g, 'agents/on-demand/'],
@@ -37,7 +39,7 @@ const BODY_TRANSFORMS = [
   [/\bCLAUDE\.md\b/g, 'AGENTS.md'],
 ];
 
-/** Инструменты: имя клона → имя моего рантайма. Порядок важен: длинные первыми. */
+/** The tools: the clone's name -> my runtime's name. The order matters: the long ones first. */
 const TOOL_MAP = [
   [/mcp__chrome-devtools__[a-z_]+/g, 'mcp_browser'],
   [/\bSendMessage\b/g, 'task_append'],
@@ -50,20 +52,20 @@ const TOOL_MAP = [
 ];
 
 /**
- * Правила движка: те, что меняют СМЫСЛ, а не путь.
+ * The engine's rules: those that change the MEANING, not the path.
  *
- * Чужой тег движка в моей зоне — не опечатка, а ошибка счёта: ядро принимает `claude-code:`,
- * и попытка MiniMax, написанная по чужему шаблону, уехала бы в счёт Клода молча.
- * Правило одно: тег в зоне — мой.
+ * A foreign engine tag in my zone - not a typo but a spend error: the core accepts `claude-code:`,
+ * and a MiniMax attempt written by a foreign template would go into Claude's spend silently.
+ * The rule is one: the tag in the zone is mine.
  */
 const FILE_RULES = {
   'on-demand/route-choice.md': [[/claude-code:/g, 'minimax:']],
 };
 
 /**
- * Зоны записи: куда роль кладёт новый файл. Эти места принадлежат движку, поэтому у моей
- * зоны — свои пути. Чтение общих скриптов (`.claude/scripts/*`) остаётся: это зависимость,
- * названная в §8, а не владение.
+ * The write zones: where a role puts a new file. These places belong to the engine, so my
+ * zone has its own paths. Reading the shared scripts (`.claude/scripts/*`) stays: it is a dependency,
+ * named in section 8, not an ownership.
  */
 const WRITE_PATH_RULES = [
   [/project\/extensions\/claude\//g, 'project/extensions/minimax/'],
@@ -72,14 +74,14 @@ const WRITE_PATH_RULES = [
   [/never to `\.claude\/scripts\/`/g, 'never to `.minimax/scripts/`'],
 ];
 
-/** Моя модель: рантайм один, различие «узел / измерение» выражено набором инструментов, а не моделью. */
+/** My model: one runtime; the "node / measurement" distinction is expressed by the tool set, not by a model. */
 const MY_MODEL = 'minimax-m3.1-flash';
 
 /**
- * Роли, которые пишет сам движок, а не генератор: их механика — моя (тег движка, журнал
- * вызовов, скрипт вывода строки). Генератор их не трогает, а проверка требует их наличия.
- * Роль Клода с тегом `claude-code:` в моей зоне была бы прямой ошибкой: ядро такой тег
- * принимает, и попытка MiniMax молча уехала бы в счёт Claude.
+ * The roles written by the engine itself, not by the generator: their mechanics is mine (the engine tag, the
+ * calls log, the line output script). The generator does not touch them, and the check requires their presence.
+ * A Claude role with the `claude-code:` tag in my zone would be a straight error: the core accepts such a tag,
+ * and a MiniMax attempt would go into Claude's spend silently.
  */
 const OWN_ROLES = new Set(['on-demand/spend-line.md']);
 
@@ -145,7 +147,7 @@ function walk(dir, base = '') {
 function main() {
   const check = process.argv.includes('--check');
   if (!fs.existsSync(SRC)) {
-    console.error(`источник ролей не найден: ${SRC}`);
+    console.error(msg('mmgen.no_source', { src: SRC }));
     process.exit(2);
   }
   const files = walk(SRC);
@@ -154,7 +156,7 @@ function main() {
   for (const rel of files) {
     const dstPath = path.join(DST, rel);
     if (OWN_ROLES.has(rel)) {
-      // Роль движка: пишется руками, генератор её не трогает — но она обязана быть.
+      // An engine role: written by hand, the generator does not touch it - but it must be there.
       if (!fs.existsSync(dstPath)) missing.push(rel);
       continue;
     }
@@ -171,18 +173,18 @@ function main() {
   }
   if (check) {
     if (missing.length) {
-      console.log('ролей движка нет на месте: ' + missing.join(', '));
+      console.log(msg('mmgen.own_missing') + missing.join(', '));
       process.exit(1);
     }
     if (diffs.length) {
-      console.log(`ролей, чьё тело разошлось с эталоном: ${diffs.length}`);
+      console.log(msg('mmgen.body_diffs', { count: diffs.length }));
       for (const d of diffs) console.log('  ' + d);
       process.exit(1);
     }
-    console.log(`все ${files.length - OWN_ROLES.size} ролей совпадают с эталоном; ролей движка на месте: ${OWN_ROLES.size}`);
+    console.log(msg('mmgen.all_match', { count: files.length - OWN_ROLES.size, own: OWN_ROLES.size }));
     return;
   }
-  console.log(`записано ролей: ${files.length - OWN_ROLES.size} → ${path.relative(ROOT, DST)}; ролей движка: ${OWN_ROLES.size} (не трогаются)`);
+  console.log(msg('mmgen.written', { count: files.length - OWN_ROLES.size, dst: path.relative(ROOT, DST), own: OWN_ROLES.size }));
 }
 
 if (require.main === module) main();

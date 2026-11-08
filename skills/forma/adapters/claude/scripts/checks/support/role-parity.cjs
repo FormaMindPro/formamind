@@ -1,11 +1,14 @@
 'use strict';
 
-// Паритет ролей Claude↔Gemini — сведение, не нарушение: роли равны по содержанию, сверяются нормализованным
-// текстом. Codex читает роли Claude по ссылке и сверяется проверкой `codex`. Не проверка реестра, а таблица,
-// которую печатает сверка.
+// Claude<->Gemini role parity - an info note, not a violation: the roles are equal by content, compared by
+// normalized text. Codex reads the Claude roles by reference and is checked by the `codex` check. Not a registry
+// check but a table the reconciliation prints.
+// Table labels come from the core dictionary: English key in code, ru value as data.
 
 const fs = require('fs');
 const path = require('path');
+const i18n = require('../../../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const roots = require('./engine-roots.cjs');
 const { isDormant } = require('./dormant.cjs');
@@ -13,14 +16,15 @@ const { isDormant } = require('./dormant.cjs');
 const CORE_ROLES = ['core', 'intent', 'kit', 'run', 'spec', 'extractor'];
 const RULE = '----------------------------------------------------------------------';
 
-// Пять постоянных ролей (корневые правила больше не пара — они в AGENTS.md, одним файлом) — жёсткий список остаётся:
-// это не растущий каталог, новая роль не заводится сама по себе, а решением человека.
+// The five standing roles (the root rules are no longer a pair - they live in AGENTS.md, one file) - the hard list stays:
+// this is not a growing catalog, a new role is not created by itself but by the human's decision.
 const titleCase = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const mdFiles = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.md')) : []);
 
-// Пары строятся по адаптерам (engines.cjs): эталон — движок, в чьей папке лежит проверка, парой к нему идёт каждый
-// другой движок с папкой ролей. Подключили четвёртый движок — он в сверке без правки этого файла; нет адаптера — нет пары.
+// The pairs are built by the adapters (engines.cjs): the base - the engine in whose folder the check lies, paired
+// with every other engine that has a roles folder. A fourth engine wired in lands in the reconciliation without
+// editing this file; no adapter - no pair.
 function pairsFor(root, base, peer) {
   const bRoles = base.src.rolesDir;
   const bOnDemand = base.src.onDemandRolesDir || `${bRoles}/on-demand`;
@@ -29,9 +33,9 @@ function pairsFor(root, base, peer) {
   const core = CORE_ROLES.map((role) => ({
     name: `Agent: ${titleCase(role)}`, base: `${bRoles}/${role}.md`, peer: `${pRoles}/${role}.md`, type: 'agent',
   }));
-  // Слой «по требованию» растёт без правки этого скрипта: сканирует оба каталога, сопоставляя по имени файла.
-  // Файл, существующий только на одной стороне, всё равно попадает в пару — comparePair() увидит его как
-  // missing_<движок>, не пропустит молча.
+  // The on-demand layer grows without editing this script: it scans both directories, matching by file name.
+  // A file existing on one side only still enters a pair - comparePair() sees it as
+  // missing_<engine>, never silently skips it.
   const names = new Set([...mdFiles(path.join(root, bOnDemand)), ...mdFiles(path.join(root, pOnDemand))]);
   const onDemand = [...names].sort().map((file) => {
     const display = file.replace(/.md$/, '').split('-').map(titleCase).join(' ');
@@ -40,13 +44,13 @@ function pairsFor(root, base, peer) {
   return [...core, ...onDemand].map((p) => ({ ...p, from: base.id, to: peer.id }));
 }
 
-/** Нормализация путей по всем адаптерам проекта: папка ролей, on-demand, скиллы, хуки, файл правил, корень движка. */
+/** Path normalization over all the project's adapters: roles folder, on-demand, skills, hooks, rules file, engine root. */
 function pathNormalizers(root) {
   const all = roots.list(root);
   const re = (p, tail = '') => new RegExp(roots.escapeRe(p) + tail, 'g');
   const out = [];
   const add = (p, to, tail) => { if (p) out.push([re(p, tail), to]); };
-  for (const e of all) { // файл правил движка: полный путь, затем имя
+  for (const e of all) { // the engine's rules file: the full path, then the name
     const rules = e.adapter.engineRulesFile;
     if (rules) { add(rules, 'ENGINE_RULES.md'); add(path.posix.basename(rules), 'ENGINE_RULES.md'); }
   }
@@ -59,17 +63,17 @@ function pathNormalizers(root) {
   for (const e of all) add(`${e.src.skillsDir}/`, 'SKILLS_DIR/');
   for (const e of all) add(`${e.src.rolesDir}/`, 'AGENTS_DIR/');
   for (const e of all) add(`${e.dir}/`, 'ENGINE_DIR/');
-  // Папка расширений проекта и тег движка в строке расхода называются именем движка — это не расхождение смысла.
+  // The project's extensions folder and the engine tag in the spend line are named by the engine's name - not a meaning divergence.
   for (const e of all) add(`project/extensions/${e.dir.replace(/^./, '')}/`, 'project/extensions/ENGINE_ID/');
   for (const e of all) add(`${e.adapter.spendTag || e.adapter.engine}:`, 'ENGINE_TAG:');
   for (const e of all) add(`${path.posix.basename(e.src.skillsDir)}/`, 'SKILLS_DIR/');
   return out;
 }
 
-// Что различает роли двух движков и не является расхождением смысла: имена файлов и каталогов, способ вызова
-// инструмента, формулировки о среде. Порядок строк — порядок применения.
-// Пути (папки движков, ролей, скиллов, хуков, файл правил) нормализует `pathNormalizers` — по адаптерам проекта;
-// здесь — то, что не путь: имена файлов правил в тексте и формулировки о среде.
+// What differs between two engines' roles without being a meaning divergence: file and directory names, the way a
+// tool is called, phrasing about the environment. The row order is the application order.
+// Paths (engine, roles, skills, hooks folders, the rules file) are normalized by `pathNormalizers` - by the
+// project's adapters; here - what is not a path: rules file names in text and phrasing about the environment.
 const NORMALIZERS_BEFORE_PATHS = [
   [/CLAUDE\.md/g, 'ENGINE_RULES.md'],
   [/GEMINI\.md/g, 'ENGINE_RULES.md'],
@@ -127,19 +131,19 @@ const AGENT_NORMALIZERS = [
   [/Every call through the external channel is also an attempt[\s\S]*?never by eye\./g, 'Every external call is an attempt, caller writes line.'],
 ];
 
-/** Текст к сравнению: без различий переводов строк и концевых пробелов; у ролей — ещё и без различий движка. */
+/** The text readied for comparison: no line-ending or trailing-space differences; for roles - no engine differences either. */
 function normalizeText(text, type, pathRules = [], tools = toolRules()) {
   let norm = text.replace(/\r\n/g, '\n');
   norm = norm.split('\n').map((l) => l.trimEnd()).join('\n').trim();
   if (type === 'agent' || type === 'on-demand') {
     for (const [re, to] of [...NORMALIZERS_BEFORE_PATHS, ...pathRules, ...AGENT_NORMALIZERS, ...tools]) norm = norm.replace(re, to);
-    // Игнорируем специфичные поля фронтматтера (model, tools, effort)
+    // The frontmatter's specific fields (model, tools, effort) are ignored
     norm = norm.replace(/^---[\s\S]*?---\n/m, '');
   }
   return norm;
 }
 
-/** Первые три расходящиеся строки двух текстов для диагностики. */
+/** The first three diverging lines of two texts, for diagnostics. */
 function lineDiffs(baseNorm, peerNorm) {
   const bLines = baseNorm.split('\n');
   const pLines = peerNorm.split('\n');
@@ -149,7 +153,7 @@ function lineDiffs(baseNorm, peerNorm) {
     if (bLines[i] === pLines[i]) continue;
     diffs.push(`Line ${i + 1}:\n  <base>: ${bLines[i] || '[EOF]'}\n  <peer>: ${pLines[i] || '[EOF]'}`);
     if (diffs.length >= 3) {
-      diffs.push(`... (всего расхождений строк: ${Math.abs(bLines.length - pLines.length) + diffs.length})`);
+      diffs.push(msg('role-parity.total_diffs', { count: Math.abs(bLines.length - pLines.length) + diffs.length }));
       break;
     }
   }
@@ -174,7 +178,7 @@ function ownRolesOf(root, peer) {
   return out;
 }
 
-/** Пара файлов: `{ status: synced|drift|missing_*, diff }`. */
+/** A pair of files: `{ status: synced|drift|missing_*, diff }`. */
 function comparePair(root, pair, pathRules = pathNormalizers(root), own = new Set(), tools = toolRules()) {
   const basePath = path.join(root, pair.base);
   const peerPath = path.join(root, pair.peer);
@@ -190,7 +194,7 @@ function comparePair(root, pair, pathRules = pathNormalizers(root), own = new Se
   return { status: 'drift', diff: lineDiffs(baseNorm, peerNorm) };
 }
 
-/** Все пары ролей проекта и итог сверки каждой: `[{ pair, res }]`. */
+/** All the project's role pairs and each one's reconciliation verdict: `[{ pair, res }]`. */
 function compareRoles(root, { only } = {}) {
   const base = roots.own(root);
   if (!base || !base.src.rolesDir) return [];
@@ -201,21 +205,21 @@ function compareRoles(root, { only } = {}) {
   });
 }
 
-/** Заголовок и строки таблицы паритета — в порядке печати. */
+/** The parity table's header and lines - in print order. */
 function parityTable(results) {
   const lines = [
-    `Паритет ролей ${[...new Set(results.map(({ pair }) => pair.from + '↔' + pair.to))].join(', ') || '(нет пар)'} — сведение, не нарушение (роли не копируются):`,
-    '| Компонент | Файл эталона | Файл движка | Статус |',
+    msg('role-parity.header', { pairs: [...new Set(results.map(({ pair }) => pair.from + '↔' + pair.to))].join(', ') || msg('role-parity.no_pairs') }),
+    msg('role-parity.col_header'),
     '|---|---|---|---|',
   ];
   for (const { pair, res } of results) {
-    const icon = res.status === 'synced' ? '✓ Паритет' : res.status === 'own' ? '◇ Своя роль' : `✗ Дрейф (${res.status})`;
+    const icon = res.status === 'synced' ? msg('role-parity.st_synced') : res.status === 'own' ? msg('role-parity.st_own') : msg('role-parity.st_drift', { status: res.status });
     lines.push(`| ${pair.name.padEnd(25)} | ${pair.base.padEnd(35)} | ${pair.peer.padEnd(45)} | ${icon} |`);
   }
   return lines;
 }
 
-/** Строки расхождений по парам с дрейфом (для `--diff`). */
+/** The drift lines by pair (for `--diff`). */
 function driftDetails(results) {
   const lines = [];
   for (const { pair, res } of results) {

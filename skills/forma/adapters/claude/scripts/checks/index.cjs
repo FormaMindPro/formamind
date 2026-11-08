@@ -1,9 +1,9 @@
 'use strict';
 
-// Реестр сверки движка Claude Code: то, что `sync-engines.cjs` запускает по кругу. Одна проверка — один файл:
-// `{ id, since, run(ctx) }` (форма — `.forma/dashboard/lib/checks.cjs`). Новая проверка — новый файл и одна строка здесь;
-// порядок строк — порядок находок в выводе. Проверки ядра (доска, manual, целостность) живут в ядре и подключаются
-// сюда по пути; проверки адаптера — рядом. Помощники — в `support/`.
+// The Claude Code engine reconciliation registry: what `sync-engines.cjs` runs in a circle. One check - one file:
+// `{ id, since, run(ctx) }` (the shape - `.forma/dashboard/lib/checks.cjs`). A new check - a new file and one line here;
+// the line order is the order of findings in the output. The core checks (board, manual, integrity) live in the core
+// and are wired in here by path; the adapter checks sit next door. Helpers - in `support/`.
 
 module.exports = [
   require('./root-rules.cjs'),

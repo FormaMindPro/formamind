@@ -1,16 +1,21 @@
-// Граф сайта: карта страниц, секций и контента удалённого сайта.
+// The site graph: the map of the pages, sections and content of the remote site.
 //
-// Снимок — один read-only вызов `novamira/execute-php` через `.claude/scripts/site-php.cjs`
-// (без --write: записывающие вызовы в PHP-коде ниже отсутствуют и были бы отклонены самим
-// site-php.cjs). Сайт не меняется. Разбор секций/виджетов — регулярками, без модели.
+// The snapshot - one read-only `novamira/execute-php` call through `.claude/scripts/site-php.cjs`
+// (no --write: writing calls are absent from the PHP code below and would be rejected by
+// site-php.cjs itself). The site does not change. The sections/widgets parsing - by regexes, no model.
 //
 //   node .claude/scripts/build-site-graph.cjs
 //
-// Выход: .forma/living/graphs/site/graph.json (формат graphify: {nodes, edges}), кэш по хэшу
-// контента каждой сущности — .forma/living/graphs/site/.cache.json. Неизменённая сущность не
-// пересобирается; изменённая разбирается заново.
+// Output: .forma/living/graphs/site/graph.json (the graphify format: {nodes, edges}), a cache by the
+// content hash of each entity - .forma/living/graphs/site/.cache.json. An unchanged entity is not
+// rebuilt; a changed one is parsed anew.
+//
+// Printed labels come from the core dictionary: English key in code, ru value as data.
 
 'use strict';
+// Printed labels come from the core dictionary: English key in code, ru value as data.
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -30,11 +35,11 @@ const rel = (f) => path.relative(ROOT, f).split(path.sep).join('/');
 const hash = (s) => crypto.createHash('sha1').update(s).digest('hex');
 const stripTags = (s) => s.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
-// ID, упомянутый в тексте карточки или проектного файла: «ID 19», «id: 76», «id=3».
+// An ID mentioned in a card's or a project file's text: "ID 19", "id: 76", "id=3".
 const ID_RE = /\bID\s*[:=]?\s*(\d{1,6})\b/gi;
 const CTA_RE = /class="[^"]*(?:\bcta\b|\bbtn\b|button)[^"]*"/i;
 
-// --- снимок сайта: один read-only PHP-вызов -------------------------------------
+// --- the site snapshot: one read-only PHP call -------------------------------------
 
 const SNAPSHOT_PHP = `<?php
 global $wpdb;
@@ -79,20 +84,20 @@ function snapshot() {
     fs.existsSync(tmpReport) && fs.unlinkSync(tmpReport);
   }
   let summary = {};
-  try { summary = JSON.parse(summaryLine); } catch { /* нет сводки — ниже стоп по report */ }
+  try { summary = JSON.parse(summaryLine); } catch { /* no summary - a stop by report below */ }
   if (!report || !report.cli || report.cli.ok === false || summary.status === 'stop') {
-    throw new Error('снимок сайта не получен: ' + JSON.stringify(summary || {}) + ' ' + JSON.stringify(report && report.cli && report.cli.error || {}));
+    throw new Error(msg('site-graph.no_snapshot', { summary: JSON.stringify(summary || {}), error: JSON.stringify(report && report.cli && report.cli.error || {}) }));
   }
   const rv = report.cli.data && report.cli.data.return_value;
-  if (!rv) throw new Error('пустой снимок сайта: ' + JSON.stringify(report.cli.data || {}));
+  if (!rv) throw new Error(msg('site-graph.empty_snapshot', { data: JSON.stringify(report.cli.data || {}) }));
   return rv;
 }
 
-// --- разбор контента: секции и ключевые виджеты, без модели ---------------------
+// --- parsing the content: the sections and the key widgets, no model ---------------------
 
 function splitSections(html) {
   const openings = [...html.matchAll(/<section\b[^>]*\bid="([^"]+)"[^>]*>/g)];
-  if (!openings.length) return [{ id: 'content', label: 'Весь контент', html }];
+  if (!openings.length) return [{ id: 'content', label: msg('site-graph.all_content_label'), html }];
   return openings.map((m, i) => ({
     id: m[1], label: m[1],
     html: html.slice(m.index, i + 1 < openings.length ? openings[i + 1].index : html.length),
@@ -118,7 +123,7 @@ function typeLabel(postType) {
   return { page: 'page', post: 'post', wp_template: 'template', wp_template_part: 'template_part', wp_navigation: 'menu' }[postType] || 'cpt';
 }
 
-// --- индекс упоминаний ID сущности в карточках / проектных файлах ---------------
+// --- the index of an entity's ID mentions in the cards / project files ---------------
 
 function indexMentions(files, cardLike, entityIds) {
   const idx = new Map();
@@ -138,9 +143,9 @@ function indexMentions(files, cardLike, entityIds) {
   return idx;
 }
 
-// --- сборка графа ----------------------------------------------------------------
+// --- building the graph ----------------------------------------------------------------
 
-// Страницы, записи и их секции/виджеты; кэш секций по хешу контента обновляется на месте.
+// The pages, the posts and their sections/widgets; the sections cache by the content hash is updated in place.
 function addContent(snap, cache, addNode, edges) {
   const templatePartByName = new Map();
   let hit = 0, miss = 0, pageCount = 0;
@@ -181,7 +186,7 @@ function addContent(snap, cache, addNode, edges) {
       });
     }
   }
-  for (const id of Object.keys(cache)) if (!alive.has(String(id))) delete cache[id]; // удалённая сущность уходит из кэша
+  for (const id of Object.keys(cache)) if (!alive.has(String(id))) delete cache[id]; // a deleted entity leaves the cache
   return { templatePartByName, alive, hit, miss, pageCount };
 }
 
@@ -191,7 +196,7 @@ function buildGraph(snap, cardIndex, projectIndex, cache) {
   addNode({ id: 'site:main', label: snap.site.name || snap.site.url, type: 'site', url: snap.site.url });
   const { templatePartByName, alive, hit, miss, pageCount } = addContent(snap, cache, addNode, edges);
 
-  // front-page: wp_template «front-page» обслуживает page_on_front, тянет шаблонные части
+  // front-page: the wp_template "front-page" serves page_on_front, pulls the template parts
   if (snap.site.show_on_front === 'page' && snap.site.front_page_id) {
     const frontTpl = (snap.content.wp_template || []).find((t) => t.post_name === 'front-page');
     if (frontTpl) {
@@ -229,11 +234,11 @@ function buildGraph(snap, cardIndex, projectIndex, cache) {
   return { nodes: [...nodes.values()], edges, hit, miss, pageCount, madeEdges };
 }
 
-// --- рендер graph.html: тот же graphify to_html, что у других корпусов, без модели ----
+// --- rendering graph.html: the same graphify to_html as the other corpora, no model ----
 
-// Минимальный набор полей, которых требует graphify.validate (file_type/source_file у узла,
-// relation/confidence/source_file у ребра) — здесь не извлечение LLM, поэтому confidence
-// всегда EXTRACTED (связь явно видна в снимке сайта, не выведена).
+// The minimal field set graphify.validate requires (file_type/source_file on a node,
+// relation/confidence/source_file on an edge) - this is not an LLM extraction, so confidence
+// is always EXTRACTED (the link is visible in the site snapshot outright, not inferred).
 function toExtraction(nodes, edges) {
   return {
     nodes: nodes.map((n) => ({ id: n.id, label: n.label || n.id, file_type: 'concept', source_file: n.url || ('site:' + n.id) })),
@@ -256,14 +261,14 @@ if G.number_of_nodes() == 0:
     print("ERROR: Graph is empty")
     raise SystemExit(1)
 communities = cluster(G)
-labels = {cid: f"Результат: кластер {cid}" for cid in communities}
+labels = {cid: f"\u0420\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442: \u043a\u043b\u0430\u0441\u0442\u0435\u0440 {cid}" for cid in communities}  # "Result: cluster {cid}" in ru, escapes
 to_html(G, communities, str(out_dir / "graph.html"), community_labels=labels)
 print(f"Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, {len(communities)} communities")
 `;
 }
 
-// Строит .forma/living/graphs/site/graph.html (Python-шаг graphify) из уже собранных nodes/edges.
-// Возвращает {nodesCount, edgesCount, communitiesCount} — для строки в graphify.log.
+// Builds .forma/living/graphs/site/graph.html (the graphify Python step) from the already-built nodes/edges.
+// Returns {nodesCount, edgesCount, communitiesCount} - for the line in graphify.log.
 function buildHtml(nodes, edges) {
   const extractPath = path.join(OUT_DIR, '.graphify_extract.json');
   fs.writeFileSync(extractPath, JSON.stringify(toExtraction(nodes, edges)), 'utf8');
@@ -277,21 +282,21 @@ function buildHtml(nodes, edges) {
     fs.existsSync(extractPath) && fs.unlinkSync(extractPath);
   }
   const m = /Graph:\s*(\d+)\s*nodes,\s*(\d+)\s*edges,\s*(\d+)\s*communities/.exec(out);
-  if (!m) throw new Error('graph.html: не удалось разобрать вывод Python-шага: ' + out);
+  if (!m) throw new Error(msg('site-graph.python_output_unparsed', { out }));
   return { nodesCount: Number(m[1]), edgesCount: Number(m[2]), communitiesCount: Number(m[3]) };
 }
 
-// Строка в .forma/dashboard/graphify.log — формат graphify.log, corpus=site.
+// A line into .forma/dashboard/graphify.log - the graphify.log format, corpus=site.
 function appendBuildLog(g, html) {
   const ts = new Date().toISOString().slice(0, 16).replace('T', ' ');
   const line = `${ts} | mode=deterministic-site | agents=0 | tokens=0 | $0.000000 | corpus=site | trigger=manual | ` +
     `nodes=${html.nodesCount} | edges=${html.edgesCount} | communities=${html.communitiesCount} | warnings=0 | ` +
-    `Построен граф site (страниц ${g.pageCount}, из кэша ${g.hit}, разобрано ${g.miss}, рёбер «сделан карточкой» ${g.madeEdges}), без модели, без записи на сайт\n`;
+    msg('site-graph.log_line', { pages: g.pageCount, hit: g.hit, miss: g.miss, made: g.madeEdges }) + '\n';
   fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true });
   fs.appendFileSync(LOG_FILE, line, 'utf8');
 }
 
-// --- запуск ------------------------------------------------------------------------
+// --- the run ------------------------------------------------------------------------
 
 function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -316,13 +321,12 @@ function main() {
     nodes: g.nodes, edges: g.edges,
   }, null, 1));
 
-  console.log(`site: ${g.nodes.length} узлов, ${g.edges.length} рёбер · страниц в графе ${g.pageCount} · ` +
-    `из кэша ${g.hit}, разобрано ${g.miss} · рёбер «сделан карточкой» ${g.madeEdges} · модель: 0 токенов · запись на сайт: 0`);
+  console.log(msg('site-graph.summary', { nodes: g.nodes.length, edges: g.edges.length, pages: g.pageCount, hit: g.hit, miss: g.miss, made: g.madeEdges }));
 
-  console.log('Строю graph.html (Python, graphify to_html, без модели)...');
+  console.log(msg('site-graph.building_html'));
   const html = buildHtml(g.nodes, g.edges);
   appendBuildLog(g, html);
-  console.log(`Graph: ${html.nodesCount} nodes, ${html.edgesCount} edges, ${html.communitiesCount} communities · записано в ${LOG_FILE}, вкладка «Граф: Результат» на дашборде.`);
+  console.log(msg('site-graph.done_line', { nodes: html.nodesCount, edges: html.edgesCount, communities: html.communitiesCount, log: LOG_FILE }));
 }
 
 if (require.main === module) {

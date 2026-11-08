@@ -1,18 +1,22 @@
 'use strict';
 
 /**
- * Адаптер Gemini (Antigravity) для ядра «Формы»:
- *  - роли узлов и каталог Run для вкладки «Форма»
- *  - transcriptsDir и parseUsage для стенограмм Antigravity
- *  - usageRefresh: выгрузка расхода сессий в .forma/dashboard/.cache/gemini-usage.json
- *  - engineSettings: MCP-серверы, хуки и активные узлы для вкладки «Движок»
- *  - instructionWeight и stepsFromCacheRead для узлов Gemini (gemini-3.8-flash)
+ * The Gemini (Antigravity) adapter for the Forma core:
+ *  - the nodes' roles and the Run directory for the "Forma" tab
+ *  - transcriptsDir and parseUsage for the Antigravity transcripts
+ *  - usageRefresh: unloading the sessions' spend into .forma/dashboard/.cache/gemini-usage.json
+ *  - engineSettings: the MCP servers, the hooks and the active nodes for the "Engine" tab
+ *  - instructionWeight and stepsFromCacheRead for the Gemini nodes (gemini-3.8-flash)
+ *
+ * Printed labels come from the core dictionary: English key in code, ru value as data.
  */
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
+const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 function resolveModule(candidates) {
   for (const c of candidates) {
@@ -45,7 +49,7 @@ const BYTES_PER_TOKEN_LATIN = 4.1;
 const BYTES_PER_TOKEN_CYRILLIC = 2.2;
 
 function estimateTokens(text) {
-  const cyrillicChars = (text.match(/[Ѐ-ӿ]/g) || []).length;
+  const cyrillicChars = (text.match(/[\u0400-\u04ff]/g) || []).length;
   const cyrillicBytes = cyrillicChars * 2;
   const totalBytes = Buffer.byteLength(text, 'utf8');
   const latinBytes = Math.max(0, totalBytes - cyrillicBytes);
@@ -88,7 +92,7 @@ function instructionWeight(root = process.cwd()) {
   return {
     estimate: true,
     model: 'gemini-3.8-flash',
-    note: 'Оценка по эвристике «байт на токен» для gemini-3.8-flash.',
+    note: msg('gad.iw_note'),
     common: { tokens: commonTokens, files: common },
     byNode,
   };
@@ -279,8 +283,8 @@ function formaRoles(root = process.cwd()) {
     title: 'Gemini',
     rolesDir: '.agents/plugins/forma/agents',
     mcpFiles: [
-      { file: path.join(root, '.agents', 'mcp_config.json'), level: 'проект (.agents/mcp_config.json)' },
-      { file: path.join(root, '.agents', 'plugins', 'forma', 'mcp_config.json'), level: 'плагин (.agents/plugins/forma/mcp_config.json)' },
+      { file: path.join(root, '.agents', 'mcp_config.json'), level: msg('gad.mcp_level_project') },
+      { file: path.join(root, '.agents', 'plugins', 'forma', 'mcp_config.json'), level: msg('gad.mcp_level_plugin') },
     ],
   });
   cat.plugins = null;
@@ -292,7 +296,7 @@ module.exports = {
   id: 'gemini',
   spendTag: 'gemini',
 
-  // Контракт движка (ENGINE-CONTRACT.md): источники, возможности, таблица узел -> модель, зоны записи.
+  // The engine contract (ENGINE-CONTRACT.md): the sources, the capabilities, the node -> model table, the write zones.
   sources: {
     rolesDir: '.agents/plugins/forma/agents',
     onDemandRolesDir: '.agents/plugins/forma/agents/on-demand',

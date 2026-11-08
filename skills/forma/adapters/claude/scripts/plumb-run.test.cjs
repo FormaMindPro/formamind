@@ -27,8 +27,8 @@ assert.strictEqual(haiku.gap, 20);
 assert.ok(haiku.noul == null && haiku.clarity == null);
 
 // Legacy form (thresholds as text inside the Plumb row): three spellings of the gap key give one value.
-const legacy = (key) => '| Plumb `plumb` | `jev`. haiku: лидер ≥ 60 %, ' + key + ' ≥ 20 п.п.; jev: лидер ≥ 70 %, ' + key + ' ≥ 20 п.п., noul лидера ≥ 70 %, ясность ≥ 3 из 4 |\n';
-for (const key of ['отрыв от второго', 'зазор', 'gap']) {
+const legacy = (key) => '| Plumb `plumb` | `jev`. haiku: \u043b\u0438\u0434\u0435\u0440 ≥ 60 %, ' + key + ' ≥ 20 \u043f.\u043f.; jev: \u043b\u0438\u0434\u0435\u0440 ≥ 70 %, ' + key + ' ≥ 20 \u043f.\u043f., noul \u043b\u0438\u0434\u0435\u0440\u0430 ≥ 70 %, \u044f\u0441\u043d\u043e\u0441\u0442\u044c ≥ 3 \u0438\u0437 4 |\n';
+for (const key of ['\u043e\u0442\u0440\u044b\u0432 \u043e\u0442 \u0432\u0442\u043e\u0440\u043e\u0433\u043e', '\u0437\u0430\u0437\u043e\u0440', 'gap']) { // the ru keys are the legacy spellings the driver parses (data)
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'plumbrow-'));
   fs.mkdirSync(path.join(tmp, 'project', 'config'), { recursive: true });
   fs.writeFileSync(path.join(tmp, 'project', 'config', 'PROJECT.md'), legacy(key));
@@ -50,9 +50,9 @@ function result(noulValue) {
 }
 const low = plumbLine(result(0.5), root);
 const high = plumbLine(result(0.9), root);
-assert.ok(/ниже порога/.test(low) && /noul/.test(low), low);
-assert.ok(/пороги пройдены/.test(high), high);
-assert.ok(!/не прочитаны/.test(low) && !/не прочитаны/.test(high));
+assert.ok(/\u043d\u0438\u0436\u0435 \u043f\u043e\u0440\u043e\u0433\u0430/.test(low) && /noul/.test(low), low); // the driver's ru output pinned byte-exact
+assert.ok(/\u043f\u043e\u0440\u043e\u0433\u0438 \u043f\u0440\u043e\u0439\u0434\u0435\u043d\u044b/.test(high), high);
+assert.ok(!/\u043d\u0435 \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u043d\u044b/.test(low) && !/\u043d\u0435 \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u043d\u044b/.test(high));
 
 // Model name comes from PROJECT.md (routes.plumb_model); a missing file falls back to the constant.
 assert.strictEqual(typeof readModel, 'function', 'readModel exported');

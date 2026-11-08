@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 'use strict';
-// Действие по человеческой команде «подключи Jev»: переключает исполнителя Отвеса с haiku на
-// внешнюю решающую модель. Не вызывает Jev само — только проверяет условие и правит PROJECT.md.
+// An action on the human's command "connect Jev": switches the Plumb's executor from haiku to
+// the external deciding model. It does not call Jev itself - only checks the condition and edits PROJECT.md.
 //
-// Использование: node .claude/scripts/plumb-switch.cjs [--root DIR]
-// Код выхода 0 — переключено, напечатан вопрос, который нужно задать человеку (лимит вызовов).
-// Код выхода 2 — остановка: OPENROUTER_API_KEY нет в .env, PROJECT.md не тронут (запрет 15).
+// Usage: node .claude/scripts/plumb-switch.cjs [--root DIR]
+// Exit code 0 - switched, the question to ask the human printed (the call limit).
+// Exit code 2 - a stop: no OPENROUTER_API_KEY in .env, PROJECT.md untouched (prohibition 15).
+//
+// Printed labels come from the core dictionary: English key in code, ru value as data.
 
 const fs = require('fs');
 const path = require('path');
 const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 function hasKey(root) {
   const envPath = path.join(root, '.env');
@@ -21,15 +24,15 @@ function hasKey(root) {
 function switchProjectMd(root) {
   const file = path.join(root, 'project', 'config', 'PROJECT.md');
   const before = fs.readFileSync(file, 'utf8');
-  // Меняем только слово-селектор в строке «Отвес `plumb`» (или «Plumb `plumb`» — англ. шаблон
-  // нового проекта); пороги и остальной текст той же ячейки (они относятся к haiku) не трогаем —
-  // запрет на самовольную установку порогов Jev.
+  // Only the selector word in the Plumb `plumb` row is changed (by any label of routes.plumb, ru or en);
+  // the thresholds and the rest of the same cell's text (they belong to haiku) are not touched -
+  // the prohibition on setting the Jev thresholds of one's own accord.
   const after = before.replace(
     new RegExp('(\\|\\s*(?:' + i18n.alt('routes.plumb') + ') `plumb`[^|]*\\|\\s*)`haiku`'),
     '$1`jev`'
   );
   if (after === before) {
-    throw new Error('строка «Отвес `plumb`» со значением `haiku` не найдена — PROJECT.md не изменён');
+    throw new Error(msg('pswitch.not_found'));
   }
   fs.writeFileSync(file, after, 'utf8');
   return file;
@@ -42,18 +45,16 @@ function main() {
 
   if (!hasKey(root)) {
     console.error(
-      'Остановка: OPENROUTER_API_KEY отсутствует или пуст в .env — plumb: jev не включаю, ' +
-        'PROJECT.md не меняю (запрет 15, AGENTS.md §5).'
+      msg('pswitch.stop_no_key')
     );
     process.exit(2);
   }
 
   const file = switchProjectMd(root);
-  console.log(`plumb: jev записан в ${file}.`);
-  console.log('Пороги Haiku не менялись; отдельные пороги под jev пока не заданы — замер (п. 6 карточки) только первый шаг.');
+  console.log(msg('pswitch.written', { file }));
+  console.log(msg('pswitch.thresholds_note'));
   console.log(
-    'Нужно спросить у человека: лимит вызовов Jev на цикл (число, не доллары) — сам не ставлю ' +
-      '(AGENTS.md §3, «Внешняя модель отвеса» в PROJECT.md).'
+    msg('pswitch.ask_human')
   );
 }
 

@@ -1,15 +1,18 @@
 #!/usr/bin/env node
-// Рендер .forma/living/graphs/<корпус>/graph.html из уже собранного graph.json для графов Kit
-// (goals, arsenal, structure, resources, board, central). Тот же шаг graphify.to_html, что у
-// engine и site — без модели, без сети: Python-рендерер.
+// Rendering .forma/living/graphs/<corpus>/graph.html from the already-built graph.json for the Kit graphs
+// (goals, arsenal, structure, resources, board, central). The same graphify.to_html step as for
+// engine and site - no model, no network: a Python renderer.
 //
-//   node .claude/scripts/build-graph-html.cjs            # все шесть
+//   node .claude/scripts/build-graph-html.cjs            # all six
 //   node .claude/scripts/build-graph-html.cjs goals board
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
+// Printed labels come from the core dictionary: English key in code, ru value as data.
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const GRAPHS = path.join(ROOT, '.forma/living', 'graphs');
@@ -53,7 +56,7 @@ communities = cluster(G)
 labels = {}
 for cid, members in communities.items():
     top = Counter(types.get(m, "") for m in members).most_common(1)
-    labels[cid] = f"Группа {cid}: {top[0][0]}" if top and top[0][0] else f"Группа {cid}"
+    labels[cid] = f"\u0413\u0440\u0443\u043f\u043f\u0430 {cid}: {top[0][0]}" if top and top[0][0] else f"\u0413\u0440\u0443\u043f\u043f\u0430 {cid}"  # "Group {cid}" in ru, escapes
 to_html(G, communities, str(out_dir / "graph.html"), community_labels=labels)
 print(f"Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, {len(communities)} communities")
 `;
@@ -61,7 +64,7 @@ print(f"Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, {len(co
 function render(corpus, tmpPy) {
   const dir = path.join(GRAPHS, corpus);
   const file = path.join(dir, 'graph.json');
-  if (!fs.existsSync(file)) throw new Error(`Нет ${file} — сначала build-kit-graphs.cjs --only ${corpus}`);
+  if (!fs.existsSync(file)) throw new Error(msg('graph-html.missing_graph', { file, corpus }));
   const extract = path.join(dir, '.graphify_extract.json');
   fs.writeFileSync(extract, JSON.stringify(toExtraction(JSON.parse(fs.readFileSync(file, 'utf8')), corpus)), 'utf8');
   try {
@@ -75,14 +78,14 @@ function main(argv = process.argv.slice(2)) {
   const wanted = argv;
   const list = wanted.length ? wanted : CORPORA;
   const bad = list.filter((c) => !CORPORA.includes(c));
-  if (bad.length) throw new Error(`Неизвестный корпус: ${bad.join(', ')}. Допустимы: ${CORPORA.join(', ')}`);
+  if (bad.length) throw new Error(msg('graph-html.unknown_corpus', { bad: bad.join(', '), corpora: CORPORA.join(', ') }));
   const tmpPy = path.join(os.tmpdir(), `kit-graph-html-${process.pid}.py`);
   fs.writeFileSync(tmpPy, PY, 'utf8');
   try {
-    // один корпус упал (например, пустой граф) — остальные всё равно рисуются
+    // one corpus failed (e.g. an empty graph) - the rest are still drawn
     for (const c of list) {
       try { console.log(`${c}: ${render(c, tmpPy)}`); }
-      catch (err) { console.log(`${c}: graph.html не собран — ${String(err && err.message || err).split('\n')[0]}`); }
+      catch (err) { console.log(msg('graph-html.not_built', { corpus: c, error: String(err && err.message || err).split('\n')[0] })); }
     }
   } finally {
     fs.unlinkSync(tmpPy);

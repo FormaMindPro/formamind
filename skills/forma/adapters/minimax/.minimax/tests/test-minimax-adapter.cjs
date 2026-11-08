@@ -2,16 +2,16 @@
 'use strict';
 
 /**
- * test-minimax-adapter.cjs — Тест соответствия адаптера MiniMax Code.
- * Проверяет:
- *  1. Наличие и содержание .minimax/rules/minimax-8.md (все девять контрактов, тег minimax:, регламент Plumb);
- *  2. Форму адаптера: ядро находит его по имени файла, каждое поле есть и своего типа, пути существуют;
- *  3. Паритет ролей зоны с каноническими ролями — побайтово, перегенерацией;
- *  4. Вывод строки расхода из записи журнала: разбор общим форматтером, неизвестное — маркером, не нулём;
- *  5. Пробу возможностей: факты, а не самоотчёт; непро provenное — помечено;
- *  6. Чистоту зоны (запрет 16): в зоне нет следов проекта.
+ * test-minimax-adapter.cjs — the MiniMax Code adapter's conformance test.
+ * It checks:
+ *  1. The presence and the content of .minimax/rules/minimax-8.md (all nine contracts, the minimax: tag, the Plumb's rules);
+ *  2. The adapter's shape: the core finds it by the file name, every field is there and of its type, the paths exist;
+ *  3. The parity of the zone's roles with the canonical roles — byte by byte, by regeneration;
+ *  4. The spend line's output from a ledger record: parsed by the shared formatter, unknown marked, not zero;
+ *  5. The capabilities probe: facts, not a self-report; what is not proven is marked;
+ *  6. The zone's cleanliness (prohibition 16): no project traces in the zone.
  *
- * Запуск:
+ * Run:
  *   node .minimax/tests/test-minimax-adapter.cjs
  */
 
@@ -31,53 +31,53 @@ const it = (name, fn) => { fn(); passed += 1; console.log('ok  ' + name); };
 
 const adapter = () => engines.loadAdapters(root).find((a) => a.dir === '.minimax');
 
-// 1. §8 движка
-it('.minimax/rules/minimax-8.md объявляет девять контрактов и тег движка', () => {
+// 1. The engine's §8
+it('.minimax/rules/minimax-8.md declares the nine contracts and the engine tag', () => {
   const p = path.join(root, '.minimax', 'rules', 'minimax-8.md');
-  assert.ok(fs.existsSync(p), 'minimax-8.md должен существовать');
+  assert.ok(fs.existsSync(p), 'minimax-8.md must exist');
   const txt = fs.readFileSync(p, 'utf8');
-  assert.match(txt, /^#\s*8\.\s*Engine architecture in MiniMax Code/m, 'должен быть заголовок §8');
-  assert.match(txt, /minimax:/, 'должен быть указан тег движка');
-  assert.match(txt, /plumb-scrub\.cjs/, 'должен быть указан скрипт очистки Plumb');
+  assert.match(txt, /^#\s*8\.\s*Engine architecture in MiniMax Code/m, 'the §8 heading must be there');
+  assert.match(txt, /minimax:/, 'the engine tag must be named');
+  assert.match(txt, /plumb-scrub\.cjs/, 'the Plumb scrubbing script must be named');
   for (const c of ['Contract 1', 'Contract 2', 'Contract 3', 'Contract 4', 'Contract 5', 'Contract 6', 'Contract 7', 'Contract 8', 'Contract 9']) {
-    assert.ok(txt.includes(c), `в §8 нет ${c}`);
+    assert.ok(txt.includes(c), `§8 has no ${c}`);
   }
-  assert.match(txt, /ENGINE-CONTRACT\.md/, '§8 должен ссылаться на контракт');
+  assert.match(txt, /ENGINE-CONTRACT\.md/, '§8 must reference the contract');
 });
 
-it('§8 не пересказывает закон: §1–§7 не копируются в файл движка', () => {
+it('§8 does not retell the law: §1–§7 are not copied into the engine file', () => {
   const txt = fs.readFileSync(path.join(root, '.minimax', 'rules', 'minimax-8.md'), 'utf8');
   const law = fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8');
   const lawHeadings = law.split(/\r?\n/).filter((l) => /^##\s+\d\./.test(l));
   for (const h of lawHeadings) {
     const title = h.replace(/^##\s*\d+\.\s*/, '').trim();
-    assert.ok(!txt.includes('## ' + title), `§8 движка повторяет раздел закона «${title}»`);
+    assert.ok(!txt.includes('## ' + title), `the engine's §8 repeats the law's section "${title}"`);
   }
 });
 
-// 2. Форма адаптера
-it('ядро находит адаптер по имени файла, без имени движка', () => {
+// 2. The adapter's shape
+it('the core finds the adapter by the file name, without an engine name', () => {
   const a = adapter();
-  assert.ok(a, 'в корне проекта нет .minimax/forma-adapter.cjs, который загружается');
+  assert.ok(a, 'there is no .minimax/forma-adapter.cjs in the project root that loads');
   assert.equal(a.engine, 'minimax-code');
 });
 
-it('форма: каждое объявленное поле есть и своего типа, лишних нет', () => {
+it('shape: every declared field is there and of its type, no extras', () => {
   const a = adapter();
   assert.deepEqual(engines.validateAdapter(a), []);
-  // Поля чтения стенограмм (TRANSCRIPT_FIELDS) — по платформе движка: у ядра на каждое запасной путь.
+  // The transcript reading fields (TRANSCRIPT_FIELDS) - by the engine's platform: the core has a fallback for each.
   const missing = Object.keys(engines.SHAPE).filter((f) => a[f] == null && !engines.TRANSCRIPT_FIELDS.includes(f));
   assert.deepEqual(missing, []);
 });
 
-it('пути адаптера — от корня проекта, и они существуют', () => {
+it('the adapter paths are from the project root, and they exist', () => {
   const a = adapter();
   for (const f of ['rolesDir', 'onDemandRolesDir', 'engineRulesFile', 'skillsDir', 'syncScript']) {
-    assert.ok(fs.existsSync(engines.resolveRel(root, a[f])), `${f}: ${a[f]} не найден`);
+    assert.ok(fs.existsSync(engines.resolveRel(root, a[f])), `${f}: ${a[f]} not found`);
   }
 });
 
-it('вес инструкций: по узлам шаг — число; шагов без кэш-чтения нет — null, не 0', () => {
+it('instruction weight: per node a step is a number; steps without a cache read - null, not 0', () => {
   const a = adapter();
   const w = a.instructionWeight();
   assert.ok(Object.keys(w.byNode).length > 0);
@@ -86,13 +86,13 @@ it('вес инструкций: по узлам шаг — число; шаго
   assert.equal(a.stepsFromCacheRead(1000, 100), 10);
 });
 
-it('расход: шаг стенограммы читается в канонические поля, недостающее — null', () => {
+it('spend: a transcript step reads into the canonical fields, the missing - null', () => {
   const u = adapter().parseUsage({ input_tokens: 3, cache_read_input_tokens: 7 });
   assert.deepEqual(u, { tokens_in: 3, tokens_out: null, cache_read: 7, cache_write: null });
 });
 
-// 3. Паритет ролей
-it('роли зоны совпадают с каноническими — перегенерацией, побайтово', () => {
+// 3. The roles' parity
+it('the zone roles match the canonical ones - by regeneration, byte by byte', () => {
   const r = spawnSync(process.execPath, [path.join(root, '.minimax', 'scripts', 'gen-roles.cjs'), '--check'], {
     cwd: root,
     encoding: 'utf8',
@@ -100,58 +100,58 @@ it('роли зоны совпадают с каноническими — пе�
   assert.equal(r.status, 0, (r.stdout || '') + (r.stderr || ''));
 });
 
-it('роли узлов и роли по требованию на месте', () => {
+it('the node roles and the on-demand roles are in place', () => {
   const dir = path.join(root, '.minimax', 'agents');
   for (const n of ['intent', 'spec', 'kit', 'run', 'core', 'extractor']) {
-    assert.ok(fs.existsSync(path.join(dir, n + '.md')), `роль ${n} отсутствует`);
+    assert.ok(fs.existsSync(path.join(dir, n + '.md')), `the role ${n} is absent`);
   }
   const onDemand = path.join(dir, 'on-demand');
-  assert.ok(fs.existsSync(onDemand) && fs.readdirSync(onDemand).some((f) => f.endsWith('.md')), 'роли по требованию отсутствуют');
+  assert.ok(fs.existsSync(onDemand) && fs.readdirSync(onDemand).some((f) => f.endsWith('.md')), 'the on-demand roles are absent');
 });
 
-// 4. Строка расхода из журнала
-it('строка расхода выводится из записи журнала и разбирается общим форматтером', () => {
+// 4. The spend line from the ledger
+it('the spend line is derived from a ledger record and parsed by the shared formatter', () => {
   const DAY = ['2000', '01', '02'].join('-');
   const line = deriveSpendLineForCall(
     { timestamp: DAY + 'T10:00:00.000Z', conversationId: 'conv-test-1234567890', input_tokens: 1200, output_tokens: 300, cache_read_tokens: 450, cache_write_tokens: 0, duration_s: 5 },
     'Spec',
-    'test-minimax-adapter: разбор'
+    'test-minimax-adapter: parse'
   );
   const t = toEnglish(line);
-  assert.ok(SPEND_TOKENS_OR_UNKNOWN_RE.test(t), 'строка не разбирается общим форматтером: ' + line);
-  // N — полный расход вызова, кэш внутри (ECONOMY.md): 1200 + 300 + 450 + 0 = 1950.
-  assert.ok(line.includes('`' + 'Spec`, ' + DAY + ': attempt, 1 950 tokens (450 cache-read), 300 out, 5 s,'), 'строка не по форме §3: ' + line);
-  assert.match(line, /minimax: /, 'нет метки движка');
+  assert.ok(SPEND_TOKENS_OR_UNKNOWN_RE.test(t), 'the line is not parsed by the shared formatter: ' + line);
+  // N - the call's full spend, cache inside (ECONOMY.md): 1200 + 300 + 450 + 0 = 1950.
+  assert.ok(line.includes('`' + 'Spec`, ' + DAY + ': attempt, 1 950 tokens (450 cache-read), 300 out, 5 s,'), 'the line is not per the §3 shape: ' + line);
+  assert.match(line, /minimax: /, 'no engine tag');
 });
 
-it('неизвестное в расходе — маркер, а не ноль', () => {
+it('unknown in the spend - a marker, not zero', () => {
   const DAY = ['2000', '01', '02'].join('-');
-  const line = deriveSpendLineForCall({ timestamp: DAY + 'T10:00:00.000Z' }, 'Run', 'test-minimax-adapter: неизвестное');
-  assert.match(line, /unknown tokens/, 'неизвестное должно оставаться маркером');
-  assert.ok(!/,\s*0 tokens/.test(line), 'ноль числом запрещён');
+  const line = deriveSpendLineForCall({ timestamp: DAY + 'T10:00:00.000Z' }, 'Run', 'test-minimax-adapter: unknown');
+  assert.match(line, /unknown tokens/, 'unknown must remain a marker');
+  assert.ok(!/,\s*0 tokens/.test(line), 'zero as a number is forbidden');
 });
 
-it('путь журнала — тот, что ядро ищет по конвенции', () => {
+it('the ledger path is the one the core looks for by convention', () => {
   const expected = path.join(root, '.minimax', '.ledger', 'calls.jsonl');
-  assert.equal(path.resolve(LEDGER), expected, 'журнал должен лежать в .minimax/.ledger/calls.jsonl');
+  assert.equal(path.resolve(LEDGER), expected, 'the ledger must sit in .minimax/.ledger/calls.jsonl');
 });
 
-// 5. Проба возможностей
-it('роль расхода в зоне — моя: тег minimax:, свой журнал, никакого claude-code:', () => {
+// 5. The capabilities probe
+it('the zone spend role is mine: the minimax: tag, own ledger, no claude-code:', () => {
   const p = path.join(root, '.minimax', 'agents', 'on-demand', 'spend-line.md');
-  assert.ok(fs.existsSync(p), 'роль расхода движка отсутствует');
+  assert.ok(fs.existsSync(p), 'the engine spend role is absent');
   const txt = fs.readFileSync(p, 'utf8');
-  assert.ok(txt.includes('minimax:'), 'роль должна предписывать тег minimax:');
-  assert.ok(!txt.includes('claude-code:'), 'роль не должна предписывать чужой тег: его принимает ядро, и попытка уехала бы в счёт другого движка');
-  assert.ok(txt.includes('.minimax/.ledger/calls.jsonl'), 'роль должна указывать журнал вызовов зоны');
-  assert.ok(txt.includes('.minimax/scripts/sync-ledger.cjs'), 'роль должна указывать скрипт вывода строки');
-  assert.ok(txt.includes('unknown'), 'роль должна называть маркер unknown для непрочитанного поля');
+  assert.ok(txt.includes('minimax:'), 'the role must prescribe the minimax: tag');
+  assert.ok(!txt.includes('claude-code:'), 'the role must not prescribe a foreign tag: the core accepts it, and the attempt would go into another engine spend');
+  assert.ok(txt.includes('.minimax/.ledger/calls.jsonl'), 'the role must name the zone calls ledger');
+  assert.ok(txt.includes('.minimax/scripts/sync-ledger.cjs'), 'the role must name the line output script');
+  assert.ok(txt.includes('unknown'), 'the role must name the unknown marker for an unread field');
 });
 
-it('в ролях зоны нет чужого тега движка', () => {
-  // Чужой тег в роли — не опечатка, а ошибка счёта: ядро принимает `claude-code:`, `codex:`,
-  // `gemini:`, и попытка MiniMax, написанная по чужому шаблону, уехала бы в счёт другого
-  // движка молча.
+it('no foreign engine tag in the zone roles', () => {
+  // A foreign tag in a role - not a typo but a spend error: the core accepts `claude-code:`,
+  // `codex:`, `gemini:`, and a MiniMax attempt written by a foreign template would go into another
+  // engine spend silently.
   const walk = (dir) => {
     const out = [];
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -165,111 +165,111 @@ it('в ролях зоны нет чужого тега движка', () => {
   for (const f of walk(path.join(root, '.minimax', 'agents'))) {
     const txt = fs.readFileSync(f, 'utf8');
     const m = txt.match(foreign);
-    assert.ok(!m, `в ${path.relative(root, f)} чужой тег движка: ${m && m[0]}`);
+    assert.ok(!m, `${path.relative(root, f)} carries a foreign engine tag: ${m && m[0]}`);
   }
 });
 
-it('проба пишет факты: изоляция есть, продолжение — не доказано, наблюдения связаны со свидетелем', () => {
+it('the probe writes facts: isolation is there, the continuation is not proven, the observations are tied to the witness', () => {
   const cap = probe();
   const witnessPath = path.join(root, '.minimax', '.state', 'observed-runtime.json');
   const witness = fs.existsSync(witnessPath) ? JSON.parse(fs.readFileSync(witnessPath, 'utf8')) : null;
   const obs = witness && witness.observations ? witness.observations : {};
 
   assert.equal(cap.engine, 'minimax');
-  assert.equal(cap.isolation.available, true, 'изоляция в этом рантайме есть');
-  assert.ok(cap.isolation.verifiedBy, 'у изоляции названо доказательство');
-  assert.ok(cap.isolation.projectRolesMechanism, 'у регистрации назван механизм — плагин движка');
-  assert.ok(cap.isolation.projectRolesReason, 'у этого пробела назван');
+  assert.equal(cap.isolation.available, true, 'isolation is available in this runtime');
+  assert.ok(cap.isolation.verifiedBy, 'isolation names its proof');
+  assert.ok(cap.isolation.projectRolesMechanism, 'the registration names a mechanism - the engine plugin');
+  assert.ok(cap.isolation.projectRolesReason, 'this probe names one');
 
-  // Регистрация ролей и доставка — наблюдения сессии: либо true со свидетелем, либо null с причиной.
+  // The roles registration and the delivery are session observations: either true with a witness, or null with a reason.
   if (obs.agentRegistry) {
-    assert.equal(cap.isolation.projectRolesRegistered, true, 'наблюдение есть — регистрация заявлена');
-    assert.ok(cap.isolation.projectRolesReason.includes('observed-runtime.json'), 'названо свидетельство');
+    assert.equal(cap.isolation.projectRolesRegistered, true, 'the observation is there - the registration is claimed');
+    assert.ok(cap.isolation.projectRolesReason.includes('observed-runtime.json'), 'the evidence is named');
   } else {
-    assert.equal(cap.isolation.projectRolesRegistered, null, 'без наблюдения — честное «не доказано»');
+    assert.equal(cap.isolation.projectRolesRegistered, null, 'without an observation - an honest "not proven"');
   }
   if (obs.roleDelivery) {
-    assert.equal(cap.roleDelivery.available, true, 'доставка наблюдена — заявлена');
-    assert.ok(cap.roleDelivery.verifiedBy && cap.roleDelivery.verifiedBy.includes('observed-runtime.json'), 'названо свидетельство');
-    assert.ok(cap.roleDelivery.sessionId, 'у наблюдения назван идентификатор сессии');
+    assert.equal(cap.roleDelivery.available, true, 'the delivery was observed - claimed');
+    assert.ok(cap.roleDelivery.verifiedBy && cap.roleDelivery.verifiedBy.includes('observed-runtime.json'), 'the evidence is named');
+    assert.ok(cap.roleDelivery.sessionId, 'the observation names a session identifier');
   } else {
-    assert.equal(cap.roleDelivery.available, null, 'без наблюдения — честное «не доказано»');
-    assert.ok(cap.roleDelivery.reason, 'у остатка дисциплины названа причина');
+    assert.equal(cap.roleDelivery.available, null, 'without an observation - an honest "not proven"');
+    assert.ok(cap.roleDelivery.reason, 'the rest of the discipline names a reason');
   }
 
-  // Продолжение вызова: либо доказано наблюдением (тогда названо свидетельство), либо честное
-  // «не доказано». Проба никогда не ставит true по умолчанию.
+  // The call's continuation: either proven by an observation (then the evidence is named), or an honest
+  // "not proven". The probe never sets true by default.
   if (obs.continuation) {
-    assert.equal(cap.continuation.available, true, 'продолжение наблюдено — заявлено');
-    assert.ok(cap.continuation.verifiedBy && cap.continuation.verifiedBy.includes('observed-runtime.json'), 'названо свидетельство');
-    assert.ok(cap.continuation.what && cap.continuation.how, 'названо, что и как наблюдалось');
-    assert.ok(cap.continuation.childSessionId, 'у наблюдения назван идентификатор дочерней сессии');
+    assert.equal(cap.continuation.available, true, 'the continuation was observed - claimed');
+    assert.ok(cap.continuation.verifiedBy && cap.continuation.verifiedBy.includes('observed-runtime.json'), 'the evidence is named');
+    assert.ok(cap.continuation.what && cap.continuation.how, 'what and how was observed is named');
+    assert.ok(cap.continuation.childSessionId, 'the observation names the child session identifier');
   } else {
-    assert.equal(cap.continuation.available, null, 'без наблюдения — честное «не доказано», не «true»');
-    assert.ok(cap.continuation.reason, 'у недоказанного названа причина');
+    assert.equal(cap.continuation.available, null, 'without an observation - an honest "not proven", not "true"');
+    assert.ok(cap.continuation.reason, 'the unproven names a reason');
   }
-  assert.equal(cap.usage.available, fs.existsSync(path.join(root, '.minimax', '.ledger', 'calls.jsonl')), 'расход доступен ровно тогда, когда есть журнал');
-  assert.ok(cap.hooks.available === false || cap.hooks.package, 'хуки: либо названо место пакета, либо сказано, что пакета нет');
+  assert.equal(cap.usage.available, fs.existsSync(path.join(root, '.minimax', '.ledger', 'calls.jsonl')), 'the spend is available exactly when the ledger is there');
+  assert.ok(cap.hooks.available === false || cap.hooks.package, 'hooks: either the package location is named, or it is said the package is absent');
   if (cap.hooks.available) {
-    assert.ok(cap.hooks.verifiedBy, 'у хуков названо доказательство');
+    assert.ok(cap.hooks.verifiedBy, 'the hooks name their proof');
     if (obs.hooks) {
-      assert.equal(cap.hooks.deliveredInSession, true, 'хуки сработали в живой сессии');
-      assert.ok(cap.hooks.observedLive.length, 'названо, какие события наблюдались вживую');
-      assert.ok(cap.hooks.observedOnlyInSimulation.length, 'названо, что осталось только в симуляции');
+      assert.equal(cap.hooks.deliveredInSession, true, 'the hooks fired in a live session');
+      assert.ok(cap.hooks.observedLive.length, 'which events were observed live is named');
+      assert.ok(cap.hooks.observedOnlyInSimulation.length, 'what remained only in the simulation is named');
     } else {
-      assert.equal(cap.hooks.deliveredInSession, null, 'без наблюдения — честное «не доказано»');
+      assert.equal(cap.hooks.deliveredInSession, null, 'without an observation - an honest "not proven"');
     }
   }
 });
 
-it('живая запись в журнале принадлежит платформенным вызовам узлов движка', () => {
+it('a live ledger record belongs to the engine nodes platform calls', () => {
   const ledger = path.join(root, '.minimax', '.ledger', 'calls.jsonl');
-  if (!fs.existsSync(ledger)) return; // журнала ещё нет — проверять нечего
+  if (!fs.existsSync(ledger)) return; // no ledger yet - nothing to check
   const recs = fs.readFileSync(ledger, 'utf8').split(/\r?\n/).filter((l) => l.trim()).map((l) => JSON.parse(l));
   for (const rec of recs) {
-    assert.ok(rec.conversationId, 'у записи нет идентификатора вызова');
-    assert.ok(rec.node, 'у записи не назван узел');
-    // Число расхода — настоящее или неизвестное (null). Нулём неизвестное не подменяется (§3).
+    assert.ok(rec.conversationId, 'the record has no call identifier');
+    assert.ok(rec.node, 'the record does not name a node');
+    // The spend number is real or unknown (null). Unknown is never substituted by zero (§3).
     assert.ok(
       rec.input_tokens === null || (typeof rec.input_tokens === 'number' && rec.input_tokens > 0),
-      'число расхода — настоящее или null, но не ноль вместо неизвестного'
+      'the spend number is real or null, but never zero instead of unknown'
     );
     const line = deriveSpendLineForCall(rec, rec.node, 'test');
     assert.ok(
       /unknown tokens/.test(line) || /\d[\d\s ]* tokens/.test(line),
-      'строка расхода говорит либо настоящее число, либо unknown'
+      'the spend line says either a real number or unknown'
     );
-    assert.ok(line.includes('`' + rec.conversationId + '`'), 'идентификатор вызова должен попасть в строку расхода');
+    assert.ok(line.includes('`' + rec.conversationId + '`'), 'the call identifier must get into the spend line');
   }
 });
 
-it('проба не ставит true там, где нет доказательства', () => {
+it('the probe does not set true where there is no proof', () => {
   const cap = probe();
   for (const [name, field] of Object.entries(cap)) {
     if (!field || typeof field !== 'object' || !('available' in field)) continue;
     if (field.available === true) {
-      assert.ok(field.verifiedBy || field.mechanism || field.package, `${name}: available=true без доказательства`);
+      assert.ok(field.verifiedBy || field.mechanism || field.package, `${name}: available=true without a proof`);
     }
     if (field.available === false || field.available === null) {
-      assert.ok(field.reason, `${name}: недоступное поле без причины`);
+      assert.ok(field.reason, `${name}: an unavailable field without a reason`);
     }
   }
 });
 
-it('файл возможностей на диске совпадает с пробой', () => {
+it('the capabilities file on disk matches the probe', () => {
   const p = path.join(root, '.minimax', '.state', 'capabilities.json');
-  assert.ok(fs.existsSync(p), 'файл возможностей отсутствует — запустите node .minimax/scripts/capabilities.cjs');
+  assert.ok(fs.existsSync(p), 'the capabilities file is absent - run node .minimax/scripts/capabilities.cjs');
   const onDisk = JSON.parse(fs.readFileSync(p, 'utf8'));
   assert.equal(onDisk.engine, 'minimax');
   assert.equal(typeof onDisk.isolation.available, 'boolean');
 });
 
-// 6. Чистота зоны (запрет 16)
-it('в зоне нет следов проекта (запрет 16)', () => {
-  // Правило — ядровое (`scanCleanFile`): одна правда для всех зон. Своей проверки тут нет.
+// 6. The zone's cleanliness (prohibition 16)
+it('no project traces in the zone (prohibition 16)', () => {
+  // The rule is a core one (`scanCleanFile`): one truth for all zones. No own check here.
   const { scanCleanFile } = require('../../.claude/scripts/checks/support/clean-zone.cjs');
-  // Машинное состояние движка (`.state/`, `.ledger/`) не поставляется: там время пробы и пути
-  // машины — как в журнале инструментов ядра. Проверяется содержимое зоны.
+  // The engine's machine state (`.state/`, `.ledger/`) does not ship: it holds the probe times and the
+  // machine paths - like the core tools' journal. The zone content is checked.
   const MACHINE_STATE = new Set(['.state', '.ledger']);
   const walk = (dir) => {
     const out = [];
@@ -290,58 +290,58 @@ it('в зоне нет следов проекта (запрет 16)', () => {
   assert.deepEqual(problems, [], problems.join('\n'));
 });
 
-// 7. Пакет плагина движка
+// 7. The engine plugin package
 const PKG = path.join(root, 'miniapps', 'minimax-engine');
 const PKG_MANIFEST = path.join(PKG, '.minimax-plugin', 'plugin.json');
 const PKG_HOOKS = path.join(PKG, 'hooks', 'hooks.json');
 const PKG_HOOK_SCRIPT = path.join(PKG, 'scripts', 'hook.mjs');
 
-it('пакет плагина собран по контракту V1: манифест, иконки, агенты, пути', () => {
+it('the plugin package is built per the V1 contract: manifest, icons, agents, paths', () => {
   const m = JSON.parse(fs.readFileSync(PKG_MANIFEST, 'utf8'));
   assert.equal(m.schemaVersion, 1);
-  assert.match(m.name, /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/, 'имя плагина должно быть kebab-case');
-  assert.match(m.version, /^\d+\.\d+\.\d+$/, 'версия должна быть SemVer');
-  assert.ok(m.description && m.description.length > 10, 'у плагина должно быть описание');
-  assert.ok(m.author, 'у плагина должен быть автор');
-  assert.ok(m.category, 'у плагина должна быть категория');
+  assert.match(m.name, /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/, 'the plugin name must be kebab-case');
+  assert.match(m.version, /^\d+\.\d+\.\d+$/, 'the version must be SemVer');
+  assert.ok(m.description && m.description.length > 10, 'the plugin must have a description');
+  assert.ok(m.author, 'the plugin must have an author');
+  assert.ok(m.category, 'the plugin must have a category');
   assert.ok(
     Array.isArray(m.exampleQueries) && m.exampleQueries.length && m.exampleQueries.every((q) => String(q).trim()),
-    'нужен хотя бы один непустой пример запроса'
+    'at least one non-empty example query is needed'
   );
-  assert.deepEqual(m.apps, [], 'локальные приложения не поддерживаются — apps должен быть пустым');
-  assert.ok(m.agents.length, 'у пакета должны быть субагенты');
+  assert.deepEqual(m.apps, [], 'local apps are not supported - apps must be empty');
+  assert.ok(m.agents.length, 'the package must have subagents');
   for (const rel of [...m.agents, ...m.hooks, ...m.mcpServers, ...m.skills]) {
-    assert.ok(!path.isAbsolute(rel) && !rel.includes('\\') && !rel.includes('..'), `путь не переносимый: ${rel}`);
-    assert.ok(fs.existsSync(path.join(PKG, ...rel.split('/'))), `файл не найден: ${rel}`);
+    assert.ok(!path.isAbsolute(rel) && !rel.includes('\\') && !rel.includes('..'), `the path is not portable: ${rel}`);
+    assert.ok(fs.existsSync(path.join(PKG, ...rel.split('/'))), `the file is not found: ${rel}`);
   }
-  assert.ok(fs.existsSync(path.join(PKG, m.icon)), 'иконка по умолчанию отсутствует');
-  if (m.darkIcon) assert.ok(fs.existsSync(path.join(PKG, m.darkIcon)), 'тёмная иконка отсутствует');
+  assert.ok(fs.existsSync(path.join(PKG, m.icon)), 'the default icon is absent');
+  if (m.darkIcon) assert.ok(fs.existsSync(path.join(PKG, m.darkIcon)), 'the dark icon is absent');
 });
 
-it('субагенты пакета: имя = имя файла, описание есть, `task` не указан', () => {
+it('the package subagents: name = file name, description present, `task` not listed', () => {
   const m = JSON.parse(fs.readFileSync(PKG_MANIFEST, 'utf8'));
   for (const rel of m.agents) {
-    assert.match(rel, /^agents\/[a-z][a-z0-9_-]*\.md$/, `путь субагента не по контракту: ${rel}`);
+    assert.match(rel, /^agents\/[a-z][a-z0-9_-]*\.md$/, `the subagent path is not per the contract: ${rel}`);
     const txt = fs.readFileSync(path.join(PKG, ...rel.split('/')), 'utf8');
     const fm = txt.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
-    assert.ok(fm, `у ${rel} нет фронтматтера`);
+    assert.ok(fm, `${rel} has no frontmatter`);
     const name = (fm[1].match(/^name:\s*(.*)$/m) || [])[1];
     const desc = (fm[1].match(/^description:\s*(.*)$/m) || [])[1];
     const tools = (fm[1].match(/^tools:\s*\[(.*)\]$/m) || [])[1];
-    assert.equal(name && name.trim(), path.basename(rel, '.md'), `имя субагента не равно имени файла: ${rel}`);
-    assert.ok(desc && desc.trim().length > 10, `у ${rel} пустое описание`);
+    assert.equal(name && name.trim(), path.basename(rel, '.md'), `the subagent name is not the file name: ${rel}`);
+    assert.ok(desc && desc.trim().length > 10, `${rel} has an empty description`);
     if (tools) {
       const names = tools.split(',').map((t) => t.trim()).filter(Boolean);
-      assert.ok(!names.includes('task'), `у ${rel} указан task — субагент плагина не делегирует дальше`);
+      assert.ok(!names.includes('task'), `${rel} lists task - a plugin subagent does not delegate further`);
       for (const t of names) {
-        assert.ok(!/^(Read|Write|Edit|Bash|Grep|Glob|Task|Agent|AskUserQuestion)$/.test(t), `у ${rel} псевдоним инструмента: ${t}`);
-        assert.match(t, /^[a-z][a-z0-9_]*$/, `у ${rel} не нативное имя инструмента: ${t}`);
+        assert.ok(!/^(Read|Write|Edit|Bash|Grep|Glob|Task|Agent|AskUserQuestion)$/.test(t), `${rel} carries a tool alias: ${t}`);
+        assert.match(t, /^[a-z][a-z0-9_]*$/, `${rel} is not a native tool name: ${t}`);
       }
     }
   }
 });
 
-it('хуки пакета: поддерживаемые события, синхронный обработчик, переносимая команда', () => {
+it('the package hooks: supported events, a synchronous handler, a portable command', () => {
   const h = JSON.parse(fs.readFileSync(PKG_HOOKS, 'utf8'));
   const SUPPORTED = new Set([
     'SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PermissionRequest',
@@ -349,29 +349,29 @@ it('хуки пакета: поддерживаемые события, синх
   ]);
   let count = 0;
   for (const [event, groups] of Object.entries(h.hooks)) {
-    assert.ok(SUPPORTED.has(event), `событие не поддерживается рантаймом: ${event}`);
+    assert.ok(SUPPORTED.has(event), `the event is not supported by the runtime: ${event}`);
     for (const group of groups) {
       if (group.matcher !== undefined) {
-        assert.ok(group.matcher.length <= 256, `matcher длиннее 256 символов: ${event}`);
+        assert.ok(group.matcher.length <= 256, `the matcher is longer than 256 characters: ${event}`);
       }
       for (const handler of group.hooks) {
         count += 1;
-        assert.equal(handler.type, 'command', 'обработчик должен быть синхронной командой');
-        assert.ok(handler.command && handler.command.includes('${PLUGIN_ROOT}'), 'команда должна идти через ${PLUGIN_ROOT}');
-        assert.ok(handler.timeout >= 1 && handler.timeout <= 10, 'таймаут вне диапазона 1–10 секунд');
+        assert.equal(handler.type, 'command', 'the handler must be a synchronous command');
+        assert.ok(handler.command && handler.command.includes('${PLUGIN_ROOT}'), 'the command must go through ${PLUGIN_ROOT}');
+        assert.ok(handler.timeout >= 1 && handler.timeout <= 10, 'the timeout is outside the 1-10 seconds range');
       }
     }
   }
-  assert.ok(count > 0, 'у пакета нет ни одного обработчика');
-  assert.ok(count <= 64, 'обработчиков больше 64');
+  assert.ok(count > 0, 'the package has no handlers at all');
+  assert.ok(count <= 64, 'more than 64 handlers');
 });
 
-it('скрипт хука синтаксически валиден для node', () => {
+it('the hook script is syntactically valid for node', () => {
   const r = spawnSync(process.execPath, ['--check', PKG_HOOK_SCRIPT], { encoding: 'utf8' });
   assert.equal(r.status, 0, (r.stdout || '') + (r.stderr || ''));
 });
 
-it('субагенты пакета совпадают с ролями зоны — перегенерацией', () => {
+it('the package subagents match the zone roles - by regeneration', () => {
   const r = spawnSync(process.execPath, [path.join(root, '.minimax', 'scripts', 'gen-plugin-agents.cjs'), '--check'], {
     cwd: root,
     encoding: 'utf8',
@@ -379,26 +379,26 @@ it('субагенты пакета совпадают с ролями зоны 
   assert.equal(r.status, 0, (r.stdout || '') + (r.stderr || ''));
 });
 
-it('установленная копия пакета в профиле совпадает с исходником', () => {
+it('the installed package copy in the profile matches the source', () => {
   const { diff, targetDir } = require('../scripts/install-plugin.cjs');
   const dst = targetDir();
   if (!fs.existsSync(dst)) {
-    // Пакета в профиле нет — это состояние среды, а не дефект пакета; проба говорит об этом честно.
-    assert.equal(probe().hooks.available, false, 'проба должна сказать, что пакета в профиле нет');
-    console.log('  (пакет не установлен в профиль — паритет не проверялся)');
+    // No package in the profile - an environment state, not a package defect; the probe says it honestly.
+    assert.equal(probe().hooks.available, false, 'the probe must say the package is not in the profile');
+    console.log('  (the package is not installed into the profile - the parity was not checked)');
     return;
   }
   const d = diff(PKG, dst);
-  assert.deepEqual(d.missing, [], 'в профиле нет файлов пакета');
-  assert.deepEqual(d.changed, [], 'файлы пакета в профиле разошлись с исходником');
-  assert.deepEqual(d.extra, [], 'в профиле есть лишние файлы пакета');
+  assert.deepEqual(d.missing, [], 'the profile has no package files');
+  assert.deepEqual(d.changed, [], 'the package files in the profile drifted from the source');
+  assert.deepEqual(d.extra, [], 'the profile carries extra package files');
 });
 
-it('хук пакета работает: охрана, фраза-пароль, доставка роли, журнал вызовов', () => {
+it('the package hook works: the guard, the pass phrase, the role delivery, the calls ledger', () => {
   const os = require('node:os');
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-minimax-hook-'));
   try {
-    // Фикстура — проект протокола во временной папке: хук пишет только туда.
+    // The fixture is a protocol project in a temp folder: the hook writes only there.
     const proj = path.join(tmp, 'project');
     fs.mkdirSync(path.join(proj, '.minimax', 'agents'), { recursive: true });
     fs.writeFileSync(path.join(proj, 'AGENTS.md'), '# law\n', 'utf8');
@@ -418,65 +418,65 @@ it('хук пакета работает: охрана, фраза-пароль,
     assert.equal(start.status, 0);
     const ctx = JSON.parse(start.out).hookSpecificOutput;
     assert.equal(ctx.hookEventName, 'SessionStart');
-    assert.ok(ctx.additionalContext.includes('.minimax'), 'роль главной сессии не названа');
+    assert.ok(ctx.additionalContext.includes('.minimax'), 'the main session role is not named');
 
     const deny = run({ hook_event_name: 'PreToolUse', tool_name: 'bash', tool_input: { command: 'rm -- "AGENTS.md"' } });
     assert.equal(deny.status, 0);
     const d = JSON.parse(deny.out).hookSpecificOutput;
-    assert.equal(d.permissionDecision, 'deny', 'удаление защищённого пути должно быть отклонено');
-    assert.match(d.permissionDecisionReason, /Отключи сенсорику/, 'в отказе не названа фраза-пароль');
+    assert.equal(d.permissionDecision, 'deny', 'deleting a protected path must be denied');
+    assert.match(d.permissionDecisionReason, /\u041e\u0442\u043a\u043b\u044e\u0447\u0438 \u0441\u0435\u043d\u0441\u043e\u0440\u0438\u043a\u0443/, 'the denial does not name the pass phrase');
 
     const quiet = run({ hook_event_name: 'PreToolUse', tool_name: 'bash', tool_input: { command: 'rm -- "notes.txt"' } });
     assert.equal(quiet.status, 0);
-    assert.equal(quiet.out, '', 'на чужой путь хук молчит');
+    assert.equal(quiet.out, '', 'on a foreign path the hook stays silent');
 
-    const phrase = run({ hook_event_name: 'UserPromptSubmit', prompt: 'Отключи сенсорику' });
+    const phrase = run({ hook_event_name: 'UserPromptSubmit', prompt: '\u041e\u0442\u043a\u043b\u044e\u0447\u0438 \u0441\u0435\u043d\u0441\u043e\u0440\u0438\u043a\u0443' });
     assert.equal(phrase.status, 0);
-    assert.equal(phrase.out, '', 'фраза не блокирует промпт');
+    assert.equal(phrase.out, '', 'the phrase does not block the prompt');
     const marker = path.join(proj, '.minimax', 'hooks', '.delete-unlock');
-    assert.ok(fs.existsSync(marker), 'маркер не создан');
+    assert.ok(fs.existsSync(marker), 'the marker was not created');
     const allowed = run({ hook_event_name: 'PreToolUse', tool_name: 'bash', tool_input: { command: 'rm -- "AGENTS.md"' } });
-    assert.equal(allowed.out, '', 'с маркером действие проходит');
-    assert.ok(!fs.existsSync(marker), 'маркер одноразовый — он исчезает');
+    assert.equal(allowed.out, '', 'with the marker the action passes');
+    assert.ok(!fs.existsSync(marker), 'the marker is one-shot - it disappears');
     const again = run({ hook_event_name: 'PreToolUse', tool_name: 'bash', tool_input: { command: 'rm -- "AGENTS.md"' } });
-    assert.equal(JSON.parse(again.out).hookSpecificOutput.permissionDecision, 'deny', 'после маркера снова отказ');
+    assert.equal(JSON.parse(again.out).hookSpecificOutput.permissionDecision, 'deny', 'after the marker a denial again');
 
     const id = 'call-sim-0001';
     run({ hook_event_name: 'SubagentStart', agent_id: id, agent_type: 'minimax-engine:spec' });
     const stop = run({ hook_event_name: 'SubagentStop', agent_id: id, agent_type: 'minimax-engine:spec' });
     assert.equal(stop.status, 0);
     const ledgerFile = path.join(proj, '.minimax', '.ledger', 'calls.jsonl');
-    assert.ok(fs.existsSync(ledgerFile), 'журнал вызовов не создан');
+    assert.ok(fs.existsSync(ledgerFile), 'the calls ledger was not created');
     const rec = JSON.parse(fs.readFileSync(ledgerFile, 'utf8').trim().split('\n').pop());
-    assert.equal(rec.conversationId, id, 'идентификатор вызова — платформенный');
-    assert.equal(rec.node, 'Spec', 'узел назван по типу агента');
-    assert.equal(rec.input_tokens, null, 'непрочитанное число — null, а не ноль');
-    const line = deriveSpendLineForCall(rec, 'Spec', 'test: симуляция хука');
-    assert.match(line, /unknown tokens/, 'строка расхода говорит unknown, а не ноль');
-    assert.ok(line.includes('`' + id + '`'), 'идентификатор вызова должен попасть в строку расхода');
+    assert.equal(rec.conversationId, id, 'the call identifier is the platform one');
+    assert.equal(rec.node, 'Spec', 'the node is named by the agent type');
+    assert.equal(rec.input_tokens, null, 'an unread number is null, not zero');
+    const line = deriveSpendLineForCall(rec, 'Spec', 'test: hook simulation');
+    assert.match(line, /unknown tokens/, 'the spend line says unknown, not zero');
+    assert.ok(line.includes('`' + id + '`'), 'the call identifier must get into the spend line');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-// 8. Расход: числа берутся из стенограммы платформы, а не выдумываются
-it('ридер стенограмм находит сессию по идентификатору и достаёт числа', () => {
+// 8. The spend: the numbers are taken from the platform transcript, never invented
+it('the transcript reader finds a session by identifier and extracts the numbers', () => {
   const reader = require(path.join(root, 'miniapps', 'minimax-engine', 'scripts', 'transcripts.cjs'));
-  assert.ok(reader.sessionsRoot(process.env), 'хранилище сессий рантайма должно находиться');
+  assert.ok(reader.sessionsRoot(process.env), 'the runtime session storage must be found');
   const ledgerFile = path.join(root, '.minimax', '.ledger', 'calls.jsonl');
   if (!fs.existsSync(ledgerFile)) return;
   const recs = fs.readFileSync(ledgerFile, 'utf8').split(/\r?\n/).filter((l) => l.trim()).map((l) => JSON.parse(l));
   const numbered = recs.filter((r) => typeof r.input_tokens === 'number');
-  if (!numbered.length) return; // платформенных записей с числами ещё нет
+  if (!numbered.length) return; // no platform records with numbers yet
   for (const rec of numbered) {
-    assert.ok(rec.model, 'у записи с числами должна быть названа модель');
-    assert.ok(rec.input_tokens > 0, 'число токенов ввода должно быть настоящим');
+    assert.ok(rec.model, 'a record with numbers must name the model');
+    assert.ok(rec.input_tokens > 0, 'the input tokens number must be real');
     const u = reader.readUsage(rec.conversationId);
-    assert.ok(u, 'стенограмма по этому идентификатору обязана находиться');
-    // Запись журнала — снимок на момент `SubagentStop`: стенограмма вызова дописывается после
-    // остановки, поэтому её полные итоги могут быть больше снимка. Свойство записи: её числа
-    // совпадают с накопленными по первым K шагам стенограммы. Это «снимок против полного»,
-    // а не расхождение; старые строки журнала и карточек не переписываются (запрет 5).
+    assert.ok(u, 'the transcript by this identifier must be found');
+    // The ledger record is a snapshot at the `SubagentStop` moment: the call transcript is appended after
+    // the stop, so its full totals may be larger than the snapshot. The record's property: its numbers
+    // match the accumulated over the first K transcript steps. This is "snapshot versus full",
+    // not a divergence; old ledger and card lines are not rewritten (prohibition 5).
     const steps = reader.readSteps(rec.conversationId);
     let ci = 0;
     let co = 0;
@@ -494,35 +494,35 @@ it('ридер стенограмм находит сессию по идент�
       const sameWrite = rec.cache_write_tokens === undefined || rec.cache_write_tokens === null || cw === rec.cache_write_tokens;
       if (sameIn && sameOut && sameCache && sameWrite) { snapshot = true; break; }
     }
-    assert.ok(snapshot, 'числа записи журнала должны совпадать с накопленными по первым K шагам стенограммы (снимок на момент SubagentStop)');
-    assert.ok(u.input >= rec.input_tokens, 'полная стенограмма не может быть меньше снимка');
+    assert.ok(snapshot, 'the ledger record numbers must match the accumulated over the first K transcript steps (a snapshot at the SubagentStop moment)');
+    assert.ok(u.input >= rec.input_tokens, 'the full transcript cannot be smaller than the snapshot');
   }
 });
 
-it('строка расхода берёт числа из полной стенограммы, а не из снимка журнала', () => {
+it('the spend line takes the numbers from the full transcript, not from the ledger snapshot', () => {
   const ledgerFile = path.join(root, '.minimax', '.ledger', 'calls.jsonl');
   if (!fs.existsSync(ledgerFile)) return;
   const reader = require(path.join(root, 'miniapps', 'minimax-engine', 'scripts', 'transcripts.cjs'));
   const { deriveSpendLineForCall } = require(path.join(root, '.minimax', 'scripts', 'sync-ledger.cjs'));
   const recs = fs.readFileSync(ledgerFile, 'utf8').split(/\r?\n/).filter((l) => l.trim()).map((l) => JSON.parse(l));
   const rec = recs.find((r) => typeof r.input_tokens === 'number' && r.conversationId);
-  if (!rec) return; // платформенных записей с числами ещё нет
+  if (!rec) return; // no platform records with numbers yet
   const u = reader.readUsage(rec.conversationId);
-  if (!u) return; // стенограммы по этому вызову нет — сверять нечего
+  if (!u) return; // no transcript for this call - nothing to compare
   const g = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   const N = u.input + u.output + u.cache_read + u.cache_write;
-  const line = deriveSpendLineForCall(rec, rec.node || 'Run', 'test: числа из полной стенограммы');
-  assert.ok(line.includes(g(N) + ' tokens'), 'строка расхода должна нести полный расход вызова из стенограммы');
-  assert.ok(line.includes(g(u.cache_read) + ' cache-read'), 'кэш-чтение в строке — из полной стенограммы');
-  assert.ok(line.includes(', ' + g(u.output) + ' out'), 'выходные токены в строке — из полной стенограммы');
+  const line = deriveSpendLineForCall(rec, rec.node || 'Run', 'test: numbers from the full transcript');
+  assert.ok(line.includes(g(N) + ' tokens'), 'the spend line must carry the call full spend from the transcript');
+  assert.ok(line.includes(g(u.cache_read) + ' cache-read'), 'the cache read in the line is from the full transcript');
+  assert.ok(line.includes(', ' + g(u.output) + ' out'), 'the output tokens in the line are from the full transcript');
 });
 
-it('хук пишет в журнал настоящие числа и нормированную стенограмму', () => {
+it('the hook writes real numbers and a normalized transcript into the ledger', () => {
   const ledgerFile = path.join(root, '.minimax', '.ledger', 'calls.jsonl');
   if (!fs.existsSync(ledgerFile)) return;
   const rec = fs.readFileSync(ledgerFile, 'utf8').split(/\r?\n/).filter((l) => l.trim()).map((l) => JSON.parse(l))
     .find((r) => typeof r.input_tokens === 'number');
-  if (!rec) return; // платформенной записи с числами ещё нет
+  if (!rec) return; // no platform record with numbers yet
 
   const os = require('node:os');
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-minimax-spend-'));
@@ -548,26 +548,26 @@ it('хук пишет в журнал настоящие числа и норм�
     });
     assert.equal(r.status, 0, (r.stdout || '') + (r.stderr || ''));
     const fixtureLedger = path.join(proj, '.minimax', '.ledger', 'calls.jsonl');
-    assert.ok(fs.existsSync(fixtureLedger), 'журнал вызовов не создан');
+    assert.ok(fs.existsSync(fixtureLedger), 'the calls ledger was not created');
     const written = JSON.parse(fs.readFileSync(fixtureLedger, 'utf8').trim().split('\n').pop());
-    assert.equal(typeof written.input_tokens, 'number', 'число токенов должно быть настоящим, а не null');
-    assert.ok(written.input_tokens > 0, 'число токенов должно быть больше нуля');
-    assert.equal(written.agent_type, 'minimax-engine:spec', 'платформенное имя агента должно попасть в запись');
-    assert.ok(written.model, 'модель должна быть названа');
-    // Нормированная стенограмма — то, что читает дашборд.
+    assert.equal(typeof written.input_tokens, 'number', 'the tokens number must be real, not null');
+    assert.ok(written.input_tokens > 0, 'the tokens number must be greater than zero');
+    assert.equal(written.agent_type, 'minimax-engine:spec', 'the platform agent name must get into the record');
+    assert.ok(written.model, 'the model must be named');
+    // The normalized transcript is what the dashboard reads.
     const trDir = path.join(proj, '.minimax', '.transcripts');
-    assert.ok(fs.existsSync(trDir), 'нормированная стенограмма не записана');
+    assert.ok(fs.existsSync(trDir), 'the normalized transcript was not written');
     const files = fs.readdirSync(trDir).filter((f) => f.endsWith('.jsonl'));
-    assert.ok(files.length, 'в каталоге стенограмм пусто');
+    assert.ok(files.length, 'the transcripts folder is empty');
     const first = JSON.parse(fs.readFileSync(path.join(trDir, files[0]), 'utf8').split('\n')[0]);
-    assert.ok(first.message.usage, 'у нормированной записи нет расхода');
-    assert.equal(typeof first.message.usage.cache_read_input_tokens, 'number', 'ядро ждёт это поле');
+    assert.ok(first.message.usage, 'the normalized record has no spend');
+    assert.equal(typeof first.message.usage.cache_read_input_tokens, 'number', 'the core expects this field');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-it('строка расхода считает N по канону: полный вызов, кэш внутри, работа = N − R', () => {
+it('the spend line counts N per the canon: the full call, cache inside, work = N − R', () => {
   const ledger = path.join(root, '.minimax', '.ledger', 'calls.jsonl');
   if (!fs.existsSync(ledger)) return;
   const { fullUsage } = require(path.join(root, '.minimax', 'scripts', 'sync-ledger.cjs'));
@@ -576,20 +576,20 @@ it('строка расхода считает N по канону: полный
   let checked = 0;
   for (const rec of recs) {
     if (rec.input_tokens == null || rec.output_tokens == null) continue;
-    // Строка расхода берёт числа из ПОЛНОЙ стенограммы вызова; запись журнала — снимок на момент
-    // `SubagentStop`, и он может быть меньше. Проверяем канон на тех числах, что несёт строка.
+    // The spend line takes the numbers from the call FULL transcript; the ledger record is a snapshot at
+    // the `SubagentStop` moment, and it may be smaller. The canon is checked on the numbers the line carries.
     const src = fullUsage(rec) || rec;
     const R = src.cache_read_tokens || 0;
     const W = src.cache_write_tokens || 0;
     const N = src.input_tokens + src.output_tokens + R + W;
     const line = deriveSpendLineForCall(rec, rec.node, 'test');
-    assert.ok(line.includes(g(N) + ' tokens'), `N должен быть полным расходом вызова: ${line}`);
-    assert.ok(line.includes('(' + g(R) + ' cache-read)'), `R должен быть кэш-чтением: ${line}`);
-    assert.ok(line.includes(', ' + g(src.output_tokens) + ' out'), `выход должен быть в строке: ${line}`);
-    assert.ok(N >= R, 'N не может быть меньше R — иначе ядро пересчитает итог');
+    assert.ok(line.includes(g(N) + ' tokens'), `N must be the call full spend: ${line}`);
+    assert.ok(line.includes('(' + g(R) + ' cache-read)'), `R must be the cache read: ${line}`);
+    assert.ok(line.includes(', ' + g(src.output_tokens) + ' out'), `the output must be in the line: ${line}`);
+    assert.ok(N >= R, 'N cannot be smaller than R - otherwise the core recalculates the total');
     checked += 1;
   }
-  assert.ok(checked > 0, 'нечего было проверять: в журнале нет записей с числами');
+  assert.ok(checked > 0, 'nothing to check: the ledger has no records with numbers');
 });
 
-console.log(`\n${passed} проверок пройдено`);
+console.log(`\n${passed} checks passed`);

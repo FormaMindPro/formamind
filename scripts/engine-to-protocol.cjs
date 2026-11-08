@@ -1,28 +1,31 @@
 #!/usr/bin/env node
-// Перенос правок движка проекта в исходник протокола: ядро — protocol/skills/forma/core/ (закон, manual,
-// дашборд с модулем экономики, каркас project/), адаптеры — protocol/skills/forma/adapters/<движок>/
-// (claude — готов; codex, gemini — «не готов», переносятся как есть).
-// Только для автора: работает, лишь если protocol/ — git-клон (есть protocol/.git).
-//   node .forma/protocol/scripts/engine-to-protocol.cjs      — показать классификацию, ничего не пишет
-//   ... --apply                                              — перенести «изменён только движок»
-//   ... --apply <файл> [<файл> ...]                          — перенести только названные файлы (пути от корня проекта); чужие расхождения не трогаются
-//   ... --add <путь-в-проекте> [--add ...]                   — явно перенести новый файл
-//   ... --mark                                               — записать базу: движок = шаблон на HEAD protocol/
-//   ... --before-push                                        — проверка перед push: версия строго выше опубликованной
+// Carries the project engine's edits back into the protocol source: the core - protocol/skills/forma/core/
+// (the law, the manual, the dashboard with the economy module, the project/ scaffold), the adapters -
+// protocol/skills/forma/adapters/<engine>/ (claude - ready; codex, gemini - "not ready", carried as is).
+// For the author only: works only when protocol/ is a git clone (protocol/.git exists).
+//   node .forma/protocol/scripts/engine-to-protocol.cjs      - show the classification, writes nothing
+//   ... --apply                                              - carry over "engine only changed"
+//   ... --apply <file> [<file> ...]                          - carry only the named files (paths from the project root); foreign divergences untouched
+//   ... --add <project-path> [--add ...]                     - carry a new file explicitly
+//   ... --mark                                               - record the base: engine = template at protocol/ HEAD
+//   ... --before-push                                        - pre-push check: the version strictly above the published one
 //
-// Направление определяется по git, не по mtime (mtime после clone/checkout = время checkout, врёт).
-// База — коммит protocol/, на котором движок и шаблон последний раз совпадали; хранится в
-// protocol/.git/forma-base (вне истории, у каждого клона свой). Для каждого файла три содержимого:
-// B = шаблон@база, H = шаблон сейчас, E = движок. Изменён только движок (E≠B, H=B) → переносится;
-// только шаблон (E=B, H≠B) → «обнови протокол Форма»; оба → конфликт, решает человек.
-// Базы нет — она выводится по файлу: самая новая версия шаблона из git log, равная E.
-// Намеренные отличия и мусор — protocol/scripts/engine-to-protocol.exceptions.
+// The direction is decided by git, not by mtime (after clone/checkout mtime = the checkout time, it lies).
+// The base is the protocol/ commit where the engine and the template last matched; kept in
+// protocol/.git/forma-base (outside history, each clone has its own). Three contents per file:
+// B = template@base, H = template now, E = engine. Engine only changed (E!=B, H=B) -> carried over;
+// template only (E=B, H!=B) -> "update the Forma protocol"; both -> conflict, the human decides.
+// No base - it is inferred per file: the newest template version from git log equal to E.
+// Deliberate differences and noise - protocol/scripts/engine-to-protocol.exceptions.
+// Printed labels come from the core dictionary: English key in code, ru value as data.
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const { walk: walkTree } = require('../skills/forma/core/dashboard/lib/fs.cjs');
 const { gitOut } = require('./lib/git.cjs');
 const { readOwnLayer, isForbiddenTransfer } = require('./lib/forbidden-transfer.cjs');
+const i18n = require('../skills/forma/core/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const root = process.cwd();
 const protoDir = path.join(root, '.forma/protocol');
@@ -33,40 +36,40 @@ const forma = path.join(protoDir, ...FORMA_GIT.split('/'));
 const baseFile = path.join(protoDir, '.git', 'forma-base');
 
 if (!fs.existsSync(path.join(protoDir, '.git'))) {
-  console.error('СТОП: protocol/.git нет — это не клон FormaMindPro/formamind. Механизм только для автора (README, «Разработка протокола из любого проекта»).');
-  console.error('Запускать из корня проекта, где protocol/ — git-клон.');
+  console.error(msg('e2p.no_git'));
+  console.error(msg('e2p.run_from_root'));
   process.exit(2);
 }
-if (!fs.existsSync(tpl)) { console.error('СТОП: нет ' + path.relative(root, tpl)); process.exit(2); }
+if (!fs.existsSync(tpl)) { console.error(msg('e2p.no_tpl', { path: path.relative(root, tpl) })); process.exit(2); }
 
 const args = process.argv.slice(2);
 const git = (...a) => gitOut(protoDir, ...a);
 
-// --before-push: после pull --rebase, перед push. Одинаковый bump на обеих сторонах git сливает МОЛЧА
-// (строки совпали — конфликта нет), и два выпуска получают один номер. Ловим это здесь.
+// --before-push: after pull --rebase, before push. The same bump on both sides of git merges SILENTLY
+// (the lines matched - no conflict), and two releases get one number. Caught here.
 if (args.includes('--before-push')) {
   const ver = (ref) => JSON.parse(git('show', ref + ':.claude-plugin/plugin.json')).version;
   const cmp = (x, y) => { const a = x.split('-')[0].split('.').map(Number), b = y.split('-')[0].split('.').map(Number);
     for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (a[i] || 0) - (b[i] || 0); if (d) return d; } return 0; };
-  let up; try { up = git('rev-parse', '--abbrev-ref', '@{u}').trim(); } catch { console.error('СТОП: у ветки protocol/ нет upstream.'); process.exit(2); }
-  if (git('status', '--porcelain').trim()) { console.error('СТОП: в protocol/ незакоммиченное или незавершённый rebase.'); process.exit(1); }
+  let up; try { up = git('rev-parse', '--abbrev-ref', '@{u}').trim(); } catch { console.error(msg('e2p.no_upstream')); process.exit(2); }
+  if (git('status', '--porcelain').trim()) { console.error(msg('e2p.dirty_protocol')); process.exit(1); }
   const mine = ver('HEAD'), theirs = ver(up);
-  if (git('rev-list', '--count', up + '..HEAD').trim() === '0') { console.log('Нечего пушить: HEAD не впереди ' + up + '.'); process.exit(0); }
-  if (git('rev-list', '--count', 'HEAD..' + up).trim() !== '0') { console.error('СТОП: ' + up + ' ушёл вперёд — сначала git -C protocol pull --rebase.'); process.exit(1); }
-  if (cmp(mine, theirs) <= 0) { console.error('СТОП: версия ' + mine + ' не больше опубликованной ' + theirs + ' (' + up + '). Поднимите patch после пришедшего, amend, повторите.'); process.exit(1); }
-  console.log('OK: ' + theirs + ' → ' + mine + ', история линейна. Пуш — по команде человека: git -C protocol push');
+  if (git('rev-list', '--count', up + '..HEAD').trim() === '0') { console.log(msg('e2p.nothing_to_push', { up })); process.exit(0); }
+  if (git('rev-list', '--count', 'HEAD..' + up).trim() !== '0') { console.error(msg('e2p.up_ahead', { up })); process.exit(1); }
+  if (cmp(mine, theirs) <= 0) { console.error(msg('e2p.version_not_higher', { mine, theirs, up })); process.exit(1); }
+  console.log(msg('e2p.push_ok', { theirs, mine }));
   process.exit(0);
 }
 const apply = args.includes('--apply');
 const mark = args.includes('--mark');
 const adds = [];
-const named = [];   // имена после --apply: переносятся только они
+const named = [];   // names after --apply: only they are carried
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--add' && args[i + 1]) adds.push(args[++i].replace(/\\/g, '/'));
   else if (!args[i].startsWith('--')) named.push((path.isAbsolute(args[i]) ? path.relative(root, args[i]) : args[i]).replace(/\\/g, '/').replace(/^\.\//, ''));
 }
 
-// --- исключения ---
+// --- exceptions ---
 const SKIP = [], MASK = {};
 const excFile = path.join(protoDir, 'scripts', 'engine-to-protocol.exceptions');
 if (fs.existsSync(excFile)) {
@@ -74,21 +77,23 @@ if (fs.existsSync(excFile)) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
     const m = line.match(/^(skip|mask)\s+(\S+)(?:\s+(.+))?$/);
-    if (!m) { console.error('СТОП: непонятная строка исключений: ' + raw); process.exit(2); }
+    if (!m) { console.error(msg('e2p.bad_exception_line', { raw })); process.exit(2); }
     if (m[1] === 'skip') SKIP.push(new RegExp(m[2]));
     else (MASK[m[2]] = MASK[m[2]] || []).push(new RegExp(m[3]));
   }
 }
-// Слой 4 (.claude/project-layer.txt) и зоны, что физически не бывают в шаблоне протокола — не «новое»,
-// не переносятся ни по --apply, ни по --add, ни попаданием в MAP (lib/forbidden-transfer.cjs).
+// Layer 4 (.claude/project-layer.txt) and zones that can never physically be in the protocol template -
+// not "new": not carried by --apply, --add, nor caught by the MAP (lib/forbidden-transfer.cjs).
 const OWN_LAYER = readOwnLayer(root);
 const forbidden = (rel) => isForbiddenTransfer(rel, OWN_LAYER);
-// Копии из project/extensions/ (папки template/ и custom/ и нераскладанная <движок>/) — файлы проекта,
-// а не движка: ни «новое», ни «изменён движок» (extensions.cjs sources). Источник правды — project/extensions/.
+// Copies from project/extensions/ (the template/ and custom/ folders and the unsorted <engine>/) - the
+// project's files, not the engine's: neither "new" nor "engine changed" (extensions.cjs sources).
+// The source of truth - project/extensions/.
 const EXT_DST = new Set();
-try { for (const x of require('../skills/forma/core/extensions/extensions.cjs').sources(root)) EXT_DST.add(x.dst.split(path.sep).join('/')); } catch { /* нет модуля — копий нет */ }
-// Инструменты самого движка (профили run-protocol-*: правка доски, дашборда, ядра, адаптеров, проверок) — комплект протокола,
-// даже если проект доставляет их копией из project/extensions/: они идут в шаблон, чтобы любой проект мог чинить движок.
+try { for (const x of require('../skills/forma/core/extensions/extensions.cjs').sources(root)) EXT_DST.add(x.dst.split(path.sep).join('/')); } catch { /* no module - no copies */ }
+// The engine's own tooling (the run-protocol-* profiles: board, dashboard, core, adapter, checks edits) -
+// the protocol's kit, even when the project delivers them as a copy from project/extensions/: they go
+// into the template so any project could fix the engine.
 const ENGINE_TOOLING = /(^|\/)agents\/run\/run-protocol-[^/]+\.md$/;
 const isExtCopy = (rel) => !ENGINE_TOOLING.test(rel) && (EXT_DST.has(rel) || [...EXT_DST].some((d) => d.startsWith(rel + '/')));
 const skipped = (rel) => forbidden(rel) || isExtCopy(rel) || SKIP.some((r) => r.test(rel));
@@ -97,50 +102,51 @@ const norm = (s) => s.replace(/\r\n/g, '\n');
 const mask = (rel, s) => { if (s == null) return null; const rs = MASK[rel]; s = norm(s);
   return rs ? s.split('\n').map((l) => (rs.some((r) => r.test(l)) ? MASKED : l)).join('\n') : s; };
 
-// проект → шаблон. living/ и project/ исключены намеренно: это история и содержимое конкретного проекта.
-// Пути шаблона — от protocol/skills/forma/. Сравниваются только файлы, которые в шаблоне уже есть.
+// project -> template. living/ and project/ excluded deliberately: they are a concrete project's history
+// and content. Template paths - from protocol/skills/forma/. Only files already present in the template
+// are compared.
 // Dormant Codex (`.forma/engines.json`): its folder is not carried into the protocol source; the shared `.agents/skills` mirror still is.
 const CODEX_ASLEEP = (() => { try { return JSON.parse(fs.readFileSync('.forma/engines.json', 'utf8')).dormant.includes('codex'); } catch { return false; } })();
 const MAP = [
-  // ядро
+  // core
   ['AGENTS.md', 'core/AGENTS.md'],
   ['.forma/dashboard', 'core/dashboard'],
   ['.forma/manual', 'core/manual'],
-  ['.forma/skills', 'core/skills'],   // интервью — ядро; .claude/skills/<интервью> — доставленная копия, в адаптер не идёт
+  ['.forma/skills', 'core/skills'],   // the interview - core; .claude/skills/<interview> - the delivered copy, does not go into the adapter
   ['.forma/board', 'core/board'],
-  ['.forma/i18n', 'core/i18n'],   // словарь ключей (§6) и тексты установщика
-  ['.forma/plumb', 'core/plumb'],   // Отвес: plumb-run.cjs и соседи
-  ['.forma/engines.json', 'core/engines.json'],   // реестр спящих движков
-  // адаптер Claude (читатели стенограмм Claude живут в .forma/dashboard проекта, но принадлежат адаптеру)
-  ['.claude/forma-adapter.cjs', 'adapters/claude/forma-adapter.cjs'],   // граница ядро — адаптер: `dashboard/lib/engines.cjs`
-  ['.claude/permission-levels.json', 'adapters/claude/permission-levels.json'],   // уровни доступа: читает permissions-level.cjs
+  ['.forma/i18n', 'core/i18n'],   // the key dictionary (§6) and the installer texts
+  ['.forma/plumb', 'core/plumb'],   // the Plumb: plumb-run.cjs and neighbours
+  ['.forma/engines.json', 'core/engines.json'],   // the registry of sleeping engines
+  // the Claude adapter (the Claude transcript readers live in the project's .forma/dashboard but belong to the adapter)
+  ['.claude/forma-adapter.cjs', 'adapters/claude/forma-adapter.cjs'],   // the core-adapter boundary: `dashboard/lib/engines.cjs`
+  ['.claude/permission-levels.json', 'adapters/claude/permission-levels.json'],   // access levels: read by permissions-level.cjs
   ['.claude/agents', 'adapters/claude/agents'],
   ['.claude/hooks', 'adapters/claude/hooks'],
   ['.claude/rules', 'adapters/claude/rules'],
   ['.claude/scripts', 'adapters/claude/scripts'],
   ['.claude/skills', 'adapters/claude/skills'],
   ['.forma/dashboard', 'adapters/claude/dashboard', { noFresh: true }],
-  // адаптеры «не готов» — как есть
-  ['.agents/forma-adapter.cjs', 'adapters/gemini/forma-adapter.cjs'],   // граница ядро — адаптер: `dashboard/lib/engines.cjs`
+  // "not ready" adapters - as is
+  ['.agents/forma-adapter.cjs', 'adapters/gemini/forma-adapter.cjs'],   // the core-adapter boundary: `dashboard/lib/engines.cjs`
   ['.agents/plugins/forma/agents', 'adapters/gemini/agents'],
   ['.agents/rules', 'adapters/gemini/rules'],
-  ['.agents/tests', 'adapters/gemini/tests'],                           // тест соответствия адаптера (прописан в adapter-conformance.cjs)
+  ['.agents/tests', 'adapters/gemini/tests'],                           // the adapter conformance test (wired in adapter-conformance.cjs)
   ['.agents/hooks', 'adapters/gemini/hooks'],
   ['.agents/scripts', 'adapters/gemini/scripts'],
   ['.agents/skills', 'adapters/codex/.agents/skills'],
   ['.codex', 'adapters/codex/.codex'],
-  // MiniMax: заготовка в шаблоне, движок спит по умолчанию; переносится независимо от реестра спящих
+  // MiniMax: a stub in the template, the engine sleeps by default; carried regardless of the sleeping registry
   ['.minimax', 'adapters/minimax/.minimax'],
   ['miniapps/minimax-engine', 'adapters/minimax/miniapps/minimax-engine'],
-  // ZCode: плоскими подпутями, как gemini; машинный .state/ в шаблон не едет
+  // ZCode: flat subpaths, as gemini; the machine .state/ does not go into the template
   ['.zcode/forma-adapter.cjs', 'adapters/zcode/forma-adapter.cjs'],
   ['.zcode/rules', 'adapters/zcode/rules'],
   ['.zcode/scripts', 'adapters/zcode/scripts'],
   ['.zcode/tests', 'adapters/zcode/tests'],
   ['.zcode/agents', 'adapters/zcode/agents'],
 ].filter(([p]) => !(CODEX_ASLEEP && p === '.codex'));
-// Файл проекта, уже известный одному из отображений (например dashboard/floor.cjs — адаптеру Claude),
-// для другого отображения того же каталога не «новый».
+// A project file already known to one of the mappings (e.g. dashboard/floor.cjs - the Claude adapter)
+// is not "new" for another mapping of the same directory.
 const KNOWN = new Set();
 for (const [p, t] of MAP) {
   const tAbs = path.join(forma, t);
@@ -148,11 +154,11 @@ for (const [p, t] of MAP) {
   if (fs.statSync(tAbs).isFile()) KNOWN.add(p); else for (const f of walk(tAbs)) KNOWN.add(p + '/' + f);
 }
 
-// Файлы под каталогом (пути через «/»); сам файл — `['']`; нет пути — `[]`.
+// Files under a directory (paths through "/"); the file itself - `['']`; no path - `[]`.
 function walk(abs) {
   return fs.existsSync(abs) && fs.statSync(abs).isFile() ? [''] : walkTree(abs, { symlinks: true });
 }
-// число строк, которые есть в одной версии и нет в другой (мультимножество)
+// The count of lines present in one version and absent in the other (multiset)
 function ldiff(a, b) {
   const m = new Map(); let d = 0;
   for (const l of a.split('\n')) m.set(l, (m.get(l) || 0) + 1);
@@ -160,7 +166,7 @@ function ldiff(a, b) {
   for (const v of m.values()) d += v;
   return d;
 }
-// Разрез ядро/адаптеры переименовал каталоги шаблона; база до разреза знает файл по старому пути.
+// The core/adapters split renamed the template's directories; a base from before the split knows the file by the old path.
 const LEGACY = [[FORMA_GIT + '/core/', FORMA_GIT + '/template/'], [FORMA_GIT + '/adapters/claude/dashboard/', FORMA_GIT + '/template/dashboard/'],
   [FORMA_GIT + '/adapters/claude/', FORMA_GIT + '/template/'], [FORMA_GIT + '/adapters/gemini/', FORMA_GIT + '/templates-gemini/'],
   [FORMA_GIT + '/adapters/codex/', FORMA_GIT + '/templates-codex/']];
@@ -171,16 +177,16 @@ const show1 = (ref, gp) => { const v = show0(ref, gp); if (v != null) return v;
 let base = null;
 if (fs.existsSync(baseFile)) {
   base = fs.readFileSync(baseFile, 'utf8').trim();
-  try { git('cat-file', '-e', base + '^{commit}'); } catch { console.error('СТОП: база ' + base + ' из protocol/.git/forma-base не найдена в истории protocol/.'); process.exit(2); }
+  try { git('cat-file', '-e', base + '^{commit}'); } catch { console.error(msg('e2p.base_not_found', { base })); process.exit(2); }
 }
 
-// классы: engine — изменён только движок; template — только шаблон; conflict — оба; same — отличаются лишь исключения
+// classes: engine - the engine only changed; template - the template only; conflict - both; same - only the exceptions differ
 const R = { engine: [], template: [], conflict: [], same: [], fresh: [] };
 for (const [p, t, opt] of MAP) {
   const pAbs = path.join(root, p), tAbs = path.join(forma, t);
   const isFile = fs.existsSync(tAbs) && fs.statSync(tAbs).isFile();
   const tFiles = walk(tAbs);
-  // Файл проекта, которого в шаблоне ещё нет, — новый; переносится по --add (каталог такой записью не станет).
+  // A project file not yet in the template - new; carried by --add (a directory never becomes one by this entry).
   if (!isFile && !fs.existsSync(tAbs) && fs.existsSync(pAbs) && fs.statSync(pAbs).isFile()) {
     if (!skipped(p)) R.fresh.push({ rel: p, src: pAbs, dst: tAbs });
     continue;
@@ -197,18 +203,18 @@ for (const [p, t, opt] of MAP) {
     const x = { rel, src, dst, eRaw, hRaw };
     if (E === H) { R.same.push(x); continue; }
     let B, how;
-    if (base) { B = mask(rel, show1(base, gp)); how = 'база ' + base.slice(0, 7); }
+    if (base) { B = mask(rel, show1(base, gp)); how = msg('e2p.how_base', { sha: base.slice(0, 7) }); }
     else {
-      // база не записана: самая новая версия шаблона, равная движку
+      // no base recorded: the newest template version equal to the engine
       const revs = git('log', '--follow', '--format=%H', '--', gp).split('\n').filter(Boolean);
       const hit = revs.find((c) => mask(rel, show1(c, gp)) === E);
-      if (hit) { B = E; how = 'движок = шаблон@' + hit.slice(0, 7); }
+      if (hit) { B = E; how = msg('e2p.how_engine_equals', { sha: hit.slice(0, 7) }); }
       else {
-        // точной нет: оценка — ближайшая к движку версия шаблона (меньше всего отличающихся строк)
+        // no exact hit: an estimate - the template version nearest to the engine (fewest differing lines)
         let best = null, bd = Infinity;
         for (const c of revs) { const v = mask(rel, show1(c, gp)); if (v == null) continue; const d = ldiff(E, v); if (d < bd) { bd = d; best = { c, v }; } }
         B = best ? best.v : H;
-        how = best ? 'оценка: ближайшая версия шаблона @' + best.c.slice(0, 7) + (best.c === revs[0] ? ' (HEAD)' : '') : 'истории нет';
+        how = best ? msg('e2p.how_estimate', { sha: best.c.slice(0, 7), head: best.c === revs[0] ? ' (HEAD)' : '' }) : msg('e2p.how_no_history');
       }
     }
     x.how = how;
@@ -218,7 +224,7 @@ for (const [p, t, opt] of MAP) {
   if (isFile || (opt && opt.noFresh)) continue;
   const known = new Set(tFiles);
   const topKnown = new Set(tFiles.map((f) => f.split('/')[0]));
-  const newSkillDirs = new Set();   // новая папка скилла: один пункт «новое» на всю папку, не на файл внутри
+  const newSkillDirs = new Set();   // a new skill folder: one "new" item for the whole folder, not per file inside
   for (const f of walk(pAbs)) {
     const rel = p + '/' + f;
     if (known.has(f) || KNOWN.has(rel) || skipped(rel)) continue;
@@ -235,9 +241,9 @@ for (const [p, t, opt] of MAP) {
   }
 }
 
-// Сверка с подключённым шаблоном проекта (project/config/PROJECT.md, «Шаблон проекта», k:name):
-// templates/<шаблон>/skills/<шаблон>/template/{scripts,agents/run}/ — файлы продукта, не движка.
-// Совпадающие с шаблоном убираются из «новых»; расходящиеся — отдельный список, не трогаются и не переносятся.
+// Cross-check with the project's installed template (project/config/PROJECT.md, "Project template", k:name):
+// templates/<template>/skills/<template>/template/{scripts,agents/run}/ - product files, not the engine.
+// Those matching the template are removed from "new"; diverging ones - a separate list, untouched, not carried.
 R.templateProject = [];
 const pmPath = path.join(root, 'project/config/PROJECT.md');
 const tplName = fs.existsSync(pmPath) && (fs.readFileSync(pmPath, 'utf8').match(/k:name\s*--> \| `([^`]+)`/) || [])[1];
@@ -258,70 +264,72 @@ if (tplName) {
   }
 }
 
-console.log('База: ' + (base ? base.slice(0, 7) + ' (protocol/.git/forma-base)' : 'не записана — выводится по истории каждого файла; после синхронизации: --mark'));
+console.log(msg('e2p.base_line', {
+  base: base ? msg('e2p.base_recorded', { sha: base.slice(0, 7) }) : msg('e2p.base_unrecorded'),
+}));
 const out = (title, list) => { console.log(`${title}: ${list.length}`); for (const x of list) console.log('  ' + x.rel + (x.how ? '   [' + x.how + ']' : '')); };
-out('Изменён только движок (перенесутся по --apply)', R.engine);
-out('Изменён только шаблон (не переносятся: «обнови протокол Форма»)', R.template);
-out('Конфликт: изменены оба (решает человек)', R.conflict);
-out('Отличаются только исключениями (обезличивание, не дрейф)', R.same);
-out('Новые в движке (только по --add <путь>)', R.fresh);
-out('Шаблон проекта расходится (не переносится)', R.templateProject);
+out(msg('e2p.title_engine_only'), R.engine);
+out(msg('e2p.title_template_only'), R.template);
+out(msg('e2p.title_conflict'), R.conflict);
+out(msg('e2p.title_same'), R.same);
+out(msg('e2p.title_fresh'), R.fresh);
+out(msg('e2p.title_template_project'), R.templateProject);
 
 if (mark) {
   const dirty = R.engine.length + R.template.length + R.conflict.length;
-  if (dirty) { console.error('\nСТОП --mark: движок и шаблон расходятся в ' + dirty + ' файлах — база была бы ложной.'); process.exit(1); }
-  if (git('status', '--porcelain', '--', FORMA_GIT).trim()) { console.error('\nСТОП --mark: в шаблоне незакоммиченное — сначала коммит в protocol/.'); process.exit(1); }
+  if (dirty) { console.error(msg('e2p.mark_dirty', { count: dirty })); process.exit(1); }
+  if (git('status', '--porcelain', '--', FORMA_GIT).trim()) { console.error(msg('e2p.mark_dirty_tree')); process.exit(1); }
   const head = git('rev-parse', 'HEAD').trim();
   fs.writeFileSync(baseFile, head + '\n');
-  console.log('\nБаза записана: ' + head);
+  console.log(msg('e2p.mark_done', { sha: head }));
   process.exit(0);
 }
 
-// Новый файл в папке движка, который не лежит ни в project/extensions/template/, ни в custom/, не в шаблоне протокола
-// и не назван в --add, — неразложенный: стоп с вопросом, молча не переносится и не остаётся.
+// A new file in an engine folder that sits in neither project/extensions/template/ nor custom/, is not in
+// the protocol template and is not named in --add - unsorted: stop with a question; silently neither carried nor left.
 const ENGINE_PREFIX = CODEX_ASLEEP ? ['.claude/', '.agents/'] : ['.claude/', '.agents/', '.codex/'];
 const unsorted = R.fresh.filter((x) => ENGINE_PREFIX.some((e) => x.rel.startsWith(e)) && !adds.includes(x.rel));
 if (unsorted.length) {
-  console.error('\nСТОП: неразложенные новые файлы в папках движка — куда они?');
+  console.error(msg('e2p.unsorted_header'));
   for (const x of unsorted) console.error('  ' + x.rel);
-  console.error('Вопрос: template (общее для проектов этого шаблона) или custom (только этого проекта)?');
-  console.error('Ответ: перенести в project/extensions/template/<движок>/ или project/extensions/custom/<движок>/ (тот же путь внутри) и запустить extensions.cjs sync;');
-  console.error('в протокол — только явно: --add <путь>.');
+  console.error(msg('e2p.unsorted_question'));
+  console.error(msg('e2p.unsorted_answer'));
+  console.error(msg('e2p.unsorted_add'));
   process.exit(3);
 }
 
 const forbiddenAdds = adds.filter(forbidden);
 if (forbiddenAdds.length) {
-  console.error('СТОП: --add отказан для продуктовых зон и слоя 4 (project/, .devtool/, .forma/living/, записи .claude/project-layer.txt): ' + forbiddenAdds.join(', '));
+  console.error(msg('e2p.add_forbidden', { list: forbiddenAdds.join(', ') }));
   process.exit(1);
 }
 const bad = adds.filter((a) => !R.fresh.some((x) => x.rel === a));
-if (bad.length) { console.error('СТОП: --add не из списка новых: ' + bad.join(', ')); process.exit(1); }
-if (named.length && !apply) { console.error('СТОП: имена файлов принимает только --apply <файл>.'); process.exit(1); }
+if (bad.length) { console.error(msg('e2p.add_not_fresh', { list: bad.join(', ') })); process.exit(1); }
+if (named.length && !apply) { console.error(msg('e2p.named_needs_apply')); process.exit(1); }
 const only = apply && named.length ? new Set(named) : null;
 if (only) {
-  // отказ целиком, до любой записи: каждое имя должно быть в «изменён только движок» или в «новых» (с --add)
+  // the refusal is whole, before any write: every name must be in "engine only changed" or in "new" (with --add)
   const refuse = [];
   for (const nm of only) {
     if (R.engine.some((x) => x.rel === nm)) continue;
     let why;
     if (R.fresh.some((x) => x.rel === nm)) {
-      if (adds.includes(nm)) continue;   // назван и в --apply, и в --add: перенос ниже
-      why = 'новый файл: переносится по --add ' + nm;
+      if (adds.includes(nm)) continue;   // named in --apply and in --add alike: carried below
+      why = msg('e2p.refuse_fresh', { path: nm });
     }
-    else if (R.conflict.some((x) => x.rel === nm)) why = 'конфликт, решает человек';
-    else if (R.template.some((x) => x.rel === nm)) why = 'изменён только шаблон: «обнови протокол Форма»';
-    else if (R.same.some((x) => x.rel === nm)) why = 'отличается только исключениями';
-    else if (forbidden(nm) || isExtCopy(nm) || SKIP.some((r) => r.test(nm))) why = 'исключён (слой 4, копия расширений или exceptions)';
-    else if (!MAP.some(([p]) => nm === p || nm.startsWith(p + '/'))) why = 'вне MAP (нет отображения в шаблон)';
-    else why = 'нет расхождения движка с шаблоном';
-    refuse.push('  ' + nm + ' — ' + why);
+    else if (R.conflict.some((x) => x.rel === nm)) why = msg('e2p.refuse_conflict');
+    else if (R.template.some((x) => x.rel === nm)) why = msg('e2p.refuse_template');
+    else if (R.same.some((x) => x.rel === nm)) why = msg('e2p.refuse_same');
+    else if (forbidden(nm) || isExtCopy(nm) || SKIP.some((r) => r.test(nm))) why = msg('e2p.refuse_excluded');
+    else if (!MAP.some(([p]) => nm === p || nm.startsWith(p + '/'))) why = msg('e2p.refuse_outside_map');
+    else why = msg('e2p.refuse_no_diff');
+    refuse.push(msg('e2p.refuse_line', { name: nm, why }));
   }
-  if (refuse.length) { console.error('СТОП: --apply отказан, ничего не записано:\n' + refuse.join('\n')); process.exit(1); }
+  if (refuse.length) { console.error(msg('e2p.apply_refused', { list: refuse.join('\n') })); process.exit(1); }
 }
-if (!apply) { console.log('\nНичего не записано. Перенести: --apply' + (R.fresh.length ? ' [--add <путь>]' : '') + '.'); process.exit(0); }
+if (!apply) { console.log(msg('e2p.nothing_written', { add: R.fresh.length ? msg('e2p.add_hint') : '' })); process.exit(0); }
 
-// перенос: содержимое движка, но маскированные строки берутся из шаблона (обезличивание не утекает)
+// the carry: the engine's content, but masked lines are taken from the template (the de-identification does not leak)
 function merge(x) {
   const rs = MASK[x.rel];
   if (!rs) return norm(x.eRaw);
@@ -335,7 +343,7 @@ let n = 0;
 for (const x of R.engine) {
   if (only && !only.has(x.rel)) continue;
   const c = merge(x);
-  if (c == null) { console.error('ПРОПУЩЕН ' + x.rel + ': число строк-исключений в движке и шаблоне разное.'); continue; }
+  if (c == null) { console.error(msg('e2p.skipped_mask', { rel: x.rel })); continue; }
   fs.writeFileSync(x.dst, x.hRaw.includes('\r\n') ? c.replace(/\n/g, '\r\n') : c); n++;
 }
 for (const x of R.fresh.filter((x) => adds.includes(x.rel) && (!only || only.has(x.rel)))) {
@@ -343,4 +351,4 @@ for (const x of R.fresh.filter((x) => adds.includes(x.rel) && (!only || only.has
   if (x.dir) fs.cpSync(x.src, x.dst, { recursive: true }); else fs.copyFileSync(x.src, x.dst);
   n++;
 }
-console.log(`\nПеренесено: ${n}. Дальше: patch в protocol/.claude-plugin/plugin.json, коммит в protocol/, --mark, pull --rebase, --before-push, push — по команде человека.`);
+console.log(msg('e2p.transferred', { count: n }));

@@ -2,15 +2,18 @@
 'use strict';
 
 /**
- * test-gemini-adapter.cjs — Тест соответствия адаптера Gemini (Antigravity).
- * Проверяет:
- *  1. Наличие и валидность .agents/rules/gemini-8.md (наличие импорта @AGENTS.md, раздел §8, описание Plumb, тег gemini:);
- *  2. Паритет ролей Gemini с каноническими ролями (.claude/);
- *  3. Отсутствие проектных профилей Run в чистой зоне .agents/;
- *  4. Формирование и разбор строк расхода с тегом gemini: по контракту ECONOMY.md;
- *  5. Чистоту файлов адаптера (запрет 16).
+ * test-gemini-adapter.cjs - the Gemini (Antigravity) adapter's fit test.
+ * It checks:
+ *  1. The presence and the validity of .agents/rules/gemini-8.md (the @AGENTS.md import, the section 8, the Plumb description, the gemini: tag);
+ *  2. The parity of the Gemini roles with the canonical roles (.claude/);
+ *  3. The absence of the project's Run profiles in the clean zone .agents/;
+ *  4. The making and the parsing of the spend lines with the gemini: tag by the ECONOMY.md contract;
+ *  5. The cleanliness of the adapter's files (prohibition 16).
  *
- * Запуск:
+ * The ru literals below are pins on ru output (the linter's, the role parity's) or fixture data -
+ * held as-is, the escape pass turns them into \u sequences.
+ *
+ * Run:
  *   node .agents/tests/test-gemini-adapter.cjs
  */
 
@@ -44,50 +47,50 @@ const adapter = require(resolveAdapter());
 let passed = 0;
 const it = (name, fn) => { fn(); passed += 1; console.log('ok  ' + name); };
 
-// 1. Проверка gemini-8.md
-it('.agents/rules/gemini-8.md существует и содержит регламент Plumb и правила движка', () => {
-  assert.ok(fs.existsSync(gemini8Path), 'gemini-8.md должен существовать');
+// 1. The gemini-8.md check
+it('.agents/rules/gemini-8.md exists and holds the Plumb rules and the engine rules', () => {
+  assert.ok(fs.existsSync(gemini8Path), 'gemini-8.md must exist');
   const txt = fs.readFileSync(gemini8Path, 'utf8');
-  assert.match(txt, /^@AGENTS\.md/m, 'должен быть импорт @AGENTS.md');
-  assert.match(txt, /#\s*8\.\s*Engine architecture in Antigravity/, 'должен быть заголовок §8');
-  assert.match(txt, /###\s*The Plumb/, 'должен быть раздел The Plumb');
-  assert.match(txt, /gemini-3\.8-flash/, 'должна быть указана модель для встроенного Plumb');
-  assert.match(txt, /plumb-scrub\.cjs/, 'должен быть указан скрипт очистки');
-  assert.match(txt, /gemini:/, 'должен быть указан тег движка');
+  assert.match(txt, /^@AGENTS\.md/m, 'the @AGENTS.md import must be there');
+  assert.match(txt, /#\s*8\.\s*Engine architecture in Antigravity/, 'the section 8 heading must be there');
+  assert.match(txt, /###\s*The Plumb/, 'the The Plumb section must be there');
+  assert.match(txt, /gemini-3\.8-flash/, "the built-in Plumb" + String.fromCharCode(39) + "s model must be named");
+  assert.match(txt, /plumb-scrub\.cjs/, 'the scrubbing script must be named');
+  assert.match(txt, /gemini:/, 'the engine tag must be named');
 });
 
-// 2. Паритет ролей
-it('роли Gemini находятся в полном паритете с эталоном', () => {
+// 2. The roles parity
+it('the Gemini roles are in full parity with the reference', () => {
   const results = parity.compareRoles(root, { only: 'gemini' });
   const drifted = results.filter((r) => r.res.status !== 'synced');
-  assert.equal(drifted.length, 0, `Обнаружен дрейф ролей: ${drifted.map((d) => d.pair.name + ' (' + d.res.status + ')').join(', ')}`);
+  assert.equal(drifted.length, 0, `A role drift found: ${drifted.map((d) => d.pair.name + ' (' + d.res.status + ')').join(', ')}`);
 });
 
-// 3. Отсутствие проектных профилей в .agents/
-it('в .agents/plugins/forma/agents/run/ отсутствуют проектные профили текущего продукта', () => {
+// 3. No project profiles in .agents/
+it('.agents/plugins/forma/agents/run/ holds no Run profiles of the current product', () => {
   const runDir = path.join(root, '.agents', 'plugins', 'forma', 'agents', 'run');
   const files = fs.readdirSync(runDir);
-  assert.ok(!files.includes('run-pillow-translate.md'), 'run-pillow-translate.md не должен находиться в .agents/');
-  assert.ok(!files.includes('run-site-upload.md'), 'run-site-upload.md не должен находиться в .agents/');
+  assert.ok(!files.includes('run-pillow-translate.md'), 'run-pillow-translate.md must not be in .agents/');
+  assert.ok(!files.includes('run-site-upload.md'), 'run-site-upload.md must not be in .agents/');
 });
 
-// 3а. Платформенные роли и профили Gemini
-it('plumb-gemini.md существует и содержит JSON-контракт измерения (choice, score, noul)', () => {
+// 3a. The Gemini platform roles and profiles
+it('plumb-gemini.md exists and holds the measurement JSON contract (choice, score, noul)', () => {
   const plumbPath = path.join(root, '.agents', 'plugins', 'forma', 'agents', 'plumb-gemini.md');
-  assert.ok(fs.existsSync(plumbPath), 'plumb-gemini.md должен существовать');
+  assert.ok(fs.existsSync(plumbPath), 'plumb-gemini.md must exist');
   const txt = fs.readFileSync(plumbPath, 'utf8');
-  assert.match(txt, /"choice":\s*\{\s*"role"/, 'должно быть поле choice');
-  assert.match(txt, /"score":\s*\{\s*"clarity"/, 'должно быть поле score');
-  assert.match(txt, /"noul":/, 'должно быть поле noul');
+  assert.match(txt, /"choice":\s*\{\s*"role"/, 'the choice field must be there');
+  assert.match(txt, /"score":\s*\{\s*"clarity"/, 'the score field must be there');
+  assert.match(txt, /"noul":/, 'the noul field must be there');
 });
 
-it('run-schema-markup.md существует в .agents/plugins/forma/agents/run/', () => {
+it('run-schema-markup.md exists in .agents/plugins/forma/agents/run/', () => {
   const schemaMarkupPath = path.join(root, '.agents', 'plugins', 'forma', 'agents', 'run', 'run-schema-markup.md');
-  assert.ok(fs.existsSync(schemaMarkupPath), 'run-schema-markup.md должен существовать в .agents/plugins/forma/agents/run/');
+  assert.ok(fs.existsSync(schemaMarkupPath), 'run-schema-markup.md must exist in .agents/plugins/forma/agents/run/');
 });
 
-// 4. Соответствие экономическому контракту (строка gemini:, разбор tally)
-it('строки расхода gemini: формируются и разбираются tally.cjs по контракту', () => {
+// 4. The economy contract fit (the gemini: line, the tally parse)
+it('the gemini: spend lines are made and parsed by tally.cjs by the contract', () => {
   const d = ['2000', '01', '02'].join('-');
   const normalLine = formatSpendLine({
     node: 'Run',
@@ -97,7 +100,7 @@ it('строки расхода gemini: формируются и разбира
     cache_read: 500,
     duration_s: 12,
     call_id: 'conv-12345678',
-    desc: 'выполнено.',
+    desc: '\u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u043e.', // a ru desc fixture: the tally parse is language-independent (data)
   });
 
   const unknownLine = formatSpendLine({
@@ -127,8 +130,8 @@ it('строки расхода gemini: формируются и разбира
   }
 });
 
-// 5. Чистая зона (Запрет 16)
-it('файлы адаптера .agents/ соответствуют запрету 16 (чистые зоны)', () => {
+// 5. The clean zone (prohibition 16)
+it('the .agents/ adapter files fit prohibition 16 (the clean zones)', () => {
   const own = cleanOwn(root);
   const targets = [
     '.agents/rules/gemini-8.md',
@@ -139,13 +142,13 @@ it('файлы адаптера .agents/ соответствуют запрет
     const abs = path.join(root, rel);
     if (fs.existsSync(abs) && inCleanZone(rel, own)) {
       const problems = scanCleanFile(rel, fs.readFileSync(abs, 'utf8'));
-      assert.deepEqual(problems, [], `След проекта в ${rel}: ${problems.join('; ')}`);
+      assert.deepEqual(problems, [], `A project trace in ${rel}: ${problems.join('; ')}`);
     }
   }
 });
 
-// 6. Расширенные поля адаптера дашборда
-it('forma-adapter.cjs предоставляет transcriptsDir и parseUsage для стенограмм Antigravity', () => {
+// 6. The dashboard adapter's extended fields
+it("forma-adapter.cjs provides transcriptsDir and parseUsage for the Antigravity transcripts", () => {
   assert.equal(typeof adapter.transcriptsDir, 'function');
   const tDir = adapter.transcriptsDir(root);
   assert.ok(tDir === null || typeof tDir === 'string');
@@ -173,14 +176,14 @@ it('forma-adapter.cjs предоставляет transcriptsDir и parseUsage д
   });
 });
 
-it('forma-adapter.cjs объявляет usageRefresh с выгрузкой в gemini-usage.json', () => {
+it('forma-adapter.cjs declares a usageRefresh unloading into gemini-usage.json', () => {
   assert.ok(Array.isArray(adapter.usageRefresh));
   assert.equal(adapter.usageRefresh.length, 1);
   assert.equal(adapter.usageRefresh[0].cache, 'gemini-usage.json');
   assert.match(adapter.usageRefresh[0].script, /sync-ledger\.cjs/);
 });
 
-it('forma-adapter.cjs engineSettings возвращает структуру MCP, хуков и активных узлов', () => {
+it('forma-adapter.cjs engineSettings returns the MCP, hooks and active nodes structure', () => {
   assert.equal(typeof adapter.engineSettings, 'function');
   const settings = adapter.engineSettings(root);
   assert.equal(settings.present, true);
@@ -191,19 +194,19 @@ it('forma-adapter.cjs engineSettings возвращает структуру MCP
   assert.ok(Array.isArray(settings.nodes));
   const nodeNames = settings.nodes.map((n) => n.name);
   for (const exp of ['intent', 'spec', 'kit', 'run', 'core']) {
-    assert.ok(nodeNames.includes(exp), `узел ${exp} должен быть в списке узлов`);
+    assert.ok(nodeNames.includes(exp), `the node ${exp} must be in the nodes list`);
   }
   assert.ok(settings.mcp && Array.isArray(settings.mcp.project));
 });
 
-it('forma-adapter.cjs предоставляет instructionWeight и stepsFromCacheRead для gemini-3.8-flash', () => {
+it('forma-adapter.cjs provides instructionWeight and stepsFromCacheRead for gemini-3.8-flash', () => {
   assert.equal(typeof adapter.instructionWeight, 'function');
   const iw = adapter.instructionWeight(root);
   assert.equal(iw.estimate, true);
   assert.equal(iw.model, 'gemini-3.8-flash');
   assert.ok(iw.common.tokens > 0);
   for (const n of ['Intent', 'Spec', 'Kit', 'Run', 'Core']) {
-    assert.ok(iw.byNode[n], `узел ${n} должен присутствовать в byNode`);
+    assert.ok(iw.byNode[n], `the node ${n} must be present in byNode`);
     assert.ok(iw.byNode[n].perStep > iw.common.tokens);
     assert.equal(iw.byNode[n].model, 'gemini-3.8-flash');
   }
@@ -214,8 +217,8 @@ it('forma-adapter.cjs предоставляет instructionWeight и stepsFromC
   assert.equal(adapter.stepsFromCacheRead(5000, 0), null);
 });
 
-// 7. Поддержка чтения стенограмм субагентов Gemini
-it('forma-adapter.cjs предоставляет findSubagent и stepOf для стенограмм Gemini', () => {
+// 7. The Gemini subagents' transcripts reading support
+it('forma-adapter.cjs provides findSubagent and stepOf for the Gemini transcripts', () => {
   assert.equal(typeof adapter.findSubagent, 'function');
   assert.equal(typeof adapter.stepOf, 'function');
 
@@ -243,29 +246,29 @@ it('forma-adapter.cjs предоставляет findSubagent и stepOf для �
   });
 });
 
-// 8. Линт ключей frontmatter файлов агентов зоны Gemini
-it('lint-agent-keys: все файлы зоны .agents проходят проверку, ключи в норме', () => {
+// 8. The lint of the Gemini zone's agent files' frontmatter keys
+it('lint-agent-keys: every file of the .agents zone passes, the keys are fine', () => {
   const r = spawnSync(process.execPath, [path.join(root, '.agents', 'scripts', 'lint-agent-keys.cjs')], { encoding: 'utf8' });
-  assert.equal(r.status, 0, 'линт зоны дал ошибку:\n' + (r.stderr || r.stdout));
-  assert.ok(r.stdout.includes('ключи в норме'));
+  assert.equal(r.status, 0, 'the zone lint gave an error:\n' + (r.stderr || r.stdout));
+  assert.ok(r.stdout.includes('\u043a\u043b\u044e\u0447\u0438 \u0432 \u043d\u043e\u0440\u043c\u0435')); // the linter's ru output pinned byte-exact (dictionary)
 });
 
-it('lint-agent-keys: опечатка ключа даёт ошибку с адресом и именем; чистый набор — exit 0', () => {
+it('lint-agent-keys: a key typo gives an error with the address and the name; a clean set - exit 0', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentkeys-gemini-'));
   try {
     const probe = path.join(dir, 'agent-probe.md');
     fs.writeFileSync(probe, '---\nname: probe\nefort: high\n---\n\n# probe\n');
     const rBad = spawnSync(process.execPath, [path.join(root, '.agents', 'scripts', 'lint-agent-keys.cjs'), dir], { encoding: 'utf8' });
-    assert.notEqual(rBad.status, 0, 'опечатка должна вызывать ошибку');
-    assert.ok((rBad.stderr || '').includes('agent-probe.md'), 'адрес файла в stderr: ' + rBad.stderr);
-    assert.ok((rBad.stderr || '').includes('efort'), 'имя ключа в stderr: ' + rBad.stderr);
+    assert.notEqual(rBad.status, 0, 'a typo must cause an error');
+    assert.ok((rBad.stderr || '').includes('agent-probe.md'), "the file" + String.fromCharCode(39) + "s address in stderr: " + rBad.stderr);
+    assert.ok((rBad.stderr || '').includes('efort'), "the key" + String.fromCharCode(39) + "s name in stderr: " + rBad.stderr);
 
     fs.writeFileSync(probe, '---\nname: probe\ndescription: probe\nmodel: gemini-3.8-flash\neffort: low\ntier: light\nuses: a\ntools: Read\nskills: s\nomitClaudeMd: true\n---\n\n# probe\n');
     const rOk = spawnSync(process.execPath, [path.join(root, '.agents', 'scripts', 'lint-agent-keys.cjs'), dir], { encoding: 'utf8' });
-    assert.equal(rOk.status, 0, 'чистый набор должен проходить: ' + (rOk.stderr || rOk.stdout));
+    assert.equal(rOk.status, 0, 'a clean set must pass: ' + (rOk.stderr || rOk.stdout));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
-console.log(`\nВсе ${passed} проверок адаптера Gemini пройдены успешно.`);
+console.log(`\nAll ${passed} Gemini adapter checks passed.`);

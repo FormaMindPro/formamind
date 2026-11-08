@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Автосборка графов Kit после правки файлов проекта: дебаунс и lock, без модели.
-//   node .claude/scripts/auto-graphs.cjs touch     — отметить «грязно»; если воркера нет — запустить его отдельным процессом
-//   node .claude/scripts/auto-graphs.cjs --worker  — внутренний: ждёт тишины, собирает, повторяет, пока метка свежее сборки
-// Тишина — DEBOUNCE_MS без новых отметок; один воркер за раз — lock-файл (устаревший lock снимается).
-// Сбой сборки не пробрасывается: хук не блокирует запись.
+// The auto-build of the Kit graphs after the project's files change: debounce and lock, no model.
+//   node .claude/scripts/auto-graphs.cjs touch     - mark "dirty"; with no worker yet - start one as a separate process
+//   node .claude/scripts/auto-graphs.cjs --worker  - internal: waits for quiet, builds, repeats while the mark is fresher than the build
+// Quiet - DEBOUNCE_MS without new marks; one worker at a time - a lock file (a stale lock is removed).
+// A build failure is not rethrown: the hook must not block writes.
 
 const fs = require('fs');
 const path = require('path');
@@ -21,7 +21,7 @@ const POLL_MS = 2000;
 const now = () => Date.now();
 const mtime = f => { try { return fs.statSync(f).mtimeMs; } catch { return 0; } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const log = s => { try { fs.appendFileSync(LOG, new Date().toISOString() + ' ' + s + '\n'); } catch { /* журнал не обязателен */ } };
+const log = s => { try { fs.appendFileSync(LOG, new Date().toISOString() + ' ' + s + '\n'); } catch { /* the log is optional */ } };
 
 function mark() {
   fs.mkdirSync(DIR, { recursive: true });
@@ -30,15 +30,15 @@ function mark() {
 
 function takeLock() {
   fs.mkdirSync(DIR, { recursive: true });
-  if (mtime(LOCK) && now() - mtime(LOCK) > STALE_LOCK_MS) { try { fs.unlinkSync(LOCK); } catch { /* занято другим */ } }
+  if (mtime(LOCK) && now() - mtime(LOCK) > STALE_LOCK_MS) { try { fs.unlinkSync(LOCK); } catch { /* held by another */ } }
   try { fs.closeSync(fs.openSync(LOCK, 'wx')); return true; } catch { return false; }
 }
 
-const dropLock = () => { try { fs.unlinkSync(LOCK); } catch { /* уже снят */ } };
+const dropLock = () => { try { fs.unlinkSync(LOCK); } catch { /* already removed */ } };
 
 function touch() {
   mark();
-  if (!takeLock()) return;                       // воркер уже ждёт или собирает — он увидит свежую метку
+  if (!takeLock()) return;                       // the worker is already waiting or building - it will see the fresh mark
   const child = spawn(process.execPath, [__filename, '--worker'], { cwd: ROOT, detached: true, stdio: 'ignore', windowsHide: true });
   child.unref();
 }
@@ -50,7 +50,7 @@ async function worker() {
       const started = now();
       const r = spawnSync(process.execPath, [path.join(__dirname, 'build-kit-graphs.cjs')], { cwd: ROOT, encoding: 'utf8', windowsHide: true });
       log(r.status === 0 ? `ok ${Math.round((now() - started) / 1000)}s` : `fail code=${r.status} ${String(r.stderr || '').split('\n')[0]}`);
-      if (mtime(STAMP) <= started) break;        // за время сборки правок не было — всё
+      if (mtime(STAMP) <= started) break;        // no edits happened during the build - done
     }
   } catch (err) { log('worker error ' + (err && err.message)); }
   finally { dropLock(); }

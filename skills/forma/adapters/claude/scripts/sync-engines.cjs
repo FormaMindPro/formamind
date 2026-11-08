@@ -2,60 +2,64 @@
 'use strict';
 
 /**
- * sync-engines.cjs — Детерминированная проверка и синхронизация правил
- * между Claude Code (.claude/ + .claude/rules/claude-8.md), Google Antigravity (.agents/ + .agents/rules/gemini-8.md)
- * и Codex (.codex/ + CODEX-8.md).
+ * sync-engines.cjs - the deterministic check and synchronization of the rules
+ * between Claude Code (.claude/ + .claude/rules/claude-8.md), Google Antigravity (.agents/ + .agents/rules/gemini-8.md)
+ * and Codex (.codex/ + CODEX-8.md).
  *
- * Claude и Gemini сверяются текстом — их роли равны по содержанию. Codex читает
- * канонический текст Claude по исполнимой ссылке, поэтому проверяется ссылка,
- * конструкция и доступность зеркала навыков (см. checks/codex.cjs).
+ * Claude and Gemini are reconciled by text - their roles are equal by content. Codex reads
+ * the canonical Claude text by an executable reference, so what is checked is the reference,
+ * the construction and the availability of the skills mirror (see checks/codex.cjs).
  *
- * Назначение:
- *   1. Проверить паритет ролей без ручного сличения файлов.
- *   2. Проверить конструкцию корневых правил: AGENTS.md — единственный источник, оба файла-обёртки его импортируют
- *      и не держат своей копии §1–7 (сверять два текста правил больше не нужно — текст один).
- *   3. Дать мгновенный статус для SessionStart-хуков (check-ready.sh) и регламента intent-housekeeping.
+ * Purpose:
+ *   1. Check the roles' parity without a manual file-by-file comparison.
+ *   2. Check the root rules' construction: AGENTS.md - the only source, both wrapper files import it
+ *      and hold no copy of §1-7 of their own (two rules texts no longer need comparing - the text is one).
+ *   3. Give an instant status for the SessionStart hooks (check-ready.sh) and the intent-housekeeping procedure.
  *
- * Использование:
- *   node .claude/scripts/sync-engines.cjs [--check] [--diff] [--quiet] [--file <путь>]
+ * Usage:
+ *   node .claude/scripts/sync-engines.cjs [--check] [--diff] [--quiet] [--file <path>]
  *   node .claude/scripts/sync-engines.cjs --apply [--dry-run]
  *   node .claude/scripts/sync-engines.cjs --selftest
  *
- * Флаги:
- *   --check    (по умолчанию) Сверить пары файлов и вывести статус. Код 0 — паритет, 1 — дрейф.
- *   --selftest Самопроба проверок реестра, которые её несут (экспортируют selftest()): приборы во
- *              временном каталоге ОС. Код 0 — все пробы зелёные, 1 — есть красная или самопроб нет.
- *   --diff     Показать строки с расхождениями для файлов, где обнаружен дрейф.
- *   --quiet    Вывести только одну строку статуса (удобно для хуков).
- *   --file     Один файл (хук чистых зон): след проекта — в вывод, код 0 всегда; вне зоны — молчание.
- *   --apply    Сгенерировать `.agents/plugins/forma/agents/` из `.claude/agents/` (роли узлов и
- *              on-demand) по правилам `checks/support/gen-gemini-roles.cjs`. Идемпотентна: без
- *              изменений в источнике повторный запуск ничего не пишет. Фронтматтер (model/effort/
- *              tools/skills) не трогает — он инженерный выбор под движок, не генерируется.
- *              Код 0 — применено (или уже синхронно), 1 — есть `problem` (новый файл без
- *              фронтматтера назначения, нужна ручная правка один раз).
- *   --dry-run  С `--apply`: показать, что будет записано, без записи.
+ * Flags:
+ *   --check    (the default) Reconcile the file pairs and print the status. Code 0 - parity, 1 - drift.
+ *   --selftest The self-test of the registry checks that carry one (export selftest()): the rigs run in
+ *              a temp directory of the OS. Code 0 - all rigs green, 1 - a red one or no self-tests.
+ *   --diff     Show the diverging lines for the files where drift was found.
+ *   --quiet    Print the single status line only (handy for hooks).
+ *   --file     One file (the clean zones hook): a project trace - into the output, exit 0 always; outside the zone - silence.
+ *   --apply    Generate `.agents/plugins/forma/agents/` from `.claude/agents/` (the node roles and
+ *              on-demand) by the rules of `checks/support/gen-gemini-roles.cjs`. Idempotent: with
+ *              no change in the source a re-run writes nothing. The frontmatter (model/effort/
+ *              tools/skills) is untouched - it is an engineering choice per the engine, not generated.
+ *              Code 0 - applied (or already in sync), 1 - there is a `problem` (a new file without
+ *              the destination's frontmatter, a one-time manual edit needed).
+ *   --dry-run  With `--apply`: show what would be written, without writing.
  *
- * Что проверяется: цельность ядра (закон, manual, модуль экономики и его тест соответствия) и каждый
- * установленный адаптер движка — своим тестом соответствия контракту экономики. Адаптер без теста
- * («не готов») называется сведением, не нарушением; паритет ролей Claude↔Gemini и строение .codex/ —
- * тоже только сведения.
+ * What is checked: the core's integrity (the law, the manual, the economy module and its conformance
+ * test) and every installed engine adapter - by its own economy-contract conformance test. An adapter
+ * without a test ("not ready") is named an info note, not a violation; the Claude<->Gemini roles parity
+ * and the .codex/ construction are also info notes only.
  *
- * Проверки — реестр в checks/index.cjs: одна проверка — один файл, скрипт только гоняет их по кругу.
+ * The checks - a registry in checks/index.cjs: one check - one file, the script only runs them in a circle.
+ *
+ * Printed labels come from the core dictionary: English key in code, ru value as data.
  */
 
 const fs = require('fs');
 const path = require('path');
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
-// Шаблонная копия исполняется только из установленного проекта: все require общего кода (сам скрипт
-// и реестр checks/) рассчитаны на глубину развёртки и сходятся в один корень <__dirname/../..>.
-// Развёртки нет — внятный выход на копию движка вместо стека MODULE_NOT_FOUND.
+// The template copy runs only from an installed project: every require of the shared code (the script
+// itself and the checks/ registry) is built for the install depth and converges on one root <__dirname/../..>.
+// No install - an intelligible exit on an engine's copy instead of a MODULE_NOT_FOUND stack.
 const ROOT = path.resolve(__dirname, '../..');
 const checksLib = ['.forma/dashboard/lib/checks.cjs', 'dashboard/lib/checks.cjs']
   .map((rel) => path.join(ROOT, rel))
   .find((abs) => fs.existsSync(abs));
 if (!checksLib) {
-  process.stderr.write('sync-engines: шаблонная копия исполняется только из установленного проекта — общие модули рассчитаны на глубину развёртки; запустите копию движка (например, .claude/scripts/sync-engines.cjs).\n');
+  process.stderr.write(msg('sync-engines.template_copy_only'));
   process.exit(1);
 }
 const { runChecks } = require(checksLib);
@@ -66,18 +70,18 @@ const geminiGen = require('./checks/support/gen-gemini-roles.cjs');
 
 const NL = String.fromCharCode(10);
 
-// Проверки, которые сверка гонит по кругу, — в checks/index.cjs. Сведения (не нарушения) проверки кладут
-// в ctx.info готовыми строками, в порядке реестра. Метки ниже читает дашборд (.forma/dashboard/data/law.cjs) — порядок и слова держатся.
+// The checks the reconciliation runs in a circle - in checks/index.cjs. The info notes (not violations) a check lays
+// into ctx.info as ready lines, in the registry's order. The labels below are read by the dashboard (.forma/dashboard/data/law.cjs) - the order and the words hold.
 
-// --- Третья среда: Codex -----------------------------------------------------
-// Проверка codex (checks/codex.cjs): Codex читает канонический текст Claude по ссылке — проверяется ссылочная
-// конструкция, а не время правки. Находки — сведения, не нарушения.
+// --- The third environment: Codex -------------------------------------------------
+// The codex check (checks/codex.cjs): Codex reads the canonical Claude text by reference - the referential
+// construction is checked, not the edit time. Findings are info notes, not violations.
 
-// --- Ядро и адаптеры -----------------------------------------------------------
-// Ядро одно для всех движков: закон, manual, модуль экономики с тестом соответствия. Адаптер движка
-// проверяется своим тестом соответствия контракту экономики (ECONOMY.md).
+// --- The core and the adapters ------------------------------------------------------
+// The core is one for all engines: the law, the manual, the economy module with its conformance test. An engine's
+// adapter is checked by its own economy-contract conformance test (ECONOMY.md).
 
-/** Один файл (хук): след в чистой зоне — вывод, код 0 всегда; вне зоны — молчание. */
+/** One file (the hook): a trace in a clean zone - into the output, exit 0 always; outside the zone - silence. */
 function checkOneFile(fileArg) {
   const abs = path.resolve(fileArg || '');
   const rel = path.relative(ROOT, abs).split(path.sep).join('/');
@@ -88,81 +92,81 @@ function checkOneFile(fileArg) {
   process.exit(0);
 }
 
-/** Строка «Корневые правила»: формулировка зависит от устройства Claude-стороны — импорт из корня или подача §8 хуком. */
+/** The "Root rules" line: the wording depends on the Claude side's construction - an import from the root, or §8 served by a hook. */
 function rootRulesOk() {
   const claudeNative = !fs.existsSync(path.join(ROOT, 'CLAUDE.md'));
   return claudeNative
-    ? 'Корневые правила: \u2713 AGENTS.md — единственный источник §1–7, §8 Claude Code читается из .claude/rules/, §8 Antigravity импортирует\n'
-    : 'Корневые правила: \u2713 AGENTS.md — единственный источник §1–7, обе обёртки его импортируют\n';
+    ? msg('sync-engines.root_rules_native')
+    : msg('sync-engines.root_rules_wrappers');
 }
 
 function printReport({ problems, info, results, isDiff }) {
   const hasDrift = problems.length > 0;
   const rule = '='.repeat(70);
   console.log(rule);
-  console.log('  СВЕРКА: закон, ядро, адаптеры движков');
+  console.log(msg('sync-engines.report_header'));
   console.log(rule + '\n');
 
   if (!hasDrift) {
     console.log(rootRulesOk());
   } else {
-    console.log('Корневые правила: \u2717 нарушена конструкция');
+    console.log(msg('sync-engines.root_rules_broken'));
     for (const problem of problems) console.log(`    — ${problem}`);
     console.log('');
   }
 
-  console.log('Ядро и адаптеры:');
+  console.log(msg('sync-engines.core_and_adapters'));
   for (const l of info) console.log(l);
   console.log('');
   for (const l of parity.parityTable(results)) console.log(l);
   console.log('\n' + parity.RULE);
 
-  if (!hasDrift) { console.log('Закон, ядро и готовые адаптеры в порядке.'); return; }
-  console.log('Сбой — в проверках выше (конструкция, ядро, адаптеры, доска, журнал).\n');
-  if (results.some(({ res }) => res.status !== 'synced' && res.status !== 'own')) console.log('Дрейф зеркал ролей: пересобрать командой  node .claude/scripts/engine-switch.cjs rebuild\n');
+  if (!hasDrift) { console.log(msg('sync-engines.all_ok')); return; }
+  console.log(msg('sync-engines.failure_line'));
+  if (results.some(({ res }) => res.status !== 'synced' && res.status !== 'own')) console.log(msg('sync-engines.drift_hint'));
   if (isDiff) for (const l of parity.driftDetails(results)) console.log(l);
-  else console.log('Для просмотра строк с расхождениями запустите с флагом --diff');
+  else console.log(msg('sync-engines.diff_hint'));
 }
 
-/** `--apply`: генерация зеркала ролей, отдельная от сверки закона/ядра ниже. */
+/** `--apply`: the roles mirror generation, separate from the law/core reconciliation below. */
 function runApply(args) {
   const dryRun = args.includes('--dry-run');
   const { written, unchanged, problems } = geminiGen.applyAll(ROOT, { dryRun });
   const rule = '='.repeat(70);
   console.log(rule);
-  console.log('  ' + (dryRun ? 'ГЕНЕРАЦИЯ (--dry-run, без записи)' : 'ГЕНЕРАЦИЯ') + ': .agents/plugins/forma/agents/ из .claude/agents/');
+  console.log('  ' + (dryRun ? msg('sync-engines.apply_dry_header') : msg('sync-engines.apply_header')) + msg('sync-engines.apply_target'));
   console.log(rule + '\n');
   if (written.length) {
-    console.log((dryRun ? 'Будет записано' : 'Записано') + `: ${written.length}`);
+    console.log((dryRun ? msg('sync-engines.would_write') : msg('sync-engines.wrote')) + `: ${written.length}`);
     for (const w of written) console.log(`  — ${w.relFile} (${w.was})`);
   } else {
-    console.log('Изменений нет — зеркало уже синхронно.');
+    console.log(msg('sync-engines.no_changes'));
   }
-  console.log(`Без изменений: ${unchanged.length}`);
+  console.log(msg('sync-engines.unchanged_line', { count: unchanged.length }));
   if (problems.length) {
-    console.log(`\nСведения, требующие ручного шага: ${problems.length}`);
+    console.log(msg('sync-engines.problems_header', { count: problems.length }));
     for (const p of problems) console.log(`  — ${p.relFile}: ${p.reason}`);
   }
   process.exit(problems.length ? 1 : 0);
 }
 
-/** `--selftest`: самопроба проверок реестра, которые её несут; приборы каждой — во временном каталоге ОС. */
+/** `--selftest`: the self-test of the registry checks that carry one; each one's rigs - in an OS temp directory. */
 function runSelftest() {
   const withSelftest = CHECKS.filter((c) => typeof c.selftest === 'function');
   if (!withSelftest.length) {
-    console.log('sync-engines --selftest: в реестре нет проверок с самопробой (selftest)');
+    console.log(msg('sync-engines.no_selftest'));
     process.exit(1);
   }
   let bad = 0;
   for (const c of withSelftest) {
     try {
       const st = c.selftest();
-      if (!st || typeof st.ok !== 'boolean') { bad += 1; console.log(`\u2717 ${c.id}: самопроба не вернула { ok, note }`); continue; }
+      if (!st || typeof st.ok !== 'boolean') { bad += 1; console.log(`\u2717 ${c.id}: ` + msg('sync-engines.selftest_bad_shape')); continue; }
       if (!st.ok) bad += 1;
       console.log((st.ok ? '\u2713 ' : '\u2717 ') + c.id + ': ' + st.note);
     } catch (e) {
       bad += 1;
-      console.log(`\u2717 ${c.id}: самопроба упала — ` + String((e && e.message) || e));
+      console.log(`\u2717 ${c.id}: ` + msg('sync-engines.selftest_failed', { error: String((e && e.message) || e) }));
     }
   }
   process.exit(bad ? 1 : 0);
@@ -180,8 +184,8 @@ function main() {
   const hasDrift = problems.length > 0;
 
   if (args.includes('--quiet')) {
-    if (hasDrift) console.log(`DRIFT: корневые правила (${problems.length})`);
-    else console.log('OK: AGENTS.md — единый закон, ядро цельно, адаптеры движков прошли тест соответствия.');
+    if (hasDrift) console.log(msg('sync-engines.quiet_drift', { count: problems.length }));
+    else console.log(msg('sync-engines.quiet_ok'));
     process.exit(hasDrift ? 1 : 0);
   }
 

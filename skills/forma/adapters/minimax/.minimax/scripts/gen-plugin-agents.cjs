@@ -1,74 +1,60 @@
 'use strict';
 
 /**
- * Генератор субагентов пакета движка: роли зоны → `agents/<роль>.md` пакета.
+ * The engine package's subagents generator: the zone roles -> the package `agents/<role>.md`.
  *
- * Плагин отдаёт свои роли рантайму как субагентов, и рантайм читает их из пакета, а не из
- * зоны. Чтобы не было второй копии, файлы пакета — ПРОИЗВОДНЫЕ: тело роли переносится
- * дословно, а шапка переписывается под контракт плагина (нативные имена инструментов,
- * без алиасов и без `task` — субагент плагина не может делегировать дальше).
+ * The plugin hands its roles to the runtime as subagents, and the runtime reads them from the
+ * package, not from the zone. So there is no second copy, the package files are DERIVED: the role
+ * body is carried over verbatim, and the head is rewritten per the plugin contract (native tool
+ * names, no aliases and no `task` - a plugin subagent cannot delegate further).
  *
- * Два переноса, без которых субагент не работает:
- *   1. инструменты — `Bash(node … *)` это не имя инструмента, а шаблон прав; имя — `bash`;
- *   2. пути — субагент работает с корнем проекта, а роль говорит «относительно зоны»:
- *      `agents/on-demand/…` значит `.minimax/agents/on-demand/…`.
+ * Two transpositions without which a subagent does not work:
+ *   1. tools - `Bash(node … *)` is not a tool name but a permission template; the name is `bash`;
+ *   2. paths - a subagent works with the project root, while a role speaks "relative to the zone":
+ *      `agents/on-demand/…` means `.minimax/agents/on-demand/…`.
  *
- * Запуск: node .minimax/scripts/gen-plugin-agents.cjs [--check]
+ * Run: node .minimax/scripts/gen-plugin-agents.cjs [--check]
  */
 
 const fs = require('fs');
 const path = require('path');
+const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SRC_DIR = path.join(ROOT, '.minimax', 'agents');
 const PKG_DIR = path.join(ROOT, 'miniapps', 'minimax-engine');
 const OUT_DIR = path.join(PKG_DIR, 'agents');
 
-/** Роли зоны, которые становятся субагентами. `intent` — главная сессия, не субагент. */
+/** The zone roles that become subagents. `intent` is the main session, not a subagent. */
 const ROLES = ['spec', 'kit', 'run', 'core', 'extractor', 'plumb-haiku', 'asset-describer-haiku'];
 
-/** Имена инструментов: роль (Claude) → нативное имя рантайма. */
+/** The tool names: a role (Claude) -> the runtime native name. */
 const NATIVE = {
   Read: 'read', Write: 'write', Edit: 'edit', Grep: 'grep', Glob: 'glob',
   Bash: 'bash', WebFetch: 'web_fetch', WebSearch: 'web_search',
   TodoWrite: 'todowrite', AskUserQuestion: 'ask_user',
 };
 
-/** Имена, которые рантайм не примет: алиасы, `task` (субагент не делегирует), MCP-серверы. */
+/** The names the runtime will not accept: aliases, `task` (a subagent does not delegate), MCP servers. */
 const DROPPED = new Set(['Task', 'SendMessage', 'KillShell', 'TaskOutput', 'Skill', 'Agent']);
 
 /**
- * Роли, которым инструменты не ограничиваются: `tools` — это allowlist, и список сузил бы
- * `Kit` до шести инструментов, а он работает с MCP-серверами и браузером. Наследование
- * (поле `tools` не задано) даёт субагенту весь набор родительской сессии.
+ * The roles whose tools are not restricted: `tools` is an allowlist, and the list would narrow
+ * `Kit` to six tools, while it works with MCP servers and the browser. Inheritance (the `tools`
+ * field unset) gives the subagent the whole parent session set.
  */
 const INHERIT_TOOLS = new Set(['kit']);
 
-/** Когда главной сессии стоит звать этого узла — подсказка к описанию роли. */
-const DELEGATE = {
-  spec: 'Зови, когда задачу надо нарезать на карточки: одна карточка — одна квалификация.',
-  kit: 'Зови, когда задаче нужно снаряжение: роль, доступ, скрипты, профили Run.',
-  run: 'Зови, когда задача снаряжена и её надо исполнить ровно по назначенному.',
-  core: 'Зови, когда круг закрыт и нужен вердикт: достигнут ли конец-образ, и кто в нём виноват.',
-  extractor: 'Зови, когда нужно вытащить из файлов ровно запрошенное, без решений.',
-  'plumb-haiku': 'Зови, когда нужно измерить, какая роль подходит под очищенную задачу.',
-  'asset-describer-haiku': 'Зови, когда нужно описать подготовленные изображения по манифесту.',
-};
+/** When the main session should call this node - a hint appended to the role description. */
+const delegateHint = (role) => (ROLES.includes(role) ? ' ' + msg('gpa.delegate.' + role) : '');
 
-const DISPLAY = {
-  spec: 'Spec — нарезка задачи',
-  kit: 'Kit — снаряжение и роль',
-  run: 'Run — исполнение',
-  core: 'Core — вердикт круга',
-  extractor: 'Extractor — извлечение',
-  'plumb-haiku': 'Plumb — измерение (встроенная малая модель)',
-  'asset-describer-haiku': 'Asset describer — описание изображений',
-};
+const displayName = (role) => msg('gpa.display.' + role);
 
 /**
- * Перенос путей из «относительно зоны» в «относительно корня проекта» — рабочий каталог
- * субагента. Чтение общих скриптов `.claude/scripts/*` не переносится: это названная
- * зависимость (§8 зоны), файлы существуют в проекте как есть.
+ * The path transposition from "relative to the zone" to "relative to the project root" - the
+ * subagent working directory. Reading the shared scripts `.claude/scripts/*` is not transposed:
+ * it is a named dependency (the zone §8), the files exist in the project as they are.
  */
 const PATH_RULES = [
   [/\.claude\/agents/g, '.minimax/agents'],
@@ -92,7 +78,7 @@ function field(fm, name) {
   return m ? m[1].trim() : '';
 }
 
-/** Инструменты роли → нативные имена: `Bash(node … *)` — это `bash`, а не отдельное имя. */
+/** The role tools -> native names: `Bash(node … *)` is `bash`, not a separate name. */
 function nativeTools(tools) {
   const out = [];
   for (const raw of String(tools).split(',')) {
@@ -108,7 +94,7 @@ function nativeTools(tools) {
   return out;
 }
 
-/** Тело роли из зоны — с путями, приведёнными к корню проекта. */
+/** The role body from the zone - with the paths brought to the project root. */
 function adaptBody(body) {
   let out = body;
   for (const [re, to] of PATH_RULES) out = out.replace(re, to);
@@ -119,14 +105,14 @@ function build(role) {
   const src = path.join(SRC_DIR, role + '.md');
   const text = fs.readFileSync(src, 'utf8');
   const { fm, body } = splitFrontmatter(text);
-  const zoneDescription = field(fm, 'description') || 'Узел протокола «Формы»: ' + role;
-  const hint = DELEGATE[role] ? ' ' + DELEGATE[role] : '';
+  const zoneDescription = field(fm, 'description') || msg('gpa.default_description') + role;
+  const hint = delegateHint(role);
   const head = ['---', `name: ${role}`, `description: ${zoneDescription}${hint}`];
   if (!INHERIT_TOOLS.has(role)) {
     const tools = nativeTools(field(fm, 'tools'));
     if (tools.length) head.push('tools: [' + tools.join(', ') + ']');
   }
-  head.push('x-mavis:', `  displayName: ${DISPLAY[role] || role}`);
+  head.push('x-mavis:', `  displayName: ${displayName(role)}`);
   head.push('---', '');
   return head.join('\n') + adaptBody(body);
 }
@@ -147,13 +133,13 @@ function main() {
   }
   if (check) {
     if (diffs.length) {
-      console.log('субагентов, чьё тело разошлось с ролью зоны: ' + diffs.join(', '));
+      console.log(msg('gpa.body_diffs') + diffs.join(', '));
       process.exit(1);
     }
-    console.log(`все ${ROLES.length} субагентов совпадают с ролями зоны`);
+    console.log(msg('gpa.all_match', { count: ROLES.length }));
     return;
   }
-  console.log(`записано субагентов: ${ROLES.length} → ${path.relative(ROOT, OUT_DIR).replace(/\\/g, '/')}`);
+  console.log(msg('gpa.written', { count: ROLES.length, dst: path.relative(ROOT, OUT_DIR).replace(/\\/g, '/') }));
 }
 
 if (require.main === module) main();

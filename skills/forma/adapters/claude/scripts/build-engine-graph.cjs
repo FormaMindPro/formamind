@@ -1,23 +1,27 @@
-// Граф движка: какой файл какие имена экспортирует и какой файл от какого зависит
-// (require/import/source). Разбор регулярками, без модели — структура видна прямо
-// в тексте файла, извлекать смысл не нужно.
+// The engine graph: which file exports which names and which file depends on which
+// (require/import/source). Parsing by regexes, no model - the structure is visible right
+// in the file's text, no need to extract meaning.
 //
 //   node .claude/scripts/build-engine-graph.cjs
 //
-// Источники: .claude/scripts, .claude/hooks, board, dashboard, .forma/protocol/bin,
-// .forma/protocol/scripts — файлы .cjs/.js/.py/.sh (без каталогов кэша вроде .forma/dashboard/.cache).
-// Зеркала .codex/ и .agents/ не обходятся: ссылка на файл внутри них сворачивается
-// в один узел-зеркало на каталог, а не в собственный узел файла.
+// Sources: .claude/scripts, .claude/hooks, board, dashboard, .forma/protocol/bin,
+// .forma/protocol/scripts - the .cjs/.js/.py/.sh files (without cache directories like .forma/dashboard/.cache).
+// The .codex/ and .agents/ mirrors are not walked: a reference to a file inside them collapses
+// into one mirror node per directory, not into the file's own node.
 //
-// Выход: .forma/living/graphs/engine/graph.json (формат graphify: {nodes, edges}), кэш по
-// хэшу содержимого каждого файла — .forma/living/graphs/engine/.cache.json. Неизменённый
-// файл берёт свои узлы и рёбра из кэша; изменённый разбирается заново; удалённый
-// уходит из графа вместе со своими узлами.
+// Output: .forma/living/graphs/engine/graph.json (the graphify format: {nodes, edges}), a cache by
+// the content hash of each file - .forma/living/graphs/engine/.cache.json. An unchanged
+// file takes its nodes and edges from the cache; a changed one is parsed anew; a deleted
+// one leaves the graph together with its nodes.
+//
+// Printed labels come from the core dictionary: English key in code, ru value as data.
 
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 const { walk, readJson } = require('../../.forma/dashboard/lib/fs.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -27,7 +31,7 @@ const CACHE_FILE = path.join(OUT_DIR, '.cache.json');
 
 const SCAN_DIRS = ['.claude/scripts', '.claude/hooks', '.forma/board', '.forma/dashboard', '.forma/protocol/bin', '.forma/protocol/scripts'];
 const EXTS = ['.cjs', '.js', '.py', '.sh'];
-// Зеркала — папки других движков: Codex (адаптера нет) и каждый адаптер проекта, кроме папки этого движка.
+// The mirrors - the other engines' folders: Codex (no adapter) and every project adapter except this engine's folder.
 const MIRROR_DIRS = (() => {
   const own = path.basename(path.resolve(__dirname, '..'));
   const dirs = { '.codex': 'mirror:codex' };
@@ -38,7 +42,7 @@ const MIRROR_DIRS = (() => {
 const rel = (f) => path.relative(ROOT, f).split(path.sep).join('/');
 const hash = (s) => crypto.createHash('sha1').update(s).digest('hex');
 
-// --- список файлов в области видимости -------------------------------------------
+// --- the list of files in scope -------------------------------------------
 
 function sourceFiles() {
   const out = [];
@@ -53,7 +57,7 @@ function sourceFiles() {
   return out;
 }
 
-// --- разбор одного файла: экспорты и ссылки на другие файлы ----------------------
+// --- parsing one file: the exports and the references to other files ----------------------
 
 function jsExports(text) {
   const names = new Set();
@@ -106,10 +110,10 @@ function parseFile(file, text) {
   return { exports: [], refs: [] };
 }
 
-// --- разрешение ссылки в путь файла (или узел-зеркало, или «не наш» — пусто) -----
+// --- resolving a reference into a file path (or a mirror node, or "not ours" - empty) -----
 
 function resolveRef(fromFile, ref) {
-  if (!ref.startsWith('.') && !ref.startsWith('/')) return null; // пакет/модуль, не файл репозитория
+  if (!ref.startsWith('.') && !ref.startsWith('/')) return null; // a package/module, not a repository file
   const base = ref.startsWith('/') ? path.join(ROOT, ref) : path.resolve(path.dirname(fromFile), ref);
   const relPath = rel(base).replace(/\\/g, '/');
   for (const [dir, mirrorId] of Object.entries(MIRROR_DIRS)) {
@@ -121,7 +125,7 @@ function resolveRef(fromFile, ref) {
   return null;
 }
 
-// --- экстракция одного файла в {nodes, edges} -------------------------------------
+// --- extracting one file into {nodes, edges} -------------------------------------
 
 function extract(file, text) {
   const id = 'file:' + rel(file);
@@ -151,13 +155,13 @@ function extract(file, text) {
     edges.push({ source: id, target: r.file, relation: 'requires' });
   }
   for (const m of mirrorsUsed) {
-    const label = 'Зеркало .' + m.slice('mirror:'.length);
+    const label = msg('engine-graph.mirror_label', { dir: m.slice('mirror:'.length) });
     nodes.push({ id: m, label, type: 'mirror' });
   }
   return { nodes, edges, excluded: null };
 }
 
-// --- сборка с кэшем по хэшу содержимого --------------------------------------------
+// --- building with a cache by the content hash --------------------------------------------
 
 function build(cache) {
   const files = sourceFiles();
@@ -182,7 +186,7 @@ function build(cache) {
   return { nodes: [...nodes.values()], edges, hit, miss, gone, excluded, fileCount: files.length };
 }
 
-// --- отчёт: файлы без входящих рёбер, циклы зависимостей --------------------------
+// --- the report: files without incoming edges, dependency cycles --------------------------
 
 function reportEntryPoints(nodes, edges) {
   const fileIds = new Set(nodes.filter((n) => n.type === 'file').map((n) => n.id));
@@ -213,7 +217,7 @@ function reportCycles(nodes, edges) {
   return cycles;
 }
 
-// --- запуск -------------------------------------------------------------------------
+// --- the run -------------------------------------------------------------------------
 
 function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -226,26 +230,25 @@ function main() {
     nodes: g.nodes, edges: g.edges,
   }, null, 1));
 
-  console.log(`engine: ${g.nodes.length} узлов, ${g.edges.length} рёбер · файлов в области видимости ${g.fileCount} · ` +
-    `из кэша ${g.hit}, разобрано ${g.miss}, ушло ${g.gone} · модель: 0 токенов`);
+  console.log(msg('engine-graph.summary', { nodes: g.nodes.length, edges: g.edges.length, files: g.fileCount, hit: g.hit, miss: g.miss, gone: g.gone }));
 
   if (g.excluded.length) {
-    console.log('Исключены (ошибка разбора):');
+    console.log(msg('engine-graph.excluded_header'));
     for (const e of g.excluded) console.log(`  ${e.file} — ${e.reason}`);
   } else {
-    console.log('Исключённых файлов нет — все файлы области видимости охвачены.');
+    console.log(msg('engine-graph.no_excluded'));
   }
 
   const entry = reportEntryPoints(g.nodes, g.edges);
-  console.log(`Файлы без входящих рёбер «requires» (${entry.length}):`);
+  console.log(msg('engine-graph.entry_points', { count: entry.length }));
   for (const id of entry) console.log(`  ${id.slice('file:'.length)}`);
 
   const cycles = reportCycles(g.nodes, g.edges);
   if (cycles.length) {
-    console.log(`Циклы зависимостей (${cycles.length}):`);
+    console.log(msg('engine-graph.cycles', { count: cycles.length }));
     for (const c of cycles) console.log('  ' + c.map((id) => id.slice('file:'.length)).join(' -> '));
   } else {
-    console.log('Циклов зависимостей нет.');
+    console.log(msg('engine-graph.no_cycles'));
   }
 }
 

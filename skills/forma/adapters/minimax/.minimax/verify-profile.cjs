@@ -1,26 +1,30 @@
 'use strict';
 
 /**
- * Профиль проверки установки движка MiniMax Code.
+ * The MiniMax Code engine installation check profile.
  *
- * Ядро находит этот файл по манифесту (`engines[].profile`) и зовёт `check(ctx)`;
- * ожидания берутся из манифеста (`engine.expect`), а не из кода: установщик записал,
- * что ставил, — профиль сверяет это с диском.
+ * The core finds this file by the manifest (`engines[].profile`) and calls `check(ctx)`;
+ * the expectations come from the manifest (`engine.expect`), not from the code: the installer wrote down
+ * what it installed - the profile collates that with the disk.
  *
- * Пока движок не зарегистрирован в манифесте, профиль не вызывается ядром; он
- * запускается вручную и тестом зоны. Всё, что он проверяет, — из зоны `.minimax/`.
+ * While the engine is not registered in the manifest, the profile is not called by the core; it
+ * is run by hand and by the zone's test. Everything it checks - from the `.minimax/` zone.
+ *
+ * Printed labels come from the core dictionary: English key in code, ru value as data.
  */
 
+const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
+const msg = (code, params) => i18n.message(code, params, 'ru');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const ZONE = '.minimax';
 
-/** Роли узлов, которые должны быть на месте. */
+/** The nodes' roles that must be in place. */
 const NODES = ['intent', 'spec', 'kit', 'core'];
 
-/** Файлы зоны, без которых движок не считается установленным. */
+/** The zone's files without which the engine does not count as installed. */
 const REQUIRED = [
   '.minimax/forma-adapter.cjs',
   '.minimax/rules/minimax-8.md',
@@ -49,8 +53,8 @@ function checkFiles(ctx, out) {
 
 function checkHooks(ctx, expect, out) {
   const { root, finding } = ctx;
-  // Хуки этого движка живут в пакете плагина: `miniapps/<id>/.minimax-plugin/`.
-  // Пакета нет — охрана и журнал вызовов не работают, и это надо назвать вслух.
+  // This engine's hooks live in the plugin package: `miniapps/<id>/.minimax-plugin/`.
+  // No package - the guard and the calls log do not work, and that must be said out loud.
   const pkg = path.join(root, 'miniapps', 'minimax-engine', '.minimax-plugin', 'plugin.json');
   const expectedHooks = (expect && expect.hooks) || [];
   if (!expectedHooks.length) {

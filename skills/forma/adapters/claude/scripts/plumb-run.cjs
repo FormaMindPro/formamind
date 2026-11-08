@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// Обёртка без логики: драйвер Plumb живёт в .forma/plumb/plumb-run.cjs.
+// A wrapper without logic: the Plumb driver lives in .forma/plumb/plumb-run.cjs.
 const path = require('path');
 const { spawnSync } = require('child_process');
 const driver = path.join(__dirname, '..', '..', '.forma', 'plumb', 'plumb-run.cjs');

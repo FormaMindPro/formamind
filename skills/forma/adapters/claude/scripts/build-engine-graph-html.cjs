@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-// Рендер .forma/living/graphs/engine/graph.html из уже собранного graph.json (скелет). Тот же шаг graphify.to_html, что у site (build-site-graph.cjs) —
-// без модели, без сети: Python-рендерер, вызывается после build-engine-graph.cjs.
+// Rendering .forma/living/graphs/engine/graph.html from the already-built graph.json (the skeleton). The same graphify.to_html step as for site (build-site-graph.cjs) -
+// no model, no network: a Python renderer, called after build-engine-graph.cjs.
+//
+// Printed labels come from the core dictionary: English key in code, ru value as data.
 //
 //   node .claude/scripts/build-engine-graph-html.cjs
 'use strict';
@@ -8,6 +10,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const OUT_DIR = path.join(ROOT, '.forma/living', 'graphs', 'engine');
@@ -46,7 +50,7 @@ if G.number_of_nodes() == 0:
     print("ERROR: Graph is empty")
     raise SystemExit(1)
 communities = cluster(G)
-labels = {cid: f"Группа: кластер {cid}" for cid in communities}
+labels = {cid: f"\u0413\u0440\u0443\u043f\u043f\u0430: \u043a\u043b\u0430\u0441\u0442\u0435\u0440 {cid}" for cid in communities}  # "Group: cluster {cid}" in ru, escapes
 to_html(G, communities, str(out_dir / "graph.html"), community_labels=labels)
 print(f"Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, {len(communities)} communities")
 `;
@@ -54,7 +58,7 @@ print(f"Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, {len(co
 
 function main() {
   if (!fs.existsSync(GRAPH_FILE)) {
-    console.error(`Нет ${GRAPH_FILE} — сначала build-engine-graph.cjs.`);
+    console.error(msg('engine-graph-html.missing_graph', { file: GRAPH_FILE }));
     process.exit(1);
   }
   const g = JSON.parse(fs.readFileSync(GRAPH_FILE, 'utf8'));
@@ -70,7 +74,7 @@ function main() {
     fs.existsSync(extractPath) && fs.unlinkSync(extractPath);
   }
   console.log(out.trim());
-  console.log(`Записано: ${path.join(OUT_DIR, 'graph.html')}`);
+  console.log(msg('engine-graph-html.written', { file: path.join(OUT_DIR, 'graph.html') }));
 }
 
 if (require.main === module) {

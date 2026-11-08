@@ -44,7 +44,7 @@ try {
   const r=spawnSync(process.execPath,[path.join(fixture,'.codex/scripts/sync-codex.cjs'),'--apply','--codex-only','--root',fixture],{encoding:'utf8'});
   assert.equal(r.status,0,r.stdout+r.stderr);
   const project=fs.readFileSync(path.join(fixture,'project/config/PROJECT.md'),'utf8');
-  const section=/(?:\*\*|^#{1,6}\s*)(?:Профили Run проекта|Project Run profiles)[\s\S]*?(?=^#{1,6}\s|\n\*\*|(?![\s\S]))/m.exec(project)?.[0]||'';
+  const section=/(?:\*\*|^#{1,6}\s*)(?:\u041f\u0440\u043e\u0444\u0438\u043b\u0438 Run \u043f\u0440\u043e\u0435\u043a\u0442\u0430|Project Run profiles)[\s\S]*?(?=^#{1,6}\s|\n\*\*|(?![\s\S]))/m.exec(project)?.[0]||'';
   for(const m of section.matchAll(/\|\s*`(run-[\w-]+)`\s*\|/g)) {
     const nativeRole=path.join(fixture,'.codex/roles/run',m[1]+'.md');
     const nativeOwned=fs.existsSync(nativeRole) && /^origin: codex$/m.test(fs.readFileSync(nativeRole,'utf8'));

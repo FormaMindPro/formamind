@@ -1,14 +1,18 @@
 'use strict';
 
 /**
- * Адаптер MiniMax Code для ядра «Формы»: то, что знает только этот движок.
- * Ядро находит его само — файл `forma-adapter.cjs` в каталоге корня, чьё имя начинается с точки;
- * форма объекта и замена отсутствующего поля — в шапке `.forma/dashboard/lib/engines.cjs`.
- * Соответствие форме проверяет `.minimax/tests/test-minimax-adapter.cjs`.
+ * The MiniMax Code adapter for the Forma core: what only this engine knows.
+ * The core finds it by itself - the `forma-adapter.cjs` file in a root directory whose name starts with a dot;
+ * the object's shape and the missing-field substitution - in the header of `.forma/dashboard/lib/engines.cjs`.
+ * The shape fit is checked by `.minimax/tests/test-minimax-adapter.cjs`.
  *
- * Механика контрактов — `.forma/manual/ru/03-protocol/ENGINE-CONTRACT.md`;
- * что этот движок выполняет конструктивно, а что держит дисциплиной, — мой §8
+ * The contracts' mechanics - `.forma/manual/ru/03-protocol/ENGINE-CONTRACT.md`;
+ * what this engine carries constructively and what it holds by discipline - my section 8
  * `.minimax/rules/minimax-8.md`.
+ *
+ * Printed labels come from the core dictionary: English key in code, ru value as data.
+ * The ru data values (the project and the user level labels) are the MCP level labels - held
+ * as-is, the escape pass holds them as unicode sequences in the source.
  */
 
 const fs = require('fs');
@@ -18,16 +22,18 @@ const toolUsage = require('./scripts/tool-usage.cjs');
 const { readMdCatalog } = require('../.forma/dashboard/lib/forma-roles.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
+const i18n = require([path.resolve(__dirname, '../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
-/** MCP-конфиги моего движка: проектные ездят с репозиторием, пользовательский — с человеком. */
+/** My engine's MCP configs: the project ones travel with the repository, the user one - with the human. */
 function mcpConfigs(root) {
   return [
-    { rel: '.minimax/mcp_config.json', file: path.join(root, '.minimax', 'mcp_config.json'), level: 'проект' },
-    { rel: '~/.minimax/mcp.json', file: path.join(process.env.HOME || process.env.USERPROFILE || '', '.minimax', 'mcp.json'), level: 'пользователь' },
+    { rel: '.minimax/mcp_config.json', file: path.join(root, '.minimax', 'mcp_config.json'), level: '\u043f\u0440\u043e\u0435\u043a\u0442' },
+    { rel: '~/.minimax/mcp.json', file: path.join(process.env.HOME || process.env.USERPROFILE || '', '.minimax', 'mcp.json'), level: '\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c' },
   ];
 }
 
-/** Имена MCP-серверов без значений (запрет 15: из конфигов — только имена). */
+/** The MCP servers' names without values (prohibition 15: from the configs - only the names). */
 function readMcpNames(root) {
   const out = { project: [], user: [], userProject: [] };
   for (const c of mcpConfigs(root)) {
@@ -40,14 +46,14 @@ function readMcpNames(root) {
     }
     const servers = (data && data.mcpServers) || {};
     for (const name of Object.keys(servers)) {
-      if (c.level === 'проект') out.project.push(name);
+      if (c.level === '\u043f\u0440\u043e\u0435\u043a\u0442') out.project.push(name);
       else out.user.push(name);
     }
   }
   return out;
 }
 
-/** Мои настройки: `.minimax/settings.json` (если появятся) — источник хуков и окружения. */
+/** My settings: `.minimax/settings.json` (if they ever appear) - the source of the hooks and the environment. */
 function readSettings(root) {
   const file = path.join(root, '.minimax', 'settings.json');
   try {
@@ -58,7 +64,7 @@ function readSettings(root) {
   }
 }
 
-/** Вкладка «Движок»: мои настройки, роли, MCP, скиллы, сверка. */
+/** The "Engine" tab: my settings, roles, MCP, skills, the check. */
 function engineSettings(root) {
   const st = readSettings(root);
   const agentsDir = path.join(root, '.minimax', 'agents');
@@ -76,12 +82,12 @@ function engineSettings(root) {
     nodes,
     skills,
     mcp: readMcpNames(root),
-    check: { ran: false, reason: 'сверка ролей этой зоны — node .minimax/scripts/gen-roles.cjs --check' },
-    plugins: { ran: false, list: [], reason: 'пакет плагина движка не установлен' },
+    check: { ran: false, reason: msg('mmad.check_reason') },
+    plugins: { ran: false, list: [], reason: msg('mmad.plugins_reason') },
   };
 }
 
-/** Срез ролей для вкладки «Форма»: узлы и каталог Run из моей зоны. */
+/** The roles slice for the "Forma" tab: the nodes and the Run directory from my zone. */
 function formaRoles(root) {
   const cat = readMdCatalog(root, {
     title: 'MiniMax Code',
@@ -95,10 +101,10 @@ function formaRoles(root) {
 module.exports = {
   engine: 'minimax-code',
   id: 'minimax',
-  // Метка расхода — та, что движок пишет в строки History и в свой журнал (`minimax:`); `engine` остаётся именем для `check`.
+  // The spend label - the one the engine writes into the History lines and its own log (`minimax:`); `engine` stays the name for `check`.
   spendTag: 'minimax',
 
-  // Контракт движка (ENGINE-CONTRACT.md): источники, возможности, таблица узел -> модель, зоны записи.
+  // The engine contract (ENGINE-CONTRACT.md): the sources, the capabilities, the node -> model table, the write zones.
   sources: {
     rolesDir: '.minimax/agents',
     onDemandRolesDir: '.minimax/agents/on-demand',
@@ -117,15 +123,15 @@ module.exports = {
     Run: { model: 'minimax-m3.1-flash', effort: 'medium' },
     Core: { model: 'minimax-m3.1-flash', effort: 'medium' },
   },
-  // Зоны записи движка: своя папка, папка пакета плагина (её пишут мои же скрипты
-  // `gen-plugin-agents.cjs` и `install-plugin.cjs`) и карточки доски.
+  // The engine's write zones: its own folder, the plugin package's folder (written by my own scripts
+  // `gen-plugin-agents.cjs` and `install-plugin.cjs`) and the board's cards.
   writeZones: ['.minimax', 'miniapps/minimax-engine', '.devtool/features'],
 
-  // Вес инструктажа на шаг вызова и число шагов по кэш-чтению.
+  // The instruction weight per call step and the number of the steps by the cache-read.
   instructionWeight: economy.instructionWeight,
   stepsFromCacheRead: economy.stepsFromCacheRead,
 
-  // Журнал инструментов: разбор объявленных в ролях и записанных хуком.
+  // The tool log: the parse of the ones declared in the roles and written by the hook.
   toolUsage: {
     source: '.minimax/scripts/tool-usage.cjs',
     readDeclared: toolUsage.readDeclared,
@@ -133,55 +139,55 @@ module.exports = {
     baseName: toolUsage.baseName,
   },
 
-  // Расход вызова: каталог стенограмм и разбор одного шага.
+  // The call spend: the transcripts directory and the parse of one step.
   parseUsage: economy.parseUsage,
   transcriptsDir: economy.transcriptsDir,
 
-  // Файлы ролей, §8 и скиллов; скрипты сверки и графа сделанных карточек.
+  // The roles files, section 8 and the skills; the check scripts and the done cards' graph.
   rolesDir: '.minimax/agents',
   onDemandRolesDir: '.minimax/agents/on-demand',
   engineRulesFile: '.minimax/rules/minimax-8.md',
   skillsDir: '.minimax/skills',
-  // Умения, что поставляет шаблон (интервью ядра): по ним вкладка «Проект» отличает ядро от проекта.
+  // The skills the template supplies (the core's interview): by them the "Project" tab tells the core from a project.
   templateSkills: ['forma-grill-with-ui', 'grilling'],
   syncScript: '.minimax/scripts/gen-roles.cjs',
 
-  // Расход диалога: скрипт пишет .forma/dashboard/.cache/session-current.json.
+  // The dialogue spend: the script writes .forma/dashboard/.cache/session-current.json.
   usageRefresh: [],
 
   mcpConfigs,
   engineSettings,
   formaRoles,
 
-  // Группа дерева «Структура» и подписи каталогов адаптера.
+  // The "Structure" tree group and the adapter directories' captions.
   //
-  // Это единственное место, где движок ОБЪЯВЛЯЕТ свои источники ядру. По конвенции
-  // `structure.cjs` группы адаптеров встают между «Движком» и «Проектом», а ядро читает их
-  // через `engines.loadAdapters` — то есть тем же путём, каким оно находит саму зону.
+  // This is the only place where the engine DECLARES its sources to the core. By the convention
+  // of `structure.cjs` the adapters' groups stand between "Engine" and "Project", and the core reads them
+  // through `engines.loadAdapters` - that is, by the same path it finds the zone itself.
   //
-  // Графы (`build-kit-graphs.cjs`) сегодня читают `.claude` напрямую и до этих объявлений не
-  // добираются: ядро должно перевести сборщик на `engines.collect` (карточка на доске). Пока
-  // этого нет, объявление здесь — источник, а не готовая сборка: движок объявляет, ядро
-  // собирает, и три движка не конфликтуют, потому что источники не пересекаются.
+  // The graphs (`build-kit-graphs.cjs`) today read `.claude` directly and do not reach these declarations:
+  // the core must move the builder onto `engines.collect` (a card on the board). Until
+  // then, the declaration here is a source, not a ready assembly: the engine declares, the core
+  // assembles, and the three engines do not conflict because the sources do not intersect.
   structure: {
     key: 'model',
-    title: 'Модель · MiniMax Code',
-    note: 'адаптер движка MiniMax Code — §8',
+    title: msg('mmad.structure_title'),
+    note: msg('mmad.structure_note'),
     roots: ['.minimax'],
     notes: {
-      '.minimax': 'всё, что знает только MiniMax Code',
-      '.minimax/agents': 'роли узлов: Intent, Spec, Kit, Run, Core',
-      '.minimax/agents/on-demand': 'роли, подгружаемые по случаю',
-      '.minimax/agents/run': 'профили Run',
-      '.minimax/rules': '§8 — архитектура движка в MiniMax Code',
-      '.minimax/scripts': 'скрипты адаптера: журнал, проба, генератор ролей',
-      '.minimax/skills': 'арсенал скиллов',
-      '.minimax/.ledger': 'журнал вызовов — источник строк расхода',
-      '.minimax/.state': 'факты о возможностях движка (проба) и свидетель наблюдений',
-      '.minimax/.transcripts': 'нормированные стенограммы — пол окна и разрезы по моделям',
-      '.minimax/tests': 'тест соответствия адаптера',
+      '.minimax': msg('mmad.cap_zcode'),
+      '.minimax/agents': msg('mmad.cap_agents'),
+      '.minimax/agents/on-demand': msg('mmad.cap_on_demand'),
+      '.minimax/agents/run': msg('mmad.cap_run'),
+      '.minimax/rules': msg('mmad.cap_rules'),
+      '.minimax/scripts': msg('mmad.cap_scripts'),
+      '.minimax/skills': msg('mmad.cap_skills'),
+      '.minimax/.ledger': msg('mmad.cap_ledger'),
+      '.minimax/.state': msg('mmad.cap_state'),
+      '.minimax/.transcripts': msg('mmad.cap_transcripts'),
+      '.minimax/tests': msg('mmad.cap_tests'),
     },
-    // Что движок отдаёт сборщику графов: список путей, а не готовый граф. Пусто — источников нет.
+    // What the engine gives the graphs builder: a list of paths, not a ready graph. Empty - no sources.
     sources: {
       rolesDir: '.minimax/agents',
       onDemandRolesDir: '.minimax/agents/on-demand',

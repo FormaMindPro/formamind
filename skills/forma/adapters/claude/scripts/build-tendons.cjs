@@ -1,49 +1,53 @@
 #!/usr/bin/env node
-// Сухожилия: слой связей между тремя графами.
+// The tendons: the layer of links between the three graphs.
 //
-// Скелет — движок (`.forma/manual/`), мышцы — проект (`project/`), сухожилия — опыт
-// (`.devtool/features/done/`). Сухожилие крепится двумя концами: к правилу, которое
-// урок обкатал, и к делу, на котором это случилось. Без костного конца урок —
-// дневник, без мышечного — теория; обе вырожденности бесполезны для переноса.
+// The skeleton - the engine (`.forma/manual/`), the muscles - the project (`project/`), the tendons - the experience
+// (`.devtool/features/done/`). A tendon fastens by two ends: to the rule the lesson
+// put to work, and to the matter where it happened. Without the bone end a lesson is
+// a diary, without the muscle end - a theory; both degeneracies are useless for transfer.
 //
-// Крепления не извлекаются моделью: они уже написаны в карточках прозой. Здесь
-// только сопоставление имён, поэтому прогон ничего не стоит и повторяется сколько
-// угодно раз.
+// The fastenings are not extracted by a model: they are already written in the cards as prose. Here
+// only names are matched, so a run costs nothing and repeats as many
+// times as one likes.
 //
-// Цепляемся к самим карточкам, а не к графу опыта: граф — одно из изображений
-// карточек, он может отставать, а карточки на диске всегда свежие.
+// We hold to the cards themselves, not to the experience graph: the graph is one of the images
+// of the cards, it may lag, while the cards on disk are always fresh.
 //
-//   node .claude/scripts/build-tendons.cjs [--out <файл>]
+//   node .claude/scripts/build-tendons.cjs [--out <file>]
+//
+// Printed labels come from the core dictionary: English key in code, ru value as data.
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 const { makeCli } = require('../../.forma/dashboard/lib/cli.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MANUAL = path.join(ROOT, '.forma/living', 'graphs', 'manual', 'graph.json');
 const PROJECT = path.join(ROOT, '.forma/living', 'graphs', 'project', 'graph.json');
-// Граф движка — необязательный вход:
-// нет файла или в нём нет description/capabilities — секция «движок → правило»
-// просто пустая, это не повод останавливать сухожилия карточек.
+// The engine graph - an optional input:
+// no file, or no description/capabilities in it - the "engine -> rule" section
+// is simply empty, no reason to stop the cards' tendons.
 const ENGINE = path.join(ROOT, '.forma/living', 'graphs', 'engine', 'graph.json');
 const CARDS_DIR = path.join(ROOT, '.devtool', 'features', 'done');
 const LAW = path.join(ROOT, 'AGENTS.md');
-// Тот же закон по-русски: граф движка построен из этого корпуса, и имена узлов
-// взяты отсюда же — значит сопоставлять надо с ним, а не с английским подлинником.
+// The same law in ru: the engine graph was built from this corpus, and the node names
+// were taken from it too - so the matching must be against it, not against the English original.
 const LAW_RU = path.join(ROOT, '.forma/manual', 'PROTOCOL.md');
 
 const OUT = makeCli().value('out', path.join(ROOT, '.forma/living', 'graphs', 'tendons.json'));
 
 const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8'));
 
-// --- запреты закона -------------------------------------------------------------
-// Карточка пишет «запрет 7», а узел графа зовётся полной формулировкой. Номера
-// берём из самого закона, а не из головы: список там нумерован и это его адрес.
+// --- the law's prohibitions -------------------------------------------------------------
+// A card writes "prohibition 7", while the graph node is named by the full wording. The numbers
+// come from the law itself, not from memory: the list there is numbered and that is its address.
 function prohibitions() {
-  const out = new Map();   // номер → формулировка
+  const out = new Map();   // a number -> a wording
   let text, marker;
-  try { text = fs.readFileSync(LAW_RU, 'utf8'); marker = '## Нельзя'; }
+  try { text = fs.readFileSync(LAW_RU, 'utf8'); marker = '\u041d\u0435\u043b\u044c\u0437\u044f'; }
   catch { text = null; }
   if (!text || !text.includes(marker)) {
     try { text = fs.readFileSync(LAW, 'utf8'); marker = '## 5. Prohibitions'; }
@@ -60,24 +64,24 @@ function prohibitions() {
   return out;
 }
 
-// --- синонимы имени узла --------------------------------------------------------
-// Дословное совпадение недосчитывает вдвое: узел зовётся «Снаряжение (Kit)», а
-// карточка пишет `Kit`. Синонимы выводятся из самого имени, не сочиняются.
+// --- the node name's synonyms --------------------------------------------------------
+// A literal match undercounts by half: the node is named "Kitting (Kit)", while
+// the card writes `Kit`. The synonyms are derived from the name itself, not invented.
 function aliases(label) {
   const out = new Set();
   const en = /\(([A-Z][A-Za-z]+)\)/.exec(label);
   if (en) {
-    out.add('`' + en[1] + '`');        // так узел зовут в карточках
-    out.add(en[1].toLowerCase() + '.md');  // и так зовут его файл роли
+    out.add('`' + en[1] + '`');        // how the cards name the node
+    out.add(en[1].toLowerCase() + '.md');  // and how its role file is named
   }
-  // Имя без уточнения в скобках: «Кэш круга (§9)» → «Кэш круга».
+  // The name without the bracketed qualifier: "The cycle cache (§9)" -> "The cycle cache".
   const bare = label.replace(/\s*\([^)]*\)\s*$/, '').trim();
   if (bare && bare !== label && bare.length >= 6) out.add(bare);
   return [...out];
 }
 
-// Слово целиком, а не кусок другого слова. Границы \b по-русски не работают
-// (они считают кириллицу не-буквой), поэтому смотрим соседние знаки сами.
+// The whole word, not a piece of another word. \b boundaries do not work for ru
+// (they count Cyrillic as non-letters), so the neighbouring characters are examined directly.
 const LETTER = /[\p{L}\p{N}_]/u;
 function mentions(text, needle) {
   if (!needle || needle.length < 4) return 0;
@@ -102,8 +106,8 @@ function loadCards() {
     }));
 }
 
-// Файлы проекта, названные в карточке, — мышечный конец. Узел графа проекта
-// привязан к своему source_file, по нему и цепляем.
+// The project's files named in a card - the muscle end. A project graph node
+// is bound to its source_file, and by it we hold on.
 function projectFileIndex(project) {
   const projectFiles = new Map();
   for (const n of project.nodes) {
@@ -114,7 +118,7 @@ function projectFileIndex(project) {
   return projectFiles;
 }
 
-// Понятия графа движка: имя узла и его синонимы, найденные в тексте карточек.
+// The engine graph's concepts: a node's name and its synonyms found in the cards' text.
 function matchBones(manual, cards, toBone, boneHits) {
   for (const node of manual.nodes) {
     const label = node.label || '';
@@ -135,30 +139,30 @@ function matchBones(manual, cards, toBone, boneHits) {
   }
 }
 
-// Запрет — самостоятельная кость, а не чей-то узел. Подбор хозяина среди понятий
-// графа по общим словам давал правдоподобный мусор: запрет 8 повисал на «Intent
-// снаряжается человеком», запрет 14 — на «Одинаковый тир не означает одного
-// агента». Уверенная связь не туда хуже её отсутствия. У запрета есть номер и
-// формулировка; этого довольно, чтобы быть костью самому.
+// A prohibition - a bone of its own, not anyone's node. Picking an owner among the graph's
+// concepts by common words gave plausible garbage: prohibition 8 hung on "Intent
+// is kitted by the human", prohibition 14 - on "The same tier does not mean one
+// agent". A confident wrong link is worse than its absence. A prohibition has a number and
+// a wording; that is enough to be a bone by itself.
 function matchProhibitions(proh, cards, toBone, boneHits) {
   for (const [num, wording] of proh) {
-    const needle = 'запрет ' + num;
-    const id = 'запрет-' + num;
+    const needle = msg('tendons.zapret_needle', { num });
+    const id = msg('tendons.zapret_id', { num });
     for (const c of cards) {
       const k = mentions(c.text.toLowerCase(), needle);
       if (!k) continue;
       toBone.push({ card: c.code, file: c.file, node: id,
-                    label: 'Запрет ' + num + ' · ' + wording,
+                    label: msg('tendons.prohibition_label', { num, wording }),
                     weight: k, via: [needle], prohibition: num });
       boneHits.set(id, (boneHits.get(id) || 0) + k);
     }
   }
 }
 
-// --- движок → правило: «реализует правило» (по описанию узла, не по коду) -----------------
-// Текст сопоставления — description+capabilities узла-файла,
-// не исходный код: совпадение по смыслу, та же логика мест, что matchBones/matchProhibitions,
-// но источник — файлы движка, а не карточки.
+// --- engine -> rule: "implements the rule" (by the node's description, not by the code) -----------------
+// The matching text - the description+capabilities of a file node,
+// not the source code: a match by meaning, the same places logic as matchBones/matchProhibitions,
+// but the source - the engine's files, not the cards.
 function engineFiles(engine) {
   if (!engine) return [];
   return engine.nodes.filter((n) => n.type === 'file' && (n.description || (n.capabilities && n.capabilities.length)));
@@ -183,13 +187,13 @@ function matchEngineBones(engine, manual, proh, toBoneEngine) {
     }
   }
   for (const [num, wording] of proh) {
-    const needle = 'запрет ' + num;
-    const id = 'запрет-' + num;
+    const needle = msg('tendons.zapret_needle', { num });
+    const id = msg('tendons.zapret_id', { num });
     for (const f of files) {
       const text = [f.description || '', ...(f.capabilities || [])].join(' ').toLowerCase();
       const k = mentions(text, needle);
       if (!k) continue;
-      toBoneEngine.push({ file: f.source_file, node: id, label: 'Запрет ' + num + ' · ' + wording,
+      toBoneEngine.push({ file: f.source_file, node: id, label: msg('tendons.prohibition_label', { num, wording }),
                            weight: k, via: [needle], prohibition: num, relation: 'implements_rule' });
     }
   }
@@ -202,7 +206,7 @@ function matchMuscles(cards, projectFiles) {
       if (!c.text.includes(src)) continue;
       toMuscle.push({ card: c.code, file: c.file, source_file: src, nodes: ids });
     }
-    // Цель — тоже мышечный конец, и она называется прямо.
+    // A goal - also a muscle end, and it is named outright.
     for (const m of c.text.matchAll(/goal-(\d+)/g)) {
       toMuscle.push({ card: c.code, file: c.file, source_file: 'goal-' + m[1], nodes: [] });
     }
@@ -218,8 +222,8 @@ function countBothEnds(toBone, toMuscle) {
   return [...byCard.values()].filter((v) => v.bone && v.muscle).length;
 }
 
-// Сколько разных карточек коснулось правила — честнее, чем сколько раз его
-// назвали: одна карточка, помянувшая `Kit` тридцать раз, обкатала его однажды.
+// How many different cards touched a rule is more honest than how many times it
+// was named: one card mentioning `Kit` thirty times put it to work once.
 function cardsPerRule(toBone) {
   const sets = new Map();
   for (const t of toBone) {
@@ -229,17 +233,17 @@ function cardsPerRule(toBone) {
   return new Map([...sets].map(([id, set]) => [id, set.size]));
 }
 
-// Понятия — это и есть закон. Документы (AGENTS.md, PROJECT.md) — адреса, где
-// он лежит; их упоминание не говорит, что правило обкатано.
+// The concepts are the law itself. The documents (AGENTS.md, PROJECT.md) are the addresses where
+// it lies; mentioning them does not say the rule was put to work.
 function wearTables(manual, toBone, boneHits) {
   const kind = new Map(manual.nodes.map((n) => [n.id, n.file_type]));
   const label = new Map(manual.nodes.map((n) => [n.id, n.label]));
-  // Запреты — кости без узла в графе: их имя приходит с самим креплением.
+  // The prohibitions - bones without a node in the graph: their name comes with the fastening itself.
   for (const t of toBone) if (!label.has(t.node)) label.set(t.node, t.label);
   const cardsPer = cardsPerRule(toBone);
   return {
     wear: [...boneHits.entries()]
-      .filter(([id]) => kind.get(id) !== 'document')   // запреты сюда входят: у них типа нет
+      .filter(([id]) => kind.get(id) !== 'document')   // the prohibitions enter here too: they have no type
       .map(([id, weight]) => ({ node: id, label: label.get(id) || id, weight, cards: cardsPer.get(id) || 0 }))
       .sort((a, b) => b.cards - a.cards || b.weight - a.weight),
     addresses: [...boneHits.entries()]
@@ -249,15 +253,14 @@ function wearTables(manual, toBone, boneHits) {
   };
 }
 
-// Итоговый файл: три корпуса, счётчики, износ правил, голые понятия и сами крепления.
+// The final file: the three corpora, the counters, the rules' wear, the bare concepts and the fastenings themselves.
 function assembleReport(src, links) {
   const { toBone, toMuscle, boneHits, toBoneEngine } = links;
   const { manual, project, cards, proh, engine } = src;
   const engFiles = engineFiles(engine);
-  // Правило, которого ни одна карточка не коснулась. Это не приговор ему: либо
-  // оно безупречно, либо ни разу не проверено, и одно от другого отличает то,
-  // заходили ли карточки в эту область вообще.
-  // Голым считается только понятие: документ не бывает «необкатанным».
+  // A rule no card ever touched. That is not its verdict: either it is flawless, or it was never
+  // tested, and what tells one from the other is whether the cards entered this area at all.
+  // Only a concept counts as bare: a document is never "unworked".
   const bare = manual.nodes
     .filter((n) => n.file_type !== 'document' && !boneHits.has(n.id))
     .map((n) => n.label);
@@ -295,19 +298,17 @@ function assembleReport(src, links) {
 
 function printSummary(out) {
   const t = out.totals;
-  console.log('Сухожилия построены:', path.relative(ROOT, OUT));
-  console.log('  к кости:', t.toBone, '| к мышце:', t.toMuscle);
-  console.log('  карточек обоими концами:', t.cardsWithBothEnds, 'из', out.corpora.tendon.cards);
-  console.log('  понятий обкатано:', t.bonesTouched, 'из', t.conceptsTotal,
-              '| голых:', t.bonesBare);
-  console.log('  запретов обкатано:', t.prohibitionsTouched, 'из', t.prohibitionsTotal);
-  console.log('  плотнее всего:', out.wear.slice(0, 3).map((w) => w.label.slice(0, 32) + ' (' + w.cards + ')').join(' · '));
+  console.log(msg('tendons.built', { file: path.relative(ROOT, OUT) }));
+  console.log(msg('tendons.ends', { bone: t.toBone, muscle: t.toMuscle }));
+  console.log(msg('tendons.cards_both_ends', { count: t.cardsWithBothEnds, total: out.corpora.tendon.cards }));
+  console.log(msg('tendons.concepts_worked', { count: t.bonesTouched, total: t.conceptsTotal, bare: t.bonesBare }));
+  console.log(msg('tendons.prohibitions_worked', { count: t.prohibitionsTouched, total: t.prohibitionsTotal }));
+  console.log(msg('tendons.tightest') + out.wear.slice(0, 3).map((w) => w.label.slice(0, 32) + ' (' + w.cards + ')').join(' · '));
   const e = out.engine;
   if (e.filesWithMeaning) {
-    console.log('  движок → правило: файлов с описанием', e.filesWithMeaning, 'из', e.filesTotal,
-                '| правил «реализует» затронуто', e.rulesImplemented, '| рёбер', out.toBoneEngine.length);
+    console.log(msg('tendons.engine_rule_line', { files: e.filesWithMeaning, total: e.filesTotal, rules: e.rulesImplemented, edges: out.toBoneEngine.length }));
   } else {
-    console.log('  движок → правило: нет описаний (.forma/living/graphs/engine/graph.json без description/capabilities) — секция пустая.');
+    console.log(msg('tendons.engine_rule_empty'));
   }
 }
 
@@ -317,12 +318,12 @@ function loadEngine() {
 
 function main() {
   const src = { manual: readJson(MANUAL), project: readJson(PROJECT), proh: prohibitions(), cards: loadCards(), engine: loadEngine() };
-  const toBone = [];     // карточка → правило движка
+  const toBone = [];     // a card -> an engine rule
   const boneHits = new Map();
   matchBones(src.manual, src.cards, toBone, boneHits);
   matchProhibitions(src.proh, src.cards, toBone, boneHits);
-  const toMuscle = matchMuscles(src.cards, projectFileIndex(src.project));   // карточка → файл проекта
-  const toBoneEngine = [];   // файл движка → правило («реализует правило»)
+  const toMuscle = matchMuscles(src.cards, projectFileIndex(src.project));   // a card -> a project file
+  const toBoneEngine = [];   // an engine file -> a rule ("implements the rule")
   matchEngineBones(src.engine, src.manual, src.proh, toBoneEngine);
 
   const out = assembleReport(src, { toBone, toMuscle, boneHits, toBoneEngine });

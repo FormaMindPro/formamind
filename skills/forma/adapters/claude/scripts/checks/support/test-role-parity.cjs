@@ -11,6 +11,8 @@ const os = require('os');
 const path = require('path');
 
 const parity = require('./role-parity.cjs');
+const i18n = require('../../../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 function fixture(baseText, peerText) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'role-parity-'));
@@ -43,7 +45,7 @@ test('a role declared own gets the own status, and the table prints it apart fro
   const res = cmp('one text', 'another text', new Set(['b/r.md']));
   assert.equal(res.status, 'own');
   const line = parity.parityTable([{ pair: { name: 'x', base: 'a', peer: 'b' }, res }]).pop();
-  assert.ok(line.includes('Своя роль') && !line.includes('Паритет') && !line.includes('Дрейф'));
+  assert.ok(line.includes(msg('role-parity.st_own')) && !line.includes(msg('role-parity.st_synced')) && !line.includes(msg('role-parity.st_drift', { status: '' })));
 });
 
 test('ownRolesOf reads paths from the paragraph that says "written by this zone"', () => {

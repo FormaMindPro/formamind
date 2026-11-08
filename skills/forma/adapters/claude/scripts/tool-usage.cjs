@@ -1,46 +1,50 @@
 #!/usr/bin/env node
-// Сводка журнала инструментов по узлам.
-// Источники: .forma/dashboard/tool-usage.log (пишет хук .claude/hooks/tool-usage.sh)
-//            .claude/agents/*.md — объявленный арсенал роли, из фронтматтера, не из памяти.
-//            .devtool/features/**/*.md — строки захода: `agent_id` → карточка и её эпик.
+// The tool-log summary by nodes.
+// Sources: .forma/dashboard/tool-usage.log (written by the hook .claude/hooks/tool-usage.sh)
+//          .claude/agents/*.md - the role's declared arsenal, from the frontmatter, not from memory.
+//          .devtool/features/**/*.md - the call lines: `agent_id` -> the card and its epic.
 //
-// Ценность сводки не в том, чем пользовались, — в том, что возили зря: объявленный
-// инструмент стоит токенов на каждом шаге захода, пользовались им или нет.
+// The summary's value is not in what was used but in what was carried in vain: a declared
+// tool costs tokens on every step of a call, used or not.
 //
-// Три состояния журнала различаются и называются вслух (признак 3 карточки):
-//   • файла нет            — хук не отработал ни разу: не зарегистрирован, не исполняем
-//                            или падает до первой записи. Это ПОЛОМКА, не тишина.
-//   • файл есть, строк нет — хук жив (заголовок писал он), вызовов не было.
-//   • строки `!ОШИБКА`     — хук отработал, но сам сломался; причина в строке.
+// The three states of the log are distinguished and named aloud (the card's sign 3):
+//   - no file            - the hook never ran: not registered, not executable
+//                          or crashes before the first record. That is a BREAKAGE, not silence.
+//   - a file, no lines   - the hook is alive (it wrote the header), no calls happened.
+//   - `!ERROR` lines     - the hook ran but broke itself; the reason is in the line.
 //
-// Запуск: node .claude/scripts/tool-usage.cjs
+// Run: node .claude/scripts/tool-usage.cjs
+//
+// Printed labels come from the core dictionary: English key in code, ru value as data.
 
 const fs = require('fs');
 const path = require('path');
 
-// Строка расхода: канон английский, русская форма старых строк приводится
-// toEnglish() до разбора (spend-line.cjs).
+// The spend line: the canon is English, the Russian shape of old lines is normalized
+// by toEnglish() before parsing (spend-line.cjs).
 const { toEnglish, CALL_ID_RE, CALL_ID_UNKNOWN_RE } = require('../../.forma/dashboard/spend-line.cjs');
 const { cardFiles, frontmatterBlock } = require('../../.forma/dashboard/lib/card.cjs');
+const i18n = require('../../.forma/i18n/index.cjs');
+const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const LOG = path.join(ROOT, '.forma/dashboard', 'tool-usage.log');
 const AGENTS_DIR = path.join(ROOT, '.claude', 'agents');
 
-// --- объявленный арсенал ---------------------------------------------------
-// Во фронтматтере инструмент может быть записан с аргументом-шаблоном:
+// --- the declared arsenal ----------------------------------------------------
+// In the frontmatter a tool may be written with a template argument:
 //   Bash(node .forma/dashboard/tally.cjs *)
-// В журнале же стоит голое tool_name — «Bash». Сопоставление идёт по базовому
-// имени (до скобки), а полная запись сохраняется, чтобы показать её человеку.
+// The log carries the bare tool_name - "Bash". The matching goes by the base
+// name (before the bracket), while the full entry is kept to show it to the human.
 function baseName(decl) {
   const i = decl.indexOf('(');
   return (i === -1 ? decl : decl.slice(0, i)).trim();
 }
 
-// Каталог ролей и файл журнала — параметры со значением по умолчанию, а не константы:
-// разбор нужен не только этой сводке, но и вкладке «Борт» (.forma/dashboard/generate.js),
-// которой корень проекта приходит снаружи. Два разных разбора одного
-// и того же журнала однажды разойдутся — и разойдутся молча, поэтому он здесь один.
+// The roles catalog and the log file are parameters with a default, not constants:
+// not only this summary needs the parsing - the "Board" tab does too (.forma/dashboard/generate.js),
+// which receives the project root from outside. Two different parsings of one and the same
+// log would diverge one day - and diverge silently, so it lives here once.
 function readDeclared(agentsDir = AGENTS_DIR) {
   const roles = new Map(); // name -> { file, decls: [...] }
   let files = [];
@@ -58,13 +62,13 @@ function readDeclared(agentsDir = AGENTS_DIR) {
     const name = (nameM ? nameM[1] : path.basename(f, '.md')).trim().replace(/^["']|["']$/g, '');
     const decls = toolsM
       ? splitTools(toolsM[1].trim())
-      : null; // null = поле tools отсутствует, роль наследует всё
+      : null; // null = the tools field is absent, the role inherits everything
     roles.set(name.toLowerCase(), { file: f, decls });
   }
   return roles;
 }
 
-// Разбор списка через запятую с оглядкой на скобки: `Bash(node x, y)` — один элемент.
+// Parsing a comma-separated list with an eye on the brackets: `Bash(node x, y)` - one element.
 function splitTools(line) {
   const out = [];
   let depth = 0;
@@ -81,9 +85,10 @@ function splitTools(line) {
   return out;
 }
 
-// --- журнал ----------------------------------------------------------------
+// --- the log ----------------------------------------------------------------
 // the hook's own error marker: the current one and the one older logs carry
-const HOOK_ERROR = ['!ERROR', '!ОШИБКА'];
+// (\u041e\u0428\u0418\u0411\u041a\u0410 = the older ru error marker, a parse pattern held as escapes)
+const HOOK_ERROR = ['!ERROR', '!\u041e\u0428\u0418\u0411\u041a\u0410'];
 
 function readLog(logFile = LOG) {
   if (!fs.existsSync(logFile)) return { alive: false, rows: [], errors: [] };
@@ -95,40 +100,40 @@ function readLog(logFile = LOG) {
     if (!s || s.startsWith('#')) continue;
     const parts = s.split('·').map((p) => p.trim());
     if (parts.length < 4) {
-      errors.push({ ts: '?', reason: `строка не разобрана: ${s}` });
+      errors.push({ ts: '?', reason: msg('tool-usage.unparsed_line', { line: s }) });
       continue;
     }
-    const [ts, node, agentId, tool, file] = parts;   // пятое поле (путь) необязательно: старые строки без него
+    const [ts, node, agentId, tool, file] = parts;   // the fifth field (path) is optional: old lines lack it
     if (HOOK_ERROR.includes(node)) errors.push({ ts, reason: tool });
     else rows.push({ ts, node, agentId, tool, file: file || null });
   }
   return { alive: true, rows, errors };
 }
 
-// --- разрез по карточкам ----------------------------------------------------
-// Журнал знает `agent_id` и не знает карточки; карточка знает задачу и не знает id.
-// Сшивает их одно поле в строке захода:
-//   `Узел`, ГГГГ-ММ-ДД: заход, N токенов (R кэш-чтение), T с, `<id вызова>` — …
-// Отсюда и весь смысл разреза: снаряжают под РОД задачи, а не под узел вообще.
-// Род задачи берётся из эпика карточки — это единственная общая рубрика, которая
-// у карточек уже есть; выдумывать вторую ради сводки не нужно.
+// --- the cut by cards --------------------------------------------------------
+// The log knows `agent_id` and knows no cards; the card knows the task and knows no id.
+// One field in the call line stitches them:
+//   `Node`, YYYY-MM-DD: call, N tokens (R cache-read), T s, `<call id>` - ...
+// Hence the whole meaning of the cut: one arms for the task's KIND, not for a node in general.
+// The task's kind comes from the card's epic - the only common rubric the cards
+// already have; inventing a second one for the summary's sake is unnecessary.
 
-// Третье состояние поля (.forma/manual/en/03-protocol/ECONOMY.md, «The `unknown` marker»): движок опознавателя не вернул,
-// узел это НАЗВАЛ — «`id неизвестен`». Сшивать такой заход не с чем, но он существует,
-// и разрез обязан назвать его отдельной величиной: иначе неизвестное неотличимо от
-// «узел поленился проставить id», а пробел растворяется в разрезе без следа.
-// Привязка к началу пункта списка (CALL_ID_UNKNOWN_RE) — правило: записью расхода является только
-// пункт `## История`, а не цитата той же формы в прозе. Цитата обязана оставаться цитатой.
+// The third state of the field (.forma/manual/en/03-protocol/ECONOMY.md, "The `unknown` marker"): the engine
+// returned no identifier, and the node NAMED it - "`id unknown`". There is nothing to stitch such a call
+// with, but it exists, and the cut must name it as a separate value: otherwise the unknown is
+// indistinguishable from "the node was too lazy to set an id", and the gap dissolves into the cut without a trace.
+// Anchoring to the start of a list item (CALL_ID_UNKNOWN_RE) - the rule: only a `## History` item is a spend
+// record, not a quote of the same shape in prose. A quote must stay a quote.
 
 function readCardIds() {
   const byId = new Map(); // agent_id -> { card, epic, node, date }
-  const unknown = [];     // заходы, где опознаватель назван неизвестным
+  const unknown = [];     // the calls whose identifier was named unknown
 
   for (const file of cardFiles(ROOT)) {
     const f = path.basename(file);
     const text = fs.readFileSync(file, 'utf8');
     const epicM = text.match(/^epic:\s*"?([^"\n]*)"?\s*$/m);
-    const epic = epicM ? epicM[1].trim() : '(без эпика)';
+    const epic = epicM ? epicM[1].trim() : msg('tool-usage.no_epic');
     for (const line of text.split(/\r?\n/)) {
       const t = toEnglish(line.trim());
       const u = CALL_ID_UNKNOWN_RE.exec(t);
@@ -148,10 +153,10 @@ function readCardIds() {
 const sumCounts = (counts) => [...counts.values()].reduce((a, b) => a + b, 0);
 const bump = (counts, key) => counts.set(key, (counts.get(key) || 0) + 1);
 
-// Записи журнала → по карточкам (нашёлся `agent_id`) и «сироты» (не нашёлся).
+// The log records -> by cards (`agent_id` found) and "orphans" (not found).
 function groupByCard(rows, byId) {
   const matched = new Map();   // card -> { epic, nodes:Set, tools:Map }
-  const orphan = new Map();    // "узел · agent_id" -> Map(tool -> n)
+  const orphan = new Map();    // "node · agent_id" -> Map(tool -> n)
   for (const r of rows) {
     const card = byId.get(r.agentId);
     if (card) {
@@ -168,18 +173,18 @@ function groupByCard(rows, byId) {
   return { matched, orphan };
 }
 
-// Неизвестное — посчитанная величина, а не пробел: заход существует, сшить его не с чем.
+// The unknown is a counted value, not a gap: the call exists, there is nothing to stitch it with.
 function printUnknownIds(unknownIds) {
   if (!unknownIds.length) return;
-  console.log(`\nопознаватель неизвестен: ${unknownIds.length} заходов (движок его не вернул, ECONOMY.md, «The unknown marker») —`);
+  console.log(msg('tool-usage.unknown_header', { count: unknownIds.length }));
   unknownIds.slice(0, 8).forEach((z) => console.log(`   ${z.card} · ${z.node} · ${z.date}`));
-  if (unknownIds.length > 8) console.log(`   … и ещё ${unknownIds.length - 8}`);
+  if (unknownIds.length > 8) console.log(msg('tool-usage.unknown_more', { count: unknownIds.length - 8 }));
 }
 
 function printMatched(matched) {
   if (matched.size === 0) {
-    console.log('\nНи один заход журнала не сопоставлен карточке. Поле `agent_id` в строках');
-    console.log('сшивать нечем. Это ожидаемое состояние, а не поломка журнала.');
+    console.log(msg('tool-usage.matched_none_1'));
+    console.log(msg('tool-usage.matched_none_2'));
     return;
   }
   const byEpic = new Map();
@@ -188,9 +193,9 @@ function printMatched(matched) {
     byEpic.get(e.epic).push([card, e]);
   }
   for (const [epic, cards] of [...byEpic.entries()].sort()) {
-    console.log(`\n── род задач (эпик): ${epic}`);
+    console.log(msg('tool-usage.epic_header', { epic }));
     for (const [card, e] of cards.sort((a, b) => a[0].localeCompare(b[0]))) {
-      console.log(`   ${card} — узлы: ${[...e.nodes].sort().join(', ')}; ${sumCounts(e.tools)} вызовов`);
+      console.log(msg('tool-usage.card_line', { card, nodes: [...e.nodes].sort().join(', '), calls: sumCounts(e.tools) }));
       [...e.tools.entries()]
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
         .forEach(([tool, n]) => console.log(`     ${String(n).padStart(5)} × ${tool}`));
@@ -201,52 +206,44 @@ function printMatched(matched) {
 function printOrphans(orphan) {
   if (!orphan.size) return;
   const total = [...orphan.values()].reduce((s, t) => s + sumCounts(t), 0);
-  console.log(`\n── карточка не сопоставлена: ${orphan.size} заходов, ${total} вызовов`);
-  console.log('   `agent_id` этих заходов не найден ни в одной истории карточек. Они не');
-  console.log('   приписаны никуда и ни к какому роду задач в счёт выше не попали.');
+  console.log(msg('tool-usage.orphan_header', { count: orphan.size, calls: total }));
+  console.log(msg('tool-usage.orphan_note_1'));
+  console.log(msg('tool-usage.orphan_note_2'));
   [...orphan.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .slice(0, 20)
     .forEach(([key, t]) => {
       const top = [...t.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
         .map(([tool, c]) => `${tool}×${c}`).join(', ');
-      console.log(`     ${key} — ${sumCounts(t)} вызовов: ${top}${t.size > 5 ? ', …' : ''}`);
+      console.log(msg('tool-usage.orphan_line', { key, calls: sumCounts(t), top, more: t.size > 5 ? ', …' : '' }));
     });
-  if (orphan.size > 20) console.log(`     … и ещё ${orphan.size - 20} заходов`);
+  if (orphan.size > 20) console.log(msg('tool-usage.orphan_more', { count: orphan.size - 20 }));
 }
 
 function printCardCut(rows) {
   const byId = readCardIds();
   const { matched, orphan } = groupByCard(rows, byId);
 
-  console.log('\n\n══ Разрез по карточкам: какому роду задач какие инструменты');
-  console.log('Сшивка — `agent_id`: журнал ↔ строка захода в истории карточки (AGENTS.md §3).');
+  console.log(msg('tool-usage.cut_header'));
+  console.log(msg('tool-usage.cut_stitch'));
   printUnknownIds(byId.unknownIds || []);
   printMatched(matched);
   printOrphans(orphan);
 }
 
-// --- сводка ----------------------------------------------------------------
+// --- the summary --------------------------------------------------------------
 function printPreamble() {
-  console.log('Журнал инструментов по узлам — сводка');
-  console.log('Источник: .forma/dashboard/tool-usage.log\n');
-  console.log('ЖУРНАЛ ПИШЕТ ПОПЫТКИ, А НЕ УДАЧИ. Хук PreToolUse срабатывает до решения о');
-  console.log('доступе, поэтому отклонённый вызов попадает в журнал наравне с исполненным:');
-  console.log('счёт ниже читается как «тянулся к», а не как «применил». Проверено на себе —');
-  console.log('заход Kit дал 19 вызовов Bash при разрешённом во фронтматтере только');
-  console.log('Bash(claude plugin *). Для подрезки арсенала это существенно: пустая строка');
-  console.log('доказывает, что инструмент лишний; ненулевая не доказывает, что он сработал.\n');
+  console.log(msg('tool-usage.preamble_1'));
+  console.log(msg('tool-usage.preamble_2'));
+  console.log(msg('tool-usage.preamble_note'));
 }
 
 function printLogMissing() {
-  console.log('ЖУРНАЛА НЕТ. Это не «вызовов не было» — это поломка: хук');
-  console.log('.claude/hooks/tool-usage.sh не отработал ни разу (не зарегистрирован в');
-  console.log('.claude/settings.json, не исполняем или падает до первой записи).');
-  console.log('Файл создаёт сам хук вместе с заголовком, при первом же вызове.');
+  console.log(msg('tool-usage.log_missing'));
   process.exitCode = 1;
 }
 
-// Записи журнала → узел → инструмент → сколько попыток.
+// The log records -> node -> tool -> how many attempts.
 function countByNode(rows) {
   const byNode = new Map();
   for (const r of rows) {
@@ -256,7 +253,7 @@ function countByNode(rows) {
   return byNode;
 }
 
-// Файлы по узлам: сколько разных файлов затронул каждый узел (строки с путём; старые строки без пути не считаются).
+// The files by nodes: how many different files each node touched (the lines with a path; old lines without a path do not count).
 function printFilesByNode(rows) {
   const by = new Map();
   for (const r of rows) {
@@ -265,46 +262,48 @@ function printFilesByNode(rows) {
     by.get(r.node).add(r.file);
   }
   console.log('');
-  if (!by.size) { console.log('Файлы по узлам: строк с путём пока нет.'); return; }
-  console.log('Файлы по узлам (разных файлов в журнале):');
+  if (!by.size) { console.log(msg('tool-usage.files_none')); return; }
+  console.log(msg('tool-usage.files_header'));
   for (const [node, set] of [...by].sort((a, b) => b[1].size - a[1].size)) console.log(`  ${node}: ${set.size}`);
 }
 
-// Честная оговорка: журнал хранит голое tool_name, поэтому две записи вида
-// Bash(...) с разными аргументами для него неразличимы.
+// The honest caveat: the log keeps the bare tool_name, so two records like
+// Bash(...) with different arguments are indistinguishable to it.
 function printAmbiguity(role, usedBases) {
   const ambiguous = role.decls.filter((d) => d.includes('(') && usedBases.has(baseName(d)));
   for (const b of new Set(ambiguous.map(baseName))) {
     const sameBase = role.decls.filter((d) => baseName(d) === b);
     if (sameBase.length > 1 || sameBase[0].includes('(')) {
-      console.log(`     (${b}: журнал хранит только имя инструмента, без аргументов —` +
-        ` какая именно из ${sameBase.length} записей \`${b}(...)\` сработала, отсюда не видно)`);
+      console.log(msg('tool-usage.ambiguity', { base: b, count: sameBase.length }));
     }
   }
 }
 
-// Объявленное против применённого: сколько возится зря.
+// The declared against the applied: how much is carried in vain.
 function printDeclared(role, used) {
   if (role.decls === null) {
-    console.log('   объявлено: поле tools во фронтматтере отсутствует — роль наследует');
-    console.log('   весь набор сессии, вычитать не из чего.');
+    console.log(msg('tool-usage.declared_null_1'));
+    console.log(msg('tool-usage.declared_null_2'));
     return;
   }
   const usedBases = new Set([...used.keys()]);
   const unused = role.decls.filter((d) => !usedBases.has(baseName(d)));
-  console.log(`   объявлено ${role.decls.length}, тянулся к ${role.decls.length - unused.length}, ` +
-    `возится зря ${unused.length} (ни одной попытки — доказанно лишние):`);
-  if (unused.length === 0) console.log('     — (весь объявленный арсенал в деле)');
+  console.log(msg('tool-usage.declared_line', {
+    declared: role.decls.length, reached: role.decls.length - unused.length, vain: unused.length,
+  }));
+  if (unused.length === 0) console.log(msg('tool-usage.all_in_use'));
   else unused.forEach((d) => console.log(`     · ${d}`));
   printAmbiguity(role, usedBases);
 }
 
 function printNode(node, used, role) {
   const total = sumCounts(used);
-  console.log(`\n── ${node} ${role ? `(.claude/agents/${role.file})` : '(роли нет — вызовы вне узлов)'}`);
-  if (total === 0) console.log('   тянулся: ни к чему — ни одной записи в журнале');
+  console.log(msg('tool-usage.node_header', {
+    node, role: role ? `(.claude/agents/${role.file})` : msg('tool-usage.node_no_role'),
+  }));
+  if (total === 0) console.log(msg('tool-usage.node_no_calls'));
   else {
-    console.log(`   тянулся к (${total} попыток, не обязательно удачных):`);
+    console.log(msg('tool-usage.node_calls', { total }));
     [...used.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .forEach(([tool, n]) => console.log(`     ${String(n).padStart(5)} × ${tool}`));
@@ -314,12 +313,11 @@ function printNode(node, used, role) {
 
 function printHookErrors(errors) {
   if (!errors.length) return;
-  console.log(`\n── ПОЛОМКИ ХУКА: ${errors.length}`);
+  console.log(msg('tool-usage.hook_errors', { count: errors.length }));
   const byReason = new Map();
   for (const e of errors) bump(byReason, e.reason);
   [...byReason.entries()].forEach(([reason, n]) => console.log(`   ${String(n).padStart(5)} × ${reason}`));
-  console.log('   Хук отработал, но не смог записать обычную строку. Эти вызовы в счёт');
-  console.log('   выше не попали — значит «не пользовался» по ним читать нельзя.');
+  console.log(msg('tool-usage.hook_errors_note'));
   process.exitCode = 1;
 }
 
@@ -330,12 +328,12 @@ function main() {
   printPreamble();
   if (!alive) { printLogMissing(); return; }
   if (rows.length === 0) {
-    console.log('Записей нет. Журнал существует — значит хук жив и заголовок писал он;');
-    console.log('вызовов инструментов с момента его появления не было.');
+    console.log(msg('tool-usage.empty_log_1'));
+    console.log(msg('tool-usage.empty_log_2'));
   }
 
   const byNode = countByNode(rows);
-  // узлы: сперва те, у кого есть роль, потом сессия и незнакомые
+  // nodes: first those with a role, then the session and the unknown ones
   const nodeNames = [...new Set([...byNode.keys(), ...declared.keys()])].sort();
   for (const node of nodeNames) printNode(node, byNode.get(node) || new Map(), declared.get(node));
 
@@ -344,8 +342,8 @@ function main() {
   printHookErrors(errors);
 }
 
-// Разбор отдан наружу (вкладка «Борт»), печать остаётся здесь. Запуск main() — только
-// когда файл запущен напрямую: require из .forma/dashboard/generate.js ничего не печатает.
+// The parsing is given away (the "Board" tab), the printing stays here. main() runs only
+// when the file is run directly: a require from .forma/dashboard/generate.js prints nothing.
 module.exports = { readDeclared, readLog, readCardIds, baseName, splitTools };
 
 if (require.main === module) main();
