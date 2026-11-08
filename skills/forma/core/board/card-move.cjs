@@ -5,7 +5,9 @@
 //                                 [--duration-ms MS --agent-id <id> [--tokens N] [--cache-read R] [--turns K] [--engine <тег движка>]]
 //                                 [--kit "<текст>"|-] [--result "<текст>"|-] [--session-spend <NNN>]
 //
-// <card>  — «NNN» или «card-NNN»; карточка живая (в done/ — уже закрыта, передавать нечего).
+// <card>  — «NNN», «card-NNN» или полный код «card-NNN-slug»; выборка точная: короткий номер — только при
+//           единственном кандидате, неоднозначность (несколько карточек под одним номером) — отказ со списком
+//           кандидатов, ничего не записывается (назовите полный код); в done/ — уже закрыта, передавать нечего.
 // --to    — куда передаём; таблица §7 → поля frontmatter, ключ этапа §6:
 //             kit     todo        Kit      stage kit      пишет Intent: открыл цикл, карточка в комплектацию
 //             run     in-progress Run      stage exec     пишет Kit: комплект готов, исполнение
@@ -30,14 +32,16 @@
 //           --session-spend NNN — только с --to accept|close: тем же вызовом дописывает строку расхода `Intent` по карточке
 //           (вывод `card-session-spend.cjs NNN --write` адаптера движка, строка перед строкой этапа); NNN — номер этой же карточки.
 //           Скрипта у адаптеров нет или он ничего не дал — ошибка до любой записи. Нового расхода нет — строка не пишется, это не ошибка.
-// Закрытие круга: node .forma/board/card-move.cjs --to core-close <NNN…> --note "<основание>" [--dry] — пишет `Core`: на каждой названной
+// Закрытие круга: node .forma/board/card-move.cjs --to core-close <NNN|card-NNN-slug…> --note "<основание>" [--dry] — пишет `Core`: на каждой названной
 //           карточке (done, assignee "Core") строка «закрыто — <основание>» в «История» и assignee: null; остальное не меняется.
 //           Неизвестный номер, повтор или карточка не в done/Core — стоп до любой записи. Флаги расхода и секций здесь не принимаются.
 // --dry   — показать изменения, файл не писать.
+// --selftest — приборы выборки карточки по коду во временном каталоге ОС (фиктивная доска); ничего не пишет; exit 0 — зелёный.
 // Пишет `modified` (на `close` — и `completedAt`), дописывает строку в «История», затем проверяет доску по этой карточке.
 // Часть ядра: одна для всех движков, путей движка не знает.
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { makeCli } = require('../dashboard/lib/cli.cjs');
 const { cardFiles, parseFrontmatter, frontmatterBlock, zoneHeadingIn, labelsOf } = require('../dashboard/lib/card.cjs');
@@ -62,7 +66,79 @@ const TARGETS = {
   close: { status: 'done', assignee: 'Core', stage: 'close', by: 'Intent' },
 };
 
-const id = normalize(cli.positional()[0]);
+// Код карточки: «NNN»|«card-NNN» → короткий «card-NNN» (normalize); «card-NNN-slug» → полный код; иначе null.
+function cardCode(word) {
+  const s = String(word || '').trim();
+  if (/^(?:card-)?\d+$/.test(s)) return normalize(s);
+  return /^card-\d+-.+$/.test(s) ? s : null;
+}
+
+/** Единая выборка карточки по коду — точный номер, fail-closed при неоднозначности:
+ *  полный код card-NNN-slug — точное имя файла, ровно один; короткий номер — точное имя или один префикс,
+ *  только при единственном кандидате; два и больше — `{ ambiguous: [относительные пути] }`, вызывающий
+ *  отказывает со списком кандидатов до любой записи. Только читает, ничего не пишет. */
+function resolveCardFiles(root, cid) {
+  const cands = /^card-\d+$/.test(cid)
+    ? cardFiles(root, (n) => n === cid + '.md' || (n.startsWith(cid + '-') && n.endsWith('.md')))
+    : cardFiles(root, (n) => n === cid + '.md');
+  if (cands.length === 1) return { file: cands[0] };
+  if (cands.length > 1) return { ambiguous: cands.map((f) => path.relative(root, f).replace(/\\/g, '/')) };
+  return {};
+}
+
+const dieAmbiguous = (cid, rels) =>
+  die(`«${cid}» — неоднозначный номер, кандидаты (назовите полный код):\n  ${rels.join('\n  ')}\nничего не записано`);
+
+// ---- --selftest: приборы выборки во временном каталоге ОС (по образцу goal-freeze.cjs) -----------
+
+function selftest() {
+  const base = process.env.FORMA_TEST_TMP && fs.existsSync(process.env.FORMA_TEST_TMP) ? process.env.FORMA_TEST_TMP : os.tmpdir();
+  const dir = fs.mkdtempSync(path.join(base, 'card-move-'));
+  const results = [];
+  const check = (name, cond) => results.push({ ok: !!cond, name });
+  // коды фикстур собираются на ходу (конвенция динамических фикстурных кодов): литерал card-NNN в чистой зоне флагает сканер
+  const probe = (n) => ['card', String(n)].join('-');
+  const LIVE = probe(901) + '-zhivaya-proba', DONE = probe(901) + '-zakrytaya-proba', UNIQUE = probe(902) + '-unikalnaya-proba';
+  const mk = (name) => `---\nid: "${name}"\nstatus: "todo"\n---\n\n# ${name}\n\n## Task\nпроба выборки.\n\n## History\n\n## Result\n`;
+  const board = path.join(dir, '.devtool', 'features');
+  const snap = () => [board, path.join(board, 'done')].flatMap((d) => fs.existsSync(d)
+    ? fs.readdirSync(d).filter((n) => n.endsWith('.md')).map((n) => n + ':' + fs.readFileSync(path.join(d, n), 'utf8')) : []).join('#');
+  try {
+    fs.mkdirSync(path.join(board, 'done'), { recursive: true });
+    fs.writeFileSync(path.join(board, LIVE + '.md'), mk(LIVE));
+    fs.writeFileSync(path.join(board, 'done', DONE + '.md'), mk(DONE));
+    fs.writeFileSync(path.join(board, UNIQUE + '.md'), mk(UNIQUE));
+    // (а) полный код резолвится среди префиксно-коллизионных имён
+    const ra = resolveCardFiles(dir, DONE);
+    check('(а) полный код при коллизии номеров — ровно done-файл', !!ra.file && path.basename(ra.file, '.md') === DONE);
+    const ra2 = resolveCardFiles(dir, LIVE);
+    check('(а) полный код живой — ровно живой файл', !!ra2.file && path.basename(ra2.file, '.md') === LIVE);
+    // (б) короткий номер с двумя кандидатами — отказ со списком
+    const rb = resolveCardFiles(dir, probe(901));
+    check('(б) короткий номер при коллизии — отказ со списком', !!rb.ambiguous && rb.ambiguous.length === 2);
+    check('(б) в списке оба пути — живой и done', !!rb.ambiguous && rb.ambiguous.some((p) => p.endsWith(LIVE + '.md')) && rb.ambiguous.some((p) => p.endsWith(DONE + '.md')));
+    // (в) короткий номер уникальный — резолвится как раньше
+    const rv = resolveCardFiles(dir, probe(902));
+    check('(в) короткий уникальный резолвится', !!rv.file && path.basename(rv.file, '.md') === UNIQUE);
+    // (г) отказ ничего не пишет
+    const before = snap();
+    resolveCardFiles(dir, probe(901));
+    check('(г) отказ ничего не пишет — фиктивная доска не изменена', snap() === before);
+    // (д) неизвестный номер — пустая выборка (вызов умирает «нет на доске»)
+    const rd = resolveCardFiles(dir, probe(500));
+    check('(д) неизвестный номер — нет кандидатов', !rd.file && !rd.ambiguous);
+    const failed = results.filter((r) => !r.ok);
+    console.log((failed.length ? '✗ ' : '✓ ') + (failed.length
+      ? 'не сошлось: ' + failed.map((r) => r.name).join('; ')
+      : 'выборка точная, ' + results.length + ' проб зелёные: полный код резолвится среди префиксных коллизий, короткий при коллизии отказывается со списком обоих путей, короткий уникальный резолвится как раньше, отказ ничего не пишет'));
+    return failed.length === 0;
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+if (process.argv.includes('--selftest')) process.exit(selftest() ? 0 : 1);
+
+const id = cardCode(cli.positional()[0]);
 const to = arg('to');
 const note = arg('note');
 
@@ -88,17 +164,18 @@ if (to === 'core-close') {
     if (cli.argv[i].startsWith('--')) { i++; continue; }
     words.push(cli.argv[i]);
   }
-  const ids = words.map(normalize);
+  const ids = words.map(cardCode);
   if (!ids.length || ids.some((x) => !x)) die('core-close: нужны номера карточек — --to core-close NNN [NNN…] --note "<основание>"');
   if (!note || /[\n]/.test(note)) die('нужен --note "<основание>" в одну строку');
   if (['kit', 'result', 'session-spend', 'tokens', 'duration-ms', 'agent-id'].some((k) => process.argv.includes('--' + k))) die('core-close: другие флаги расхода и секций не принимаются');
   const day0 = new Date().toISOString().slice(0, 10);
   const plan = [];
   for (const cid of ids) {
-    const fs0 = cardFiles(ROOT, (n) => n.startsWith(cid + '-') && n.endsWith('.md'));
-    if (!fs0.length) die(`карточки ${cid} нет на доске — ничего не записано`);
-    if (plan.some((p) => p.cid === path.basename(fs0[0], '.md'))) die(`${cid} назван дважды — ничего не записано`);
-    const f0 = fs0[0];
+    const found = resolveCardFiles(ROOT, cid);
+    if (found.ambiguous) dieAmbiguous(cid, found.ambiguous);
+    if (!found.file) die(`карточки ${cid} нет на доске — ничего не записано`);
+    if (plan.some((p) => p.cid === path.basename(found.file, '.md'))) die(`${cid} назван дважды — ничего не записано`);
+    const f0 = found.file;
     const cid0 = path.basename(f0, '.md');
     let tx = fs.readFileSync(f0, 'utf8');
     const fm0 = parseFrontmatter(tx);
@@ -235,7 +312,7 @@ if (process.argv.includes('--session-spend') && (sessionSpendArg == null || sess
 if (sessionSpendArg != null) {
   if (to !== 'accept' && to !== 'close') die('--session-spend пишется только при --to accept|close (расход Intent дописывается при принятии)');
   if (!/^\d{1,4}$/.test(sessionSpendArg)) die(`--session-spend "${sessionSpendArg}" — нужен номер карточки NNN`);
-  if (sessionSpendArg.padStart(3, '0') !== id.replace(/^card-0*(\d+)$/, (m, d) => d.padStart(3, '0'))) die(`--session-spend ${sessionSpendArg} — не номер карточки ${id}`);
+  if (sessionSpendArg.padStart(3, '0') !== id.replace(/^card-0*(\d+)(?:-.+)?$/, (m, d) => d.padStart(3, '0'))) die(`--session-spend ${sessionSpendArg} — не номер карточки ${id}`);
 }
 function sessionSpendLines(num) {
   const E = require('../dashboard/lib/engines.cjs');
@@ -250,11 +327,12 @@ function sessionSpendLines(num) {
   return r.stdout.split(/\r?\n/).filter((l) => l.startsWith('- '));
 }
 
-// 1. Карточка: только живая
-const files = cardFiles(ROOT, (n) => n.startsWith(id + '-') && n.endsWith('.md'));
-if (!files.length) die(`карточки ${id} нет на доске`);
-const file = files.find((f) => path.dirname(f) === BOARD);
-if (!file) die(`${id} лежит в done/ — закрытую карточку не передают`);
+// 1. Карточка: только живая — единая выборка по точному номеру, fail-closed при неоднозначности
+const found = resolveCardFiles(ROOT, id);
+if (found.ambiguous) dieAmbiguous(id, found.ambiguous);
+if (!found.file) die(`карточки ${id} нет на доске`);
+const file = found.file;
+if (path.dirname(file) !== BOARD) die(`${id} лежит в done/ — закрытую карточку не передают`);
 const cardId = path.basename(file, '.md');
 
 let text = fs.readFileSync(file, 'utf8');

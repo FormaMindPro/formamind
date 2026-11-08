@@ -7,6 +7,11 @@
 //   node .claude/scripts/external-model-bridge.cjs --prompt-file <path> [--provider deepseek|openrouter] [--model ...] [--max-tokens 8192] [--out <path>]
 //   node .claude/scripts/external-model-bridge.cjs --prompt "<текст>" ...
 //
+// Запрет 17 (AGENTS.md §5): наружу уходит только скрабленое. CLI-путь чистит --prompt/--prompt-file
+// и --system тем же модулем, что и Отвес (plumb-scrub.cjs): значения из .env и VARS/ → [[имя]],
+// шаблоны (адреса, токены, пути) → метки. Секретоподобный остаток — отказ fail-closed (код 2,
+// сетевой вызов не выполняется); откат — к исполнителю своей семьи (Agent tool), не повтор запроса.
+//
 // Ключ — DEEPSEEK_API_KEY / OPENROUTER_API_KEY, читается из .env в корне проекта (не из процесса/оболочки — запрет 15, AGENTS.md §5).
 // Печатает содержимое ответа модели в stdout (или пишет в --out, если задан); ничего лишнего не добавляет —
 // вызывающий узел разбирает результат сам, как разбирал бы текст субагента.
@@ -227,6 +232,21 @@ function callChatCompletions({ provider, apiKey, model, system, prompt, maxToken
   });
 }
 
+// Скраб исходящего текста (запрет 17): секреты .env/VARS → [[имя]], остаток — отказ с кодом 2.
+// Отказ происходит до загрузки ключа и до любого сетевого вызова.
+function scrubOutgoing(text) {
+  const { loadSecrets, scrub, residue } = require('./plumb-scrub.cjs');
+  const siteHosts = new Set();
+  const secrets = loadSecrets(path.join(__dirname, '..', '..'), siteHosts);
+  const { text: scrubbed } = scrub(text, secrets, siteHosts);
+  const why = residue(scrubbed, secrets);
+  if (why.length) {
+    console.error(`scrub-refused: текст не прошёл скраб (${why.join('; ')}) — вызов внешней модели отменён (запрет 17), используйте исполнителя своей семьи.`);
+    process.exit(2);
+  }
+  return scrubbed;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.prompt && !args.promptFile) {
@@ -241,7 +261,8 @@ async function main() {
     console.error('Для --provider openrouter нужен явный --model (например z-ai/glm-5.3-flash)');
     process.exit(1);
   }
-  const prompt = args.prompt || fs.readFileSync(args.promptFile, 'utf8');
+  const prompt = scrubOutgoing(args.prompt || fs.readFileSync(args.promptFile, 'utf8'));
+  const system = args.system ? scrubOutgoing(args.system) : undefined;
   const apiKey = loadEnvKey(PROVIDER_HOSTS[args.provider].envKey);
 
   const t0 = Date.now();
@@ -249,7 +270,7 @@ async function main() {
     provider: args.provider,
     apiKey,
     model: args.model,
-    system: args.system,
+    system,
     prompt,
     maxTokens: args.maxTokens,
     reasoningEffort: args.reasoningEffort,
@@ -293,4 +314,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { loadEnvKey, loadEnvKeyOptional, callChatCompletions, callDecisions, estimateCostUsd, PRICING };
+module.exports = { loadEnvKey, loadEnvKeyOptional, callChatCompletions, callDecisions, estimateCostUsd, PRICING, scrubOutgoing };

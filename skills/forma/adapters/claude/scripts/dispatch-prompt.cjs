@@ -13,8 +13,11 @@
 //
 // Usage:
 //   node .claude/scripts/dispatch-prompt.cjs --node Kit --card .devtool/features/card-NNN-....md \
-//        [--marker assembling] [--note "free text"] [--with-task]
+//        --marker <holding course|counting cost|assembling|preserving> [--note "free text"] [--with-task]
 //   node .claude/scripts/dispatch-prompt.cjs --self-test
+//
+// The marker is the sender's explicit position decision (law §4) — there is no default: a build
+// without an explicit --marker is rejected with a named problem, same as a marker outside the four.
 // Exit: 0 prompt printed, 1 usage/validation error, 2 scrub refused (secret-like residue).
 
 const fs = require('fs');
@@ -105,6 +108,9 @@ function selfTest() {
   const badMarker = build({ node: 'Kit', card: 'x.md', marker: 'just do it', root: process.cwd() });
   ok('unknown marker is rejected with a named problem', (badMarker.problems || []).some(p => p.includes('marker')));
 
+  const noMarker = build({ node: 'Kit', card: 'x.md', root: process.cwd() });
+  ok('missing --marker is rejected with a named problem', (noMarker.problems || []).some(p => p.includes('marker')));
+
   const badNode = build({ node: 'Writer', card: 'x.md', marker: 'assembling', root: process.cwd() });
   ok('unknown node is rejected with a named problem', (badNode.problems || []).some(p => p.includes('node')));
 
@@ -117,7 +123,7 @@ function selfTest() {
 function main() {
   const argv = process.argv.slice(2);
   if (argv.includes('--self-test')) selfTest();
-  const a = { node: null, card: null, marker: 'assembling', note: null, withTask: false, root: process.cwd() };
+  const a = { node: null, card: null, marker: null, note: null, withTask: false, root: process.cwd() };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i];
     if (v === '--node') a.node = argv[++i];

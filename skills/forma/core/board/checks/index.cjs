@@ -20,6 +20,8 @@ module.exports = [
   require('./agent-id.cjs'),
   require('./engine-tag.cjs'),
   require('./ledger-parity.cjs'),
+  require('./budget-stop.cjs'),
+  require('./human-row-trace.cjs'),
   require('./route-regression.cjs'),
   require('./check-ready.cjs'),
 ];

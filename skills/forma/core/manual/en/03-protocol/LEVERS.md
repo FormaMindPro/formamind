@@ -28,6 +28,7 @@ Clean zone: no card codes, dates or project names here (`AGENTS.md`, prohibition
 | Context at session start grows unnoticed | Live eval of start context, before/after | `test/eval-start-context.cjs` | partial |
 | A repeated task re-solved from scratch each time | Skills for repeatable steps; project knowledge written to `project/` once | `SKILLS.md`, skill `project-knowledge` | partial |
 | Same diagnosis repeated across reassemblies | Second identical diagnosis is a stop, not another attempt | `AGENTS.md` prohibition 14 | in place |
+| Thousands of temporary test files choke disk queues and wear SSD | Adaptive RAM disk in memory (R:\forma-tmp), up to 7.5x speedup on small files, eliminates CPU I/O wait, zero TBW wear | `scripts/setup-ramdisk.ps1`, `test-runner.cjs`, `FUNCTIONS.md` | in place |
 
 ## Open leaks (to investigate)
 

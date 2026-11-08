@@ -264,6 +264,10 @@ which names the Claude installer's own settings — reading them is not writing 
 The zone's test guards the one thing that would silently mis-count: no role of this zone may
 prescribe another engine's tag.
 
+## Credentials guard (§5, prohibition 15: held by discipline)
+
+Values of credentials (API keys, tokens, passwords, PEM private keys) live only in `.env` at the project root and `project/VARS/credentials.md`. The plugin package's hooks cover destructive commands and session events, not file writes, so prohibition 15 is held **by discipline** (ENGINE-CONTRACT.md): before a write or commit of a file that may carry a credential, the node runs `node .forma/board/checks/credentials-zone.cjs --file <path>`; a finding stops the write (fail-closed). References by name — `[[name]]` for `VARS/`, `VARIABLE_NAME` for `.env` — are never values and are always allowed.
+
 ## Verification of this zone
 
 - `.minimax/tests/test-minimax-adapter.cjs` — the form of the adapter, the presence and content

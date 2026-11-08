@@ -98,3 +98,7 @@ The main Antigravity session runs as `Intent`: before its first reply it reads `
 The installation and wiring of the Gemini adapter is verified **by construction**:
 * Registered in `.forma/install-manifest.json` with profile `.agents/verify-profile.cjs` and expected hooks (`guard-delete.cjs`, `unlock-delete.cjs`, `post-invocation.cjs`).
 * Verified by running `node .forma/verify/verify-install.cjs`.
+
+## Credentials guard (§5, prohibition 15: held by discipline)
+
+Values of credentials (API keys, tokens, passwords, PEM private keys) live only in `.env` at the project root and `project/VARS/credentials.md`. The hook mechanism of this engine in this project intercepts `run_command` and `invoke_subagent` only — a file write carries no hook event, so prohibition 15 is held **by discipline** (ENGINE-CONTRACT.md): before a write or commit of a file that may carry a credential, the node runs `node .forma/board/checks/credentials-zone.cjs --file <path>`; a finding stops the write (fail-closed). References by name — `[[name]]` for `VARS/`, `VARIABLE_NAME` for `.env` — are never values and are always allowed.

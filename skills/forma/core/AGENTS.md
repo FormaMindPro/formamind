@@ -103,9 +103,7 @@ Two, declared as numbers in `PROJECT.md`: **attempts** (cap per task) and **volu
 
 **No start without the two thresholds and the nine goals** (and a per-cycle limit for each paid external service); asked at once in the interview, never assumed. The one exception is an agreed `demo` cycle — `intent-session-start.md`.
 
-**Spend is counted by fact, not by impression.** A node doesn't know its own spend from inside — it is in the call's metadata. The contract — skeleton, every field, the `unknown` state, external model and service, `Intent`'s own lines — is `.forma/manual/en/03-protocol/ECONOMY.md`, one for every engine; the engine's own fields — its §8. What holds here:
-
-- **The caller (or the engine's hook) writes the line right after the return** into the card's `## History`, from the call's metadata, never estimated; the engine tag opens the description (`spendTag`, §8). `unknown` marks only what the engine never returned — never zero. Format and fields — `spend-line.md`.
+**Spend is counted by fact, not by impression** — from the call's metadata, written by the caller (or the engine's hook) right after the return into the card's `## History`, never estimated; `unknown` marks only what the engine never returned, never zero. Holders: `ledger-recorder.cjs`, `card-session-spend.cjs --auto`, `ledger-parity.cjs`; fields — `spend-line.md`, `ECONOMY.md`, engine's §8 (`spendTag`).
 
 **Good / fast / cheap — good at the center, unbending to the other two.** `Intent` holds cheap, `Kit` holds fast, `Core` holds good. `Spec` and `Run` are deliberately outside this: their job is execution, not tracking a limit.
 
@@ -144,12 +142,12 @@ Phrased affirmatively — what must hold, not what's forbidden. Numbering is fix
 12. A defect outside one's own work goes back per the route table — never fixed on the spot.
 13. A discrepancy is named with both: the address and the expected value — either alone isn't enough.
 14. A second identical diagnosis in a row is a stop, not another reassembly.
-15. Access credentials live in exactly one of two places, by kind: site/project access only in `VARS/credentials.md`; environment access only in `.env` at the project root (outside git). A card references a credential by name and status, never by value, in any zone — `card-and-board.md`.
-16. Clean zones — files that ship to other projects (law, adapters, roles, skills, scripts, hooks, manual, dashboard, README, `docs/`, templates) — carry no trace of a project: no card codes, dates, hashes, domains, names, personal data. The history lives in cards, `.forma/living/`, `JOURNAL.md`, the changelog — `intent-housekeeping.md`.
+15. Credentials live by kind in exactly one place — site/project: `VARS/credentials.md`; environment: `.env` at the root; a card names a credential and its status, never its value (`credentials-zone.cjs`, `check-credentials.sh`).
+16. Clean zones — files that ship to other projects (law, roles, skills, scripts, hooks, templates) — carry no trace of a project; the history lives in cards, `.forma/living/`, `JOURNAL.md` (`check-clean-zone.sh`, `sync-engines --check`).
 
-17. Only the scrubbed leaves the model family. Whatever goes to an external model or service first passes a scrubbing script, not a model; a refusal is fail-closed: the call falls back to the in-family executor, never sent unscrubbed — `kit.md`, `spec.md`.
+17. Only the scrubbed leaves the model family: whatever goes to an external model or service first passes a scrubbing script; a refusal is fail-closed — in-family fallback (`plumb-scrub.cjs`).
 
-18. Commit messages of the protocol repository are English only. The protocol is published, and its history reads in one language for everyone; the project repository keeps its own language. A message with Cyrillic is a stop in `forma-commit.cjs` and in the pre-push check, never a warning.
+18. Commit messages of the protocol repository are English only; the project repository keeps its own language — Cyrillic is a stop in `forma-commit.cjs` and the pre-push check, never a warning.
 
 **Narrow exception to prohibition 1 — a short mechanical task:** `Intent` may execute a change of literally named values across an explicitly listed set of files within epics "3. Project protocol" or "8. Competence segments", without `Kit` and without a separate confirming node; a card is still opened and names the exception — `intent-housekeeping.md`.
 
@@ -159,14 +157,14 @@ Phrased affirmatively — what must hold, not what's forbidden. Numbering is fix
 
 A card is five fields (kind | what it delivers | readiness criterion | attempt budget | where it goes next), one goal label, one `route-N` label, four zones (Task, Kit, History, Result), a `card-NNN` code. **Before creating, editing or checking a card, read `card-and-board.md`** — fields, labels, route reasons, stage lines, kinds, zones.
 
-The readiness criterion is written in two parts — **gate and verdict**: the gate is machine clauses, each stated as a `check:` command and judged by `.forma/board/check-ready.cjs`; the verdict is what the command cannot decide, left to judgment. A card does not close without a green gate — or, for a red one, an `exception:` line recorded in History; the full convention — `card-and-board.md`.
+The readiness criterion is two parts — **gate and verdict**: machine `check:` clauses judged by `check-ready.cjs`, and what the command cannot decide, left to judgment. A card does not close without a green gate — or, for a red one, an `exception:` line in History; the convention — `card-and-board.md`.
 
-**Keys are English, whatever the project language.** Zone headings (Task, Kit, History, Result), the card kind (work, tooling, decision), the Kit unit keys (Role, Skill, Tool, Access, Data, Model), history verbs (attempt, closed, human approved) and the keys of `PROJECT.md` are English words of one dictionary, `.forma/i18n/keys.json`; code reads them by key, never by a Russian spelling. A language is only a localization: labels in the dictionary and the texts after the key. `check-board` check `key-language` reports a card with a non-English key; `node .forma/board/migrate-keys.cjs --apply` fixes it.
+**Keys are English, whatever the project language** — zone headings, card kinds, Kit unit keys, history verbs, `PROJECT.md` keys: one dictionary, `.forma/i18n/keys.json`; code reads them by key, a language is only a localization. `key-language` reports a non-English key; `node .forma/board/migrate-keys.cjs --apply` fixes it.
 
-**Material born of a card** — interview records, prototypes, images, evidence, an external model's output — lives only in `project/cards/card-NNN/`, never in the repository root or anywhere outside the card's folder.
+**Material born of a card** — records, prototypes, images, evidence, an external model's output — lives only in `project/cards/card-NNN/`, never outside the card's folder (`card-materials.cjs`).
 
 ---
 
 ## 7. Board
 
-`.devtool/features/` is the board; a node taking a card syncs both `status` and `assignee` (`backlog` Spec · `todo` Kit · `in-progress` Run · `review` Intent · `done` Core, then null). **Before moving a card, read `card-and-board.md`** — the table, short route, wave gate, returns, cycle closing.
+`.devtool/features/` is the board; a node taking a card syncs both `status` and `assignee` — by `card-move.cjs`; before moving a card, read `card-and-board.md`.

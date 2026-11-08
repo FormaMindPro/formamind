@@ -3,6 +3,9 @@
  * Usage: node .forma/board/run-in-card.cjs <card> -- node generate-diffui-focus-assets.cjs [outputDir] [reportPath]
  * Paths: argv > CARD_ASSETS/CARD_DIR (set by run-in-card) > assets/focus in the repository root.
  * Credentials are read only from the repository-root .env file.
+ * Prohibition 17 (AGENTS.md §5): only scrubbed content leaves. Every illustration prompt is
+ * scrubbed with the same module the Plumb uses (plumb-scrub.cjs): .env/VARS values → [[name]],
+ * secret-like residue → fail-closed refusal, no request is sent.
  */
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -38,17 +41,32 @@ async function fetchOrThrow(url, options) {
   return response;
 }
 
+// Prohibition 17: scrub every outgoing prompt before it can reach the network. Fail-closed:
+// a secret-like residue aborts the whole run before any request is made.
+function scrubPrompts(rows) {
+  const { loadSecrets, scrub, residue } = require('./plumb-scrub.cjs');
+  const siteHosts = new Set();
+  const secrets = loadSecrets(root, siteHosts);
+  return rows.map(([filename, reference, prompt]) => {
+    const { text } = scrub(prompt, secrets, siteHosts);
+    const why = residue(text, secrets);
+    if (why.length) throw new Error(`scrub-refused: ${filename}: prompt did not pass the scrub (${why.join('; ')}) — sending cancelled.`);
+    return [filename, reference, text];
+  });
+}
+
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
   const env = readEnv(await fs.readFile(path.join(root, '.env'), 'utf8'));
   const token = env.DIFFUI_BUILD_TOKEN;
   if (!token) throw new Error('DIFFUI_BUILD_TOKEN is absent from the root .env file.');
-  const report = { dryRun, outputDir, assets: [], startedAt: new Date().toISOString() };
+  const scrubbed = scrubPrompts(assets);
+  const report = { dryRun, outputDir, scrubbedPrompts: scrubbed.length, assets: [], startedAt: new Date().toISOString() };
   if (dryRun) {
-    report.assets = assets.map(([filename, reference]) => ({ filename, reference, status: 'planned' }));
+    report.assets = scrubbed.map(([filename, reference]) => ({ filename, reference, status: 'planned' }));
   } else {
     await fs.mkdir(outputDir, { recursive: true });
-    for (const [filename, reference, prompt] of assets) {
+    for (const [filename, reference, prompt] of scrubbed) {
       const referenceImageUrl = `https://diffui.ai/image/${reference}.webp?authToken=${encodeURIComponent(token)}`;
       const generated = await fetchOrThrow('https://diffui.ai/api/build/generate-image', {
         method: 'POST',

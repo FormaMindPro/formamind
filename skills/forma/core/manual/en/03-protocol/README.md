@@ -26,6 +26,7 @@ Complete reference documents of the engine live here — they are not divided in
 | [LOCALIZATION.md](LOCALIZATION.md) | dashboard localization: two languages, dictionaries, the `locale-parity` check |
 | [PROTOCOL-DEVELOPMENT.md](PROTOCOL-DEVELOPMENT.md) | developing the protocol from a project: clone, engine alignment, transfer, trace check, push |
 | [ENGINE-MAP.md](ENGINE-MAP.md) | the engine map: three levels of rules with sizes, sources outside them, machinery, hooks, what the engine produces, gaps found |
+| [FUNCTIONS.md](FUNCTIONS.md) | engine functions and architecture: virtual disk (RAM disk), CPU interaction, comparative benchmark results |
 
 ## Demo cycle
 

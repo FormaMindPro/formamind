@@ -19,9 +19,12 @@
  * Использование:
  *   node .claude/scripts/sync-engines.cjs [--check] [--diff] [--quiet] [--file <путь>]
  *   node .claude/scripts/sync-engines.cjs --apply [--dry-run]
+ *   node .claude/scripts/sync-engines.cjs --selftest
  *
  * Флаги:
  *   --check    (по умолчанию) Сверить пары файлов и вывести статус. Код 0 — паритет, 1 — дрейф.
+ *   --selftest Самопроба проверок реестра, которые её несут (экспортируют selftest()): приборы во
+ *              временном каталоге ОС. Код 0 — все пробы зелёные, 1 — есть красная или самопроб нет.
  *   --diff     Показать строки с расхождениями для файлов, где обнаружен дрейф.
  *   --quiet    Вывести только одну строку статуса (удобно для хуков).
  *   --file     Один файл (хук чистых зон): след проекта — в вывод, код 0 всегда; вне зоны — молчание.
@@ -143,8 +146,31 @@ function runApply(args) {
   process.exit(problems.length ? 1 : 0);
 }
 
+/** `--selftest`: самопроба проверок реестра, которые её несут; приборы каждой — во временном каталоге ОС. */
+function runSelftest() {
+  const withSelftest = CHECKS.filter((c) => typeof c.selftest === 'function');
+  if (!withSelftest.length) {
+    console.log('sync-engines --selftest: в реестре нет проверок с самопробой (selftest)');
+    process.exit(1);
+  }
+  let bad = 0;
+  for (const c of withSelftest) {
+    try {
+      const st = c.selftest();
+      if (!st || typeof st.ok !== 'boolean') { bad += 1; console.log(`\u2717 ${c.id}: самопроба не вернула { ok, note }`); continue; }
+      if (!st.ok) bad += 1;
+      console.log((st.ok ? '\u2713 ' : '\u2717 ') + c.id + ': ' + st.note);
+    } catch (e) {
+      bad += 1;
+      console.log(`\u2717 ${c.id}: самопроба упала — ` + String((e && e.message) || e));
+    }
+  }
+  process.exit(bad ? 1 : 0);
+}
+
 function main() {
   const args = process.argv.slice(2);
+  if (args.includes('--selftest')) runSelftest();
   if (args.includes('--apply')) runApply(args);
   const fi = args.indexOf('--file');
   if (fi >= 0) checkOneFile(args[fi + 1]);
