@@ -1,11 +1,11 @@
 ---
 name: forma-grill-with-ui
-description: "Grilling-интервью на локальной странице браузера вместо терминала: все вопросы с рекомендациями разом, ответ в любом порядке, обсуждение по каждому, одна кнопка «Send to Agent». Запуск — «forma/форма grill with ui» или /forma-grill-with-ui <тема>; продолжение — /forma-grill-with-ui resume."
+description: "The grilling interview on a local browser page instead of the terminal: all questions with their recommendations at once, answers in any order, a discussion per each, one \"Send to Agent\" button. Start - \"forma grill with ui\" or /forma-grill-with-ui <topic>; resume - /forma-grill-with-ui resume."
 ---
 
 # grill-with-ui
 
-Форк `grill-with-ui` (jasonku09) под протокол «Форма» — собственная зафиксированная копия, не апстрим (исходник — `UPSTREAM-README.md`).
+A fork of `grill-with-ui` (jasonku09) for the "Forma" protocol - an own pinned copy, not the upstream (the source - `UPSTREAM-README.md`).
 
 `$SKILL` below means this skill's base directory (the folder holding this file). Everything is
 plain Node with no install step: `node $SKILL/server.mjs <command>`.
@@ -273,12 +273,10 @@ On a `finish` action, or when the user says finish in the terminal:
    **Section headers follow the project's language** (same rule as `AGENTS.md` §6 already
    sets for task cards — check `project/config/PROJECT.md`, "Project language"). All thirteen sections
    get translated, not only the five Form axes below; nothing above is skipped or renamed to
-   English when the project language isn't English. For a Russian-language project, use:
-   Terms → Термины · Why → Почему · Locked decisions → Закреплённые решения · Routine
-   choices → Рутинные решения · Verified facts → Проверенные факты · Risks → Риски ·
-   Deferred → Отложено · Open threads → Открытые нити · Beauty → Красота · Simplicity →
-   Простота · Individuality → Индивидуальность · Honesty → Честность · Naturalness →
-   Естественность.
+   English when the project language isn't English. In a non-English project each section name
+   is written in that language as a straightforward translation of the English name above;
+   the English names stay the canonical keys (the `forma` skill's skeleton-translation step
+   works the same way).
 
    **Form axes — five sections synthesized across the whole interview, not copied from any
    single question.** Fixed order (this is how a person's attention naturally moves — see it,

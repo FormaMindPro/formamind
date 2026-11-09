@@ -1,36 +1,36 @@
 ---
 name: engine-switch
-description: Включить или выключить движок (Codex, Gemini, MiniMax) — спящий режим через реестр .forma/engines.json, одной командой. Вызывать, когда человек просит разбудить, включить, усыпить или отключить движок.
+description: Enable or disable an engine (Codex, Gemini, MiniMax) - dormant mode via the .forma/engines.json registry, one command. Invoke when the human asks to wake, enable, put to sleep, or switch off an engine.
 ---
 
-# Включение и выключение движков
+# Enabling and disabling engines
 
-Один маркер: `.forma/engines.json` → `{ "dormant": ["codex", "minimax"] }`. Движок в списке спит: не предлагается и не ставится установщиком, не сверяется, не пересобирается. Его файлы (`.codex/`, `.minimax/`) остаются нетронутыми.
+One marker: `.forma/engines.json` → `{ "dormant": ["codex", "minimax"] }`. An engine on the list sleeps: the installer neither offers nor installs it, it is not compared, not rebuilt. Its files (`.codex/`, `.minimax/`) stay untouched.
 
-Состояние: `node .claude/scripts/engine-switch.cjs status`
+Status: `node .claude/scripts/engine-switch.cjs status`
 
-## Разбудить движок
+## Wake an engine
 
-1. `node .claude/scripts/engine-switch.cjs wake codex` — снимает маркер, пересобирает данные движка из `.claude/` (Codex: `sync-codex --apply`, затем его тест), запускает `sync-engines --check`. Зелёное — готово.
-2. Красное: читать вывод команды, чинить расхождения в зоне движка (`.codex/` — его зона, `AGENTS.md` §8), повторить сверку.
-3. Отдать в протокол: карточка, `node .forma/protocol/scripts/forma-commit.cjs "…"`, затем `--release`. Реестр уходит в `core/engines.json`; после выпуска установщик снова предлагает движок.
-4. Другие проекты — «форма апдейт».
+1. `node .claude/scripts/engine-switch.cjs wake codex` - removes the marker, rebuilds the engine's data from `.claude/` (Codex: `sync-codex --apply`, then its test), runs `sync-engines --check`. Green - done.
+2. Red: read the command output, fix the divergences in the engine's zone (`.codex/` is its zone, `AGENTS.md` §8), rerun the comparison.
+3. Hand over to the protocol: a card, `node .forma/protocol/scripts/forma-commit.cjs "…"`, then `--release`. The registry lands in `core/engines.json`; after the release the installer offers the engine again.
+4. Other projects - "forma update".
 
-## Усыпить движок
+## Put an engine to sleep
 
 1. `node .claude/scripts/engine-switch.cjs sleep codex`
-2. Отдать в протокол — как в п. 3 выше.
+2. Hand over to the protocol - as in item 3 above.
 
-## Правила
+## Rules
 
-- Только `claude` не усыпляется.
-- Движок без записи в таблице `REBUILD` скрипта (Gemini) будится одним маркером и общей сверкой; пересборку для нового движка добавлять в `REBUILD`.
-- Не править `.codex/` вручную ради сверки — пересборка делает это сама.
+- Only `claude` is never put to sleep.
+- An engine without a row in the script's `REBUILD` table (Gemini) is woken by the marker alone plus the general comparison; add the rebuild for a new engine to `REBUILD`.
+- Do not edit `.codex/` by hand for the comparison's sake - the rebuild does that itself.
 
-## Догнать ядро после долгого сна
+## Catch up with the core after a long sleep
 
-Для спящих движков (`codex`, `minimax`): пока движок спит, `.claude/` и закон уходят вперёд, зеркала движка отстают.
+For dormant engines (`codex`, `minimax`): while an engine sleeps, `.claude/` and the law move ahead and the engine's mirrors fall behind.
 
-1. `node .claude/scripts/engine-switch.cjs wake <движок>` — маркер снят, зеркала пересобраны из `.claude/` по таблице `REBUILD` (Codex: `sync-codex --apply`; MiniMax: `gen-roles.cjs`, `gen-plugin-agents.cjs`, `install-plugin.cjs`), затем тест адаптера.
-2. Тест адаптера красный — читать вывод, чинить расхождения в зоне движка (`.codex/`, `.minimax/`, `miniapps/minimax-engine/`), пересобрать, повторить тест.
-3. Зелёное: `node .claude/scripts/sync-engines.cjs --check`, затем отдать в протокол (п. 3 раздела «Разбудить движок»). Не нужен сейчас — `sleep <движок>` и тоже в протокол.
+1. `node .claude/scripts/engine-switch.cjs wake <engine>` - marker removed, mirrors rebuilt from `.claude/` per the `REBUILD` table (Codex: `sync-codex --apply`; MiniMax: `gen-roles.cjs`, `gen-plugin-agents.cjs`, `install-plugin.cjs`), then the adapter test.
+2. Adapter test red - read the output, fix the divergences in the engine's zone (`.codex/`, `.minimax/`, `miniapps/minimax-engine/`), rebuild, rerun the test.
+3. Green: `node .claude/scripts/sync-engines.cjs --check`, then hand over to the protocol (item 3 of "Wake an engine"). Not needed right now - `sleep <engine>` and hand over to the protocol as well.

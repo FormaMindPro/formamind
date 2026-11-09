@@ -1,68 +1,68 @@
 ---
 name: grilling
-description: Интервью для формирования замысла цели — раундами по фронтиру дерева решений. Используется только `Intent`, эпик «6. Обсуждение дел».
+description: An interview for shaping a goal's intent - in rounds along the decision tree's frontier. Used only by `Intent`, epic "6. Discussion of matters".
 ---
 
-# grilling — интервью для образа результата
+# grilling - the interview for the end-image
 
-Адаптация [mattpocock/skills, `grilling`](https://github.com/mattpocock/skills/blob/main/skills/productivity/grilling/SKILL.md) под пятиузловую схему: техника ведения раздела «Интервью» `intent.md`. Работает только в эпике «6. Обсуждение дел» на доске `.devtool/features/`, только через `Intent` — без `Kit`/`Run`/`Core` в маршруте.
+An adaptation of [mattpocock/skills, `grilling`](https://github.com/mattpocock/skills/blob/main/skills/productivity/grilling/SKILL.md) to the five-node scheme: the technique behind the "Interview" section of `intent.md`. Works only in epic "6. Discussion of matters" on the `.devtool/features/` board, only through `Intent` - no `Kit`/`Run`/`Core` in the route.
 
-## Что это добавляет поверх пяти вопросов `intent.md`
+## What it adds on top of `intent.md`'s five questions
 
-Пять вопросов раздела «Интервью» — не линейный чек-лист, а корень дерева решений: ответ на один открывает следующие, которые без него можно было бы задать только гадая на неуслышанный ответ. Веди это деревом, не списком. Пятый (естественность — почему именно это и почему именно сейчас) — такой же полноправный вопрос человеку, как первые четыре, не вывод, который узел делает сам за него; фронтир и раунды применяются к нему тем же порядком.
+The five questions of the "Interview" section are not a linear checklist but the root of a decision tree: the answer to one opens the next ones, which without it could only be asked by guessing at an unheard answer. Run it as a tree, not a list. The fifth (naturalness - why exactly this and why exactly now) is as full a question to the human as the first four, not a conclusion the node draws for them; the frontier and the rounds apply to it in the same order.
 
-**Вопросы незаметны: не называют качество, которое достают.** Человек на пути наименьшего действия не может объективно ответить на прямой вопрос про признак — он просто хочет и не замечает вокруг ничего, кроме своего желания (`PROTOCOL.md`, «Путь наименьшего действия»). Поэтому все пять звучат обычным разговорным вопросом, не анонсируют себя.
+**The questions are inconspicuous: they do not name the quality being drawn out.** A human on the path of least action cannot answer a direct question about the criterion objectively - they simply want, and notice nothing around them but their desire (`PROTOCOL.md`, "The path of least action"). So all five sound like an ordinary conversational question, announcing nothing.
 
-**Признак прибытия и референсы — не вопрос дерева, а синтез после раундов.** Фронтир из пяти вопросов исчерпан — не открывай человеку шестую ветку про сам признак: собери синтез сама, из всех пяти ответов и референса, и неси его на подтверждение тем же порядком, что и любой другой раунд.
+**The arrival criterion and references are not a question of the tree but a synthesis after the rounds.** The frontier of five questions exhausted - do not open a sixth branch about the criterion itself: assemble the synthesis yourself, from all five answers and the reference, and bring it for confirmation in the same order as any other round.
 
-## Раунды и фронтир
+## Rounds and the frontier
 
-**Фронтир** — все вопросы, чьи предпосылки уже осели (можно спросить прямо сейчас, не гадая на ещё не услышанный ответ). Задавай фронтир целиком за раунд, пронумерованно, с рекомендуемым ответом — не по одному вопросу за раз и не всё дерево разом. Вопрос, зависящий от другого, ещё не отвеченного в этом же раунде, — уходит в следующий раунд, не в этот.
+**The frontier** - all questions whose premises have already settled (they can be asked right now, without guessing at an answer not yet heard). Ask the frontier in full per round, numbered, with a recommended answer - not one question at a time and not the whole tree at once. A question that depends on another, not yet answered in the same round, moves to the next round, not this one.
 
-Формат раунда:
+The format of a round:
 
 ```
-❓ **В1** — **<заголовок вопроса>**: <тело, может быть несколько абзацев/вариантов>
+❓ **Q1** - **<question heading>**: <body, may be several paragraphs/options>
 
-➡️ <твой рекомендованный ответ>
+➡️ <your recommended answer>
 
 ---
 
-❓ **В2** — **<заголовок вопроса>**: ...
+❓ **Q2** - **<question heading>**: ...
 
-➡️ <твой рекомендованный ответ>
+➡️ <your recommended answer>
 ```
 
-Каждый ответ человека переставляет фронтир: закрытые решения открывают то, что от них зависело. Пересчитывай фронтир и задавай следующий раунд.
+Each answer of the human rearranges the frontier: settled decisions open what depended on them. Recompute the frontier and ask the next round.
 
-## Пять осей целостной картины (любая тема, не только открытие цели)
+## Five axes of a whole picture (any topic, not only goal opening)
 
-За пятью словами узловых критериев (`AGENTS.md` §1) стоит не только «чем узел судит завершённый круг», но и пять осей, вдоль которых собирается целостное представление о **любом** решении/теме интервью — не только о замысле цели. Порядок фиксирован, потому что так естественно движется внимание человека — сначала видит, потом понимает суть, потом ценность, потом действие, потом то, что делает это неизбежным:
+Behind the five words of the nodes' criteria (`AGENTS.md` §1) stands not only "by what a node judges a finished circle" but also five axes along which a whole picture of **any** decision/topic of the interview is assembled - not only a goal's intent. The order is fixed, because this is how the human's attention naturally moves - first they see, then grasp the essence, then the value, then the action, then what makes it inevitable:
 
-1. **Красота** — как выглядит решение.
-2. **Простота** — что решение делает.
-3. **Индивидуальность** — какую пользу оно приносит.
-4. **Честность** — какие действия нужны, чтобы его получить.
-5. **Естественность** — что нужно знать, чтобы результат стал неизбежным, единственно возможным, а не одним из многих равновероятных. Знание, доведённое до полноты (весь нужный арсенал, место, контекст уже установлены), само схлопывает выбор — поступить иначе больше нельзя. Это та же логика, что у пятого вопроса открытия цели («свет находит кратчайший путь не потому, что выбирает его, а потому что не может иначе»), только не про мотив человека, а про любое знание, которое требуется для темы интервью.
+1. **Beauty** - what the decision looks like.
+2. **Simplicity** - what the decision does.
+3. **Individuality** - what use it brings.
+4. **Honesty** - what actions are needed to obtain it.
+5. **Naturalness** - what needs to be known for the result to become inevitable, the only possible one, not one of many equally likely. Knowledge carried to completeness (the whole needed arsenal, place, context already established) collapses the choice by itself - acting otherwise is no longer possible. This is the same logic as the fifth question of goal opening ("light finds the shortest path not because it chooses it, but because it cannot do otherwise"), only not about the human's motive but about any knowledge the interview's topic requires.
 
-**Оси — не пять прямых вопросов, а структура сборки, разворачивай в вопросы по масштабу темы.** Маленький вопрос — минимум подвопросов на ось, где-то она вообще может остаться пустой строкой. Большой процесс/система — каждую ось поджаривай до основания: раунд за раундом, пока не наберётся достаточно деталей, чтобы по этой оси сложилась цельная картина, не полфразы. Вопросы задавай тем же незаметным образом, что и в разделе выше — не объявляй вслух, к какой оси относится вопрос; раскладка по осям — твой синтез при сборке итога, не то, что видит собеседник по ходу.
+**The axes are not five direct questions but a structure of assembly; unfold them into questions by the topic's scale.** A small question - a minimum of subquestions per axis; somewhere an axis may remain an empty line. A large process/system - roast every axis to the foundation: round after round, until enough details gather for a whole picture on that axis, not half a phrase. Ask the questions in the same inconspicuous way as in the section above - do not announce aloud which axis a question belongs to; the layout over axes is your synthesis when assembling the outcome, not what the interlocutor sees along the way.
 
-## Каркас записи — `project/brief/idea.md`
+## The record skeleton - `project/brief/idea.md`
 
-Интервью ведётся по его семи разделам. По каждому ответу правится только затронутый раздел; неподтверждённое — *guess*, неспрошенное — *not yet asked*, изменение сказанного — строкой "changed per qN" (маркеры — как в каркасе; если проект переведён на другой язык, переведены и они, и проверка принимает оба написания).
+The interview runs over its seven sections. Per each answer only the touched section is edited; unconfirmed - *guess*, not asked - *not yet asked*, a change of what was said - a line "changed per qN" (the markers as in the skeleton; if the project is translated into another language, they are translated too, and the check accepts both spellings).
 
-## Живые файлы — на каждую отправку
+## Live files - per each send
 
-По каждой отправке правятся три файла, только затронутое: `project/brief/idea.md`; `project/brief/picture.json` → `tree` (узел `{id, kind: said|guess|pending, label, from: "qN", role, children}`); `project/brief/landing-prompt.md` — промпт первой страницы (сценарий вовлечения, секции, стиль, тексты; непроверенное — *guess*). На Finish все три сверяются со всеми ответами: сказанное не потеряно, противоречий нет, закрытая ответом догадка теряет пометку.
+Per each send three files are edited, only what is touched: `project/brief/idea.md`; `project/brief/picture.json` → `tree` (a node `{id, kind: said|guess|pending, label, from: "qN", role, children}`); `project/brief/landing-prompt.md` - the landing page's prompt (the engagement scenario, sections, style, texts; unverified - *guess*). On Finish all three are checked against all the answers: nothing said is lost, no contradictions, a guess closed by an answer loses its mark.
 
-## Факты — твоя работа, не вопрос человеку
+## Facts - your work, not a question to the human
 
-Фронтир иногда упирается не в решение, а в факт из среды (файл, БД, конфиг, арсенал). За фактом — не к человеку: разведай сам или спусти в субагента, тем же порядком, каким `Kit` не гадает, а сверяет с арсеналом. Не блокируй на этом весь раунд — вопросы, зависящие от факта, ждут; остальной фронтир задавай сейчас.
+The frontier sometimes runs not into a decision but into a fact of the environment (a file, a DB, a config, the arsenal). For a fact - not to the human: scout it yourself or push it down into a subagent, in the same order by which `Kit` does not guess but checks against the arsenal. Do not block the whole round on it - the questions depending on the fact wait; ask the rest of the frontier now.
 
-## Глоссарий по ходу
+## The glossary along the way
 
-Термин прояснён в раунде — сразу строка в `project/ops/GLOSSARY.md`, не пачкой в конце; слово человека расходится с глоссарием или с кодом/сайтом — назови в том же раунде. Как — скилл `project-knowledge`.
+A term clarified in a round - a line into `project/ops/GLOSSARY.md` at once, not a batch at the end; the human's word diverges from the glossary or from the code/site - name it in the same round. How - the `project-knowledge` skill.
 
-## Конец сессии
+## The end of a session
 
-Фронтир пуст — каждая ветка дерева пройдена, ничего не оставлено молчаливым допущением. Не переходи к записи (`brief/interview.md`, `brief/reference.md`), пока человек прямо не подтвердил: понимание общее. Согласие собеседника «и так понятно» — не то же самое, что пройденный фронтир (см. `intent.md`: «Останов интервью — не по удовлетворению человека, а по проверке»).
+The frontier empty - every branch of the tree walked, nothing left a silent assumption. Do not move to the writing (`brief/interview.md`, `brief/reference.md`) until the human has explicitly confirmed: the understanding is shared. The interlocutor's consent "it's clear enough" is not the same as a walked frontier (see `intent.md`: "The interview's stop is not by the human's satisfaction but by the check").

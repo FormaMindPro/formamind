@@ -1,53 +1,53 @@
 ---
 name: project-knowledge
-description: Куда записать новое знание о проекте — решение (ADR), факт среды (опыт), термин (глоссарий), решение схемы, правило узла, внешнюю ссылку; проверка дубля и оспаривание термина. Вызывать в момент, когда знание появилось, до записи.
+description: Where to record new project knowledge - a decision (ADR), an environment fact (experience), a term (glossary), a schema decision, a node rule, an external link; duplicate check and challenging a term. Invoke at the moment the knowledge appears, before writing it down.
 ---
 
-# Запись знания проекта
+# Recording project knowledge
 
-Закон: знание о проекте записывается в файлы проекта по этой таблице, не в память движка (`AGENTS.md` §6). Продуктовое — факт или настройка этого сайта/проекта — только в `project/` (`AGENTS.md`, «Three layers of files»): никогда в роль, скилл, скрипт, manual или исходник протокола. Здесь — только «как».
+The law: knowledge about the project is written into the project's files per this table, not into the engine's memory (`AGENTS.md` §6). Product knowledge - a fact or a setting of this site/project - only into `project/` (`AGENTS.md`, "Three layers of files"): never into a role, a skill, a script, the manual, or the protocol source. Here - only the "how".
 
-Основа: `domain-modeling` из `mattpocock/skills` (https://github.com/mattpocock/skills, `engineering/domain-modeling`), адаптирована.
+Basis: `domain-modeling` from `mattpocock/skills` (https://github.com/mattpocock/skills, `engineering/domain-modeling`), adapted.
 
-## Маршрут
+## The route
 
-| Что появилось | Куда | Формат |
+| What appeared | Where | Format |
 |---|---|---|
-| Решение, прошедшее **все три** условия (ниже) | `project/adr/NNNN-<slug>.md` | `project/adr/README.md`; ADR называет код карточки |
-| Факт о сайте/среде: гоча, ограничение, что не сработало и почему | `project/experience/<предмет>.md` | `project/experience/README.md`; есть файл предмета — строка в него, второй не заводить |
-| Термин предметной области | `project/ops/GLOSSARY.md` | шапка файла; одна-две фразы, что это *есть*, без реализации |
-| Решение о самой схеме (роли, закон, маршрут) | `.forma/living/CHANGELOG.md` | запись с датой |
-| Правило поведения узла | роль, скилл или закон — к чему относится | в паритете движков |
-| Внешняя ссылка, источник | `project/reference/` | один файл на род источников |
-| Решение, не прошедшее три условия | только карточка | ничего сверх |
+| A decision that passed **all three** conditions (below) | `project/adr/NNNN-<slug>.md` | `project/adr/README.md`; the ADR names the card code |
+| A fact about the site/environment: a gotcha, a constraint, what did not work and why | `project/experience/<subject>.md` | `project/experience/README.md`; the subject has a file - a line into it, do not start a second one |
+| A domain term | `project/ops/GLOSSARY.md` | the file's header; one or two phrases of what it *is*, without implementation |
+| A decision about the schema itself (roles, law, route) | `.forma/living/CHANGELOG.md` | a dated entry |
+| A rule of a node's conduct | the role, skill, or law it belongs to | in engine parity |
+| An external link, a source | `project/reference/` | one file per source kind |
+| A decision that failed the three conditions | the card only | nothing beyond |
 
-**Память движка — не место знания о проекте.** Её не читают другие движки и узлы. В ней — только то, что касается самой сессии движка; иначе максимум указатель на файл проекта.
+**Engine memory is not a place for project knowledge.** Other engines and nodes do not read it. Only what concerns the engine session itself belongs there; otherwise at most a pointer to a project file.
 
-## Фильтр трёх условий (ADR)
+## The three-condition filter (ADR)
 
-Все три, иначе ADR нет:
-1. **Трудно отменить** — откат стоит заметной работы.
-2. **Удивит без контекста** — читатель через полгода спросит «почему так?».
-3. **Был реальный выбор** — рассматривались альтернативы, одна отвергнута по причине.
+All three, or there is no ADR:
+1. **Hard to reverse** - rolling back costs noticeable work.
+2. **Would surprise without context** - a reader six months later will ask "why like this?".
+3. **There was a real choice** - alternatives were considered, one rejected for a reason.
 
-ADR «для полноты» не предлагать.
+Do not propose an ADR "for completeness".
 
-## Кто и когда пишет
+## Who writes what, and when
 
-- **ADR** — постоянная запись закрытой карточки-решения (или любой карточки, чей результат — решение), прошедшей фильтр выше; формат — `project/adr/README.md`. Пишет `Intent`, когда подтверждает эту карточку; ADR называет код карточки.
-- **Глоссарий** (`project/ops/GLOSSARY.md`) — только термины предметной области, без реализации; формат — в шапке файла. Пишет `Intent` в момент, когда термин установлен, не пачкой; он же оспаривает слова человека по глоссарию, коду и сайту. Остальные узлы берут термины оттуда и называют конфликт (`AGENTS.md` §2), не переопределяют.
+- **ADR** - a standing record of a closed decision card (or any card whose result is a decision) that passed the filter above; the format is `project/adr/README.md`. `Intent` writes it when confirming that card; the ADR names the card code.
+- **The glossary** (`project/ops/GLOSSARY.md`) - domain terms only, no implementation; the format is in the file's header. `Intent` writes at the moment a term is settled, not in batches; it also challenges the human's words against the glossary, the code, and the site. The other nodes take terms from there and name a conflict (`AGENTS.md` §2), they do not redefine.
 
-## Перед записью — проверка дубля
+## Before writing - the duplicate check
 
-1. Грепнуть предмет по месту назначения и по соседним: `project/experience/`, `project/adr/`, `project/ops/GLOSSARY.md`, `.forma/living/CHANGELOG.md`, роли и скиллы.
-2. Нашлось по смыслу (не только по словам) — дописать недостающее в тот же файл; второй не заводить.
-3. Нашлось противоречие — не перезаписывать молча: назвать, что было и что стало, с датой и источником.
-4. Перенос из памяти/чата — факты дословно: числа, id, пути, даты, «почему».
+1. Grep the subject across the destination and its neighbors: `project/experience/`, `project/adr/`, `project/ops/GLOSSARY.md`, `.forma/living/CHANGELOG.md`, the roles and skills.
+2. Found by meaning (not only by words) - append what is missing to that same file; do not start a second one.
+3. Found a contradiction - do not overwrite silently: name what was and what is now, with the date and the source.
+4. Carrying over from memory/chat - facts verbatim: numbers, ids, paths, dates, the "why".
 
-## Оспаривание термина
+## Challenging a term
 
-- Слово человека расходится с глоссарием — назвать сразу: «в глоссарии X, вы, похоже, о Y — что имеется в виду?».
-- Слово размыто или перегружено — предложить одно точное.
-- Человек говорит, как что-то работает — сверить с кодом/сайтом по факту; расхождение назвать, не сглаживать.
-- Термин устоялся — строка в глоссарий сразу, не пачкой в конце.
-- Кроме ведущего глоссарий (`Intent`), узлы термин не переопределяют — конфликт называют по маршруту (§2).
+- The human's word diverges from the glossary - name it at once: "the glossary says X, you seem to mean Y - what is meant?".
+- A word is vague or overloaded - propose one precise word.
+- The human says how something works - check against the code/site by fact; name a divergence, do not smooth it over.
+- A term has settled - a line into the glossary at once, not a batch at the end.
+- Apart from the glossary's keeper (`Intent`), nodes do not redefine a term - a conflict is named per the route (§2).

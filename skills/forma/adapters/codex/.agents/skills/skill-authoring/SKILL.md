@@ -1,61 +1,61 @@
 ---
 name: skill-authoring
-description: Как оформить новое умение (SKILL.md), когда его не хватает в арсенале, и как писать текст, который читает агент (умение, файл роли, строка закона, description). Применяют Kit (снаряжение задачи, `kit-limits.md`) и Intent (хозяйство, правка .claude/skills/ напрямую), когда готового скилла нет ни в арсенале, ни в источниках готового.
+description: How to shape a new skill (SKILL.md) when the arsenal lacks one, and how to write text an agent reads (a skill, a role file, a law line, a description). Used by Kit (equipping a task, `kit-limits.md`) and Intent (housekeeping, editing .claude/skills/ directly), when no ready skill exists in the arsenal or in the ready-made sources.
 ---
 
-# skill-authoring — как оформить новое умение
+# skill-authoring - how to shape a new skill
 
-Официальный источник механики — https://code.claude.com/docs/en/skills.md. Здесь — только то, что специфично для этого проекта поверх официального формата, без пересказа документации целиком.
+The official source of the mechanics is https://code.claude.com/docs/en/skills.md. Here - only what is specific to this project on top of the official format, without retelling the whole documentation.
 
-## Когда
+## When
 
-`Kit` — `kit-limits.md`, «Limits»: умения нет ни в `.claude/skills/`, ни в источниках готового (таблица ниже) — поднимает тир до strongest и проектирует сам.
+`Kit` - `kit-limits.md`, "Limits": the skill exists neither in `.claude/skills/` nor in the ready-made sources (the table below) - raises the tier to strongest and designs it itself.
 
-## Источники готового — до проектирования умения
+## Ready-made sources - before designing a skill
 
-Источники различаются тем, кто их подключает и что можно делать с находкой:
+The sources differ in who connects them and what may be done with a find:
 
-| Источник | Где | Кто подключает | Что делаешь с находкой |
+| Source | Where | Who connects it | What you do with the find |
 |---|---|---|---|
-| Свой `project/config/CONFIG.md` | проект | — | **смотри первым, до всего внешнего**: пробел мог закрыться в прошлой цели (хранилище опыта — `kit.md`, «Experience») |
-| Умения, уже доступные в Claude Code | список, который среда показывает при старте сессии: `.claude/skills/` проекта, глобальные (`~/.claude/skills/`) и плагинные (`impeccable`, `dataviz`, `artifact-design`) | уже подключены | самый дешёвый источник — вызвать `Skill`, ничего не копировать и не оформлять |
-| Маркетплейс плагинов | подключённые источники (`claude plugin marketplace list`, `claude plugin list`, `claude plugin details <name>`) | **человек** — это меняет общую среду всех проектов | заявка человеку; сам не ставишь |
-| `github.com/anthropics/skills` | браузером (`new_page` + `take_snapshot`) | — | шаблон: скопировать и оформить своим в `.claude/skills/` — обычная работа, одобрение не нужно |
-| Сторонние каталоги умений, подключённые под проект (например, MCP-каталог дизайн-умений) | на проект, при снаряжении конкретной работы | уже подключены | сначала статус, если серверу нужен, потом поиск; браузер (`new_page` + `take_snapshot`) — запасной путь. Находка — шаблон, как выше |
+| Own `project/config/CONFIG.md` | the project | - | **look first, before anything external**: the gap may have closed in a past goal (the experience store - `kit.md`, "Experience") |
+| Skills already available in Claude Code | the list the environment shows at session start: the project's `.claude/skills/`, global (`~/.claude/skills/`) and plugin ones (`impeccable`, `dataviz`, `artifact-design`) | already connected | the cheapest source - invoke `Skill`, copy and shape nothing |
+| The plugin marketplace | connected sources (`claude plugin marketplace list`, `claude plugin list`, `claude plugin details <name>`) | **the human** - it changes the shared environment of all projects | a request to the human; do not install it yourself |
+| `github.com/anthropics/skills` | via the browser (`new_page` + `take_snapshot`) | - | a template: copy and shape it as your own in `.claude/skills/` - ordinary work, no approval needed |
+| Third-party skill catalogs connected per project (e.g., an MCP catalog of design skills) | per project, when equipping specific work | already connected | status first, if the server needs it, then search; the browser (`new_page` + `take_snapshot`) is the fallback path. A find is a template, as above |
 
-Источник недоступен — `kit-limits.md`, «Limits» и «Environment limitation».
+A source unavailable - `kit-limits.md`, "Limits" and "Environment limitation".
 
-## Умение, которое будет снаряжать `Run` не раз, — не писать на глаз
+## A skill that will equip `Run` more than once is not written by eye
 
-`skill-creator` — если плагин подключён или он лежит в `.claude/skills/skill-creator/` (официальный `anthropics/skills`) — это процесс: черновик → тестовые промпты → evals → правки → бенчмарк → оптимизация `description`. Слабое умение в снаряжении `Run` — искажение, потеря `Kit`: оно не всплывёт сразу, а покажет себя на первой попытке, где формулировка подвела. Это базовый процесс для любого умения, мелкий разовый пробел включён: своего более лёгкого пути нет. Правила проекта поверх `skill-creator` — «Специфика этого проекта» ниже.
+`skill-creator` - if the plugin is connected or it sits in `.claude/skills/skill-creator/` (the official `anthropics/skills`) - it is a process: draft → test prompts → evals → edits → benchmark → `description` optimization. A weak skill in `Run`'s equipment is distortion, a loss for `Kit`: it will not surface at once, it will show itself on the first attempt where the wording failed. This is the base process for any skill, a small one-off gap included: there is no lighter path of our own. The project's rules on top of `skill-creator` - "This project's specifics" below.
 
-`Intent` — хозяйство (`AGENTS.md` §1): правка `.claude/skills/*/SKILL.md` напрямую с человеком, вне производственного маршрута — свой инструментарий, не продукт сайта.
+`Intent` - housekeeping (`AGENTS.md` §1): editing `.claude/skills/*/SKILL.md` directly with the human, outside the production route - its own toolkit, not a product of the site.
 
-## Механика SKILL.md (официальная, кратко)
+## SKILL.md mechanics (official, briefly)
 
-- Обязательных полей frontmatter нет; де-факто нужны `name` и `description`.
-- `description` — до 1536 символов, ключевой сценарий использования первым: по нему модель решает, вызывать ли скилл. Расплывчатое описание не найдётся, когда нужно. Критерий, [адаптированный из mattpocock/skills](https://github.com/mattpocock/skills/blob/main/skills/productivity/writing-for-agents/SKILL.md): ведущее слово-триггер — первым, не в середине фразы; одна ветка сценария — один триггер (синонимы одной и той же ветки схлопнуть, не перечислять); не повторять в описании то, что и так ясно из тела файла.
-- Держать `SKILL.md` компактным (официальный ориентир — до ~500 строк); большой контент — в соседние файлы того же каталога (`reference.md`, `examples.md`), не внутрь одного файла. Критерий, когда именно выносить (тот же источник, что выше): в файл — то, что нужно не каждой ветке применения скилла; в `SKILL.md` остаётся то, что нужно всем веткам сразу.
-- Есть опциональные поля (`disable-model-invocation`, `context: fork`, `allowed-tools`, `model`/`effort`, `paths`…) — в этом проекте пока не используются ни в одном скилле. Не добавлять без причины: минимальный frontmatter (`name`+`description`) уже работает у всех текущих умений (`grilling`, `excalidraw-diagrams`, `skill-creator` и т.д.) — не усложнять по умолчанию.
+- No frontmatter fields are required; de facto `name` and `description` are needed.
+- `description` - up to 1536 characters, the key usage scenario first: the model decides from it whether to invoke the skill. A vague description will not be found when needed. The criterion, [adapted from mattpocock/skills](https://github.com/mattpocock/skills/blob/main/skills/productivity/writing-for-agents/SKILL.md): the leading trigger word first, not mid-phrase; one branch of a scenario - one trigger (synonyms of the same branch collapse, not enumerate); do not repeat in the description what the file body already makes clear.
+- Keep `SKILL.md` compact (the official guide is up to ~500 lines); large content goes into neighboring files of the same directory (`reference.md`, `examples.md`), not into the one file. The criterion of what exactly to move out (same source as above): into the file - what not every branch of the skill's use needs; what all branches need at once stays in `SKILL.md`.
+- There are optional fields (`disable-model-invocation`, `context: fork`, `allowed-tools`, `model`/`effort`, `paths`…) - not used in any skill of this project yet. Do not add without a reason: minimal frontmatter (`name`+`description`) already works for all current skills (`grilling`, `excalidraw-diagrams`, `skill-creator` etc.) - do not complicate by default.
 
-## Специфика этого проекта
+## This project's specifics
 
-- **Куда класть**: `.claude/skills/<имя>/SKILL.md` — проектный уровень, не личный (`~/.claude/skills/`) и не плагин. Подключение плагина или личного каталога — не то, что оформляешь сама: это заявка человеку (`kit-limits.md`, «Limits»), меняет общую среду для всех проектов, а не только этого.
-- **Имя**: латиница, kebab-case, по образцу уже существующих (`grilling`, `excalidraw-diagrams`, `project-knowledge-pattern`) — не кириллический слаг. Кириллица в этом проекте — только для файлов карточек доски (`spec.md`), не для скиллов.
-- **Описание** — по-русски, в стиле остальных умений: одна строка, что это и когда применять, без воды.
-- **Регистрации нет**: список умений — сами `SKILL.md`, строка «подо что годится» — их `description`. Отдельной описи не ведётся.
-- **Скилл скопирован/адаптирован из внешнего источника** (каталог умений, репозиторий вроде `mattpocock/skills`) — ссылка на источник в теле файла, как у `grilling`. Не выдавать чужое за придуманное здесь (запрет 6, `AGENTS.md` §5).
+- **Where to put it**: `.claude/skills/<name>/SKILL.md` - the project level, not personal (`~/.claude/skills/`) and not a plugin. Connecting a plugin or a personal directory is not something you arrange yourself: it is a request to the human (`kit-limits.md`, "Limits") - it changes the shared environment of all projects, not only this one.
+- **The name**: Latin script, kebab-case, after the pattern of the existing ones (`grilling`, `excalidraw-diagrams`, `project-knowledge-pattern`) - not a Cyrillic slug. Cyrillic in this project is only for the board's card files (`spec.md`), not for skills.
+- **The description** - in English, in the style of the other skills: one line of what it is and when to apply it, no filler.
+- **No registry**: the list of skills is the `SKILL.md` files themselves; the "what it is good for" line is their `description`. No separate inventory is kept.
+- **A skill copied/adapted from an external source** (a skill catalog, a repository like `mattpocock/skills`) - a link to the source in the file body, as in `grilling`. Do not pass off another's work as invented here (prohibition 6, `AGENTS.md` §5).
 
-## Писать текст, который читает агент
+## Writing text an agent reads
 
-Умение, файл роли, строка закона, `description`. Четыре правила из `mattpocock/skills`, `productivity/writing-for-agents` (https://github.com/mattpocock/skills/tree/main/skills/productivity/writing-for-agents). Что схема уже держит, здесь не повторяется: положительные формулировки — `AGENTS.md` §5; один источник — §8 файла движка и «не дублировать» ниже; критерий завершения — §6.
+A skill, a role file, a law line, a `description`. Four rules from `mattpocock/skills`, `productivity/writing-for-agents` (https://github.com/mattpocock/skills/tree/main/skills/productivity/writing-for-agents). What the schema already holds is not repeated here: affirmative phrasings - `AGENTS.md` §5; one source - §8 of the engine file and "do not duplicate" below; the completion criterion - §6.
 
-- **Указатель** (`description`, строка, называющая другой файл): ведущее слово первым; один триггер на отдельный случай — синонимы одного случая схлопываются в один; то, что тело говорит о себе, вырезается. Указатель грузится на каждом ходу, поэтому режется жёстче тела.
-- **Охота на холостой ход:** предложение, которое ничего не меняет против поведения модели по умолчанию, удаляется целиком, а не подрезается. Слово, слишком слабое, чтобы перебить умолчание, заменяется более сильным.
-- **Ведущие слова:** объяснение, повторённое в нескольких местах, схлопывается в одно слово, которое модель уже знает (примеры из источника: _tight_, _red_); придуманное слово — только когда подходящего нет, и определяется один раз.
-- **Пересказ среды — это кэш:** то, что показывает один файл или одна команда (конфиг, структура каталогов, `--help`), оставляется среде; пишется только то, что осмотром не найти, — причина, подвох.
+- **The pointer** (a `description`, a line naming another file): the leading word first; one trigger per distinct case - synonyms of one case collapse into one; what the body says about itself is cut. The pointer loads on every turn, so it is cut harder than the body.
+- **Hunting idle strokes:** a sentence that changes nothing against the model's default behavior is deleted whole, not trimmed. A word too weak to override the default is replaced by a stronger one.
+- **Leading words:** an explanation repeated in several places collapses into one word the model already knows (examples from the source: _tight_, _red_); a coined word - only when no fitting one exists, and defined once.
+- **Retelling the environment is a cache:** what one file or one command shows (a config, a directory structure, `--help`) is left to the environment; only what an inspection cannot find is written - the cause, the gotcha.
 
-## Чего не делать
+## What not to do
 
-- Не собирать скилл «на будущее», без конкретного пробела, который он закрывает прямо сейчас, — раздутый арсенал никто не будет знать целиком (`kit.md`: «Отдельной описи нет — она разошлась бы с действительностью»).
-- Не дублировать то, что уже есть общим текстом в `AGENTS.md`/`.claude/agents/*.md` — скилл это узкая техника «как делать», а не пересказ общих правил другими словами.
+- Do not assemble a skill "for the future", without a concrete gap it closes right now - a bloated arsenal is known to no one in full (`kit.md`: "There is no separate inventory - it would drift from reality").
+- Do not duplicate what already stands as common text in `AGENTS.md`/`.claude/agents/*.md` - a skill is a narrow technique of "how to do", not a retelling of the common rules in other words.

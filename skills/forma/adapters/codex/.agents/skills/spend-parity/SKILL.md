@@ -1,35 +1,35 @@
 ---
 name: spend-parity
-description: Сверка расхода claude-code между журналом вызовов, строками карточек, tally и вкладкой «Экономика» — применять, когда цифры попыток расходятся или нужно объяснить разницу.
+description: Reconciling the claude-code spend across the call ledger, the cards' lines, the tally, and the Economy tab - invoke when attempt figures diverge or a difference needs explaining.
 ---
 
-# spend-parity — почему четыре счётчика показывают разное
+# spend-parity - why four counters show different numbers
 
-Четыре источника считают одно и то же по-разному. Разность — не ошибка сама по себе; сначала разложи её по причинам.
+Four sources count the same thing differently. The difference is not an error in itself; first break it down by causes.
 
-## Источники и команды
+## Sources and commands
 
-| Источник | Что считает | Как получить |
+| Source | What it counts | How to get it |
 |---|---|---|
-| Текстовый grep | строки с `claude-code:` во всех карточках | `grep -rc "claude-code:" .devtool/features` |
-| `tally` | разобранные строки расхода, дедупликация по `dedupKey` | `node .forma/dashboard/tally.cjs .devtool/features` → `byEngine["claude-code"].attempts` |
-| Вкладка «Экономика» | сводка движка после дедупликации `dedupeAttempts` | `economy.speed.summary.engines['claude-code']` в `generate.js buildData` |
-| Журнал вызовов | записи хука `SubagentStop` | `.claude/.ledger/calls.jsonl` |
+| A text grep | lines with `claude-code:` across all cards | `grep -rc "claude-code:" .devtool/features` |
+| `tally` | parsed spend lines, deduplicated by `dedupKey` | `node .forma/dashboard/tally.cjs .devtool/features` → `byEngine["claude-code"].attempts` |
+| The Economy tab | the engine's summary after `dedupeAttempts` deduplication | `economy.speed.summary.engines['claude-code']` in `generate.js buildData` |
+| The call ledger | records of the `SubagentStop` hook | `.claude/.ledger/calls.jsonl` |
 
-Порядок убывания: grep ≥ tally ≥ вкладка. Журнал короче всех — он ведётся только с момента установки хука.
+Descending order: grep ≥ tally ≥ the tab. The ledger is the shortest of all - it is kept only since the hook was installed.
 
-## Причины расхождений
+## Causes of divergence
 
-- **grep → tally:** строки, не являющиеся расходом (цитаты, описания самой сверки); строки вида `attempt N,` (N — число) без числа токенов — их не читает ни tally, ни вкладка, и в `unparsed` они не попадают.
-- **tally → вкладка:** метка `(batch I/K)`. Ключ дедупликации в `tally.cjs` её учитывает, в `data/cards.cjs` (`dedupeAttempts`) — нет, поэтому вкладка склеивает разные попытки одного пакета. Это недосчёт вкладки, а не дедупликация.
-- **журнал → карточки:** строки до хука, строки без id вызова (`id unknown`), строки основной сессии Intent (пишутся `card-session-spend.cjs`, в журнал не идут), строки, записанные вручную по `spend-line.md`.
+- **grep → tally:** lines that are not spend (quotes, descriptions of this very reconciliation); lines of the form `attempt N,` (N a number) without a token count - neither tally nor the tab reads them, and they do not land in `unparsed` either.
+- **tally → tab:** the `(batch I/K)` mark. The dedup key in `tally.cjs` accounts for it, the one in `data/cards.cjs` (`dedupeAttempts`) does not, so the tab merges distinct attempts of one batch. This is the tab's undercount, not deduplication.
+- **ledger → cards:** lines from before the hook, lines without a call id (`id unknown`), lines of Intent's main session (written by `card-session-spend.cjs`, they do not enter the ledger), lines written by hand per `spend-line.md`.
 
-## Проверка паритета
+## The parity check
 
-`.forma/board/checks/ledger-parity.cjs` сверяет только в одну сторону: запись журнала без строки в карточке. Обратного направления («строка карточки без записи журнала»), заявленного в шапке файла, в коде нет. `unknown`-id пропускаются, пустой журнал даёт пустой результат без сообщения. Без `since` проверка поднимает записи других движков за все даты.
+`.forma/board/checks/ledger-parity.cjs` compares in one direction only: a ledger record without a line in a card. The reverse direction ("a card line without a ledger record"), claimed in the file's header, is not in the code. `unknown` ids are skipped; an empty ledger yields an empty result without a message. Without `since`, the check raises other engines' records for all dates.
 
-## Как разложить разность
+## How to break a difference down
 
-1. Получи три числа из таблицы выше.
-2. Для каждой пары назови причину из списка и посчитай строки по ней; сумма причин должна равняться разности.
-3. Остаток без причины — новая находка: назови адрес строки и ожидаемое значение (запрет 13), не правь на месте (запрет 12).
+1. Get the three numbers from the table above.
+2. For each pair, name the cause from the list and count the lines by it; the causes' sum must equal the difference.
+3. A remainder without a cause - a new finding: name the line's address and the expected value (prohibition 13), do not fix in place (prohibition 12).

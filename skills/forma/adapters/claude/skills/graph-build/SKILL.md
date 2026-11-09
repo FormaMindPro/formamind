@@ -1,60 +1,60 @@
 ---
 name: graph-build
-description: Сборка графов Kit — какой командой строится каждый граф (goals, board, arsenal, structure, resources, central, manual, project, tendons, site, engine-скелет) и как проверить результат. Применять, когда карточка велит построить или обновить граф.
+description: Building the Kit graphs - which command builds each graph (goals, board, arsenal, structure, resources, central, manual, project, tendons, site, engine skeleton) and how to verify the result. Invoke when a card says to build or update a graph.
 ---
 
 # graph-build
 
-Все графы — `.forma/living/graphs/<имя>/graph.json`, формат graphify (`nodes`, `edges`). Все строятся механически, скриптом: разбор frontmatter, заголовков, ссылок, путей, регулярок — без модели. Кэш по хэшу файла: неизменённое не пересчитывается, повторный прогон — «разобрано 0».
+All graphs live at `.forma/living/graphs/<name>/graph.json`, in the graphify format (`nodes`, `edges`). All are built mechanically, by script: parsing frontmatter, headings, links, paths, regexes - no model. Cache keyed by file hash: unchanged files are not recomputed, a rerun reports "parsed 0".
 
-## Команды
+## Commands
 
-| Граф | Команда |
+| Graph | Command |
 |---|---|
-| goals, board, arsenal, structure, resources, central | `node .claude/scripts/build-kit-graphs.cjs` (один: `--only goals\|board\|arsenal\|structure\|resources\|central`); `central` объединяет остальные и печатает отчёт об обрывах для Core |
-| manual, project | `node .claude/scripts/build-kit-graphs.cjs --only manual` и `--only project` |
-| реестр ресурсов (вход resources) | `node .claude/scripts/resources.cjs sort\|inventory\|report` — до графа; `prepare`, `batch`, `apply`, `register`, `decide` — ниже |
-| tendons | `node .claude/scripts/build-tendons.cjs` — **последним** |
+| goals, board, arsenal, structure, resources, central | `node .claude/scripts/build-kit-graphs.cjs` (one: `--only goals\|board\|arsenal\|structure\|resources\|central`); `central` merges the rest and prints a breakage report for Core |
+| manual, project | `node .claude/scripts/build-kit-graphs.cjs --only manual` and `--only project` |
+| the resources registry (input to resources) | `node .claude/scripts/resources.cjs sort\|inventory\|report` - before the graph; `prepare`, `batch`, `apply`, `register`, `decide` - below |
+| tendons | `node .claude/scripts/build-tendons.cjs` - **last** |
 | site | `node .claude/scripts/build-site-graph.cjs` |
-| engine (скелет) | `node .claude/scripts/build-engine-graph.cjs` |
-| engine (graph.html) | `node .claude/scripts/build-engine-graph-html.cjs` — для вкладки дашборда |
+| engine (skeleton) | `node .claude/scripts/build-engine-graph.cjs` |
+| engine (graph.html) | `node .claude/scripts/build-engine-graph-html.cjs` - for the dashboard tab |
 
-Граф опыта отдельно не строится: закрытые карточки (`done`) входят в граф `board`.
+The experience graph is not built separately: closed cards (`done`) are part of the `board` graph.
 
-Порядок: kit-графы → manual/project → tendons. Tendons требует `.forma/living/graphs/manual` и `.forma/living/graphs/project`; их нет — tendons не запускать, назвать в Результате. Граф сайта независим от tendons — своя команда, свой кэш.
+Order: kit-graphs → manual/project → tendons. Tendons requires `.forma/living/graphs/manual` and `.forma/living/graphs/project`; without them, do not run tendons - name that in the Result. The site graph is independent of tendons - its own command, its own cache.
 
-**Один прогон за раз.** Второй прогон не запускать и не уводить в фон, пока первый не завершился: общий файл кэша.
+**One run at a time.** Do not start a second run, nor send one to the background, until the first has finished: they share the cache file.
 
-### Графы structure и resources
+### The structure and resources graphs
 
-`structure` — зоны и файлы `project/`, рёбра карточка → зона, расход по зонам. `resources` — реестр `project/resources/_assets.json` (ключ sha256): узел `asset:<sha12>`, рёбра `made_by` (карточка), `serves` (цель), `used_in` (зона потребителя), `contains` (зона → ресурс); состояние `в работе` / `в запасе` / `бесхозный`. Правила — `project/config/resources.rules.json`.
+`structure` - the zones and files of `project/`, edges card → zone, spend per zone. `resources` - the registry `project/resources/_assets.json` (keyed by sha256): node `asset:<sha12>`, edges `made_by` (card), `serves` (goal), `used_in` (consumer zone), `contains` (zone → resource); state `in work` / `in stock` / `unowned`. Rules - `project/config/resources.rules.json`.
 
-**Ресурс** — любой материал проекта, кроме черновиков (`work/`, tmp, drafts, имена draft/wip) и служебного (`~$*`, `.bkp`, `VARS`, сам реестр). Класс по пути (первое совпадение в `classes`): `source`, `generated`, `reference`, `prompt`, `script`, `doc`, `config`, `data`. Скрипты и файлы протокола (`.claude/scripts`, `.forma/`) ресурсами не считаются (`exclude_paths`).
+**A resource** - any material of the project except drafts (`work/`, tmp, drafts, names draft/wip) and the service files (`~$*`, `.bkp`, `VARS`, the registry itself). Class by path (first match in `classes`): `source`, `generated`, `reference`, `prompt`, `script`, `doc`, `config`, `data`. Scripts and protocol files (`.claude/scripts`, `.forma/`) do not count as resources (`exclude_paths`).
 
-**Описания.** Картинки и видео — агент `asset-describer-haiku`. Тексты, таблицы, схемы — `resources.cjs describe` без модели (заголовки, листы, шапки). Смысловые теги — второй проход: `resources.cjs tag-batch` → модель ставит теги только из закрытого словаря `domain_tags` → `resources.cjs apply-tags`. Поиск ресурса по слову из описания — `node .claude/scripts/graph-query.cjs find <слово>`.
+**Descriptions.** Images and videos - the `asset-describer-haiku` agent. Texts, tables, schemas - `resources.cjs describe` without a model (headings, sheets, header rows). Semantic tags are a second pass: `resources.cjs tag-batch` → the model sets tags only from the closed `domain_tags` dictionary → `resources.cjs apply-tags`. Finding a resource by a word from its description - `node .claude/scripts/graph-query.cjs find <word>`.
 
-Порядок для resources: `resources.cjs sort` (класс ресурс/черновик/неясное; неясное — списком по папкам, решает человек: `resources.cjs decide <папка> resource|draft`) → `inventory` → `prepare`/`batch --n N` (уменьшение до ~1024 px и кадры видео через ffmpeg → `project/work/prep`, манифест `project/work/batch.json`) → агент `asset-describer-haiku` читает манифест и возвращает JSON (один раз по sha256) → `apply <json>` (пишет в реестр скрипт) → `build-kit-graphs.cjs --only resources` → `report` (файл без записи, запись без файла, без описания). Сначала замер на 5–10 файлах, показ человеку, полный прогон — только по его «да». Ничего не удаляется; черновики — в `project/work/` (в `.gitignore`).
+Order for resources: `resources.cjs sort` (class resource/draft/unclear; unclear ones listed by folder, the human decides: `resources.cjs decide <folder> resource|draft`) → `inventory` → `prepare`/`batch --n N` (downscaling to ~1024 px and video frames via ffmpeg → `project/work/prep`, manifest `project/work/batch.json`) → the `asset-describer-haiku` agent reads the manifest and returns JSON (once per sha256) → `apply <json>` (the script writes into the registry) → `build-kit-graphs.cjs --only resources` → `report` (a file without a record, a record without a file, no description). First a trial run on 5-10 files, shown to the human; the full run only on their "yes". Nothing is deleted; drafts go to `project/work/` (in `.gitignore`).
 
-### Граф сайта
+### The site graph
 
-Узлы: сайт → страница/запись/CPT/шаблон/template_part/меню/медиа → секция (верхнеуровневый `<section id>`, иначе синтетический `content`) → виджет (`heading`/`cta`/`link`). Рёбра: `contains`, `uses_template`, `uses_media`, `made` (карточка → страница, по совпадению ID), `described_in` (страница → файл `project/*.md`).
+Nodes: site → page/post/CPT/template/template_part/menu/media → section (a top-level `<section id>`, else a synthetic `content`) → widget (`heading`/`cta`/`link`). Edges: `contains`, `uses_template`, `uses_media`, `made` (card → page, by ID match), `described_in` (page → a `project/*.md` file).
 
-Снимок — один read-only вызов `novamira/execute-php` через `.claude/scripts/site-php.cjs`; сайт не меняется. Кэш — `.forma/living/graphs/site/.cache.json`.
+The snapshot is a single read-only call of `novamira/execute-php` via `.claude/scripts/site-php.cjs`; the site is not modified. Cache - `.forma/living/graphs/site/.cache.json`.
 
-Проверка числа страниц — сверка со снимком: `node -e "const g=require('./.forma/living/graphs/site/graph.json');console.log(g.nodes.filter(n=>n.type==='page').length)"` против списка опубликованных страниц.
+Verifying the page count - compare against the snapshot: `node -e "const g=require('./.forma/living/graphs/site/graph.json');console.log(g.nodes.filter(n=>n.type==='page').length)"` against the list of published pages.
 
-### Граф движка (скелет)
+### The engine graph (skeleton)
 
-Узлы: файл (`.cjs`/`.js`/`.py`/`.sh` из `.claude/scripts`, `.claude/hooks`, `.forma/board`, `.forma/dashboard`, `.forma/protocol/bin`, `.forma/protocol/scripts`, без `.cache`) → его экспорты. Рёбра: `requires`, `exports`. Зеркала `.codex/` и `.agents/` не обходятся — один узел-зеркало на каталог. Разбор регулярками. Кэш — `.forma/living/graphs/engine/.cache.json`.
+Nodes: file (`.cjs`/`.js`/`.py`/`.sh` from `.claude/scripts`, `.claude/hooks`, `.forma/board`, `.forma/dashboard`, `.forma/protocol/bin`, `.forma/protocol/scripts`, no `.cache`) → its exports. Edges: `requires`, `exports`. The `.codex/` and `.agents/` mirrors are not walked - one mirror node per directory. Parsing by regex. Cache - `.forma/living/graphs/engine/.cache.json`.
 
-Отчёт скрипта (stdout): файлы без входящих `requires` и циклы зависимостей.
+The script's report (stdout): files with no incoming `requires` and dependency cycles.
 
-## Вопросы к графу
+## Asking questions of a graph
 
-`node .claude/scripts/graph-query.cjs find <текст> [--type T]` · `node <id>` (узел и рёбра по отношениям) · `path <a> <b>` (кратчайший путь) · `digest` (обрывы central). По умолчанию граф `central`, другой — `--graph <имя>`. Автосборка после правок — хук `auto-graphs.sh` (дебаунс 30 с, lock).
+`node .claude/scripts/graph-query.cjs find <text> [--type T]` · `node <id>` (a node and its edges by relations) · `path <a> <b>` (shortest path) · `digest` (central breakages). Default graph `central`, another one - `--graph <name>`. Auto-rebuild after edits - the `auto-graphs.sh` hook (30 s debounce, lock).
 
-## Проверка
+## Verification
 
-Для каждого построенного графа:
-`node -e "const g=require('./.forma/living/graphs/<имя>/graph.json');console.log(g.nodes.length,g.edges.length)"`
-Готово: JSON читается, узлов и рёбер > 0. В Результат — узлы/рёбра каждого графа.
+For each built graph:
+`node -e "const g=require('./.forma/living/graphs/<name>/graph.json');console.log(g.nodes.length,g.edges.length)"`
+Done: the JSON reads, nodes and edges > 0. Into the Result - nodes/edges of each graph.

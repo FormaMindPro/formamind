@@ -3,10 +3,11 @@
 // English-only gate for executable code of the template's clean zones. The law (prohibition 19) states the
 // rule in one line; this file holds it: the machine finds Cyrillic in executable code and paints the build.
 //
-// Scanned: executable extensions (*.cjs, *.js, *.mjs, *.ps1, *.sh, *.py) under skills/, scripts/, bin/, test/
-// of the repository root (nearest .git upward from this file).
-// Never scanned: *.md (the law, roles, skills), the core dictionary data (skills/forma/core/i18n/), fixture
-// and golden paths (fixture text is data, not code), node_modules, .git, .github.
+// Scanned: executable extensions (*.cjs, *.js, *.mjs, *.ps1, *.sh, *.py) and skill bodies (files named
+// exactly SKILL.md) under skills/, scripts/, bin/, test/ of the repository root (nearest .git upward from
+// this file).
+// Never scanned: other *.md (the law, roles, notes), the core dictionary data (skills/forma/core/i18n/),
+// fixture and golden paths (fixture text is data, not code), node_modules, .git, .github.
 //
 // Modes:
 //   no args     full run: files of zones named in "allowList" (the data file next to this script) are
@@ -27,6 +28,8 @@ const { walk, readJson } = require('../../dashboard/lib/fs.cjs');
 const ZONES_FILE = 'check-english-code.zones.json';
 const ROOTS = ['skills', 'scripts', 'bin', 'test'];
 const EXT = /\.(?:cjs|js|mjs|ps1|sh|py)$/i;
+// Skill bodies: any file named exactly SKILL.md is scanned as text (zone "skill-md"), like code.
+const SKILL_MD = 'SKILL.md';
 // Cyrillic blocks: Cyrillic, Supplement, Extended-A, Extended-B, Extended-C.
 const CYRILLIC = /[\u0400-\u04FF\u0500-\u052F\u2DE0-\u2DFF\uA640-\uA69F\u1C80-\u1C8F]/;
 // Directories never entered: dependencies, git plumbing, CI definitions, fixture text.
@@ -91,7 +94,7 @@ function scan(root, o = {}) {
     });
     for (const rel of rels) {
       const relPath = top + '/' + rel;
-      if (!EXT.test(relPath)) continue;
+      if (!EXT.test(relPath) && rel.split('/').pop() !== SKILL_MD) continue;
       const zone = zoneOf(relPath, zones && zones.zones);
       if (o.onlyZone ? zone !== o.onlyZone : Boolean(zone && allow.has(zone))) { skipped++; continue; }
       files.push(relPath);
@@ -171,6 +174,7 @@ function makeTree(dir) {
   put('scripts/golden/ref.sh', `echo "${WORD}"\n`);
   put('skills/forma/core/i18n/messages/ru.cjs', `// ${WORD}\n`);
   put('scripts/README.md', `# ${WORD}\n`);
+  put('scripts/skills/inner/SKILL.md', `# ${TEXT}\n`);
   put('scripts/node_modules/pkg/x.cjs', `// ${WORD}\n`);
   put('scripts/.github/wf.js', `// ${WORD}\n`);
   put('bin/tool.sh', `echo "${WORD}"\n`);
@@ -180,22 +184,26 @@ function makeTree(dir) {
 
 function scanAssertions(failures, dir) {
   const expect = (cond, msg) => { if (!cond) failures.push(msg); };
-  // No zones data: everything strict; only data paths (md, dictionary, fixtures, golden, deps, CI) escape.
+  // No zones data: everything strict; only data paths (non-skill md, dictionary, fixtures, golden, deps, CI)
+  // escape; a SKILL.md body counts as scanned text.
   let r = scan(dir, { zones: null });
   expect(r.skipped === 0, `no-zones run: skipped ${r.skipped}, expected 0`);
-  expect(r.scanned === 6, `no-zones run: scanned ${r.scanned}, expected 6`);
-  expect(r.findings.length === 5, `no-zones run: findings ${r.findings.length}, expected 5`);
+  expect(r.scanned === 7, `no-zones run: scanned ${r.scanned}, expected 7`);
+  expect(r.findings.length === 6, `no-zones run: findings ${r.findings.length}, expected 6`);
   const rels = r.findings.map((f) => f.rel).sort().join(',');
-  expect(rels === 'bin/tool.sh,scripts/bad.js,scripts/install.cjs,scripts/nested/deep.mjs,test/sample.test.cjs',
+  expect(rels ===
+    'bin/tool.sh,scripts/bad.js,scripts/install.cjs,scripts/nested/deep.mjs,scripts/skills/inner/SKILL.md,test/sample.test.cjs',
     `no-zones run: files ${rels}`);
   expect(r.findings.every((f) => f.line === 1 && f.text.length > 0), 'no-zones run: finding lacks line or text');
   // Allow-list as data: the "tests-fixtures" zone (test/) is skipped in the full run.
   const zones = { allowList: ['tests-fixtures'], zones: { 'tests-fixtures': { prefixes: ['test/'] } } };
   r = scan(dir, { zones });
-  expect(r.scanned === 5 && r.skipped === 1, `allow-list run: scanned ${r.scanned}, skipped ${r.skipped}`);
+  expect(r.scanned === 6 && r.skipped === 1, `allow-list run: scanned ${r.scanned}, skipped ${r.skipped}`);
   expect(!r.findings.some((f) => f.rel.startsWith('test/')), 'allow-list run: test/ still reported');
-  // Zone matchers: prefixes, one-segment glob, basename patterns, exact files, catch-all rest.
+  // Zone matchers: basename patterns, prefixes, one-segment glob, exact files, catch-all rest. "skill-md"
+  // sits first on purpose: its SKILL.md name must win over the adapter/installer prefixes.
   const cfg = {
+    'skill-md': { names: ['SKILL.md'] },
     'board-core': { prefixes: ['skills/forma/core/board/'] },
     'hooks-spend': { prefixGlobs: ['skills/forma/adapters/*/hooks/'], names: ['*spend*', '*ledger*'] },
     'adapters-installers': { prefixes: ['skills/forma/adapters/'], files: ['scripts/scaffold-engine.cjs'], names: ['*gen-roles*'] },
@@ -203,6 +211,8 @@ function scanAssertions(failures, dir) {
     'skill-scripts': { rest: true },
   };
   const cases = [
+    ['skills/forma/adapters/claude/skills/x/SKILL.md', 'skill-md'],
+    ['skills/forma/SKILL.md', 'skill-md'],
     ['skills/forma/core/board/x.cjs', 'board-core'],
     ['skills/forma/core/other/x.cjs', 'skill-scripts'],
     ['skills/forma/adapters/claude/hooks/h.cjs', 'hooks-spend'],

@@ -1,6 +1,11 @@
 {
   "allowList": [],
   "zones": {
+    "skill-md": {
+      "names": [
+        "SKILL.md"
+      ]
+    },
     "board-core": {
       "prefixes": [
         "skills/forma/core/board/"

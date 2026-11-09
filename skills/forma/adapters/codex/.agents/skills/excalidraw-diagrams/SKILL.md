@@ -1,52 +1,52 @@
 ---
 name: excalidraw-diagrams
-description: "Excalidraw-диаграммы проекта: шрифт, палитра, два способа создания (локальный файл или облачный коннектор), типичные ошибки."
+description: "Project's Excalidraw diagrams: font, palette, two ways to draw (a local file or the cloud connector), typical mistakes."
 ---
 
-# excalidraw-diagrams — правила рисования в Excalidraw
+# excalidraw-diagrams - drawing rules for Excalidraw
 
-## Шрифт — всегда Excalifont
+## Font - always Excalifont
 
-`fontFamily: 5` (Excalifont) — актуальный шрифт Excalidraw с 2024 года, предустановленный по умолчанию в самом приложении. **Никогда не `fontFamily: 1`** (Virgil) — это старый шрифт, вытесненный Excalifont, но многие примеры в интернете и старые генераторы всё ещё используют `1` по инерции.
+`fontFamily: 5` (Excalifont) is Excalidraw's current font since 2024, preset as the default in the app itself. **Never `fontFamily: 1`** (Virgil) - the old font displaced by Excalifont, yet many examples on the web and older generators still use `1` out of inertia.
 
-Полная таблица `FONT_FAMILY` (`packages/common/src/constants.ts` в `excalidraw/excalidraw`):
+The full `FONT_FAMILY` table (`packages/common/src/constants.ts` in `excalidraw/excalidraw`):
 
-| Значение | Имя | Назначение |
+| Value | Name | Purpose |
 |---|---|---|
-| 1 | Virgil | старый рукописный (не использовать) |
-| 2 | Helvetica | обычный (устаревший слот) |
-| 3 | Cascadia | код (устаревший слот) |
-| 5 | **Excalifont** | **рукописный, по умолчанию — использовать** |
-| 6 | Nunito | обычный текст |
-| 8 | Comic Shanns | код |
+| 1 | Virgil | old handwriting (do not use) |
+| 2 | Helvetica | normal (deprecated slot) |
+| 3 | Cascadia | code (deprecated slot) |
+| 5 | **Excalifont** | **handwriting, the default - use it** |
+| 6 | Nunito | normal text |
+| 8 | Comic Shanns | code |
 
-На каждом текстовом элементе (`type: "text"`) и в `label` подписи фигуры — поле `fontFamily: 5`, если не нужен явно другой шрифт (код — 8, обычный — 6).
+On every text element (`type: "text"`) and in the `label` of a shape's caption - the field `fontFamily: 5`, unless a different font is explicitly needed (code is 8, normal text is 6).
 
-## Два способа рисовать — какой когда
+## Two ways to draw - which one when
 
-| Способ | Когда | Особенности |
+| Way | When | Notes |
 |---|---|---|
-| **Локальный `.excalidraw` JSON-файл** (Node-скрипт генерирует файл целиком) | Большая структурная диаграмма для `.forma/manual/diagrams/`, которую держим в проекте и дорабатываем | Никакого живого движка — перенос текста и высоту блока считаешь сам (см. ниже); зато один проход, без round-trip'ов; открывается локальным приложением пользователя |
-| **Облачный коннектор `claude.ai Excalidraw`** (`create_view`, `export_to_excalidraw`) | Диаграмма для показа прямо в чате, или нужна расшаренная ссылка excalidraw.com | `create_view` — рисует с анимацией, требует `cameraUpdate` первым элементом (4:3, см. подсказку `read_me`); `export_to_excalidraw` — грузит готовый JSON, возвращает `https://excalidraw.com/#json=...`. **`read_me` вызывается один раз за разговор** — второй вызов ничего нового не покажет |
+| **A local `.excalidraw` JSON file** (a Node script generates the whole file) | A large structural diagram for `.forma/manual/diagrams/`, kept in the project and refined over time | No live engine - text wrapping and block height are computed by hand (see below); in exchange, one pass, no round-trips; opens in the user's local app |
+| **The `claude.ai Excalidraw` cloud connector** (`create_view`, `export_to_excalidraw`) | A diagram to show right in the chat, or a shareable excalidraw.com link is needed | `create_view` - draws with animation, requires `cameraUpdate` as the first element (4:3, see the `read_me` hint); `export_to_excalidraw` - uploads ready JSON, returns `https://excalidraw.com/#json=...`. **`read_me` is called once per conversation** - a second call shows nothing new |
 
-Оба способа принимают одну и ту же схему элементов (`rectangle`/`ellipse`/`diamond`/`arrow`/`text`), но `create_view` дополнительно понимает укороченный синтаксис `label` на фигуре (подпись без отдельного текстового элемента) — для ручной генерации JSON `label` не годится, там нужен отдельный `text`-элемент или `boundElements`/`containerId`.
+Both ways accept the same element schema (`rectangle`/`ellipse`/`diamond`/`arrow`/`text`), but `create_view` additionally understands the shortened `label` syntax on a shape (a caption without a separate text element) - for hand-generated JSON `label` does not fit; there you need a separate `text` element or `boundElements`/`containerId`.
 
-## Локальная генерация — обязательный ручной перенос текста
+## Local generation - mandatory manual text wrapping
 
-Excalidraw не пересчитывает высоту контейнера сам при программной записи JSON (в отличие от `label`-подписи в `create_view`, которая авто-центрируется движком). Перед записью:
+Excalidraw does not recompute a container's height itself when the JSON is written programmatically (unlike a `label` caption in `create_view`, which the engine auto-centers). Before writing:
 
-1. оцени ширину символа как `fontSize * 0.5–0.56`;
-2. посчитай, сколько строк займёт текст при ширине блока минус отступы (~16px с каждой стороны);
-3. перенеси текст руками (`\n` внутри `text`), не полагайся на `width` — оно влияет только на перенос при `type: "text"` без готовых `\n`, и то не всегда предсказуемо;
-4. высота блока — по накопленной высоте всех строк + отступы, не «на глаз».
+1. estimate the character width as `fontSize * 0.5-0.56`;
+2. count how many lines the text takes at the block width minus padding (~16px per side);
+3. wrap the text by hand (`\n` inside `text`), do not rely on `width` - it only affects wrapping for `type: "text"` without ready `\n`, and even then not always predictably;
+4. block height - from the accumulated height of all lines plus padding, not "by eye".
 
-Пример готового генератора — `.forma/manual/en/assets/` (прежний `project-structure.excalidraw` удалён человеком) (скрипт хранился в scratchpad сессии, не в проекте — при повторном использовании написать заново по этому образцу, не искать старый файл).
+An example of a finished generator - `.forma/manual/en/assets/` (the older `project-structure.excalidraw` was removed by the human) (the script lived in a session scratchpad, not in the project - on reuse, write it anew after this pattern, do not hunt for the old file).
 
-## Палитра
+## Palette
 
-Для диаграмм по структуре **этого проекта** (пять узлов Intent/Spec/Kit/Run/Core) — не общая палитра Excalidraw, а уже принятая проектная (совпадает с `.forma/manual/diagrams/five-nodes-console.html` и `.forma/manual/diagrams/five-nodes.excalidraw`):
+For diagrams of **this project's** structure (the five nodes Intent/Spec/Kit/Run/Core) - not a generic Excalidraw palette but the accepted project one (matches `.forma/manual/diagrams/five-nodes-console.html` and `.forma/manual/diagrams/five-nodes.excalidraw`):
 
-| Узел | Hex |
+| Node | Hex |
 |---|---|
 | Intent | `#b98cff` |
 | Spec | `#6fd3ff` |
@@ -54,10 +54,10 @@ Excalidraw не пересчитывает высоту контейнера с�
 | Run | `#7be0a8` |
 | Core | `#ff6b57` |
 
-Фон — тёмный `#0f2a4a` (`appState.viewBackgroundColor`), не белый по умолчанию: проект держит единый тёмный блюпринт-стиль во всех диаграммах и артефактах.
+The background is dark `#0f2a4a` (`appState.viewBackgroundColor`), not the default white: the project keeps a single dark blueprint style across all diagrams and artifacts.
 
-Для диаграмм **не про структуру проекта** (генерация через `create_view`, разовые пояснительные схемы) — держись палитры из `read_me` того сервера (`Color Palette`/`Excalidraw Fills`/`Background Zones` разделы), она рассчитана на белый фон и читаемость в чате.
+For diagrams **not about the project structure** (generated via `create_view`, one-off explanatory sketches) - stick to the palette of that server's `read_me` (the `Color Palette`/`Excalidraw Fills`/`Background Zones` sections); it is tuned for a white background and readability in chat.
 
-## Дорогая ошибка — не перечитывать большой сгенерированный файл целиком
+## An expensive mistake - never re-read a large generated file in full
 
-`.excalidraw`-файл — один длинный JSON без переносов строк. Инструмент `Read` не может постранично читать однострочный файл (упирается в лимит превью ~25000 токенов и обрезает). Если нужно **точечно** поправить файл (например, значение одного поля везде) — правь через `sed`/`grep -o … | wc -l` для проверки, не через `Read` + переписывание. Если нужен **весь** текст файла (например, для `export_to_excalidraw`) — это неизбежно дорого (десятки тысяч токенов за большую диаграмму); делай это осознанно и по запросу, не «на всякий случай» после каждой правки.
+An `.excalidraw` file is one long JSON without line breaks. The `Read` tool cannot read a single-line file page by page (it hits the ~25000-token preview limit and truncates). If a **point** fix is needed (say, one field's value everywhere) - edit via `sed`/`grep -o … | wc -l` for verification, not via `Read` + rewriting. If the **whole** file text is needed (say, for `export_to_excalidraw`) - that is unavoidably expensive (tens of thousands of tokens for a large diagram); do it deliberately and on request, not "just in case" after every edit.

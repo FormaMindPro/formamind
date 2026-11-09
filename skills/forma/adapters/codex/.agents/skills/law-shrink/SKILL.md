@@ -1,32 +1,32 @@
 ---
 name: law-shrink
-description: Сжатие AGENTS.md до держателей — применять, когда закон раздулся или правка закона добавляет прозу: конструктивное (запреты со скриптами-держателями) сжимается по принципу «адрес остаётся, проза уходит, держатель называется», сужденческое не трогается; после сжатия гейт law-shrink.cjs обязателен.
+description: Shrinking AGENTS.md down to its holders - apply when the law has bloated or a law edit adds prose: constructive rules (prohibitions with script-holders) shrink by the principle "the address stays, the prose leaves, the holder is named", judgment rules are untouched; after shrinking, the law-shrink.cjs gate is obligatory.
 ---
 
-# law-shrink — сжатие закона до держателей
+# law-shrink - shrinking the law down to its holders
 
-Закон (`AGENTS.md`) грузится в каждую сессию каждого движка: его вес — цена чтения, а не байты ради байтов. Правило, которое уже держится скриптом, не обязано объяснять в законе, как оно исполняется, — достаточно адреса держателя.
+The law (`AGENTS.md`) loads into every session of every engine: its weight is a reading cost, not bytes for bytes' sake. A rule already held by a script need not explain in the law how it is executed - the holder's address suffices.
 
-## Принцип
+## Principle
 
-**Адрес остаётся, проза уходит, держатель называется.** Строка закона, чьё исполнение несёт скрипт, сжимается до: что должно держаться + в скобках имя держателя. Пример (запрет 18): четыре строки описания → одна — «держится `forma-commit.cjs` + pre-push».
+**The address stays, the prose leaves, the holder is named.** A line of law whose execution a script carries shrinks to: what must hold + the holder's name in brackets. Example (prohibition 18): four lines of description → one - "held by `forma-commit.cjs` + pre-push".
 
-- Номера запретов — постоянные адреса: ссылки ролей («запрет 17») и `law-pointers.cjs` по ним живут; номера не перенумеровывать.
-- Названный законом файл обязан существовать — гейт проверяет каждое имя в бэктиках.
+- The prohibitions' numbers are permanent addresses: roles' references ("prohibition 17") and `law-pointers.cjs` live by them; do not renumber.
+- A file the law names must exist - the gate checks every name in backticks.
 
-## Что не сжимается
+## What is not shrunk
 
-Сужденческие правила — то, чьё исполнение не несёт скрипт и не сведётся к нему: запреты 2, 6, 7, 9–14, §1 (пять пар), §2 (маршрут), §4 (маркеры позиции). Сжатие их — потеря смысла, а не веса. Характер пар (§1) и табличные формы — тоже не трогаются: они не «проза», а несущая конструкция.
+Judgment rules - what no script carries and no script could carry: prohibitions 2, 6, 7, 9-14, §1 (the five pairs), §2 (the route), §4 (the position markers). Shrinking them loses meaning, not weight. The pairs' character (§1) and the tabular forms are not touched either: they are not "prose" but the load-bearing structure.
 
-## Порядок
+## The order
 
-1. **Базлайн.** Объём закона до сжатия записывается в `.forma/living/checks.json` (ключ `lawShrink.baselineBytes`), если ещё не записан: гейт судит «строго меньше базлайна».
-2. **Сжатие.** Только уже-конструктивное: запреты со скриптами-держателями и счётные правила §3. Каждый уходящий кусок прозы оставляет после себя адрес держателя.
-3. **Гейт.** `node .forma/board/checks/law-shrink.cjs` — зелёный обязателен: объём ниже базлайна, номера запретов 1–18 и заголовки §1–§7 на месте, все названные в бэктиках файлы на диске.
-4. **Сверка зеркал.** `node .claude/scripts/sync-engines.cjs --check` — закон разъезжается по движкам; красная сверка = правка не закончена.
+1. **Baseline.** The law's volume before shrinking is recorded in `.forma/living/checks.json` (key `lawShrink.baselineBytes`) if not recorded yet: the gate judges "strictly less than the baseline".
+2. **Shrinking.** Only what is already constructive: prohibitions with script-holders and the countable rules of §3. Every leaving piece of prose leaves behind the holder's address.
+3. **The gate.** `node .forma/board/checks/law-shrink.cjs` - green is obligatory: the volume below the baseline, the prohibition numbers 1-18 and the §1-§7 headings in place, every backtick-named file on disk.
+4. **The mirror reconciliation.** `node .claude/scripts/sync-engines.cjs --check` - the law travels across the engines; a red reconciliation = the edit is not finished.
 
-## Границы честности
+## The bounds of honesty
 
-Потолок сжатия реален: пул конструктивной прозы конечен (замер при первом применении метода: ~2,3 КБ при honest-потолке), глубже — режет смысл. Сжатие не гонится за байтами: если после сжатия правило читается хуже, чем держится, — откатить кусок. Один тест на правку — прочесть раздел вслух: если держатель назван и правило понятно без удалённой прозы, сжатие честное.
+The shrinking ceiling is real: the pool of constructive prose is finite (measured at the method's first application: ~2.3 KB at the honest ceiling); deeper than that cuts meaning. Shrinking does not chase bytes: if after shrinking a rule reads worse than it holds - roll the piece back. One test per edit - read the section aloud: if the holder is named and the rule is clear without the removed prose, the shrinking is honest.
 
-Метод исполнен и проверен на живом законе (14 769 → 13 649 Б); держатель гейта — `law-shrink.cjs`, прецедент записи базлайна — `.forma/living/checks.json`.
+The method has been executed and verified on the live law (14769 → 13649 B); the gate's holder is `law-shrink.cjs`, the precedent for recording the baseline is `.forma/living/checks.json`.
