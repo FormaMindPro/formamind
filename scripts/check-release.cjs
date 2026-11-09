@@ -31,7 +31,8 @@ const TRACES = [
   { id: 'criterion', re: /\u043a\u0440\u0438\u0442\u0435\u0440\u0438\p{L}*\s+\d|criterion\s+\d/iu, why: tr('rel.why_criterion') },
   { id: 'site', re: /iamforma\.pro|yaforma|formacraft/i, why: tr('rel.why_site'), files: /^(?!README(\.ru)?\.md$)/ }, // except README: links to the official community sites
   { id: 'connector', re: /mcp__novamira-[a-z0-9]+(?:-[a-z0-9]+)*__/i, why: tr('rel.why_connector') },
-  { id: 'date', re: /\b20\d\d-\d\d-\d\d\b/, why: tr('rel.why_date'), files: /^(?!test\/)/ },
+  // except CHANGELOG.md: the version history is published by design, its dates are its substance, not a project trace
+  { id: 'date', re: /\b20\d\d-\d\d-\d\d\b/, why: tr('rel.why_date'), files: /^(?!test\/)(?!CHANGELOG\.md$)/ },
 ];
 // The project's own site names: the `mcp__novamira-<slug>` connector slugs and the domains from curl rules in the project's
 // Claude Code settings (the clone lives in <project>/.forma/protocol). No file, or the clone outside a project - an empty list.

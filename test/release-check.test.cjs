@@ -74,6 +74,13 @@ test('the card-001...009, card-099, goal-00 stubs and dates in test/ are not a t
   assert.deepEqual(scanTraces(dir), []);
 });
 
+test('a date in CHANGELOG.md is not a trace - the version history is published by design', () => {
+  const changelog = repoWith({ 'CHANGELOG.md': '## [1.0.0] - 20' + '31-01-05\n' });
+  assert.deepEqual(scanTraces(changelog), []);
+  const other = repoWith({ 'NOTES.md': 'dated 20' + '31-01-05\n' });
+  assert.deepEqual(scanTraces(other).map((x) => x.rule), ['date']);
+});
+
 test('project traces in commit messages; a date in a message is allowed', () => {
   assert.equal(scanMessages(['Card ' + '134: grid', 'card-' + '197: set', 'v1 — 20' + '31-01-05', 'Clean message']).length, 2);
 });
