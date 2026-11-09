@@ -4,6 +4,7 @@
 //   node .forma/board/card-move.cjs <card> --to kit|run|intent|accept|close --note "<what is done>" [--node <node>] [--dry]
 //                                 [--duration-ms MS --agent-id <id> [--tokens N] [--cache-read R] [--turns K] [--engine <engine tag>]]
 //                                 [--kit "<text>"|-] [--result "<text>"|-] [--session-spend <NNN>]
+//   node .forma/board/card-move.cjs <card> --stage <key> --node <node> --note "<what>" [--dry] - the stage line only, no move
 //
 // <card>  - "NNN", "card-NNN" or the full code "card-NNN-slug"; the sampling is exact: a short number - only with
 //           a single candidate, an ambiguity (several cards under one number) - a refusal with the list
@@ -18,6 +19,11 @@
 //           holds "Kit"; `route-0` and `route-1` - Intent executes, `run` holds "Intent"; the other routes - Run.
 // --note  - the "what" in the stage line; without it - an error: an empty stage line says nothing.
 // --node  - whose line; by default the node making this handover (see the table; for `intent` - the previous executor).
+// --stage - the stage line by the same call (§6), the key from a closed list of seven
+//           (card|approve|kit|exec|check|accept|close); with --to the key must match the target's stage - one call
+//           writes one stage line; without --to - the line only: the status and the assignee do not change,
+//           --node names whose line it is (the table §7 does not cover a no-move call - no default), the spend
+//           and section flags are not accepted. An unknown key or a missing text - a stop before any write.
 // The spend (AGENTS.md §3, ECONOMY.md) - the caller writes it right after the node's return; the same call also appends the spend line:
 //           --duration-ms MS (seconds are rounded), --agent-id <id of the call>; both are needed. N, R and O are read from the call's transcript
 //           (as `claude-economy.cjs line`); --tokens N - the fallback value: with it the line is written as is, without reading the transcript.
@@ -66,6 +72,15 @@ const TARGETS = {
   accept: { status: 'review', assignee: 'Intent', stage: 'accept', by: 'Intent' },
   close: { status: 'done', assignee: 'Core', stage: 'close', by: 'Intent' },
 };
+// The stage keys of §6 card-and-board.md - the same closed list the route-stage check keeps; --stage takes no others.
+const STAGE_KEYS = ['card', 'approve', 'kit', 'exec', 'check', 'accept', 'close'];
+
+// One frontmatter field by key, whole-value; no field - a stop (fail-closed), shared by both call forms.
+const setField = (src, key, val) => {
+  const re = new RegExp('^' + key + ':.*$', 'm');
+  if (!re.test(src)) die(msg('board.card-move.no_field', { key }));
+  return src.replace(re, `${key}: ${val}`);
+};
 
 // The card code: "NNN"|"card-NNN" → the short "card-NNN" (normalize); "card-NNN-slug" → the full code; otherwise null.
 function cardCode(word) {
@@ -89,6 +104,34 @@ function resolveCardFiles(root, cid) {
 
 const dieAmbiguous = (cid, rels) =>
   die(msg('board.card-move.ambiguous', { cid, rels: rels.join('\n  ') }));
+
+/** 6b. The dashboard cache invalidation / recalculation at a card update - shared by both call forms. */
+function refreshDashboardCache() {
+  try {
+    const cacheFile = path.join(ROOT, '.forma', 'dashboard', '.cache', 'data.json');
+    if (fs.existsSync(cacheFile)) {
+      let rebuilt = false;
+      const candidates = [
+        path.join(ROOT, '.forma', 'dashboard', 'generate.js'),
+        path.resolve(__dirname, '../dashboard/generate.js'),
+      ];
+      for (const genFile of candidates) {
+        if (fs.existsSync(genFile)) {
+          try {
+            const { buildData } = require(genFile);
+            const data = buildData(ROOT);
+            fs.writeFileSync(cacheFile, JSON.stringify(data, null, 2), 'utf8');
+            rebuilt = true;
+            break;
+          } catch {}
+        }
+      }
+      if (!rebuilt) {
+        fs.rmSync(cacheFile, { force: true });
+      }
+    }
+  } catch {}
+}
 
 // ---- --selftest: the sampling gauges in the OS temp directory (after the model of goal-freeze.cjs) -----------
 
@@ -142,6 +185,7 @@ if (process.argv.includes('--selftest')) process.exit(selftest() ? 0 : 1);
 const id = cardCode(cli.positional()[0]);
 const to = arg('to');
 const note = arg('note');
+const stage = arg('stage');
 
 /** The early spend-parity check (ledger-parity) over the named cards, before any write:
  *  `problems` - a numeric drift of the line from the journal (it stops the handover before the status mutation),
@@ -168,7 +212,7 @@ if (to === 'core-close') {
   const ids = words.map(cardCode);
   if (!ids.length || ids.some((x) => !x)) die(msg('board.card-move.coreclose_need_ids'));
   if (!note || /[\n]/.test(note)) die(msg('board.card-move.need_note_reason'));
-  if (['kit', 'result', 'session-spend', 'tokens', 'duration-ms', 'agent-id'].some((k) => process.argv.includes('--' + k))) die(msg('board.card-move.coreclose_no_other_flags'));
+  if (['kit', 'result', 'session-spend', 'tokens', 'duration-ms', 'agent-id', 'stage'].some((k) => process.argv.includes('--' + k))) die(msg('board.card-move.coreclose_no_other_flags'));
   const day0 = new Date().toISOString().slice(0, 10);
   const plan = [];
   for (const cid of ids) {
@@ -204,6 +248,54 @@ if (to === 'core-close') {
   const bad = checkBoard(ROOT).filter((p) => plan.some((q) => p.includes(q.cid)));
   for (const p of plan) console.log(msg('board.card-move.closed_ok', { cid: p.cid }));
   if (bad.length) { console.error(bad.join('\n')); process.exit(1); }
+  process.exit(0);
+}
+
+// The stage key: a closed list of seven (§6); with --to the key must match the target's stage - one call
+// writes one stage line; an unknown key or a mismatch - a stop before any write.
+if (process.argv.includes('--stage') && (stage == null || stage === '')) die(msg('board.card-move.stage_need_key', { keys: STAGE_KEYS.join('|') }));
+if (stage != null && !STAGE_KEYS.includes(stage)) die(msg('board.card-move.bad_stage', { stage, keys: STAGE_KEYS.join('|') }));
+if (stage != null && to != null) {
+  if (!TARGETS[to]) die(msg('board.card-move.bad_to', { to, targets: Object.keys(TARGETS).join('|') }));
+  if (stage !== TARGETS[to].stage) die(msg('board.card-move.stage_to_mismatch', { stage, to, target: TARGETS[to].stage }));
+}
+
+// --stage without --to: the stage line only (§6 card-and-board.md), no move - the status, the assignee and
+// completedAt do not change; --node names whose line it is (the table §7 does not cover a no-move call);
+// the spend and section flags belong to the moves - not accepted; the text after the dash is mandatory.
+if (stage != null && !to) {
+  if (['kit', 'result', 'session-spend', 'tokens', 'duration-ms', 'agent-id'].some((k) => process.argv.includes('--' + k))) die(msg('board.card-move.stage_no_other_flags'));
+  if (!id) die(msg('board.card-move.need_card_stage'));
+  if (!note || /[\n]/.test(note)) die(msg('board.card-move.need_note'));
+  const snode = arg('node');
+  if (!snode) die(msg('board.card-move.stage_need_node'));
+  if (!/^[A-Za-z]\w*$/.test(snode)) die(msg('board.card-move.bad_node', { node: snode }));
+  const foundS = resolveCardFiles(ROOT, id);
+  if (foundS.ambiguous) dieAmbiguous(id, foundS.ambiguous);
+  if (!foundS.file) die(msg('board.card-move.no_card', { id }));
+  const fileS = foundS.file;
+  if (path.dirname(fileS) !== BOARD) die(msg('board.card-move.in_done', { id }));
+  const cardIdS = path.basename(fileS, '.md');
+  let textS = fs.readFileSync(fileS, 'utf8');
+  const nowS = new Date().toISOString();
+  textS = setField(textS, 'modified', `"${nowS}"`);
+  const zoneHist = zoneHeadingIn(textS, 'history');
+  const zoneRes = zoneHeadingIn(textS, 'result');
+  if (!zoneHist) die(msg('board.card-move.no_history_zone'));
+  const dayS = nowS.slice(0, 10);
+  const lineS = `- \`${snode}\`, ${dayS}: stage ${stage} — ${note.replace(/\.?\s*$/, '.')}`;
+  const histAt = textS.indexOf('\n## ' + zoneHist);
+  const resAt = zoneRes ? textS.indexOf('\n## ' + zoneRes, histAt + 1) : -1;
+  const histEnd = resAt === -1 ? textS.length : resAt;
+  const body = textS.slice(histAt, histEnd).replace(/\s*$/, '');
+  textS = textS.slice(0, histAt) + body + '\n' + lineS + '\n' + (resAt === -1 ? '' : textS.slice(resAt));
+  if (flag('dry')) { console.log(path.relative(ROOT, fileS).replace(/\\/g, '/') + '\n' + textS); process.exit(0); }
+  fs.writeFileSync(fileS, textS);
+  console.log(path.relative(ROOT, fileS).replace(/\\/g, '/'));
+  refreshDashboardCache();
+  const mine = checkBoard(ROOT).filter((p) => p.includes(cardIdS));
+  if (mine.length) { console.error(mine.join('\n')); process.exit(1); }
+  console.log(`ok: ${cardIdS} · stage ${stage} (no move)`);
   process.exit(0);
 }
 
@@ -353,11 +445,6 @@ if (!/^[A-Za-z]\w*$/.test(node)) die(msg('board.card-move.bad_node', { node }));
 // 4. The frontmatter edit: status, assignee, modified (+ completedAt on close)
 const now = new Date().toISOString();
 const day = now.slice(0, 10);
-const setField = (src, key, val) => {
-  const re = new RegExp('^' + key + ':.*$', 'm');
-  if (!re.test(src)) die(msg('board.card-move.no_field', { key }));
-  return src.replace(re, `${key}: ${val}`);
-};
 text = setField(text, 'status', `"${t.status}"`);
 text = setField(text, 'assignee', `"${assignee}"`);
 text = setField(text, 'modified', `"${now}"`);
@@ -418,30 +505,7 @@ fs.writeFileSync(target, text);
 console.log(path.relative(ROOT, target).replace(/\\/g, '/'));
 
 // 6b. The dashboard cache invalidation / recalculation at a card update
-try {
-  const cacheFile = path.join(ROOT, '.forma', 'dashboard', '.cache', 'data.json');
-  if (fs.existsSync(cacheFile)) {
-    let rebuilt = false;
-    const candidates = [
-      path.join(ROOT, '.forma', 'dashboard', 'generate.js'),
-      path.resolve(__dirname, '../dashboard/generate.js'),
-    ];
-    for (const genFile of candidates) {
-      if (fs.existsSync(genFile)) {
-        try {
-          const { buildData } = require(genFile);
-          const data = buildData(ROOT);
-          fs.writeFileSync(cacheFile, JSON.stringify(data, null, 2), 'utf8');
-          rebuilt = true;
-          break;
-        } catch {}
-      }
-    }
-    if (!rebuilt) {
-      fs.rmSync(cacheFile, { force: true });
-    }
-  }
-} catch {}
+refreshDashboardCache();
 
 // 7. The check over this card
 const mine = checkBoard(ROOT).filter((p) => p.includes(cardId));

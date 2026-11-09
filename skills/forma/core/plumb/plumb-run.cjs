@@ -95,7 +95,8 @@ function buildCatalog(roleDir) {
 
 // The thresholds from PROJECT.md (the "Plumb" table row), the executor's set: jev - the text after "jev:",
 // haiku - before "jev:". The keys are English (leader, gap, noul, clarity); local words are aliases.
-// All values are numbers 0..100 (percents). For haiku, noul and clarity may be null.
+// leader/gap are percents, clarity is 0..4; noul may be written as a fraction 0..1 (0.75) or a percent
+// (75) - the comparison normalizes it to a fraction. For haiku, noul and clarity may be null.
 function readThresholds(root, executor) {
   try {
     const md = fs.readFileSync(path.join(root, 'project', 'config', 'PROJECT.md'), 'utf8');
@@ -104,7 +105,8 @@ function readThresholds(root, executor) {
     const byRow = { leader: null, gap: null, noul: null, clarity: null };
     for (const f of Object.keys(byRow)) byRow[f] = i18n.rowNumber(md, `plumb.${who}.${f}`);
     const needed = who === 'jev' ? Object.values(byRow) : [byRow.leader, byRow.gap];
-    if (needed.every((v) => v !== null)) return who === 'jev' ? byRow : { ...byRow, noul: null, clarity: null };
+    const ok = (v) => v !== null && Number.isFinite(v); // NaN counts as unread, never as a pass
+    if (needed.every(ok)) return who === 'jev' ? byRow : { ...byRow, noul: null, clarity: null };
     // The older shape: the thresholds inside the "Plumb" row as the text "leader >= 60 %".
     let row = md.split(/\r?\n/).find((l) => /plumb/i.test(l) && /≥/.test(l));
     if (!row) return null;
@@ -112,7 +114,8 @@ function readThresholds(root, executor) {
     const isJev = (executor || 'jev') === 'jev';
     if (cut >= 0) row = isJev ? row.slice(cut) : row.slice(0, cut);
     const num = (re) => { const m = re.exec(row); return m ? Number(m[1].replace(',', '.')) : null; };
-    const re = (key, between) => new RegExp(`(?:${i18n.alt(key)})${between}≥\\s*([\\d.,]+)`, 'i');
+    // The capture stops before a list comma: "0.75," is 0.75, not "0.75." - Number("0.75.") is NaN.
+    const re = (key, between) => new RegExp(`(?:${i18n.alt(key)})${between}≥\\s*(\\d+(?:[.,]\\d+)?)`, 'i');
     const t = {
       leader: num(re('plumb.leader', '\\s*')),
       gap: num(re('plumb.gap', '[^≥]*')),
@@ -120,14 +123,11 @@ function readThresholds(root, executor) {
       clarity: num(re('plumb.clarity', '[^≥]*')),
     };
     const required = isJev ? Object.values(t) : [t.leader, t.gap];
-    return required.some((v) => v === null) ? null : t;
+    return required.some((v) => v === null || !Number.isFinite(v)) ? null : t;
   } catch (e) {
     return null;
   }
 }
-
-// noul arrives as a fraction 0..1; the threshold is in percents. A value <= 1 is a fraction.
-function toPercent(v) { return v <= 1 ? v * 100 : v; }
 
 // The Plumb line for the card's history.
 function plumbLine(result, root) {
@@ -145,8 +145,11 @@ function plumbLine(result, root) {
     if (lead < t.leader) miss.push(i18n.message('plumb.miss_leader', { v: lead, t: t.leader }, 'ru'));
     if (gap < t.gap) miss.push(i18n.message('plumb.miss_gap', { v: gap, t: t.gap }, 'ru'));
     if (t.noul !== null) {
-      if (typeof leadNoul !== 'number') miss.push(i18n.message('plumb.miss_noul_missing', { t: t.noul }, 'ru'));
-      else if (toPercent(leadNoul) < t.noul) miss.push(`noul ${Math.round(toPercent(leadNoul))} < ${t.noul}`);
+      // noul arrives as a fraction 0..1; the threshold may be a fraction (0.75) or a percent (75): the
+      // threshold is normalized to a fraction, the comparison and the message stay in one unit.
+      const tFrac = t.noul <= 1 ? t.noul : t.noul / 100;
+      if (typeof leadNoul !== 'number') miss.push(i18n.message('plumb.miss_noul_missing', { t: tFrac }, 'ru'));
+      else if (leadNoul < tFrac) miss.push(i18n.message('plumb.miss_noul', { v: leadNoul, t: tFrac }, 'ru'));
     }
     if (t.clarity !== null && score.clarity < t.clarity) miss.push(i18n.message('plumb.miss_clarity', { v: score.clarity, t: t.clarity }, 'ru'));
     outcome = miss.length ? i18n.message('plumb.below_threshold', { miss: miss.join('; ') }, 'ru') : i18n.message('plumb.thresholds_passed', null, 'ru');

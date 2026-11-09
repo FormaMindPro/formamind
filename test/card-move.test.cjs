@@ -131,3 +131,69 @@ test('card-move: --kit/--result - only on their own handovers, no emptiness, no 
   assert.equal(move(f, ['001', '--to', 'run', '--note', 'x', '--kit', '-'], '  \n').status, 2, 'empty stdin');
   assert.equal(cardText(f), before);
 }));
+
+// --stage: the stage line by the same call (§6). Without --to - the line only, the status and the assignee
+// do not change; the key is a closed list of seven; the text after the dash is mandatory; with --to the key
+// must match the target's stage (one call - one stage line). The stage keys the test writes are status-consistent
+// (the fixture card starts review/Intent): the route-stage check would flag a contradiction.
+test('card-move: --stage without --to - the line only, the status and the assignee untouched', () => withFx((f) => {
+  const before = cardText(f);
+  const r = move(f, ['001', '--stage', 'check', '--node', 'Intent', '--note', DATA.probe]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const text = cardText(f);
+  assert.match(text, new RegExp(`^- \`Intent\`, \\d{4}-\\d{2}-\\d{2}: stage check — ${DATA.probe}\\.$\\n\\n## Result`, 'm'));
+  assert.equal(text.match(/^status: ".*"$/m)[0], before.match(/^status: ".*"$/m)[0], 'the status is unchanged');
+  assert.equal(text.match(/^assignee: ".*"$/m)[0], before.match(/^assignee: ".*"$/m)[0], 'the assignee is unchanged');
+  assert.doesNotMatch(text, /^modified: "2031-/m, 'modified is rewritten');
+  assert.equal(run(f, ['.forma/board/check-board.cjs']).status, 0);
+}));
+
+test('card-move: --stage - the closed list of seven, unknown key stops before any write', () => withFx((f) => {
+  const before = cardText(f);
+  const r = move(f, ['001', '--stage', 'nope', '--node', 'Spec', '--note', 'x']);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, ruRe('board.card-move.bad_stage', { stage: 'nope' }));
+  const r2 = move(f, ['001', '--stage', 'nope', '--to', 'run', '--note', 'x']);
+  assert.equal(r2.status, 2, 'the unknown key stops with --to too');
+  const r3 = move(f, ['001', '--stage', '--node', 'Spec', '--note', 'x']);
+  assert.equal(r3.status, 2);
+  assert.match(r3.stderr, ruRe('board.card-move.stage_need_key'));
+  assert.equal(cardText(f), before, 'nothing is written');
+}));
+
+test('card-move: --stage without --to - --node and the text are mandatory, spend and section flags are not accepted', () => withFx((f) => {
+  const before = cardText(f);
+  assert.equal(move(f, ['001', '--stage', 'check', '--note', 'x']).status, 2, 'no --node');
+  assert.equal(move(f, ['001', '--stage', 'check', '--node', '9x', '--note', 'x']).status, 2, 'a bad node name');
+  const noNote = move(f, ['001', '--stage', 'check', '--node', 'Intent']);
+  assert.equal(noNote.status, 2, 'no text after the dash');
+  assert.match(noNote.stderr, ruRe('board.card-move.need_note'));
+  const withSpend = move(f, ['001', '--stage', 'check', '--node', 'Intent', '--note', 'x', '--tokens', '5', '--duration-ms', '1', '--agent-id', 'z1']);
+  assert.equal(withSpend.status, 2);
+  assert.match(withSpend.stderr, ruRe('board.card-move.stage_no_other_flags'));
+  assert.equal(move(f, ['001', '--stage', 'check', '--node', 'Intent', '--note', 'x', '--kit', 'z']).status, 2, 'no --kit');
+  assert.equal(move(f, ['003', '--stage', 'check', '--node', 'Intent', '--note', 'x']).status, 2, 'a done card is not written to');
+  assert.equal(cardText(f), before);
+}));
+
+test('card-move: --stage with --to - a mismatch stops, a match writes exactly one stage line', () => withFx((f) => {
+  const before = cardText(f);
+  const bad = move(f, ['001', '--to', 'run', '--stage', 'check', '--note', 'x']);
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, ruRe('board.card-move.stage_to_mismatch', { stage: 'check', to: 'run' }));
+  assert.equal(cardText(f), before, 'the mismatch writes nothing');
+  const ok = move(f, ['001', '--to', 'intent', '--stage', 'check', '--note', DATA.doneRu]);
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  const hist = zoneOf(cardText(f), 'History');
+  // the fixture card already holds one "stage check" line, so the call's own line is counted by its note:
+  // exactly one line with this note (one call writes one stage line), two lines with the key in total.
+  assert.equal((hist.match(new RegExp(escRe('stage check — ' + DATA.doneRu), 'g')) || []).length, 1, 'one call writes one stage line');
+  assert.equal((hist.match(/stage check —/g) || []).length, 2, 'the fixture line stays, the call adds exactly one');
+  assert.match(cardText(f), /^status: "review"$/m);
+}));
+
+test('card-move: core-close does not take --stage', () => withFx((f) => {
+  const r = move(f, ['--to', 'core-close', '003', '--note', 'x', '--stage', 'close']);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, ruRe('board.card-move.coreclose_no_other_flags'));
+}));

@@ -3,6 +3,25 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.12] - 2026-11-10
+
+### Added
+
+- Board: `cycle-report` — the cycle summary for the Core verdict as one file: per-card five fields, the last stage line, per-node spend totals, gate statuses; selection by goal label and/or card list, markdown to stdout and/or `--out`
+- Board: `card-move --stage` — the stage history line in the same call as the move, without a status change; the closed key list of seven, fail-closed on an unknown key or empty text, composes with `--session-spend`
+- Board: `new-card --node` — the history lines carry the calling node (default `Intent`); numbering without a race: exclusive file create, rescan when the number is taken
+- `project-setup` skill: a Routes step asks the project's human the five route questions (enabled routes, the small-task threshold, the external cheap model with its per-cycle cap, the batch acceptance size, the dispatcher) with recommended starting values — the human fills the values, the wizard never writes them silently
+
+### Changed
+
+- i18n: live dictionaries synced with the clone (en/ru parity in both trees); plumb threshold aliases learn the scaffold's localized wording, so a fresh template's row parses
+- Plumb: the reading line's verdict text reflects the actual comparison against the declared thresholds — a below-threshold noul no longer reports "passed"; fraction and percent spellings normalize to one scale
+
+### Fixed
+
+- `new-card`: the stage line separator and its missing dictionary key — the silent fallback printed the raw key code
+- Plumb driver: the noul threshold parse swallowed a trailing comma into NaN and compared a percent against a fraction, so recalibrated rows read as passed
+
 ## [0.0.11] - 2026-11-09
 
 ### Added

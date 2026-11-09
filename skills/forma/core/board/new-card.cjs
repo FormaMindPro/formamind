@@ -3,6 +3,7 @@
 //
 //   node .forma/board/new-card.cjs --kind <code> --title "<title>" [--goal goal-NN] [--type work|tooling|decision]
 //                                     [--status backlog] [--assignee Intent] [--priority medium] [--lang ru|en] [--dry]
+//                                     [--node <name>]
 //                                     [--route N] [--over N]… [--seg N] [--wave N] [--after NNN]… [--trial] [--demo]
 //                                     [--delivers "<what it gives>"] [--criterion "<criterion>"] [--budget "<attempts>"] [--next "<where next>"]
 //                                     [--why <code>] [--why-detail "<a note>"] [--stage card|approve]
@@ -18,6 +19,8 @@
 // --delivers/--criterion/--budget/--next - the task fields (§6) right away, without editing the file after the write; an unset one stays the <…> blank.
 // --why - the route reason (§6, the codes: human|ready|scale|risk|decision|tooling|plumb): writes into History the line `route route-N (why: …)`;
 //            --stage - the line `stage <key>` (card - the task is written, approve - awaits the human's "yes"). Without the flag the line is not written.
+// --node  - the node signing the history lines (the route reason, the stage); `Intent` by default - the cards
+//            are opened by Intent (§7). A bare name only (`Intent`, `Run`); `9x` stops before any write.
 // The number - the next free `card-NNN` over the board and done/. The zones - in the project language (§6).
 // After the write - the core's board check (.forma/board/check-board.cjs) over this card; an error on it - exit code 1.
 // Part of the core: one for all engines, it knows no engine paths.
@@ -132,24 +135,35 @@ const status = arg('status', 'backlog');
 const assignee = arg('assignee', noSpec ? 'Intent' : 'Spec');
 const priority = arg('priority', 'medium');
 
-// 5. The number
-let max = 0;
-for (const f of cardFiles(ROOT, /^card-\d+/)) max = Math.max(max, +path.basename(f).match(/^card-(\d+)/)[1]);
-const num = String(max + 1).padStart(3, '0');
+// 4b. The node signing the history lines (§6): whoever calls the script. `Intent` stays the default - the
+// cards are opened by Intent (AGENTS.md §7). A bare name only (`Intent`, `Run`); `9x` stops before any write.
+const node = arg('node', 'Intent');
+if (!/^[A-Za-z]\w*$/.test(node)) die(msg('board.new-card.bad_node', { node }));
+
+// 5. The number - chosen by what is actually on the disk at the moment of the write: the scan runs inside the
+// write loop, and the write itself is an exclusive create (wx). A card appearing between the scan and the
+// write (a concurrent invocation) fails wx, the loop re-scans and takes the next number - two files never
+// share one number.
 // The Cyrillic → latin transliteration for slugs; the keys by escapes - the gate guards this file too.
 const TR = { '\u0430':'a','\u0431':'b','\u0432':'v','\u0433':'g','\u0434':'d','\u0435':'e','\u0451':'e','\u0436':'zh','\u0437':'z','\u0438':'i','\u0439':'j','\u043A':'k','\u043B':'l','\u043C':'m','\u043D':'n','\u043E':'o','\u043F':'p','\u0440':'r','\u0441':'s','\u0442':'t','\u0443':'u','\u0444':'f','\u0445':'h','\u0446':'c','\u0447':'ch','\u0448':'sh','\u0449':'sch','\u044A':'','\u044B':'y','\u044C':'','\u044D':'e','\u044E':'yu','\u044F':'ya' };
 const slug = title.toLowerCase().split('').map(c => TR[c] ?? c).join('')
   .replace(/[^a-z0-9 -]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-').slice(0, 50).replace(/-$/, '');
-const id = `card-${num}-${slug || 'task'}`;
 const now = new Date().toISOString();
 const day = now.slice(0, 10);
 const detail = arg('why-detail', quick ? 'quick incubator without project scanning' : undefined);
 const history = [
-  why !== undefined ? `- \`Intent\`, ${day}: route ${routeLabel} (why: ${why})${detail ? ' — ' + detail.replace(/\.?$/, '.') : '.'}` : '',
-  stage !== undefined ? '- `Intent`, ' + day + ': stage ' + stage + msg('board.new-card.stage_created') : '',
+  why !== undefined ? `- \`${node}\`, ${day}: route ${routeLabel} (why: ${why})${detail ? ' — ' + detail.replace(/\.?$/, '.') : '.'}` : '',
+  stage !== undefined ? '- `' + node + '`, ' + day + ': stage ' + stage + msg('board.new-card.stage_created') : '',
 ].filter(Boolean).join('\n');
 
-const text = `---
+let num, id, file, text;
+for (;;) {
+  let max = 0;
+  for (const f of cardFiles(ROOT, /^card-\d+/)) max = Math.max(max, +path.basename(f).match(/^card-(\d+)/)[1]);
+  num = String(max + 1).padStart(3, '0');
+  id = `card-${num}-${slug || 'task'}`;
+  file = path.join(BOARD, id + '.md');
+  text = `---
 id: "${id}"
 status: "${status}"
 priority: "${priority}"
@@ -173,11 +187,12 @@ ${num} · ${type} | ${fields.join(' | ')}
 ${history ? history + '\n' : ''}
 ## ${Z.res}
 `;
-
-const file = path.join(BOARD, id + '.md');
+  if (flag('dry')) break;
+  fs.mkdirSync(BOARD, { recursive: true });
+  try { fs.writeFileSync(file, text, { flag: 'wx' }); break; }
+  catch (e) { if (e.code !== 'EEXIST') throw e; } // the number was taken in flight - re-scan
+}
 if (flag('dry')) { console.log(file + '\n' + text); process.exit(0); }
-fs.mkdirSync(BOARD, { recursive: true });
-fs.writeFileSync(file, text);
 console.log(path.relative(ROOT, file).replace(/\\/g, '/'));
 
 // Auto-create card materials folder for quick mode (or --materials flag)

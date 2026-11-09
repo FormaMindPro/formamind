@@ -1,6 +1,6 @@
 ---
 name: project-setup
-description: Initial setup wizard for a new project in the Forma protocol. Guides step-by-step configuration of virtual RAM disk, project thresholds (volume=25, attempts=3), Plumb calibration and models (OpenRouter typesafe/jev-1.14 or builtin, calibration thresholds, and .env key), and language localization (ru, en, or package generation). Invoke when starting the protocol in a new project, when "STOP START" appears in the session start report, or upon project configuration requests.
+description: Initial setup wizard for a new project in the Forma protocol. Guides step-by-step configuration of virtual RAM disk, project thresholds (volume=25, attempts=3), route settings (enabled routes, route-0 threshold, over-2 model and limit, over-4 batch, dispatcher), Plumb calibration and models (OpenRouter typesafe/jev-1.14 or builtin, calibration thresholds, and .env key), and language localization (ru, en, or package generation). Invoke when starting the protocol in a new project, when "STOP START" appears in the session start report, or upon project configuration requests.
 ---
 
 # project-setup — initial project setup wizard
@@ -20,10 +20,10 @@ Without clearing the start gate, no production cycles can open: all work remains
 
 ---
 
-## 5 Setup Steps
+## 6 Setup Steps
 
 ```
-1. RAM disk (vdisk-setup) ➔ 2. Thresholds (25 / 3) ➔ 3. Plumb (role fit / model) ➔ 4. Localization (i18n) ➔ 5. Clear STOP START
+1. RAM disk (vdisk-setup) ➔ 2. Thresholds (25 / 3) ➔ 3. Routes (route table) ➔ 4. Plumb (role fit / model) ➔ 5. Localization (i18n) ➔ 6. Clear STOP START
 ```
 
 ### Step 1. Virtual RAM disk
@@ -47,7 +47,22 @@ Record the two fundamental protocol thresholds in `project/config/PROJECT.md` un
 > [!NOTE]
 > Token spend and elapsed time are statistics, not thresholds. They are recorded by fact in card history and are never capped or set in advance (`AGENTS.md` §3). No spending limit in dollars is ever set.
 
-### Step 3. Plumb calibration and role fit
+### Step 3. Routes
+
+Fill the route settings with the user in `project/config/PROJECT.md` under `## Routes` (`<!-- k:routes -->`). Ask each question with its recommended starting value; **the user fills in the values** — never write them into `PROJECT.md` silently:
+
+| Question | Recommended starting value |
+|---|---|
+| Enabled routes | all `route-0`…`route-8` and overlays `over-1`…`over-4` enabled |
+| `route-0` small-task threshold | work smaller than its own card: up to 3 edits in up to 3 files, mechanical, without interpretation |
+| `over-2` (external cheap model) | enabled — mechanical "was → becomes" edits through `external-model-bridge.cjs`; external model `openrouter:typesafe/jev-1.14` (same channel as the Plumb `jev`), cycle call limit **100** |
+| `over-4` (batch acceptance) | enabled — batch up to **10** cards, one acceptance per batch |
+| Dispatcher | `Intent` (Workflow not connected; no threshold for switching to Workflow) |
+
+> [!NOTE]
+> Route codes and the choice rule — `route-choice.md`, costs and movement names — `.forma/manual/en/03-protocol/ROUTES.md` §3–§6. Route settings are project configuration, not thresholds of the law (`AGENTS.md` §3): every value is the project's own choice, the table only proposes a start.
+
+### Step 4. Plumb calibration and role fit
 
 Configure Plumb in `project/config/PROJECT.md` under `## Routes` (`<!-- k:routes -->`):
 1. **Calibration thresholds:**
@@ -60,14 +75,14 @@ Configure Plumb in `project/config/PROJECT.md` under `## Routes` (`<!-- k:routes
    - Verify OpenRouter API key presence in `.env` (`OPENROUTER_API_KEY`).
    - If absent and external Plumb is chosen, prompt user to supply key.
 
-### Step 4. Language localization
+### Step 5. Language localization
 
 Verify `<!-- k:language -->` in `project/config/PROJECT.md`:
 - `Russian` for Russian (`ru`).
 - `English` for English (`en`).
 - For unbundled languages (e.g. `de`, `fr`), verify `.forma/translation-pending.json` schedule.
 
-### Step 5. Clear STOP START gate
+### Step 6. Clear STOP START gate
 
 1. Run board and project integrity verification:
    ```bash
