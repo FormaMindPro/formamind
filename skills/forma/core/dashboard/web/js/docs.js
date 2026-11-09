@@ -1,6 +1,6 @@
-// Вкладка «Документация»: две книги (`data/docs.cjs`), структура — из `_toc.json`, не из папок.
-// Состояние (книга/язык/страница/поиск) живёт в `docsState`, переживает пересборку SSE: содержимое
-// панели перерисовывается заново при каждом обновлении, а выбор человека — нет.
+// The "Documentation" tab: two books (`data/docs.cjs`), the structure comes from `_toc.json`, not from folders.
+// The state (book/language/page/search) lives in `docsState` and survives an SSE rebuild: the panel's
+// contents are redrawn on every update, the human's selection is not.
 
 const docsState = { book: null, lang: 'ru', page: null, q: '' };
 
@@ -78,7 +78,7 @@ function docsHtml(d) {
   return `${switcher}<div class="doc-layout">${sidebar}<section class="doc-main">${body}</section></div>`;
 }
 
-// Делегирование — один раз на контейнер; его дети перезаписываются при каждой пересборке, сам узел — нет.
+// Delegation - once per container; its children are rewritten on every rebuild, the node itself is not.
 function docsBind() {
   const el = document.getElementById('docs');
   if (!el || el.dataset.bound) return;

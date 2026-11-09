@@ -1,6 +1,6 @@
-// Вкладка «Цепь».
+// The "Chain" tab.
 
-// Название шага: перевод по номеру, запас — то, что отдал сервер.
+// The step's name: translated by its number, the fallback is what the server gave.
 const stepName = st => { const k = 'chain.step.' + st.n, v = t(k); return v === k ? st.name : v; };
 
 function chainHtml(c){

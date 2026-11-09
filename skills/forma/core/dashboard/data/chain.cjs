@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * Цепь производства: интервью → образ → цель → эпик → карточки. Ничего не чинит и ничего не советует:
- * показывает, где звено появилось раньше своего предшественника. Порядок нарушен — это факт для человека.
+ * The production chain: interview → end-image → goal → epic → cards. It fixes nothing and advises nothing:
+ * it shows where a link appeared before its predecessor. The order is broken - that is a fact for the human.
  */
 
 const fs = require('fs');
@@ -25,10 +25,10 @@ const SETUP_STEPS = [
 const readOrNull = (p) => readIfExists(p, null);
 
 /**
- * Состояние шага подготовки. Наличие файла шагом не является: часть из них лежит в проекте готовым шаблоном
- * с первого дня — с методикой внутри и пустыми местами под ответы. Заполненным считается тот, где есть запись
- * с датой (правило «разошлось — новая запись с датой»). Ни одной даты, а заготовки на месте — это шаблон,
- * не сделанный шаг, и он называется своим именем.
+ * The state of a preparation step. The presence of a file is not the step: some of them lie in the project as a ready template
+ * from day one - with the method inside and empty places for answers. The filled one is the one where there is a record
+ * with a date (the rule "spread - a new record with a date"). Not one date, with the blanks in place - that is a template,
+ * not a done step, and it is called by its name.
  */
 function setupState(root, step) {
   if (step.file) {
@@ -43,7 +43,7 @@ function setupState(root, step) {
   return fs.readdirSync(dir).some((d) => step.glob.test(d)) ? 'done' : 'missing';
 }
 
-/** Подготовка проекта — общие ворота, один раз на проект. */
+/** Project preparation - the common gate, once per project. */
 function readSetup(root) {
   return SETUP_STEPS.map((s) => {
     const state = setupState(root, s);
@@ -51,7 +51,7 @@ function readSetup(root) {
   });
 }
 
-/** Имена процессных эпиков — из PROJECT.md, тем же правилом, что у sync-engines. */
+/** Process epic names - from PROJECT.md, by the same rule as sync-engines. */
 function readProcessEpics(root) {
   const names = new Set();
   const projectMd = readOrNull(projectFile(root, 'PROJECT.md'));
@@ -63,13 +63,13 @@ function readProcessEpics(root) {
   return names;
 }
 
-/** Цели: каталог даёт существование, GOAL.md — заполнен ли образ. */
+/** Goals: the catalog gives existence, GOAL.md - whether the end-image is filled. */
 function readGoalDirs(root) {
   const goalsDir = path.join(root, 'project', 'goals');
   const goals = new Map();
   if (!fs.existsSync(goalsDir)) return goals;
   for (const d of fs.readdirSync(goalsDir)) {
-    // goal-NN — подцель, goal-<код> — главная цель вида.
+    // goal-NN - a subgoal, goal-<code> - the goal form's main goal.
     const m = d.match(/^(goal-\d+)/) || d.match(/^(goal-[a-z][a-z-]*)$/);
     if (!m || !fs.statSync(path.join(goalsDir, d)).isDirectory()) continue;
     const goalMd = readOrNull(path.join(goalsDir, d, 'GOAL.md'));
@@ -83,7 +83,7 @@ function readGoalDirs(root) {
   return goals;
 }
 
-/** ROADMAP.md даёт цели имя. */
+/** ROADMAP.md gives the goal its name. */
 function nameGoalsFromRoadmap(root, goals) {
   const roadmap = readOrNull(opsFile(root, 'ROADMAP.md'));
   if (!roadmap) return;
@@ -96,8 +96,8 @@ function nameGoalsFromRoadmap(root, goals) {
 }
 
 /**
- * Эпики доски, привязанные к целям: пишет число карточек в цели, возвращает эпики без цели (имя → число карточек).
- * Истина — метка цели в labels; старое имя эпика «goal-NN …/SKRIC» — запасной путь для давних карточек.
+ * Board epics tied to goals: writes the number of cards in a goal, returns the epics without a goal (name → card count).
+ * The truth is the goal label in labels; the old epic name "goal-NN .../SKRIC" is the fallback path for old cards.
  */
 function attachEpics(root, goals, processEpics) {
   const orphanEpics = new Map();
@@ -124,7 +124,7 @@ function attachEpics(root, goals, processEpics) {
 
 function goalViolations(goal) {
   const out = [];
-  const production = /^goal-(\d+|goal)$/.test(goal.id); // интервью под черновиком — норма: оно и формирует образ
+  const production = /^goal-(\d+|goal)$/.test(goal.id); // an interview under a draft is the norm: it is what forms the end-image
   if (production && goal.cards > 0 && goal.draft) {
     out.push({
       kind: 'cards-without-image', goal: goal.id, count: goal.cards,
@@ -144,7 +144,7 @@ function goalViolations(goal) {
   return out;
 }
 
-/** Нарушения порядка: карточки без образа, эпик разошёлся с ROADMAP, нет GOAL.md, эпик без цели, образ без интервью. */
+/** Order violations: cards without an end-image, an epic diverged from ROADMAP, no GOAL.md, an epic without a goal, an end-image without an interview. */
 function chainViolations(goals, orphanEpics, interviewDone) {
   const violations = [];
   for (const goal of goals.values()) violations.push(...goalViolations(goal));

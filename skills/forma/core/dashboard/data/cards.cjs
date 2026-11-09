@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * Карточки для счёта расхода: заходы, сервисы, дата закрытия — и свёртки по эпикам и по доске.
- * Отдельный разбор от доски (`board.cjs`): счёту нужны только строки расхода, доске — поля карточки целиком.
+ * Cards for the spend count: attempts, services, the closure date - and the folds by epic and by board.
+ * A separate parse from the board's (`board.cjs`): the count needs only the spend lines, the board - the card's fields whole.
  */
 
 const fs = require('fs');
@@ -11,7 +11,7 @@ const { walk } = require('../lib/fs.cjs');
 const { boardDir, parseFrontmatter, cardTitle } = require('../lib/card.cjs');
 const { parseAttempts, parseServiceLines, parseMalformedAttempts, parseClosedDate } = require('./attempts.cjs');
 
-/** Токены карточки/эпика по тегу движка; `unknown tokens` — счётчиком рядом, не нулём. */
+/** A card's/epic's tokens by engine tag; `unknown tokens` - a counter beside it, not a zero. */
 function tokensByEngine(attempts) {
   const out = {};
   for (const z of attempts) {
@@ -22,7 +22,7 @@ function tokensByEngine(attempts) {
   return out;
 }
 
-/** Складывает разрез по движкам `add` в `acc` (токены разных движков между собой не смешиваются). */
+/** Folds the per-engine cut `add` into `acc` (different engines' tokens are not mixed with each other). */
 function addByEngine(acc, add) {
   for (const [k, v] of Object.entries(add)) {
     const o = acc[k] || (acc[k] = { tokens: 0, attempts: 0, tokensUnknown: 0 });
@@ -32,8 +32,8 @@ function addByEngine(acc, add) {
 }
 
 /**
- * Один вызов, записанный в нескольких карточках теми же числами, считается один раз; общий id с разными числами — разные окна, считаются все — ключ тот же, что в `tally.cjs`.
- * Ключ — `dedupKey` из spend-line.cjs (метки сессии и `batch I/K` учтены там). `seen` копит ключи по всем карточкам.
+ * One call recorded in several cards with the same numbers is counted once; a shared id with different numbers - different windows, all are counted - the key is the same as in `tally.cjs`.
+ * The key is `dedupKey` from spend-line.cjs (the session markers and `batch I/K` are accounted there). `seen` accumulates the keys across all cards.
  */
 function dedupeAttempts(attempts, file, seen) {
   return attempts.filter((z) => {
@@ -46,9 +46,9 @@ function dedupeAttempts(attempts, file, seen) {
 }
 
 /**
- * Дату закрытия пишет САМО расширение доски — поле `completedAt` во фронтматтере, при переезде карточки
- * в `done/`. Это механическая запись: день, когда карточку приняли. Строка `закрыто —` от `Core` — вторая,
- * поздняя отметка: день, когда круг разобран по существу. Первая надёжнее и старше, поэтому она главная.
+ * The closure date is written by THE board extension itself - the `completedAt` field in the frontmatter, when the card moves
+ * into `done/`. It is a mechanical record: the day the card was accepted. The closure line from `Core` is a second,
+ * later mark: the day the cycle was taken apart in substance. The first is more reliable and older, so it is the main one.
  */
 function closedDateOf(fm, raw) {
   return (fm.completedAt && String(fm.completedAt).slice(0, 10)) || parseClosedDate(raw) || null;
@@ -79,13 +79,13 @@ function spendCard({ projectRoot, file, raw, fm }, seen) {
     serviceLines: parseServiceLines(raw),
     malformed: parseMalformedAttempts(raw),
     closedDate: closedDateOf(fm, raw),
-    // Токены — по тегу движка: разные движки в одну сумму не идут.
+    // Tokens go by the engine tag: different engines do not go into one sum.
     tokensByEngine: tokensByEngine(attempts),
     costUsdTotal: attempts.reduce((s, z) => s + z.costUsd, 0),
   };
 }
 
-/** Карточки доски (и `done/`) с заходами и сервисами. Файл без `id` во фронтматтере — не карточка. */
+/** Board cards (and `done/`) with attempts and services. A file without an `id` in the frontmatter is not a card. */
 function readSpendCards(projectRoot) {
   const dir = boardDir(projectRoot);
   const files = fs.existsSync(dir) ? walk(dir, { ext: '.md', abs: true }) : [];
@@ -95,13 +95,13 @@ function readSpendCards(projectRoot) {
     const raw = fs.readFileSync(file, 'utf8');
     const fm = parseFrontmatter(raw);
     if (!fm.id) continue;
-    if ((fm.labels || []).includes('demo')) continue; // демонстрационный круг — не расход проекта
+    if ((fm.labels || []).includes('demo')) continue; // a demonstration cycle - not the project's spend
     cards.push(spendCard({ projectRoot, file, raw, fm }, seen));
   }
   return cards;
 }
 
-/** Эпики: карточки, статусы, токены по движкам, заходы. Ключ — имя эпика. */
+/** Epics: cards, statuses, tokens by engines, attempts. The key is the epic's name. */
 function groupEpics(cards) {
   const epics = {};
   for (const c of cards) {
@@ -120,7 +120,7 @@ function groupEpics(cards) {
   return epics;
 }
 
-/** Итоги по всей доске. */
+/** Totals across the whole board. */
 function cardTotals(cards, epics) {
   const totals = {
     cardCount: cards.length,

@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * Вкладки «Доска», «Цели», «Скиллы» и «Закон»: карточки целиком (`board-card.cjs`), связи между ними —
- * материалы, упоминания, ADR, коммиты, — пороги и образы целей, скиллы проекта.
+ * The "Board", "Goals", "Skills" and "Law" tabs: whole cards (`board-card.cjs`), the links between them -
+ * materials, mentions, ADRs, commits -, the goals' thresholds and end-images, the project's skills.
  */
 
 const fs = require('fs');
@@ -15,7 +15,7 @@ const engines = require('../lib/engines.cjs');
 const { parseBoardCard } = require('./board-card.cjs');
 const { buildLaw } = require('./law.cjs');
 
-/** Скиллы проекта: имя → описание из frontmatter `SKILL.md`. */
+/** The project's skills: name → description from the `SKILL.md` frontmatter. */
 function readSkills(projectRoot) {
   const skills = {};
   const dir = engines.firstPath(projectRoot, 'skillsDir');
@@ -35,7 +35,7 @@ function readCards(dir, skillNames) {
     .map((f) => parseBoardCard(f, fs.readFileSync(path.join(dir, f), 'utf8'), skillNames));
 }
 
-/** Цели: код → заголовок из `GOAL.md`. */
+/** Goals: code → title from `GOAL.md`. */
 function readGoals(projectRoot) {
   const dir = path.join(projectRoot, 'project', 'goals');
   if (!fs.existsSync(dir)) return {};
@@ -48,7 +48,7 @@ function readGoals(projectRoot) {
   return out;
 }
 
-/** Образ, черновик и «кто закрывает» каждой цели. */
+/** The end-image, the draft and "who closes" of each goal. */
 function readGoalInfo(projectRoot) {
   const dir = path.join(projectRoot, 'project', 'goals');
   const info = {};
@@ -68,7 +68,7 @@ function readGoalInfo(projectRoot) {
   return info;
 }
 
-/** Пороги «заходов на задачу» и «объёма круга» из `PROJECT.md`; нет числа — `null`. */
+/** The "attempts per task" and "cycle volume" thresholds from `PROJECT.md`; no number - `null`. */
 function readThresholds(projectRoot) {
   const table = i18n.reader(readIfExists(projectFile(projectRoot, 'PROJECT.md'))).table('thresholds');
   const number = (key) => +((String(i18n.rowValue(table, key) || '').match(/^\d+/) || [])[0]) || null;
@@ -81,7 +81,7 @@ function readAdrs(projectRoot) {
   return fs.readdirSync(dir).filter((f) => /^\d{4}-.*\.md$/.test(f)).map((f) => ({ f, t: fs.readFileSync(path.join(dir, f), 'utf8') }));
 }
 
-/** История git: `[хеш, дата, тема]`; нет git или истории — пусто, карточки остаются без дат коммитов. */
+/** Git history: `[hash, date, subject]`; no git or history - empty, the cards stay without commit dates. */
 function readCommits(projectRoot) {
   try {
     return execSync('git log --pretty=format:%h%x09%ad%x09%s --date=short', { cwd: projectRoot, encoding: 'utf8', maxBuffer: 1 << 26 })
@@ -91,18 +91,18 @@ function readCommits(projectRoot) {
   }
 }
 
-/** После-зависимости: `after-card-NNN` открыта, пока та карточка не в `done`. */
+/** After-dependencies: `after-card-NNN` stays open until that card is in `done`. */
 function markOpenDeps(cards) {
   const doneCodes = new Set(cards.filter((c) => c.status === 'done').map((c) => c.code));
   cards.forEach((c) => { c.ready.depsOpen = c.ready.deps.filter((d) => !doneCodes.has(d)); });
 }
 
-/** Связи карточки: материалы, упоминания в других карточках, ADR, коммиты, флаг «ждёт решения человека». */
+/** A card's links: materials, mentions in other cards, ADRs, commits, the "awaits a human decision" flag. */
 function linkCards(cards, { projectRoot, adrs, commits }) {
   const cardsDir = path.join(projectRoot, 'project', 'cards');
   cards.forEach((c) => {
     const n = c.code.replace('card-', '');
-    const re = new RegExp(`(card-${n}(?!\\d)|[Кк]арточк\\p{L}*\\s+${n}(?!\\d))`, 'u');
+    const re = new RegExp(`(card-${n}(?!\\d)|[\u041a\u043a]\u0430\u0440\u0442\u043e\u0447\u043a\\p{L}*\\s+${n}(?!\\d))`, 'u');
     const md = path.join(cardsDir, c.code);
     c.materials = fs.existsSync(md) ? fs.readdirSync(md, { recursive: true }).map(String).filter((f) => fs.statSync(path.join(md, f)).isFile()) : [];
     c.mentions = cards.filter((o) => o !== c && re.test(o.text)).map((o) => o.code);
@@ -120,7 +120,7 @@ function buildBoard(projectRoot) {
     .sort((a, b) => String(b.modified).localeCompare(String(a.modified)));
   markOpenDeps(cards);
   linkCards(cards, { projectRoot, adrs: readAdrs(projectRoot), commits: readCommits(projectRoot) });
-  cards.forEach((c) => { delete c.text; }); // text нужен только для поиска связей
+  cards.forEach((c) => { delete c.text; }); // text is needed only for link search
   return {
     law: buildLaw(projectRoot),
     thresholds: readThresholds(projectRoot),

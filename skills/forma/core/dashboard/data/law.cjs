@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * Вкладка «Закон»: AGENTS.md, §8 движка, роли, маршруты, проект, проверки — текстом, как лежат в файлах.
- * Пути движка (роли, файл правил, скрипт сверки) называет адаптер через `lib/engines.cjs`; нет адаптера —
- * пустой текст и пустые списки, а не ошибка.
+ * The "Law" tab: AGENTS.md, the engine's §8, roles, routes, the project, checks - as text, the way the files hold it.
+ * The engine's paths (roles, the rules file, the verification script) are named by the adapter through `lib/engines.cjs`; no adapter -
+ * empty text and empty lists, not an error.
  */
 
 const fs = require('fs');
@@ -12,7 +12,7 @@ const { readIfExists, projectFile } = require('../lib/fs.cjs');
 const { parseFlatFrontmatter } = require('../lib/card.cjs');
 const engines = require('../lib/engines.cjs');
 
-/** Роли из каталога `dir` (относительно корня): имя, описание, модель, усилие, инструменты, тело. */
+/** Roles from catalog `dir` (relative to the root): name, description, model, effort, tools, body. */
 function readRoles(projectRoot, dir) {
   if (!dir || !fs.existsSync(path.join(projectRoot, dir))) return [];
   return fs.readdirSync(path.join(projectRoot, dir)).filter((f) => f.endsWith('.md')).map((f) => {
@@ -25,7 +25,7 @@ function readRoles(projectRoot, dir) {
   });
 }
 
-/** Текст файла, который называет адаптер по полю `field`; нет адаптера или поля — пустая строка. */
+/** The text of the file the adapter names by field `field`; no adapter or field - an empty string. */
 function readEngineFile(projectRoot, field) {
   const rel = engines.first(projectRoot, field);
   return rel ? readIfExists(path.join(projectRoot, rel)) : '';

@@ -1,50 +1,52 @@
 #!/usr/bin/env node
-// Коммит движка без дрейфа: Claude → Gemini/Codex → исходник протокола → коммиты.
-// Для автора протокола, в любом проекте, где protocol/ — git-клон FormaMindPro/formamind. Запуск из корня проекта.
-//   node .forma/protocol/scripts/forma-commit.cjs "сообщение"          — синхронизировать, проверить, закоммитить
-//   ... --check                                                   — только проверить, ничего не пишет (для pre-commit)
-//   ... --release [--to X.Y.Z]                                    — выпуск сейчас: dev → main, версия +1 (или названная), push main и dev
-//   ... --push                                                    — отправить dev (версия не меняется) и проект, если у него есть remote
-// Коммиты протокола идут в ветку dev без версии; набралось N (PROJECT.md, «Выпуск протокола») — выпуск сам.
-//   ... --sync-staged                                             — проверка ядра и адаптеров перед коммитом (его зовёт pre-commit); роли между движками не копируются
-//   ... --sync-plugin                                             — обновить плагин Claude Code из GitHub (marketplace + plugin update) и сверить версии; после --release это идёт само, --no-plugin отключает
-//   ... --install-hook                                            — поставить .git/hooks/pre-commit (любой запуск ставит его сам)
+// The engine commit without drift: Claude -> Gemini/Codex -> the protocol source -> commits.
+// For the protocol author, in any project whose protocol/ is a git clone of FormaMindPro/formamind. Run from the project root.
+//   node .forma/protocol/scripts/forma-commit.cjs "message"          - sync, check, commit
+//   ... --check                                                   - check only, writes nothing (for pre-commit)
+//   ... --release [--to X.Y.Z]                                    - release now: dev -> main, version +1 (or the named one), push main and dev
+//   ... --push                                                    - push dev (version unchanged) and the project, if it has a remote
+// Protocol commits go into the dev branch without a version; once N accumulate (PROJECT.md, the "Protocol release" line) - the release runs by itself.
+//   ... --sync-staged                                             - core and adapter check before the commit (pre-commit calls it); roles are not copied between engines
+//   ... --sync-plugin                                             - update the Claude Code plugin from GitHub (marketplace + plugin update) and verify versions; after --release this runs by itself, --no-plugin turns it off
+//   ... --install-hook                                            - install .git/hooks/pre-commit (any run installs it by itself)
 //
-// Порядок: sync-engines --check (ядро + адаптеры по тесту соответствия; роли между движками не копируются) →
-// engine-to-protocol --apply (core/, adapters/claude/, adapters/codex/, adapters/gemini/) →
-// коммит protocol/ в dev + --mark → коммит проекта (git add -A, со ссылкой на новый HEAD protocol/).
-// Стоп на конфликте или «изменён только шаблон»: это решает человек («обнови протокол Форма»).
+// Order: sync-engines --check (core + adapters by the conformance test; roles are not copied between engines) ->
+// engine-to-protocol --apply (core/, adapters/claude/, adapters/codex/, adapters/gemini/) ->
+// commit protocol/ into dev + --mark -> commit the project (git add -A, referencing the new protocol/ HEAD).
+// Stop on a conflict or "only the template changed": the human decides that ("update the Forma protocol").
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const { walk: walkTree, projectFile } = require('../skills/forma/core/dashboard/lib/fs.cjs');
 const { run, gitRun } = require('./lib/git.cjs');
 const { scanTraces, scanMessages } = require('./check-release.cjs');
+const i18n = require('../skills/forma/core/i18n/index.cjs');
+const tr = (code, params) => i18n.message(code, params, 'ru');
 
 const root = process.cwd();
 const proto = path.join(root, '.forma/protocol');
 const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
-const toAt = args.indexOf('--to'); // --release --to X.Y.Z: выпуск с названной версией вместо +1 к патчу
+const toAt = args.indexOf('--to'); // --release --to X.Y.Z: release with the named version instead of +1 to the patch
 const toVer = toAt >= 0 ? args[toAt + 1] : null;
 const msg = args.find((a, i) => !a.startsWith('--') && !(toAt >= 0 && i === toAt + 1));
-// В протокол уходит чистое сообщение: ведущая отметка карточки проекта («Карточка NNN: …») отбрасывается,
-// в коммите проекта она остаётся. Любой другой след в сообщении — стоп.
-const protoMsg = msg ? msg.replace(/^\s*(?:карточк\p{L}*|card)[\s-]*\d{2,3}\s*[:—-]\s*/iu, '') : '';
+// The protocol receives a clean message: the leading project card marker ("Card NNN: ...") is dropped,
+// it stays in the project's commit. Any other trace in the message is a stop.
+const protoMsg = msg ? msg.replace(/^\s*(?:\u043a\u0430\u0440\u0442\u043e\u0447\u043a\p{L}*|card)[\s-]*\d{2,3}\s*[:—-]\s*/iu, '') : '';
 const CO = 'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>';
 
 const node = (script, ...a) => run('node', [script, ...a]);
 const git = (...a) => gitRun(root, ...a);
 const pgit = (...a) => gitRun(proto, ...a);
-const stop = (m, code = 1) => { console.error('СТОП: ' + m); process.exit(code); };
+const stop = (m, code = 1) => { console.error(tr('commit.stop_prefix') + m); process.exit(code); };
 const ok = (m) => console.log('✓ ' + m);
 
-if (!fs.existsSync(path.join(proto, '.git'))) stop('protocol/.git нет — это не клон FormaMindPro/formamind.', 2);
+if (!fs.existsSync(path.join(proto, '.git'))) stop(tr('commit.no_git'), 2);
 
-// Выпуск по объёму: коммиты копятся в `dev`, версия поднимается раз на выпуск.
-// N — PROJECT.md, строка «Выпуск протокола»; нет строки — 10.
+// Release by volume: commits accumulate in `dev`, the version is raised once per release.
+// N - PROJECT.md, the "Protocol release" line; no line - 10.
 const RELEASE_N = (() => {
-  try { const m = fs.readFileSync(projectFile(root, 'PROJECT.md'), 'utf8').match(/Выпуск протокола[^\n]*?(\d+)\s*$/m); if (m) return +m[1]; } catch { /* нет PROJECT.md или строки выпуска — берём умолчание ниже */ }
+  try { const m = fs.readFileSync(projectFile(root, 'PROJECT.md'), 'utf8').match(/\u0412\u044b\u043f\u0443\u0441\u043a \u043f\u0440\u043e\u0442\u043e\u043a\u043e\u043b\u0430[^\n]*?(\d+)\s*$/m); if (m) return +m[1]; } catch { /* no PROJECT.md or release line - the default below applies */ }
   return 10;
 })();
 const hasDev = () => !!pgit('rev-parse', '--verify', '-q', 'refs/heads/dev').out.trim();
@@ -53,15 +55,15 @@ const pending = () => hasDev()
 function onDev() {
   if (pgit('rev-parse', '--abbrev-ref', 'HEAD').out.trim() === 'dev') return;
   const r = hasDev() ? pgit('checkout', '-q', 'dev') : pgit('checkout', '-q', '-b', 'dev');
-  if (r.code) stop('protocol/: не перейти на dev:\n' + r.out);
+  if (r.code) stop(tr('commit.no_checkout_dev', { out: r.out }));
 }
 function stopTraces(files, msgs) {
-  const lines = files.slice(0, 40).map((b) => `  ${b.file}:${b.line} [${b.why}] ${b.text}`)
-    .concat(msgs.map((b) => `  сообщение «${b.message}» [${b.why}]`));
-  stop('в протоколе следы проекта (запрет 16) — в клон идёт только чистый код:\n' + lines.join('\n'));
+  const lines = files.slice(0, 40).map((b) => tr('commit.trace_file_line', b))
+    .concat(msgs.map((b) => tr('commit.trace_message', b)));
+  stop(tr('commit.stop_traces', { lines: lines.join('\n') }));
 }
-// Плагин Claude Code ставится из этого же GitHub-репозитория (marketplace forma): отдельной публикации нет, нужно
-// обновить его копию. Сверяем пять мест: origin/main, тег, package.json, plugin.json и установленный плагин.
+// The Claude Code plugin is installed from the same GitHub repository (the forma marketplace): there is no separate
+// publication, its copy needs updating. Five places are verified: origin/main, the tag, package.json, plugin.json and the installed plugin.
 function claudeCli(a) {
   const r = require('child_process').spawnSync('claude', a, { encoding: 'utf8', shell: process.platform === 'win32' });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
@@ -72,85 +74,85 @@ function syncPlugin(expected) {
   const want = expected || remote('package.json');
   const rows = [['origin/main package.json', remote('package.json')], ['origin/main plugin.json', remote('.claude-plugin/plugin.json')]];
   const tag = pgit('ls-remote', '--tags', 'origin', 'refs/tags/v' + want).out.trim();
-  rows.push(['тег v' + want + ' на GitHub', tag ? want : null]);
+  rows.push([tr('commit.tag_row', { version: want }), tag ? want : null]);
   const cli = claudeCli(['--version']);
-  if (cli.code !== 0) { console.log('! claude CLI недоступен — плагин не обновлён, версии сверены только на GitHub'); }
+  if (cli.code !== 0) { console.log(tr('commit.plugin_cli_missing')); }
   else {
     const m = claudeCli(['plugin', 'marketplace', 'update', 'forma']);
-    if (m.code) console.log('! marketplace update не прошёл:\n' + m.out);
+    if (m.code) console.log(tr('commit.plugin_marketplace_fail', { out: m.out }));
     const u = claudeCli(['plugin', 'update', 'forma@forma']);
-    if (u.code) console.log('! plugin update не прошёл:\n' + u.out);
+    if (u.code) console.log(tr('commit.plugin_update_fail', { out: u.out }));
     let installed = null;
     try {
       const all = JSON.parse(claudeCli(['plugin', 'list', '--json']).out).filter((x) => x.id === 'forma@forma');
       installed = (all.find((x) => x.scope === 'user') || {}).version || null;
-      // установки с областью project обновляются только из своего проекта: называем их, не трогаем
+      // project-scoped installations are updated only from their own project: name them, do not touch them
       for (const x of all.filter((y) => y.scope !== 'user' && y.version !== want)) {
-        console.log(`! плагин в проекте ${x.projectPath}: ${x.version} — обновить оттуда: claude plugin update forma@forma --scope ${x.scope}`);
+        console.log(tr('commit.plugin_project_scope', { path: x.projectPath, version: x.version, scope: x.scope }));
       }
-    } catch { /* список не разобран */ }
-    rows.push(['плагин Claude Code (user)', installed]);
+    } catch { /* the list did not parse */ }
+    rows.push([tr('commit.plugin_row_user'), installed]);
   }
   let good = true;
   for (const [what, v] of rows) {
-    if (v === want) ok(`${what}: ${v}`); else { good = false; console.log(`! ${what}: ${v || 'нет'} (ожидалось ${want})`); }
+    if (v === want) ok(`${what}: ${v}`); else { good = false; console.log(tr('commit.row_mismatch', { what, value: v || tr('commit.no_value'), want })); }
   }
-  if (good) console.log('Перезапусти Claude Code, чтобы плагин подхватился.');
+  if (good) console.log(tr('commit.restart_plugin'));
   return good;
 }
 function release() {
   const list = pending();
   const dirty = scanMessages(list);
   if (dirty.length) stopTraces([], dirty);
-  if (!list.length) { ok('выпуск: в dev нет новых коммитов'); return; }
-  if (pgit('status', '--porcelain').out.trim()) stop('выпуск: в protocol/ незакоммиченное.');
-  // Проверка перед выпуском: следы порчи переезда, тесты, линтер. Красное — выпуска нет, ничего не слито и не отправлено.
+  if (!list.length) { ok(tr('commit.release_no_commits')); return; }
+  if (pgit('status', '--porcelain').out.trim()) stop(tr('commit.release_dirty'));
+  // The pre-release check: carry-over corruptions, tests, linter. Red - no release, nothing merged or pushed.
   const chk = run('node', [path.join(proto, 'scripts', 'check-release.cjs')]);
-  if (chk.code) stop('выпуск остановлен проверкой перед выпуском:\n' + chk.out);
-  ok('проверка перед выпуском пройдена');
+  if (chk.code) stop(tr('commit.release_check_failed', { out: chk.out }));
+  ok(tr('commit.release_check_ok'));
   pgit('fetch', '-q', 'origin');
   let r = pgit('checkout', '-q', 'main');
-  if (r.code) stop('выпуск: не перейти на main:\n' + r.out);
+  if (r.code) stop(tr('commit.no_main', { out: r.out }));
   r = pgit('merge', '--ff-only', '-q', 'origin/main');
-  if (r.code) { pgit('checkout', '-q', 'dev'); stop('выпуск: origin/main разошёлся с main — решает человек:\n' + r.out); }
+  if (r.code) { pgit('checkout', '-q', 'dev'); stop(tr('commit.main_diverged', { out: r.out })); }
   r = pgit('merge', '--no-ff', '--no-commit', 'dev');
-  if (r.code) { pgit('merge', '--abort'); pgit('checkout', '-q', 'dev'); stop('выпуск: конфликт dev → main:\n' + r.out); }
+  if (r.code) { pgit('merge', '--abort'); pgit('checkout', '-q', 'dev'); stop(tr('commit.merge_conflict', { out: r.out })); }
   const pj = path.join(proto, '.claude-plugin', 'plugin.json');
   const j = fs.readFileSync(pj, 'utf8');
   const v = JSON.parse(j).version, m = v.match(/^(\d+)\.(\d+)\.(\d+)(-[\w.]+)?$/);
-  if (!m) stop('выпуск: версия «' + v + '» не вида X.Y.Z[-метка].');
-  const nv = toVer || `${m[1]}.${m[2]}.${+m[3] + 1}${m[4] || ''}`; // метка стадии (-alpha) переносится как есть
-  if (toVer && !/^\d+\.\d+\.\d+$/.test(toVer)) { pgit('merge', '--abort'); pgit('checkout', '-q', 'dev'); stop('выпуск: --to «' + toVer + '» не вида X.Y.Z.'); }
+  if (!m) stop(tr('commit.bad_version', { v }));
+  const nv = toVer || `${m[1]}.${m[2]}.${+m[3] + 1}${m[4] || ''}`; // the stage label (-alpha) is carried over as is
+  if (toVer && !/^\d+\.\d+\.\d+$/.test(toVer)) { pgit('merge', '--abort'); pgit('checkout', '-q', 'dev'); stop(tr('commit.bad_to_version', { to: toVer })); }
   fs.writeFileSync(pj, j.replace(`"version": "${v}"`, `"version": "${nv}"`));
-  const pk = path.join(proto, 'package.json'); // package.json держит ту же версию, что plugin.json
+  const pk = path.join(proto, 'package.json'); // package.json carries the same version as plugin.json
   const pkj = fs.readFileSync(pk, 'utf8');
   fs.writeFileSync(pk, pkj.replace(/"version": "[^"]*"/, `"version": "${nv}"`));
   pgit('add', '-A');
   r = pgit('commit', '-q', '-m', `v${nv} — ${list.length} commit(s)\n\n${list.reverse().map((s) => '- ' + s).join('\n')}\n\n${CO}`);
-  if (r.code) stop('выпуск: коммит слияния не прошёл:\n' + r.out);
-  ok(`protocol/ выпуск: ${v} → ${nv}, коммитов ${list.length}`);
+  if (r.code) stop(tr('commit.merge_commit_failed', { out: r.out }));
+  ok(tr('commit.released', { v, nv, n: list.length }));
   const bp = node(E2P, '--before-push');
   if (bp.code) stop(bp.out);
   r = pgit('push', '-q', 'origin', 'main');
-  if (r.code) stop('push protocol/ main не прошёл:\n' + r.out);
+  if (r.code) stop(tr('commit.push_main_failed', { out: r.out }));
   pgit('checkout', '-q', 'dev');
   r = pgit('merge', '--ff-only', '-q', 'main');
-  if (r.code) stop('dev не догнал main:\n' + r.out);
+  if (r.code) stop(tr('commit.dev_behind_main', { out: r.out }));
   r = pgit('push', '-q', '-u', 'origin', 'dev');
-  if (r.code) stop('push protocol/ dev не прошёл:\n' + r.out);
+  if (r.code) stop(tr('commit.push_dev_failed', { out: r.out }));
   const mk = node(E2P, '--mark');
-  if (mk.code) console.error('! --mark не записал базу (движок и шаблон расходятся) — следующая сверка покажет ложные конфликты:\n' + mk.out);
-  ok('protocol/ отправлен: main и dev');
+  if (mk.code) console.error(tr('commit.mark_failed', { out: mk.out }));
+  ok(tr('commit.pushed'));
   try {
     if (run('gh', ['auth', 'status']).code === 0) {
       const rel = run('gh', ['release', 'create', `v${nv}`, '--title', nv, '--notes', `Release v${nv}`, '--latest', '-R', 'FormaMindPro/formamind']);
-      if (rel.code === 0) ok('GitHub Release v' + nv + ' создан через gh CLI');
-      else console.log('! gh release create не удался, релиз подхватит GitHub Actions:\n' + rel.out);
+      if (rel.code === 0) ok(tr('commit.gh_release_created', { v: nv }));
+      else console.log(tr('commit.gh_release_failed', { out: rel.out }));
     } else {
-      console.log('! gh CLI не авторизован — релиз будет создан через GitHub Actions');
+      console.log(tr('commit.gh_no_auth'));
     }
   } catch {
-    console.log('! gh CLI недоступен — релиз будет создан через GitHub Actions');
+    console.log(tr('commit.gh_missing'));
   }
   if (!has('--no-plugin')) syncPlugin(nv);
   git('add', '.forma/protocol');
@@ -161,19 +163,19 @@ const CDX = '.codex/scripts/sync-codex.cjs';
 const E2P = '.forma/protocol/scripts/engine-to-protocol.cjs';
 function codexDormant() { try { return JSON.parse(fs.readFileSync('.forma/engines.json', 'utf8')).dormant.includes('codex'); } catch { return false; } }
 
-// pre-commit проекта: любой коммит, и обычный git commit, переносит Claude → Gemini/Codex
-// и берёт их файлы в тот же коммит. Перенос в исходник протокола и версия — по-прежнему forma-commit.
-// Первым в хуке — гейт заморозки версий (goal-freeze.cjs): перезапись хука этой константой гейт восстанавливает сама.
+// The project's pre-commit: any commit, a plain git commit too, carries Claude -> Gemini/Codex
+// and takes their files into the same commit. Carrying into the protocol source and the version - still forma-commit.
+// First in the hook is the version-freeze gate (goal-freeze.cjs): if this constant rewrites the hook, the gate restores it itself.
 const HOOK = path.join(root, '.git', 'hooks', 'pre-commit');
-const HOOK_BODY = '#!/bin/sh\n# forma: гейт заморозки версий (goal-freeze.cjs) — замороженные файлы без записи «human approved» коммит не проходят\nnode .forma/board/checks/goal-freeze.cjs --staged || exit 1\n# forma: проверка ядра и адаптеров перед коммитом (forma-commit.cjs)\nexec node .forma/protocol/scripts/forma-commit.cjs --sync-staged\n';
+const HOOK_BODY = '#!/bin/sh\n# forma: ' + tr('board.goal-freeze.wire_comment') + '\nnode .forma/board/checks/goal-freeze.cjs --staged || exit 1\n# forma: ' + tr('board.goal-freeze.hook_fallback_comment') + '\nexec node .forma/protocol/scripts/forma-commit.cjs --sync-staged\n';
 function installHook() {
   fs.writeFileSync(HOOK, HOOK_BODY);
-  try { fs.chmodSync(HOOK, 0o755); } catch { /* ФС без chmod (Windows) — git запустит хук и так */ }
+  try { fs.chmodSync(HOOK, 0o755); } catch { /* a filesystem without chmod (Windows) - git runs the hook anyway */ }
 }
-if (has('--install-hook')) { installHook(); ok('pre-commit поставлен: ' + path.relative(root, HOOK)); process.exit(0); }
-try { if (fs.readFileSync(HOOK, 'utf8') !== HOOK_BODY) throw 0; } catch { installHook(); ok('pre-commit поставлен: проверка ядра и адаптеров на каждом коммите'); }
+if (has('--install-hook')) { installHook(); ok(tr('commit.hook_installed_path', { path: path.relative(root, HOOK) })); process.exit(0); }
+try { if (fs.readFileSync(HOOK, 'utf8') !== HOOK_BODY) throw 0; } catch { installHook(); ok(tr('commit.hook_installed_check')); }
 
-// Хуки клона протокола: коммит и пуш со следами проекта (коды карточек, даты, имена сайтов) невозможны и мимо forma-commit.
+// The protocol clone's hooks: a commit or push carrying project traces (card codes, dates, site names) is impossible past forma-commit too.
 const PROTO_HOOKS = {
   'pre-commit': 'node scripts/check-release.cjs --traces',
   'commit-msg': 'node scripts/check-release.cjs --message "$1"',
@@ -181,15 +183,15 @@ const PROTO_HOOKS = {
 };
 for (const [name, cmd] of Object.entries(PROTO_HOOKS)) {
   const f = path.join(proto, '.git', 'hooks', name);
-  const body = `#!/bin/sh\n# forma: чистый протокол — проверка следов проекта (check-release.cjs)\nexec ${cmd}\n`;
-  try { if (fs.readFileSync(f, 'utf8') === body) continue; } catch { /* хука нет */ }
-  try { fs.writeFileSync(f, body); fs.chmodSync(f, 0o755); } catch { /* ФС без chmod — git запустит хук и так */ }
+  const body = tr('commit.hook_proto_body', { cmd });
+  try { if (fs.readFileSync(f, 'utf8') === body) continue; } catch { /* no hook */ }
+  try { fs.writeFileSync(f, body); fs.chmodSync(f, 0o755); } catch { /* a filesystem without chmod - git runs the hook anyway */ }
 }
 
-// Паритет движков. Незакрытые Core карточки — не дрейф движка: предупреждение, не стоп.
-// tpl=false: расхождение .codex/ с шаблоном протокола — не дрейф между движками, его переносит шаг 2
-// (engine-to-protocol). Проверять его до шага 2 значит останавливать каждую правку .codex/.
-// Коммит сверяет только ядро и адаптер Claude; Codex и Gemini — ручной sync-engines --check перед выпуском.
+// Engine parity. Unclosed Core cards are not engine drift: a warning, not a stop.
+// tpl=false: .codex/ diverging from the protocol template is not drift between engines; step 2 carries it over
+// (engine-to-protocol). Checking it before step 2 means stopping every .codex/ edit.
+// The commit verifies only the core and the Claude adapter; Codex and Gemini - a manual sync-engines --check before the release.
 const OTHER = /\.codex\/|\.agents\/|GEMINI\.md|adapters\/(codex|gemini)\/|CODEX-8|gemini-8|\bCodex\b|\bGemini\b/i;
 function parity(tpl = true) {
   const bad = [];
@@ -197,22 +199,22 @@ function parity(tpl = true) {
     const out = node(ENG, '--check').out.split(/\r?\n/);
     let cards = false;
     for (const l of out) {
-      if (/^\s{4}— /.test(l)) { cards = /не закрыты `Core`/.test(l); if (!cards && (tpl || !OTHER.test(l))) bad.push(l.trim()); }
-      if (cards && /не закрыты `Core`/.test(l)) console.log('! ' + l.trim().replace(/^— /, '') + ' — дело Core, коммит не держит');
+      if (/^\s{4}— /.test(l)) { cards = /\u043d\u0435 \u0437\u0430\u043a\u0440\u044b\u0442\u044b `Core`/.test(l); if (!cards && (tpl || !OTHER.test(l))) bad.push(l.trim()); }
+      if (cards && /\u043d\u0435 \u0437\u0430\u043a\u0440\u044b\u0442\u044b `Core`/.test(l)) console.log(tr('commit.core_deal', { line: l.trim().replace(/^— /, '') }));
     }
   }
-  // Codex — адаптер «не готов»: его сверка — сведение, коммит не держит; спящий (`.forma/engines.json`) — не сверяется вовсе.
-  if (tpl && fs.existsSync(CDX) && !codexDormant()) { const r = node(CDX, '--check'); if (r.code) console.log('! адаптер Codex (не готов) расходится со своей сверкой — сведение, коммит не держит'); }
+  // Codex - a "not ready" adapter: its check is a summary, the commit does not hold; a dormant one (`.forma/engines.json`) is not checked at all.
+  if (tpl && fs.existsSync(CDX) && !codexDormant()) { const r = node(CDX, '--check'); if (r.code) console.log(tr('commit.codex_not_ready')); }
   return bad;
 }
-// Движок против исходника протокола
+// The engine against the protocol source
 function e2p() {
   const out = node(E2P).out;
-  const n = (t) => +((out.match(new RegExp(t + '[^:]*: (\\d+)')) || [])[1] || 0);
-  return { out, engine: n('Изменён только движок'), template: n('Изменён только шаблон'), conflict: n('Конфликт') };
+  const n = (t) => +((out.match(new RegExp(t.replace(/[.*+?${}()|[\]\\]/g, '\\$&') + '[^:]*: (\\d+)')) || [])[1] || 0);
+  return { out, engine: n(tr('e2p.title_engine_only')), template: n(tr('e2p.title_template_only')), conflict: n(tr('e2p.title_conflict')) };
 }
 
-// Файлы протокола проекта против их пар в шаблоне. Предупреждение, не стоп; CRLF → LF.
+// The project's protocol files against their counterparts in the template. A warning, not a stop; CRLF -> LF.
 const CORE = path.join(proto, 'skills', 'forma', 'core'), CLA = path.join(proto, 'skills', 'forma', 'adapters', 'claude');
 function templateDrift() {
   const pairs = [];
@@ -226,21 +228,21 @@ function templateDrift() {
   for (const f of ['generate.js', 'index.html', 'economy.cjs', 'tally.cjs', 'spend-line.cjs']) pairs.push([path.join(root, 'dashboard', f), path.join(CORE, 'dashboard', f)]);
   tree('dashboard/web', CORE, 'dashboard/web');
   const rd = (f) => { try { return fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n'); } catch { return null; } };
-  // Копии из project/extensions/ — файлы проекта, не движка: их отличие от шаблона не отставание (как в engine-to-protocol.cjs).
-  // Профили run-protocol-* — инструмент движка и идут в шаблон, даже если проект доставляет их копией.
+  // Copies from project/extensions/ are the project's files, not the engine's: their difference from the template is not lag (as in engine-to-protocol.cjs).
+  // The run-protocol-* profiles are engine tooling and go into the template even if the project delivers them as copies.
   const ext = new Set();
-  try { for (const x of require('../skills/forma/core/extensions/extensions.cjs').sources(root)) ext.add(x.dst.split(path.sep).join('/')); } catch { /* нет модуля — копий нет */ }
+  try { for (const x of require('../skills/forma/core/extensions/extensions.cjs').sources(root)) ext.add(x.dst.split(path.sep).join('/')); } catch { /* no module - no copies */ }
   const isExtCopy = (a) => { const rel = path.relative(root, a).replace(/\\/g, '/'); return ext.has(rel) && !/(^|\/)agents\/run\/run-protocol-[^/]+\.md$/.test(rel); };
   return pairs.filter(([a, b]) => { if (isExtCopy(a)) return false; const x = rd(a), y = rd(b); return x !== null && x !== y; })
     .map(([a]) => path.relative(root, a).replace(/\\/g, '/'));
 }
 
 if (has('--sync-staged')) {
-  // Роли между движками не копируются: каждый движок держит свой адаптер. Здесь только проверка.
+  // Roles are not copied between engines: each engine keeps its own adapter. Only the check lives here.
   const bad = parity(false);
-  if (bad.length) { console.error('Ядро или адаптер не сходится, коммит остановлен:\n  ' + bad.join('\n  ')); process.exit(1); }
+  if (bad.length) { console.error(tr('commit.core_mismatch_staged', { list: bad.join('\n  ') })); process.exit(1); }
   const tdiff = templateDrift();
-  if (tdiff.length) console.log('! шаблон protocol/skills/forma/ отстаёт от проекта: ' + tdiff.join(', ') + ' — коммит не держит');
+  if (tdiff.length) console.log(tr('commit.template_behind', { files: tdiff.join(', ') }));
   process.exit(0);
 }
 
@@ -248,71 +250,71 @@ if (has('--sync-plugin')) process.exit(syncPlugin(null) ? 0 : 1);
 
 if (has('--check')) {
   const bad = parity(), s = e2p();
-  if (s.engine) bad.push(`движок впереди протокола в ${s.engine} файлах — node .forma/protocol/scripts/forma-commit.cjs "…"`);
-  if (s.template || s.conflict) bad.push(`протокол впереди движка или конфликт (${s.template}/${s.conflict}) — node ${E2P}`);
-  if (bad.length) { console.error('Дрейф движков, коммит остановлен:\n  ' + bad.join('\n  ')); process.exit(1); }
-  ok('дрейфа нет');
+  if (s.engine) bad.push(tr('commit.engine_ahead', { n: s.engine }));
+  if (s.template || s.conflict) bad.push(tr('commit.protocol_ahead', { template: s.template, conflict: s.conflict, e2p: E2P }));
+  if (bad.length) { console.error(tr('commit.drift_stop', { list: bad.join('\n  ') })); process.exit(1); }
+  ok(tr('commit.no_drift'));
   process.exit(0);
 }
 
-// --push без сообщения — только отправка уже сделанных коммитов.
-if (!msg && !has('--push') && !has('--release')) stop('нужно сообщение коммита: node .forma/protocol/scripts/forma-commit.cjs "что сделано"', 2);
+// --push without a message - pushing the already made commits only.
+if (!msg && !has('--push') && !has('--release')) stop(tr('commit.need_message'), 2);
 if (msg) {
 
-// 1. ядро + адаптеры по тесту соответствия (роли между движками не копируются)
+// 1. the core + adapters by the conformance test (roles are not copied between engines)
 const bad = parity(false);
-if (bad.length) stop('ядро или адаптер не сходится, дочинить руками:\n  ' + bad.join('\n  '));
-ok('ядро цельно, адаптеры прошли тест соответствия');
+if (bad.length) stop(tr('commit.core_mismatch_fix', { list: bad.join('\n  ') }));
+ok(tr('commit.core_ok'));
 
-// 2. движок → исходник протокола
+// 2. the engine -> the protocol source
 let s = e2p();
-if (s.template || s.conflict) stop(`в протоколе есть правки, которых нет в движке (${s.template} шаблон, ${s.conflict} конфликт):\n` + s.out);
+if (s.template || s.conflict) stop(tr('commit.template_ahead_stop', { template: s.template, conflict: s.conflict, out: s.out }));
 if (s.engine) {
   const r = node(E2P, '--apply');
-  if (/ПРОПУЩЕН/.test(r.out)) stop('часть файлов не перенесена:\n' + r.out);
-  ok(`перенесено в протокол: ${s.engine}`);
+  if (/\u041f\u0420\u041e\u041f\u0423\u0429\u0415\u041d/.test(r.out)) stop(tr('commit.carry_partly_failed', { out: r.out }));
+  ok(tr('commit.carried', { n: s.engine }));
 }
-const fresh = (s.out.split('Новые в движке')[1] || '').split(/\r?\n/).slice(1).filter((l) => /^\s{2}\S/.test(l)).map((l) => l.trim());
-if (fresh.length) console.log('! новые файлы движка не переносятся сами (решение — --add): ' + fresh.join(', '));
+const fresh = (s.out.split(tr('e2p.title_fresh'))[1] || '').split(/\r?\n/).slice(1).filter((l) => /^\s{2}\S/.test(l)).map((l) => l.trim());
+if (fresh.length) console.log(tr('commit.fresh_files', { files: fresh.join(', ') }));
 
-// 3. коммит протокола в `dev` без версии; версия — только на выпуске
+// 3. the protocol commit into `dev` without a version; the version - only on a release
 if (pgit('status', '--porcelain').out.trim()) {
   onDev();
   pgit('add', '-A');
   const ft = scanTraces(proto), mt = scanMessages([protoMsg]);
   if (ft.length || mt.length) { pgit('reset', '-q'); stopTraces(ft, mt); }
   const c = pgit('commit', '-q', '-m', `${protoMsg}\n\nCarried over from the engine by forma-commit.cjs.\n\n${CO}`);
-  if (c.code) stop('коммит protocol/ не прошёл:\n' + c.out);
+  if (c.code) stop(tr('commit.proto_commit_failed', { out: c.out }));
   node(E2P, '--mark');
-  ok(`protocol/ dev: в выпуске ${pending().length}/${RELEASE_N}`);
+  ok(tr('commit.proto_dev_status', { n: pending().length, total: RELEASE_N }));
 }
 
-// 4. коммит проекта — всё, включая ссылку на protocol/
+// 4. the project commit - everything, including the reference to protocol/
 git('add', '-A');
 if (git('diff', '--cached', '--quiet').code) {
   const c = git('commit', '-q', '-m', `${msg}\n\n${CO}`);
-  if (c.code) stop('коммит проекта не прошёл:\n' + c.out);
-  ok('проект: ' + git('log', '--oneline', '-1').out.trim());
-} else ok('проект: изменений нет');
+  if (c.code) stop(tr('commit.project_commit_failed', { out: c.out }));
+  ok(tr('commit.project_committed', { line: git('log', '--oneline', '-1').out.trim() }));
+} else ok(tr('commit.project_clean'));
 }
 
-// 5. выпуск: набрано N коммитов в `dev`, или --release (закрытие круга, команда человека).
-//    dev → main одним merge, один подъём patch, push main и dev. --push без выпуска — только dev.
+// 5. release: N commits accumulated in `dev`, or --release (closing the circle, the human's command).
+//    dev -> main by one merge, one patch raise, push main and dev. --push without a release - dev only.
 if (has('--release') || pending().length >= RELEASE_N) release();
 else if (has('--push') && pgit('rev-parse', '--verify', '-q', 'dev').out.trim()) {
   const ps = pgit('push', '-q', '-u', 'origin', 'dev');
-  if (ps.code) stop('push protocol/ dev не прошёл:\n' + ps.out);
-  ok(`protocol/ dev отправлен (в выпуске ${pending().length}/${RELEASE_N}, версия не менялась)`);
+  if (ps.code) stop(tr('commit.push_dev_failed', { out: ps.out }));
+  ok(tr('commit.dev_pushed_status', { n: pending().length, total: RELEASE_N }));
 }
 if (has('--push') || has('--release')) {
   if (git('remote').out.trim()) {
     const ps = git('push', '-q');
-    if (ps.code) stop('push проекта не прошёл:\n' + ps.out);
-    ok('проект отправлен');
-  } else ok('проект: remote нет — только локальный коммит');
+    if (ps.code) stop(tr('commit.project_push_failed', { out: ps.out }));
+    ok(tr('commit.project_pushed'));
+  } else ok(tr('commit.no_remote'));
 }
 
-// 6. отчёт: счёт круга по эпикам и незапушенные коммиты. Push — на закрытии круга `Core`
-//    или по команде человека, не на каждой карточке (AGENTS.md §7).
+// 6. The report: the circle count by epics and unpushed commits. The push - on closing the circle by `Core`
+//    or on the human's command, not on every card (AGENTS.md §7).
 const CYC = '.claude/scripts/cycle-status.cjs';
 if (fs.existsSync(path.join(root, CYC))) { const r = node(CYC); if (r.out.trim()) console.log('! ' + r.out.trim()); }

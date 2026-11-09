@@ -9,7 +9,7 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const ROOTS = ['.claude/scripts', '.forma/board', '.forma/dashboard', '.forma/rules', '.forma/plumb', '.forma/i18n', '.claude/hooks'];
 const SKIP = /(node_modules|[\\/]protocol[\\/]|[\\/]locales[\\/]|\.test\.cjs$|[\\/]messages[\\/]|[\\/]\.cache[\\/])/;
-const CYR = /[А-Яа-яЁё]/;
+const CYR = /[\u0410-\u042f\u0430-\u044f\u0401\u0451]/;
 
 // file (relative, with /) → why Russian words inside patterns are allowed there
 const EXCEPTIONS = {
@@ -28,12 +28,12 @@ const EXCEPTIONS = {
   '.claude/scripts/dashboard-view.cjs': 'reads a terminal table of another tool',
   '.claude/scripts/engine-switch.cjs': 'reads the output of sync-engines',
   '.claude/scripts/plumb-scrub.cjs': 'scrub patterns: Russian words of a credential in free text',
-  '.claude/scripts/resources.cjs': 'styles of an office document (Заголовок), not keys',
+  '.claude/scripts/resources.cjs': 'styles of an office document (\u0417\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a), not keys',
   '.claude/scripts/test-ledger-parity-reverse.cjs': 'a test of a Russian message',
 
   '.forma/dashboard/checks/locale-parity.cjs': 'the check looks for any Cyrillic letter',
-  '.forma/dashboard/data/board.cjs': 'free words «карточка N» of a human sentence',
-  '.forma/dashboard/serve.js': 'free word «позиция» of a node tag',
+  '.forma/dashboard/data/board.cjs': 'free words «\u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0430 N» of a human sentence',
+  '.forma/dashboard/serve.js': 'free word «\u043f\u043e\u0437\u0438\u0446\u0438\u044f» of a node tag',
   '.forma/dashboard/subagents-log.cjs': 'a state phrase of the log',
   '.forma/dashboard/tally.cjs': 'a letter class of a service unit',
   '.forma/i18n/project-checks.cjs': 'a value of the language field (documentation language), not a key',
@@ -55,9 +55,9 @@ function offenders(file) {
     const code = t.replace(/\s\/\/.*$/, '');
     if (!CYR.test(code)) return;
     if (/(console\.|\bdie\(|throw |problems\.push|\.push\(`)/.test(code)) return; // messages for the human
-    const regexLiteral = /(^|[=(,:!&|?]\s*)\/(?![/*])(?:[^/\\\n]|\\.)*[А-Яа-яЁё](?:[^/\\\n]|\\.)*\/[gimsuy]*/.test(code);
+    const regexLiteral = /(^|[=(,:!&|?]\s*)\/(?![/*])(?:[^/\\\n]|\\.)*[\u0410-\u042f\u0430-\u044f\u0401\u0451](?:[^/\\\n]|\\.)*\/[gimsuy]*/.test(code);
     const regExpCtor = /new RegExp\(/.test(code);
-    const comparison = /(===|!==|\.includes\(|\.startsWith\(|\.endsWith\(|\.indexOf\()\s*['"`][^'"`]*[А-Яа-яЁё]/.test(code);
+    const comparison = /(===|!==|\.includes\(|\.startsWith\(|\.endsWith\(|\.indexOf\()\s*['"`][^'"`]*[\u0410-\u042f\u0430-\u044f\u0401\u0451]/.test(code);
     if (regexLiteral || regExpCtor || comparison) out.push(`${path.relative(ROOT, file).replace(/\\/g, '/')}:${i + 1}: ${t.slice(0, 140)}`);
   });
   return out;

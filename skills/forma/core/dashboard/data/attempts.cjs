@@ -2,20 +2,20 @@
 const i18n = require('../../i18n/index.cjs');
 
 /**
- * Строки расхода в карточке: заходы узлов, сервисы, неисправные записи, дата закрытия.
- * Формат зафиксирован в AGENTS.md §3:
- *   `Узел`, ГГГГ-ММ-ДД: заход, N токенов (R кэш-чтение), T с — <что сделано>.
- *   `Узел`, ГГГГ-ММ-ДД: заход, N токенов (R кэш-чтение), T с, $X.XXXXXX (провайдер/модель) — ...
- * Денежный сегмент опционален — только внешняя модель, не Agent tool (подписка).
+ * Spend lines in a card: node attempts, services, malformed entries, closure date.
+ * The format is fixed in AGENTS.md §3:
+ *   `Node`, YYYY-MM-DD: attempt, N tokens (R cache-read), T s - <what was done>.
+ *   `Node`, YYYY-MM-DD: attempt, N tokens (R cache-read), T s, $X.XXXXXX (provider/model) - ...
+ * The money segment is optional - external model only, not the Agent tool (subscription).
  *
- * Кэш-чтение и секунды разбираются как необязательные: старые строки без них читаются как раньше
- * и отличаются от новых не нулём, а признаком «не записано» (`null`).
- * «токен / токена / токенов» — числительное согласуется, разборщик обязан это знать.
- * Число ОБЯЗАНО начинаться с цифры: класс `[\d\s\u00a0]+` совпадал и с одними пробелами,
- * поэтому строка «заход, токенов не записано» разбиралась как исправная запись с NaN
- * и уносила в NaN весь счёт. `\d[\d\s\u00a0]*` требует хотя бы одну цифру, а «4 787 590»
- * разбирает ровно как раньше: пробелы стоят внутри числа, не в его начале.
- * Канон ключевой части — английский; русские строки приводятся `toEnglish()` до разбора.
+ * Cache-read and seconds parse as optional: old lines without them read as before
+ * and differ from new ones not by a zero but by a "not recorded" marker (`null`).
+ * "token / tokens" - the numeral agrees in Russian, and the parser must know this.
+ * The number MUST start with a digit: the class `[\d\s\u00a0]+` also matched spaces alone,
+ * so a line "attempt, tokens not recorded" parsed as a well-formed entry with NaN
+ * and dragged the whole count into NaN. `\d[\d\s\u00a0]*` requires at least one digit, and "4 787 590"
+ * parses exactly as before: the spaces sit inside the number, not before it.
+ * The canonical key part is English; Russian lines are reduced by `toEnglish()` before parsing.
  */
 
 const { toEnglish, SPEND_SOURCE, ID_UNKNOWN_RE, CLAIM_RE, sessionWindowEnd, outTokens, dedupKey } = require('../spend-line.cjs');
@@ -25,14 +25,14 @@ const ATTEMPT_RE = new RegExp(SPEND_SOURCE, 'g');
 const num = (s) => parseInt(String(s).replace(/[\s\u00a0]/g, ''), 10);
 
 /**
- * Вторая защита, независимая от первой. Строгая цифра в разборе закрывает известный случай;
- * эта проверка закрывает неизвестные: нечисло не входит в сумму НИКОГДА. NaN заразен: одно значение
- * уносит любой итог, куда попало, и отладить это по отчёту нельзя. Строка с нечислом уходит наверх
- * как неисправная и называется адресом карточки (`data.economy.malformed`).
- * Возвращает готовые числа или `null` — «это не запись расхода, считать её нельзя».
+ * A second defense, independent of the first. The strict digit in parsing closes the known case;
+ * this check closes the unknown ones: a non-number NEVER enters the sum. NaN is contagious: one value
+ * drags any total it lands in, and this cannot be debugged from a report. A line with a non-number goes up
+ * as malformed and is named by the card's address (`data.economy.malformed`).
+ * Returns ready numbers or `null` - "this is not a spend entry, it cannot be counted".
  */
 function attemptNumbers(m) {
-  // `unknown tokens` (ECONOMY.md, «The `unknown` marker») — заход есть, числа нет: null, не ноль и не выпадение.
+  // `unknown tokens` (ECONOMY.md, "The `unknown` marker") - the attempt is there, the number is not: null, not zero, not an omission.
   const tokensUnknown = m[3] === 'unknown';
   const tokens = tokensUnknown ? null : num(m[3]);
   if (!tokensUnknown && !Number.isFinite(tokens)) return null;
@@ -43,11 +43,11 @@ function attemptNumbers(m) {
   return { tokens, tokensUnknown, cacheRead, seconds, secondsUnknown: m[5] === 'unknown' };
 }
 
-// Внешний сервис считает в своей единице: у Magnific — кредиты, у другого могут быть запросы или минуты.
-// Разбор имён сервисов НЕ знает: берёт любое «N <единица> (<сервис>/<операция>)» и группирует по паре
-// сервис+единица. Иначе каждый новый сервис требовал бы правки кода, а до неё его расход молча не считался бы.
-// Доллары остаются отдельным сегментом: у них своя, давняя запись `$X (провайдер/модель)`.
-const SERVICE_RE = /(\d[\d\s\u00a0]*)\s*([A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё.]*)\s*\(([^)/]+)\/([^)]+)\)/g;
+// An external service counts in its own unit: Magnific has credits, another may have requests or minutes.
+// The service-name parser does NOT know the names: it takes any "N <unit> (<service>/<operation>)" and groups by the pair
+// service+unit. Otherwise every new service would require a code change, and until then its spend would silently go uncounted.
+// Dollars stay a separate segment: they have their own, long-standing record `$X (provider/model)`.
+const SERVICE_RE = /(\d[\d\s\u00a0]*)\s*([A-Za-z\u0410-\u042f\u0430-\u044f\u0401\u0451][A-Za-z\u0410-\u042f\u0430-\u044f\u0401\u0451.]*)\s*\(([^)/]+)\/([^)]+)\)/g;
 
 function parseServices(tail) {
   const out = [];
@@ -55,16 +55,16 @@ function parseServices(tail) {
   SERVICE_RE.lastIndex = 0;
   let m;
   while ((m = SERVICE_RE.exec(tail)) !== null) {
-    // Сервис от времени по названию единицы не отличить: «12 минут (aura/build)» — законная единица
-    // сервиса, а не время захода. Отличает форма: у сервиса есть скобка с косой чертой.
+    // A service cannot be told from time by the unit's name: "12 minutes (aura/build)" is a legitimate service
+    // unit, not an attempt's time. The form tells them apart: a service has a parenthesis with a slash.
     out.push({ amount: num(m[1]), unit: m[2], service: m[3].trim(), operation: m[4].trim() });
   }
   return out;
 }
 
-// Расход сервиса не всегда рождается внутри захода узла: генерацию может запустить человек напрямую,
-// а токенов у такого события нет вовсе. Поэтому — отдельная форма строки, не подделка под заход:
-//   `- Сервис, ГГГГ-ММ-ДД: 1160 кредитов (magnific/tripo-image-to-3d-high) — что сделано.`
+// A service's spend is not always born inside a node's attempt: a human may trigger the generation directly,
+// and such an event has no tokens at all. Hence a separate line form, not a fake attempt:
+//   `- Service, YYYY-MM-DD: 1160 credits (magnific/tripo-image-to-3d-high) - what was done.`
 const SERVICE_LINE_RE = new RegExp('^-\\s*(?:' + i18n.alt('service') + '),\\s*(\\d{4}-\\d{2}-\\d{2}):([^\\n—]*)', 'gm');
 
 function parseServiceLines(raw) {
@@ -78,10 +78,10 @@ function parseServiceLines(raw) {
 }
 
 /**
- * Строки со словом «заход», которые НЕ разобрались как запись расхода. Не то же, что законный ноль:
- * `Intent` в общей сессии пишет «заход, 0 токенов, 0 с» — там числа ЕСТЬ и они верны. Здесь расход был,
- * а числа нет вовсе — такие строки молча выпадали из счёта, пока наружу их не показывал никто.
- * Ищется ФОРМА записи (дата, двоеточие, «заход,»), а не слово: в прозе оно встречается сплошь.
+ * Lines with the word "attempt" that did NOT parse as a spend entry. Not the same as a legitimate zero:
+ * `Intent` in the main session writes "attempt, 0 tokens, 0 s" - there the numbers EXIST and are true. Here spend happened,
+ * but there is no number at all - such lines silently fell out of the count while no one showed them outward.
+ * What is matched is the FORM of the entry (date, colon, "attempt,"), not the word: prose is full of it.
  */
 function parseMalformedAttempts(raw) {
   const out = [];
@@ -90,16 +90,16 @@ function parseMalformedAttempts(raw) {
     if (!/^-\s/.test(t) || !CLAIM_RE.test(t)) continue;
     ATTEMPT_RE.lastIndex = 0;
     const m = ATTEMPT_RE.exec(t);
-    // Совпала с формой — ещё не значит исправна: числа могут оказаться нечислом. Тогда строка НАЗЫВАЕТСЯ.
+    // Matching the form does not yet mean well-formed: the numbers may turn out to be non-numbers. Then the line is NAMED.
     if (m && attemptNumbers(m)) continue;
     out.push(t.replace(/^-\s*/, '').slice(0, 180));
   }
   return out;
 }
 
-// Дата закрытия карточки. Во фронтматтере её нет и не будет (§6: файлы пишет расширение доски и сохранит ли оно
-// незнакомый ключ — не установлено). Источник — строка истории с постоянным началом `закрыто —`, которую пишет
-// `Intent` при закрытии. Нет строки — null, и отображение берёт дату последнего захода, подписав её приблизительной.
+// The card's closure date. It is not in the frontmatter and will not be (§6: the board extension writes these files, and whether it keeps
+// an unfamiliar key is not established). The source is a history line with the constant closure prefix, which
+// `Intent` writes on closing. No line - null, and the display takes the last attempt's date, labeling it approximate.
 const CLOSED_RE = new RegExp('^-\\s*`([^`]+)`,\\s*(\\d{4}-\\d{2}-\\d{2}):\\s*(?:' + i18n.alt('hist.closed') + ')\\s*—', 'm');
 
 function parseClosedDate(raw) {
@@ -107,26 +107,26 @@ function parseClosedDate(raw) {
   return m ? m[2] : null;
 }
 
-// Запись расхода — ПУНКТ списка `## История`, а не всякое место, где форма встретилась: разбор по всему
-// телу файла засчитывал бы дословную цитату учётной строки в прозе как ещё один заход. То же правило —
-// в `parseMalformedAttempts`, `tally.cjs`, `sync-engines.cjs`. Группы совпадают с ATTEMPT_RE.
+// A spend entry is an ITEM of the `## History` list, not every place where the form occurs: parsing across the
+// whole file body would count a verbatim quote of an accounting line in prose as another attempt. The same rule -
+// in `parseMalformedAttempts`, `tally.cjs`, `sync-engines.cjs`. The groups match ATTEMPT_RE.
 const ATTEMPT_LINE_RE = new RegExp('^-\\s*' + ATTEMPT_RE.source);
 
-/** Запись захода из совпадения `m` и строки `line`; нечисло — `null` (его называет `parseMalformedAttempts`). */
+/** An attempt entry from match `m` and line `line`; a non-number - `null` (`parseMalformedAttempts` names it). */
 function attemptRecord(m, line, file) {
   const n = attemptNumbers(m);
   if (n === null) return null;
   const english = toEnglish(line.trim());
   const { cacheRead } = n;
-  // Канон economy.cjs: R больше N — значит N записан без кэша, итог N + R.
+  // economy.cjs canon: R greater than N means N was written without cache, total N + R.
   const tokens = n.tokens != null && cacheRead != null && cacheRead > n.tokens ? n.tokens + cacheRead : n.tokens;
-  // Тег движка — первое слово описания (AGENTS.md §3); нет тега — `untagged`.
+  // The engine tag is the first word of the description (AGENTS.md §3); no tag - `untagged`.
   const tag = /—\s*([a-z][a-z0-9-]*):/.exec(english);
-  // id вызова — чтобы один вызов, записанный в нескольких карточках, считался один раз (как в tally.cjs).
+  // The call id - so that one call recorded in several cards is counted once (as in tally.cjs).
   const idm = !ID_UNKNOWN_RE.test(english) && /`([^`\s]+)`\s*$/.exec(m[9] || '');
   const record = {
     callId: idm ? idm[1] : null,
-    // Ключ дедупликации — общий с tally.cjs (spend-line.cjs `dedupKey`); без id вызова дедупликации нет.
+    // The dedup key is shared with tally.cjs (spend-line.cjs `dedupKey`); without a call id there is no dedup.
     dedupKey: idm && file ? dedupKey(line, file, idm[1], m) : null,
     sessionSpend: /card-session-spend/.test(line),
     tokensUnknown: n.tokensUnknown,
@@ -134,13 +134,13 @@ function attemptRecord(m, line, file) {
     engine: tag ? tag[1] : 'untagged',
     date: m[2],
     tokens,
-    // Кэш-чтение — постоянные накладные вызова: загрузка закона и роли (§3). Это и есть «инструктаж»;
-    // остаток — работа собственно по карточке. Тоньше внутри одного вызова не делится.
+    // Cache-read is the call's fixed overhead: loading the law and the role (§3). This is the "briefing";
+    // the rest is the work on the card itself. It does not divide finer inside one call.
     cacheRead,
-    // Выходные токены: число или `null` — «out unknown» и старая строка без сегмента (читается как есть, не как 0).
+    // Output tokens: a number or `null` - "out unknown" and an old line without the segment (read as is, not as 0).
     tokensOut: outTokens(english),
-    // Три состояния (ECONOMY.md, «The `unknown` marker»): число записано; поля нет вовсе (старая строка); движок числа
-    // не вернул и узел это НАЗВАЛ. Третье считается отдельной величиной и никогда не складывается нулём.
+    // Three states (ECONOMY.md, "The `unknown` marker"): the number is recorded; the field is absent altogether (an old line); the engine
+    // returned none and the node NAMED it. The third is counted as a separate quantity and never summed as zero.
     cacheReadUnknown: /cache-read unknown/.test(m[0]),
     work: cacheRead != null && tokens != null ? Math.max(0, tokens - cacheRead) : null,
     seconds: n.seconds,
@@ -149,20 +149,20 @@ function attemptRecord(m, line, file) {
     provider: m[8] || null,
     services: parseServices(m[9]),
   };
-  // Метка границы окна (строка основной сессии, `card-session-spend`): приращения одной сессии различаются ею.
-  // Поле только при метке — записи без неё остаются прежними, снимок данных не меняется.
+  // The window-boundary marker (main-session line, `card-session-spend`): one session's increments are told apart by it.
+  // The field exists only with the marker - entries without it stay as they were, the data snapshot does not change.
   const windowEnd = sessionWindowEnd(line);
   if (windowEnd != null) record.windowEnd = windowEnd;
   return record;
 }
 
-/** Заходы узлов из строк расхода карточки. */
+/** Node attempts from the card's spend lines. */
 function parseAttempts(raw, file) {
   const attempts = [];
   for (const line of raw.split(/\r?\n/)) {
     const m = ATTEMPT_LINE_RE.exec(toEnglish(line.trim()));
     if (m === null) continue;
-    // Единственное место, где рождается запись расхода, — значит и единственные ворота для нечисла.
+    // The only place where a spend entry is born - hence also the only gate for a non-number.
     const record = attemptRecord(m, line, file);
     if (record !== null) attempts.push(record);
   }

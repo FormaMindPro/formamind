@@ -1,7 +1,7 @@
-// Вкладки «Проект» и «Движок» в настройках: только показ; каталог маршрутов.
-// Все строки интерфейса — через t() из словарей, ключи `eng.*`. Локальные переменные не называть `t`.
+// The "Project" and "Engine" tabs in the settings: display only; the route catalog.
+// Every UI string goes through t() from the dictionaries, the keys are `eng.*`. Do not name local variables `t`.
 
-/* Общие кирпичи: плитка, плашка, таблица, сворачиваемый раздел. */
+/* Common blocks: tile, badge, table, collapsible section. */
 const setEmpty = () => `<span class="set-empty">${t('eng.empty')}</span>`;
 const setTile = (num, lbl, cls = '') => `<div class="bs-tile ${cls}"><b>${num}</b><span>${lbl}</span></div>`;
 const setPill = (txt, cls = '', title = '') => `<span class="set-pill ${cls}"${title ? ` title="${esc(title)}"` : ''}>${esc(txt)}</span>`;
@@ -13,7 +13,7 @@ const setTable = (tbl) => (!tbl || !tbl.rows.length) ? setEmpty()
 const ENG_INFO = [];
 const engHelp = (name, desc) => { ENG_INFO.push({ name, desc }); return `<button class="eng-help${desc ? '' : ' st-nohelp'}" data-ei="${ENG_INFO.length - 1}" title="${esc(t('eng.what'))}">?</button>`; };
 
-/* Вкладка «Проект»: собирает generate.js → settings.project. Браузер ничего не пишет. */
+/* The "Project" tab: assembled by generate.js -> settings.project. The browser writes nothing. */
 function projectSettingsHtml(p){
   if (!p || !p.present) return `<div class="chain-clean">${t('eng.project.missing')}</div>`;
   const ready = p.goals.filter(g => !g.draft), draft = p.goals.filter(g => g.draft);
@@ -38,7 +38,7 @@ function projectSettingsHtml(p){
   </section>`;
 }
 
-/* Вкладка «Движок»: собирает generate.js → settings.engine. Браузер ничего не пишет. */
+/* The "Engine" tab: assembled by generate.js -> settings.engine. The browser writes nothing. */
 function engineSettingsHtml(e){
   if (!e || !e.present) return `<div class="chain-clean">${t('eng.engine.missing')}</div>`;
   ENG_INFO.length = 0;
@@ -89,7 +89,7 @@ document.addEventListener('click', e => {
   d.showModal();
 });
 
-/* все 13 кодов из ROUTES.md — всё, что есть в движке; без вкл/выкл и настроек проекта. */
+/* all 13 codes from ROUTES.md - everything the engine has; without on/off switches and the project's settings. */
 function routesCatalogHtml(r, EMPTY, src){
   if (!r) return '';
   const head = `<h3 class="eyebrow">${t('eng.routes.title')} ${src((r.source || '') + ' · ' + t('eng.routes.tables'))}</h3>`;

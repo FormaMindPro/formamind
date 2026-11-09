@@ -163,7 +163,7 @@ Found in the project root: ${list}`)
   console.log("      They can move into project/source/ — only the protocol's files, Git's and .env* stay in the root.")
   const a = (await live('Move them? [y/N]: ')).trim().toLowerCase()
   if (!ask) live.close()
-  return a === 'y' || a === 'д' || a === 'yes' || a === 'да' ? { items, note: null } : { items: [], note: 'adopt: declined — nothing moved' }
+  return a === 'y' || a === '\u0434' || a === 'yes' || a === '\u0434\u0430' ? { items, note: null } : { items: [], note: 'adopt: declined — nothing moved' }
 }
 
 function adoptStep(root, adopt) {
@@ -325,7 +325,7 @@ function readProjectTemplate(root) {
   if (!fs.existsSync(f)) return null
   const name = i18n.rowValue(i18n.reader(fs.readFileSync(f, 'utf8')).table('template'), 'name')
   const value = name && name.trim()
-  return value && value !== '—' && value !== 'нет' && value !== 'none' ? value : null
+  return value && value !== '—' && value !== '\u043d\u0435\u0442' && value !== 'none' ? value : null
 }
 function templateFiles(name) {
   // what a template puts into the project: [source, path in the project]
@@ -431,7 +431,7 @@ async function chooseBoard(o, ask) {
   if (!boardMode && ask) {
     console.log('\n[3/5] Kanban board — the Kanban Markdown editor extension:')
     const a = (await ask('Find editors and install it? [Y/n]: ')).trim().toLowerCase()
-    boardMode = a === 'n' || a === 'н' || a === 'no' ? 'skip' : 'auto'
+    boardMode = a === 'n' || a === '\u043d' || a === 'no' ? 'skip' : 'auto'
   }
   return boardMode || 'auto'
 }
@@ -734,7 +734,7 @@ async function chooseCompact(o, ask, root, engines) {
   console.log(`\n[5/5] Auto-compact window for Claude Code in this project: ${COMPACT_DEFAULT} tokens`)
   console.log('      (the conversation is compacted when it grows past it; your own setting is never changed)')
   const a = (await ask('Set it? [Y/n]: ')).trim().toLowerCase()
-  return a === 'n' || a === 'н' || a === 'no' ? 'off' : COMPACT_DEFAULT
+  return a === 'n' || a === '\u043d' || a === 'no' ? 'off' : COMPACT_DEFAULT
 }
 
 function printReport({ report, boardLines }) {

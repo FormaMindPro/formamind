@@ -1,17 +1,17 @@
 'use strict';
 
 /**
- * Скорость и эффективность по движкам: выходные токены в секунду, секунды на попытку, попытки на закрытую
- * карточку, токены и цена на закрытую карточку, доля кэша. Функция чистая: карточки приходят снаружи.
+ * Speed and effectiveness per engine: output tokens per second, seconds per attempt, attempts per closed
+ * card, tokens and price per closed card, the cache share. The function is pure: cards come from outside.
  *
- * Правила знаменателя (ECONOMY.md, «The `unknown` marker»):
- *   - скорость = выходные токены / секунды только по попыткам, где известны ОБА числа; строки `out unknown` (и
- *     старые без сегмента `out`) в знаменатель не входят и считаются отдельно (`outUnknown`) — их не видно
- *     иначе, чем пометкой;
- *   - секунды на попытку — по попыткам с записанным временем;
- *   - «на закрытую карточку» — по карточкам `done`, где у движка есть хотя бы одна попытка;
- *   - доля кэша — кэш-чтение / токены по попыткам, где записаны оба.
- * Ни одно имя движка не сравнивается: ключ — тег строки расхода.
+ * Denominator rules (ECONOMY.md, "The `unknown` marker"):
+ *   - speed = output tokens / seconds only over attempts where BOTH numbers are known; `out unknown` lines (and
+ *     old ones without the `out` segment) do not enter the denominator and are counted separately (`outUnknown`) - they are not visible
+ *     any way other than by the marker;
+ *   - seconds per attempt - over attempts with a recorded time;
+ *   - "per closed card" - over `done` cards where the engine has at least one attempt;
+ *   - cache share - cache-read / tokens over attempts where both are recorded.
+ * No engine name is ever compared: the key is the spend line's tag.
  */
 
 const ALL = 'all';
@@ -45,8 +45,8 @@ function finish(r) {
 }
 
 /**
- * Срез «движок + модель»: модель — из `z.model` строки, иначе из таблицы узел-модель адаптера (`modelOf(движок, узел)`),
- * нет ни того ни другого — строка `unknown` (не ноль). Знаменатель скорости — только попытки с известными out и секундами.
+ * The "engine + model" cut: the model - from the row's `z.model`, else from the adapter's node-model table (`modelOf(engine, node)`),
+ * neither - the string `unknown` (not zero). The speed's denominator - only attempts with known out and seconds.
  */
 const UNKNOWN_MODEL = 'unknown';
 function modelRows(cards, modelOf) {
@@ -67,7 +67,7 @@ function modelRows(cards, modelOf) {
     .sort((a, b) => a.engine.localeCompare(b.engine) || (a.model === UNKNOWN_MODEL) - (b.model === UNKNOWN_MODEL) || a.model.localeCompare(b.model));
 }
 
-/** Строки по движкам для набора карточек. */
+/** Rows by engines for a set of cards. */
 function rowsOf(cards) {
   const acc = {};
   const at = (k) => acc[k] || (acc[k] = emptyRow());
@@ -99,9 +99,9 @@ function rowsOf(cards) {
 }
 
 /**
- * `{ kinds, byKind }`: `byKind.all` — все карточки, `byKind[вид]` — только карточки этого вида (поле kind карточки);
- * в каждом `{ engines: { тег: строка } }`. Движки без попыток в выборке отсутствуют; список `extraTags` (движки
- * с адаптером) добавляется пустыми строками, чтобы колонка была от папки движка.
+ * `{ kinds, byKind }`: `byKind.all` - all cards, `byKind[kind]` - only the cards of that kind (the card's kind field);
+ * in each `{ engines: { tag: row } }`. Engines without attempts are absent from the sample; the `extraTags` list (engines
+ * with an adapter) is added as empty rows so that the column exists per the engine's folder.
  */
 function buildSpeed(cards, extraTags = [], modelOf = null) {
   const kinds = [...new Set(cards.filter((c) => c.attempts.length && c.kind).map((c) => c.kind))].sort((a, b) => a.localeCompare(b, 'ru'));
@@ -117,17 +117,17 @@ function buildSpeed(cards, extraTags = [], modelOf = null) {
 }
 
 /**
- * Сводка по движкам для верха вкладки «Экономика»: чистая функция, карточки и записи журналов приходят снаружи.
- * Метрика — `{ v, n, m, low, rank }`: значение (или null), наблюдений, возможных, пометка «мало данных (n из m)».
- *   - секунд / токенов на закрытую карточку: сумма по попыткам закрытых карточек движка / число закрытых карточек;
- *     n — закрытые карточки с известной величиной, m — закрытые карточки движка; rank — 1 у меньшего;
- *   - доля повторных попыток: (попытки закрытых карточек − закрытые карточки) / попытки закрытых карточек;
- *   - задержка до ответа: медиана `first_response_s` по записям журнала; нет поля — null (не ноль);
- *   - токены на секунду активной работы: Σ output_tokens / Σ время, по записям журнала с обоими числами; у продолжения
- *     выход — прирост против прошлой записи вызова, время — `active_s`; иначе `duration_s`. Без догадок.
- * Малая выборка: n < MIN_N; для метрики по выходу — ещё и известный выход у меньше чем половины попыток (по карточкам)
- * или записей журнала. Число остаётся, низкая выборка только помечается.
- * `ledgers`: `{ тег движка: [записи журнала] }`; теги — основные метки (после canonicalTag).
+ * The per-engine summary for the top of the "Economy" tab: a pure function, the cards and journal entries come from outside.
+ * A metric - `{ v, n, m, low, rank }`: the value (or null), observations, possible ones, the "little data (n of m)" marker.
+ *   - seconds / tokens per closed card: the sum over the engine's closed cards' attempts / the number of closed cards;
+ *     n - closed cards with a known value, m - the engine's closed cards; rank - 1 for the smaller;
+ *   - the retry share: (closed cards' attempts - closed cards) / closed cards' attempts;
+ *   - the delay to first response: the median of `first_response_s` over journal entries; no field - null (not zero);
+ *   - tokens per second of active work: Σ output_tokens / Σ time, over journal entries with both numbers; for a continuation
+ *     the output is the increment against the previous call entry, the time is `active_s`; else `duration_s`. No guesses.
+ * Small sample: n < MIN_N; for the output metric - also a known output on fewer than half the attempts (by cards)
+ * or journal entries. The number stays, the low sample is only marked.
+ * `ledgers`: `{ engine tag: [journal entries] }`; the tags are the main markers (after canonicalTag).
  */
 const MIN_N = 5;
 const metric = (v, n, m, extraLow = false) => ({ v: n > 0 ? v : null, n, m, low: n > 0 && (n < MIN_N || extraLow) });
@@ -158,11 +158,11 @@ function ledgerStats(records) {
 }
 
 /**
- * Расход и производительность по строкам `## История`. `engine` — тег или `null` («Итого» по всем движкам).
- *   - расход всего: сумма по попыткам с известной величиной; n — такие попытки, m — все попытки;
- *   - цена $: только попытки с записанной ценой (сегмент `$` или провайдер) — нет цены, это не ноль, а «нет данных»;
- *   - на закрытую карточку: сумма по попыткам закрытых карточек / число закрытых карточек с известной величиной;
- *   - токены out в секунду вызова: Σ out / Σ секунд по попыткам, где известны оба числа и секунды > 0.
+ * Spend and performance over the `## History` lines. `engine` - a tag or `null` ("Total" across all engines).
+ *   - total spend: the sum over attempts with a known value; n - such attempts, m - all attempts;
+ *   - the $ price: only attempts with a recorded price (a `$` segment or provider) - no price is not zero but "no data";
+ *   - per closed card: the sum over closed cards' attempts / the number of closed cards with a known value;
+ *   - out tokens per call second: Σ out / Σ seconds over attempts where both numbers are known and seconds > 0.
  */
 function spendOf(cards, engine) {
   const s = { att: 0, tok: 0, tokN: 0, usd: 0, usdN: 0, sec: 0, secN: 0, out: 0, outSec: 0, outN: 0, outKnown: 0,
@@ -225,10 +225,10 @@ function buildSummary(cards, ledgers = {}, extraTags = []) {
     pooled.records += l.records; pooled.first.push(...l.first); pooled.out += l.out; pooled.sec += l.sec;
     pooled.used += l.used; pooled.knownOut += l.knownOut;
   }
-  // Итого по всем движкам: карточка с попытками двух движков считается закрытой один раз.
+  // Total across all engines: a card with attempts of two engines is counted closed once.
   const allRows = Object.values(rows);
   const total = { ...spendOf(cards, null), ...ledgerOf(pooled, { attempts: allRows.reduce((s, r) => s + r.attempts, 0), outKnown: allRows.reduce((s, r) => s + r.outKnown, 0) }) };
-  // Рейтинг: 1-е место — меньше; только среди движков со значением.
+  // Rating: 1st place - smaller; only among engines with a value.
   for (const key of ['secPerClosed', 'tokensPerClosed']) {
     tags.filter((k) => engines[k][key].v != null).sort((x, y) => engines[x][key].v - engines[y][key].v)
       .forEach((k, i) => { engines[k][key].rank = i + 1; });

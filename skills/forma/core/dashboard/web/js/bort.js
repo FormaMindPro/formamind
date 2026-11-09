@@ -1,14 +1,14 @@
-// Вкладка «Борт». Все строки интерфейса — через t()/cnt() из словарей, ключи `bort.*`.
-// Внимание: локальные переменные не называть `t` — это перевод.
+// The "Bort" tab. Every UI string goes through t()/cnt() from the dictionaries, the keys are `bort.*`.
+// Caution: do not name local variables `t` - that is the translate function.
 
-/* ===================== БОРТ ==========================================
-   Что стоит на борту у каждого узла и у сессии. Три яруса, и они не смешиваются:
-   арсенал узла правится файлом роли, MCP-серверы объявлены на всю сессию сразу,
-   пол окна — движком, и нам не подчиняется. Кнопок «отключить» нет ни у чего:
-   экран называет АДРЕС правки, а правка идёт обычным путём — карточка, `Kit`, сверка.
+/* ===================== BORT ==========================================
+   What sits on the bort of each node and of the session. Three tiers, and they do not mix:
+   the node's arsenal is edited by the role file, the MCP servers are declared for the whole session at once,
+   the window floor is the engine's, and does not obey us. Nothing has an "disable" button:
+   the screen names the ADDRESS of the edit, while the edit goes the usual way - a card, `Kit`, the sync.
    ==================================================================== */
 
-// Подписи вычисляются при обращении, а не при загрузке: язык меняется без перезагрузки.
+// The labels are computed on access, not at load: the language changes without a reload.
 const VD = {
   live:    {cls:'vd-live',    get label(){ return t('bort.vd.live'); }},
   dead:    {cls:'vd-dead',    get label(){ return t('bort.vd.dead'); }},
@@ -35,7 +35,7 @@ function bortNodeHtml(n){
     </div>`;
   }
 
-  // Порядок: сперва то, что в деле, потом доказанно лишнее, потом неизвестное.
+  // The order: first what is in use, then the provably redundant, then the unknown.
   const order = {live:0, dead:1, unknown:2};
   const tools = [...n.tools].sort((a,b) =>
     order[a.verdict] - order[b.verdict] || b.calls - a.calls || a.decl.localeCompare(b.decl));
@@ -136,8 +136,8 @@ function bortSessionHtml(b){
     </div>`;
 }
 
-/* Линия пола. Рисуется линией, а не числом, намеренно: величина почти целиком —
-   собственный промпт движка, и любоваться ею незачем. Читается НАКЛОН. */
+/* The floor line. Drawn as a line, not a number, on purpose: the value is almost entirely
+   the engine's own prompt, and there is nothing to admire in it. What is read is the SLOPE. */
 function floorChartHtml(f){
   if (!f) {
     return `<div class="nodata">${t('bort.fl.notMeasured')}</div>`;
@@ -150,8 +150,8 @@ function floorChartHtml(f){
   const pts = f.byDate;
   const W = 1000, H = 200, PL = 64, PR = 16, PT = 14, PB = 26;
   const vals = pts.map(p => p.floor);
-  // Шкала НЕ от нуля: от нуля линия в 70 тысяч выглядит прямой, и наклон — ровно то,
-  // ради чего график заведён, — становится невидим. Поле ±8% сверху и снизу.
+  // The scale does NOT start at zero: from zero a 70-thousand line looks straight, and the slope -
+  // the very thing the chart exists for - becomes invisible. The field is +/-8% on top and bottom.
   const lo = Math.min(...vals), hi = Math.max(...vals);
   const pad = Math.max(1, (hi - lo) * 0.25 || hi * 0.02);
   const y0 = lo - pad, y1 = hi + pad;
@@ -164,8 +164,8 @@ function floorChartHtml(f){
   const grid = [y0 + (y1-y0)*0.15, (y0+y1)/2, y1 - (y1-y0)*0.15].map(v =>
     `<line class="fl-grid" x1="${PL}" y1="${y(v).toFixed(1)}" x2="${W-PR}" y2="${y(v).toFixed(1)}"/>
      <text class="fl-lbl" x="${PL-8}" y="${(y(v)+3).toFixed(1)}" text-anchor="end">${fmt(Math.round(v))}</text>`).join('');
-  // Подписей дат ровно три — первая, средняя, последняя: на тринадцати точках всё
-  // остальное слипается в кашу и мешает видеть линию.
+  // Exactly three date labels - the first, the middle, the last: on thirteen points everything
+  // else clumps into a mush and keeps the line from being seen.
   const ticks = [0, Math.floor((pts.length-1)/2), pts.length-1].filter((v,i,a) => a.indexOf(v) === i)
     .map(i => `<text class="fl-lbl" x="${x(i).toFixed(1)}" y="${H-6}" text-anchor="middle">${esc(pts[i].date)}</text>`).join('');
 
@@ -185,12 +185,12 @@ function floorChartHtml(f){
   </div>`;
 }
 
-// Узел «Формы» ↔ узел «Борта» по имени без учёта регистра. Борт считается по одному движку (с журналом вызовов).
+// The "Forma" node <-> the "Bort" node by name, case-insensitive. The bort is computed for one engine (the one with a call log).
 function bortFind(b, name){
   return b && b.nodes ? b.nodes.find(n => n.node.toLowerCase() === String(name).toLowerCase()) || null : null;
 }
 
-// Полоса нагрузки на карточке узла: что объявлено и вердикт одной плашкой.
+// The load bar on the node's card: what is declared and the verdict in one badge.
 function bortStripHtml(n, idx){
   let body, cls;
   if (n.inherits) { cls = 'bs-none'; body = `<span class="bs-main">${t('bort.strip.inherits')}</span>`; }
@@ -203,7 +203,7 @@ function bortStripHtml(n, idx){
   return `<button class="bort-strip ${cls}" data-bi="${idx}" title="${esc(t('bort.strip.title'))}">${body}<span class="bs-go">›</span></button>`;
 }
 
-// Сводка под ролями: плитки итогов и по строке-столбцу на узел (в деле / лишнее / не знаем в токенах на шаг).
+// The summary under the roles: tiles of the totals and a bar-row per node (in use / redundant / unknown in tokens per step).
 function bortSummaryHtml(b){
   if (!b || !b.totals) return '';
   const tot = b.totals, unit = b.toolTokenCost || 720;
@@ -229,7 +229,7 @@ function bortSummaryHtml(b){
   </section>`;
 }
 
-// Блок «Сессия» вкладки «Форма»: охват журнала (свёрнут), MCP-серверы сессии, пол окна.
+// The "Session" block of the "Forma" tab: the log's coverage (collapsed), the session's MCP servers, the window floor.
 function bortSessionBlockHtml(b){
   if (!b) return '';
   return `<section class="forma-sec forma-sec--session"><h2 class="forma-h">${t('bort.session.title')}</h2>

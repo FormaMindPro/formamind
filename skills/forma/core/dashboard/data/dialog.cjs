@@ -1,11 +1,11 @@
 'use strict';
 
 /**
- * Экономика сессий и статья «Intent ↔ человек» (AGENTS.md §3) — расход диалога в основной сессии, отдельно
- * от пяти узлов. Ведомости пишут скрипты адаптера движка (`.forma/dashboard/.cache/session-economy.json`,
- * `session-current.json`, `codex-usage.json`); здесь только чтение: обход стенограмм стоит секунды и
- * гигабайты, и делать его на каждой сборке дашборда нельзя. Поле `cache` из выдачи не переносится — оно
- * служебное и втрое раздувает data.json.
+ * Session economy and the "Intent ↔ human" line (AGENTS.md §3) - the dialogue spend in the main session, separate
+ * from the five nodes. The returns are written by the engine adapter's scripts (`.forma/dashboard/.cache/session-economy.json`,
+ * `session-current.json`, `codex-usage.json`); this module only reads: walking the transcripts costs seconds and
+ * gigabytes, and doing it on every dashboard assembly is not allowed. The `cache` field of the output is not carried over - it is
+ * a service field and bloats data.json threefold.
  */
 
 const fs = require('fs');
@@ -14,30 +14,30 @@ const { readJson } = require('../lib/fs.cjs');
 const engines = require('../lib/engines.cjs');
 const { cachePath, readStatement } = require('./cache.cjs');
 
-/** Полная ведомость сессий с возрастом: стенограммы растут каждый день, вчерашняя — не сегодняшняя. */
+/** The full session return with age: transcripts grow every day, yesterday's is not today's. */
 const readSessionEconomy = (projectRoot) => readStatement(projectRoot, 'session-economy.json', ['cache']);
 
-// Текущие сессии пересчитываются здесь же (`--session current`, доли секунды), но не чаще раза в минуту:
-// сборка дашборда идёт на каждое изменение файла.
+// Current sessions are recomputed right here (`--session current`, fractions of a second), but no more often than once a minute:
+// the dashboard assembly runs on every file change.
 const DIALOG_REFRESH_MS = 60 * 1000;
 
 function isStale(file) {
   try { return Date.now() - fs.statSync(file).mtimeMs > DIALOG_REFRESH_MS; }
-  catch { return true; } // нет файла — обновить
+  catch { return true; } // no file - refresh
 }
 
-/** Обновляет кэши расхода диалога скриптами, которые объявили адаптеры (`usageRefresh`). */
+/** Refreshes the dialogue-spend caches with the scripts the adapters declared (`usageRefresh`). */
 function refreshUsageCaches(projectRoot) {
   for (const { script, args, cache } of engines.all(projectRoot, 'usageRefresh')) {
     if (!isStale(cachePath(projectRoot, cache))) continue;
     try {
       execFileSync(process.execPath, [engines.resolveRel(projectRoot, script), ...(args || [])],
         { stdio: 'ignore', timeout: 20000 });
-    } catch { /* нет стенограмм на этом хосте — покажем то, что есть */ }
+    } catch { /* no transcripts on this host - we show what there is */ }
   }
 }
 
-/** «Всего» — из полной ведомости, как есть, со своим возрастом. */
+/** "Total" - from the full return, as is, with its own age. */
 function totalDialog(se) {
   if (!se || !se.totals) return null;
   return {
@@ -55,8 +55,8 @@ function currentDialog(current) {
 }
 
 /**
- * Чьи это ведомости: метка движка → имена кэшей, что объявил его адаптер в `usageRefresh`, и владелец ведомости сессий
- * (`session-current.json`/`session-economy.json`) — первый адаптер, объявивший её. Имён движков здесь нет: UI сверяется с этим.
+ * Whose returns these are: the engine tag → the cache names its adapter declared in `usageRefresh`, and the owner of the session return
+ * (`session-current.json`/`session-economy.json`) - the first adapter that declared it. Engine names are not here: the UI checks against this.
  */
 function ledgerOwners(projectRoot) {
   const usageCaches = {};

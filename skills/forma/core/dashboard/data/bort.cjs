@@ -1,15 +1,15 @@
 'use strict';
 
 /**
- * БОРТ — что стоит на борту у каждого узла и у сессии.
+ * THE ARSENAL - what is on board for each node and for the session.
  *
- * Три яруса, и они НЕ смешиваются, потому что бортов на самом деле три и правятся они в трёх разных местах:
- * арсенал узла — файлом роли, MCP-серверы — конфигурацией сессии сразу для всех узлов, пол окна — движком,
- * и нам не подчиняется. Один список на всё это предлагал бы отключить то, что отключить нельзя.
+ * Three tiers, and they are NOT mixed, because there are really three arsenals and they are edited in three different places:
+ * a node's arsenal - by the role file, MCP servers - by the session configuration for all nodes at once, the window's floor - by the engine,
+ * and it does not obey us. One list for all this would suggest switching off what cannot be switched off.
  *
- * Разбор фронтматтера и журнала НЕ повторяется здесь: он берётся у адаптера движка (`toolUsage`). Два разбора
- * одного журнала однажды разойдутся, и разойдутся молча. Зависимость необязательная; нет адаптера —
- * ярус узлов честно говорит, что источника нет.
+ * The frontmatter and journal parsing is NOT repeated here: it is taken from the engine's adapter (`toolUsage`). Two parses
+ * of one journal will someday diverge, and diverge silently. The dependency is optional; no adapter -
+ * the node tier honestly says there is no source.
  */
 
 const fs = require('fs');
@@ -18,31 +18,31 @@ const { parseFrontmatter } = require('../lib/card.cjs');
 const engines = require('../lib/engines.cjs');
 const { readStatement } = require('./cache.cjs');
 
-// Цена одного объявленного инструмента на один шаг захода — оценка, не измерение (первый замер: ~720 токенов).
-// Оценкой и называется в отображении.
+// The price of one declared tool per one attempt step is an estimate, not a measurement (first measurement: ~720 tokens).
+// The display calls it an estimate, too.
 const TOOL_TOKEN_COST = 720;
 
 /**
- * ТРИ ЗНАЧЕНИЯ ВЕРДИКТА, И ТРЕТЬЕ — ГЛАВНОЕ В ЭТОМ ЭКРАНЕ.
+ * THREE VERDICT VALUES, AND THE THIRD IS THE MAIN ONE ON THIS SCREEN.
  *
- * Журнал закрывает наглухо ровно одну сторону: ни одной попытки — инструмент возится зря. Обратное неверно
- * дважды. Во-первых, попытка не доказывает нужности: хук пишет PreToolUse, то есть «тянулся», а не «сработало».
- * Во-вторых, ОТСУТСТВИЕ ЖУРНАЛА ПО УЗЛУ НЕ ОЗНАЧАЕТ, ЧТО ЕГО ИНСТРУМЕНТЫ ЛИШНИЕ: узла, которого в журнале
- * нет вовсе, пустая строка и не-заведённая строка на вид одинаковы, и экран, выдавший арсенал за мёртвый,
- * предложил бы срезать нужное.
+ * The journal seals exactly one side airtight: not a single attempt - the tool is being fiddled with in vain. The converse is wrong
+ * twice over. First, an attempt does not prove usefulness: the hook writes PreToolUse, that is "reached for", not "worked".
+ * Second, THE ABSENCE OF A JOURNAL FOR A NODE DOES NOT MEAN ITS TOOLS ARE SUPERFLUOUS: a node the journal
+ * does not mention at all, an empty line and an unopened line look alike, and a screen that declared the arsenal dead
+ * would propose cutting away what is needed.
  *
- * Различие проведено ПО УЗЛУ, а не по инструменту:
- *   • журнала нет вовсе (файла нет / записей нет)          → всё «не знаем»
- *   • журнал есть, но по ЭТОМУ узлу нет ни одной строки    → всё «не знаем»
- *   • по этому узлу строки есть, у инструмента попыток 0   → «доказанно лишний»
- *   • попытки есть                                          → «в деле»
+ * The distinction is drawn BY NODE, not by tool:
+ *   • no journal at all (no file / no entries)             → everything "unknown"
+ *   • a journal exists, but not one line for THIS node     → everything "unknown"
+ *   • lines exist for this node, the tool has 0 attempts   → "proved superfluous"
+ *   • attempts exist                                        → "in service"
  */
 function verdictFor(calls, nodeInLog) {
   if (!nodeInLog) return 'unknown';
   return calls > 0 ? 'live' : 'dead';
 }
 
-// ---- MCP-серверы --------------------------------------------------------------------------------
+// ---- MCP servers --------------------------------------------------------------------------------
 
 function mcpServerRow(name, cfg, meta) {
   return {
@@ -56,19 +56,19 @@ function mcpServerRow(name, cfg, meta) {
 }
 
 /**
- * MCP-СЕРВЕРЫ ЧИТАЮТСЯ С ДВУХ УРОВНЕЙ, И ТРЕТЬЕГО ЭТОТ КОД НЕ ВИДИТ ВОВСЕ.
+ * MCP SERVERS ARE READ FROM TWO LEVELS, AND THIS CODE NEVER SEES THE THIRD AT ALL.
  *
- * Уровней конфигурации на диске два: проектный и пользовательский (ключ `mcpServers` верхнего уровня);
- * файлы называет адаптер движка (`mcpConfigs`). Первый ездит с репозиторием, второй — с человеком; у каждого
- * сервера сказано, откуда он взялся. Сверх этих двух сессия несёт коннекторы уровня учётной записи и серверы
- * плагинов: ни в одном локальном файле их нет, прочитать их отсюда НЕЛЬЗЯ — и молчать об этом нельзя тем более.
- * Поэтому `scanned` возвращает пройденные уровни, а отображение обязано назвать непрочитываемый словами.
+ * There are two configuration levels on disk: the project's and the user's (the top-level `mcpServers` key);
+ * the files are named by the engine's adapter (`mcpConfigs`). The first travels with the repository, the second with the human; each
+ * server says where it came from. Beyond these two the session carries account-level connectors and plugin
+ * servers: they are in no local file, they cannot be read from here - and staying silent about that is even less allowed.
+ * Hence `scanned` returns the levels covered, and the display must name the unreadable one in words.
  */
 function readMcpConfigs(projectRoot) {
   const servers = [];
   const scanned = [];
   for (const { rel, file, level } of engines.collect(projectRoot, 'mcpConfigs')) {
-    // Файла может не быть — это не ошибка, это «на этом уровне не объявлено».
+    // The file may be absent - that is not an error, that is "not declared at this level".
     if (!fs.existsSync(file)) { scanned.push({ source: rel, level, exists: false, broken: false, count: 0 }); continue; }
     let d;
     try { d = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {
@@ -84,9 +84,9 @@ function readMcpConfigs(projectRoot) {
 }
 
 /**
- * Ярус сессии, вторая половина: на какие серверы ссылаются роли. Имя сервера — из `mcp__<сервер>__<инструмент>`.
- * Сервера нет в конфигурации проекта — это НЕ «не авторизован»: он может приезжать из глобального конфига
- * или плагина. Третье значение и здесь, по той же причине, что и в вердикте.
+ * The session tier, second half: which servers the roles reference. The server name comes from `mcp__<server>__<tool>`.
+ * A server absent from the project's configuration is NOT "unauthorized": it may arrive from the global config
+ * or a plugin. The third value here too, for the same reason as in the verdict.
  */
 function referencedServers(nodes, servers) {
   const configured = new Set(servers.map((s) => s.name).filter(Boolean));
@@ -105,12 +105,12 @@ function referencedServers(nodes, servers) {
   return [...refMap.values()].sort((a, b) => a.server.localeCompare(b.server));
 }
 
-// ---- узлы ---------------------------------------------------------------------------------------
+// ---- nodes ---------------------------------------------------------------------------------------
 
-/** Пол окна — читается из кэша, не считается здесь; считает `node .forma/dashboard/floor.cjs`. */
+/** The window's floor is read from the cache, not computed here; `node .forma/dashboard/floor.cjs` computes it. */
 const readFloor = (projectRoot) => readStatement(projectRoot, 'floor.json', ['cache', 'sessions']);
 
-/** Попытки по узлам. Ключ — имя узла в нижнем регистре, как в журнале и во фронтматтере. */
+/** Attempts by node. The key is the node's name in lower case, as in the journal and the frontmatter. */
 function callsByNode(rows) {
   const byNode = new Map();
   for (const r of rows) {
@@ -128,16 +128,16 @@ function toolRows(role, used, ctx) {
   return role.decls.map((decl) => {
     const base = ctx.toolUsage.baseName(decl);
     const calls = used.get(base) || 0;
-    // Журнал хранит голое tool_name без аргументов: две записи `Bash(...)` с разными шаблонами для него
-    // неразличимы — попытки по ним не делятся, а дублируются. Помечается, а не заминается.
+    // The journal stores the bare tool_name without arguments: two `Bash(...)` entries with different templates are
+    // indistinguishable to it - their attempts are not split but duplicated. This is marked, not hushed up.
     const sameBase = role.decls.filter((d) => ctx.toolUsage.baseName(d) === base).length;
     return { decl, base, calls, ambiguous: sameBase > 1 && calls > 0, verdict: verdictFor(calls, ctx.nodeInLog) };
   });
 }
 
 /**
- * Тянулись, но во фронтматтере не объявлено (`SubagentHandback` и прочие неявные). Не входит ни в вес,
- * ни в вердикты: подрезать нечего, это не наш арсенал.
+ * Were reached for, but not declared in the frontmatter (`SubagentHandback` and other implicit ones). Enters neither the weight,
+ * nor the verdicts: there is nothing to trim, this is not our arsenal.
  */
 function undeclaredOf(used, role, toolUsage) {
   const bases = new Set(role.decls.map(toolUsage.baseName));
@@ -167,8 +167,8 @@ function declaredRow(head, role, ctx) {
 }
 
 /**
- * Роль без поля `tools` наследует весь набор сессии. Вычитать не из чего, и выдавать это за «инструментов ноль»
- * нельзя: их, наоборот, максимум.
+ * A role without a `tools` field inherits the session's whole set. There is nothing to subtract, and passing this off as "zero tools"
+ * is not allowed: there are, on the contrary, the most of them.
  */
 function inheritingRow(head, ctx) {
   const used = ctx.byNodeTools.get(head.node) || new Map();
@@ -184,8 +184,8 @@ function inheritingRow(head, ctx) {
 function nodeRow([name, role], ctx) {
   const fm = parseFrontmatter(fs.readFileSync(path.join(ctx.rolesDir, role.file), 'utf8'));
   const head = { node: name, file: role.file, model: fm.model || null, effort: fm.effort || null };
-  // Узел ЕСТЬ в журнале, если журнал вообще жив И по этому узлу в нём заведена хотя бы одна строка.
-  // Ноль строк — не ноль попыток.
+  // A node IS in the journal if the journal is alive at all AND at least one line for this node is opened in it.
+  // Zero lines is not zero attempts.
   const nodeCtx = { ...ctx, nodeInLog: ctx.logUsable && ctx.byNodeTools.has(name) };
   return role.decls === null ? inheritingRow(head, nodeCtx) : declaredRow(head, role, nodeCtx);
 }
@@ -211,26 +211,26 @@ function logSummary(logData, logUsable, byNodeTools) {
     usable: logUsable,
     rowCount: logData.rows.length,
     errorCount: logData.errors.length,
-    // Узлы, про которые журнал вообще что-то знает, — включая те, у кого нет роли (`сессия`). Нужны
-    // отображению, чтобы назвать охват журнала числом, а не словом.
+    // The nodes the journal knows anything about at all - including those without a role (`session`). They are needed
+    // by the display to name the journal's coverage with a number, not a word.
     nodesSeen: [...byNodeTools.keys()].sort(),
   };
 }
 
-/** Имя движка адаптера — то же, что в `formaCatalog.engines[].engine`; адаптера нет — `null`. */
+/** The adapter's engine name - the same as in `formaCatalog.engines[].engine`; no adapter - `null`. */
 const tagOf = (a) => (a ? (a.engine || engines.UNKNOWN) : null);
 
 function buildBort(projectRoot) {
   const floor = readFloor(projectRoot);
   const { servers, scanned: mcpScanned } = readMcpConfigs(projectRoot);
-  // Журнал инструментов и каталог ролей берутся у ОДНОГО адаптера — первого с `toolUsage`: разбор одного движка
-  // не читает каталог другого (иначе при выключенном первом движке пути ролей чужие).
+  // The tool journal and the role catalog are taken from ONE adapter - the first with `toolUsage`: one engine's parsing
+  // does not read another's catalog (otherwise, with the first engine off, the role paths are foreign).
   const owner = engines.loadAdapters(projectRoot).find((a) => a.toolUsage && typeof a.rolesDir === 'string');
   const toolUsage = owner ? owner.toolUsage : null;
   const rolesDir = owner ? engines.resolveRel(projectRoot, owner.rolesDir) : null;
 
   if (!toolUsage || !rolesDir) {
-    // Ярус узлов построить не на чем — и это сказано вслух (`source: null`), а не молча пусто.
+    // There is nothing to build the node tier on - and this is said aloud (`source: null`), not silently empty.
     return { source: null, engine: null, log: null, nodes: [], totals: null, servers, mcpScanned, referenced: [], floor, toolTokenCost: TOOL_TOKEN_COST };
   }
 
@@ -245,7 +245,7 @@ function buildBort(projectRoot) {
 
   return {
     source: toolUsage.source,
-    // Движок журнала вызовов — первый адаптер с `toolUsage`: по нему вкладка «Форма» решает, чья это полоса.
+    // The call journal's engine is the first adapter with `toolUsage`: by it the "Form" tab decides whose strip this is.
     engine: tagOf(engines.loadAdapters(projectRoot).find((a) => a.toolUsage)),
     log: logSummary(logData, logUsable, byNodeTools),
     nodes,

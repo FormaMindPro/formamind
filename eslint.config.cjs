@@ -1,5 +1,5 @@
-// ESLint протокола — только для разработки движка, в проекты не ставится (package.json, «files»).
-// Правила минимальные: цель — точка отсчёта серии рефакторинга, а не исправление.
+// The protocol's ESLint - engine development only, never installed into projects (package.json, "files").
+// Minimal rules: the goal is a baseline for a refactoring series, not fixing.
 const globals = require('globals');
 
 module.exports = [
@@ -7,10 +7,10 @@ module.exports = [
     ignores: [
       'node_modules/**',
       'test/.baseline/**',
-      '**/skill-creator/**',        // вендорный, из anthropics/skills
-      'skills/forma/adapters/codex/**', // зона Codex
-      'skills/forma/adapters/gemini/**', // зона Gemini
-      'skills/forma/adapters/minimax/**', // зона MiniMax
+      '**/skill-creator/**',        // vendor code, from anthropics/skills
+      'skills/forma/adapters/codex/**', // the Codex zone
+      'skills/forma/adapters/gemini/**', // the Gemini zone
+      'skills/forma/adapters/minimax/**', // the MiniMax zone
     ],
   },
   {
@@ -31,8 +31,8 @@ module.exports = [
     },
   },
   {
-    // Браузерные скрипты дашборда: классические <script src> в одной глобальной области, без модулей.
-    // Функцию верхнего уровня зовёт другой файл, линтеру этого не видно — «не используется» считается только внутри функций.
+    // Browser scripts of the dashboard: classic <script src> in one global scope, no modules.
+    // Another file calls a top-level function; the linter cannot see that, so "unused" counts only inside functions.
     files: ['skills/forma/core/dashboard/web/js/*.js'],
     languageOptions: { ecmaVersion: 2023, sourceType: 'script', globals: { ...globals.browser, marked: 'readonly' } },
     rules: { 'no-unused-vars': ['warn', { vars: 'local', args: 'after-used', caughtErrors: 'none' }] },

@@ -1,31 +1,31 @@
 #!/usr/bin/env node
 'use strict';
-// Plumb-драйвер внешнего исполнителя (plumb: jev, OpenRouter Decisions API, typesafe/jev-1.14).
-// Очищенная карточка + каталог ролей -> мост (external-model-bridge.cjs, Decisions API) ->
-// строгий JSON {choice, score, noul}. Сам не вызывает haiku (у скрипта нет инструмента Agent) —
-// при отсутствии ключа, ошибке моста или отказе очистки печатает {fallback:"haiku", reason:...}
-// и завершается с кодом 0: вызывающий (главная сессия) тогда сам вызывает plumb-haiku.
+// The external executor's Plumb driver (plumb: jev, OpenRouter Decisions API, typesafe/jev-1.14).
+// A scrubbed card + a roles catalog -> the bridge (external-model-bridge.cjs, Decisions API) ->
+// strict JSON {choice, score, noul}. It does not call haiku itself (the script has no Agent tool) -
+// with a missing key, a bridge error or a scrub refusal it prints {fallback:"haiku", reason:...}
+// and exits with code 0: the caller (the main session) then calls plumb-haiku itself.
 //
-// Использование:
+// Usage:
 //   node .forma/plumb/plumb-run.cjs <card.md> [--root DIR] [--engine ID | --roles-dir PATH]
 //                                   [--site host[,host]] [--out FILE] [--write]
 //
-// --write: при ответе jev дописывает в конец «## История / ## History» карточки одну строку Отвеса
-// (роль, уверенность, зазор, ясность, noul, исполнитель, итог по порогам PROJECT.md, расход в
-// своей единице: токены, мс, USD) и печатает тот же JSON. При {fallback:haiku} строка не пишется.
+// --write: on a jev answer it appends one Plumb line to the end of the card's "## History / ## History" zone
+// (role, confidence, gap, clarity, noul, executor, the verdict against the PROJECT.md thresholds, the spend in
+// its own unit: tokens, ms, USD) and prints the same JSON. With {fallback:haiku} no line is written.
 //
-// Каталог ролей: --roles-dir (путь как есть) либо runRolesDir адаптера движка --engine
-// (.forma/dashboard/lib/engines.cjs, sourcesOf; ID — id, engine, spendTag или имя папки адаптера).
-// Без аргументов — каталог Claude (.claude/agents/run).
+// Roles catalog: --roles-dir (the path as is) or the engine adapter's runRolesDir --engine
+// (.forma/dashboard/lib/engines.cjs, sourcesOf; the ID is id, engine, spendTag or the adapter folder's name).
+// Without arguments - the Claude catalog (.claude/agents/run).
 //
-// Контракт вывода — такой же, как у plumb-haiku.md: {choice, score, noul}, плюс meta (не часть
-// контракта, только для строки расхода): usage, cost_usd, duration_ms, id, model_served, roles_dir, roles.
+// The output contract is the same as plumb-haiku.md's: {choice, score, noul}, plus meta (not part of the
+// contract, only for the spend line): usage, cost_usd, duration_ms, id, model_served, roles_dir, roles.
 
 const fs = require('fs');
 const path = require('path');
 const i18n = require('../i18n/index.cjs');
 
-// Очистка и мост лежат рядом с драйвером или в скриптах Claude.
+// The scrubber and the bridge sit next to the driver or in the Claude scripts.
 function requireSibling(name) {
   for (const dir of [__dirname, path.join(__dirname, '..', '..', '.claude', 'scripts')]) {
     const file = path.join(dir, name);
@@ -36,17 +36,17 @@ function requireSibling(name) {
 const { extractTask, loadSecrets, scrub, residue } = requireSibling('plumb-scrub.cjs');
 const { loadEnvKeyOptional, callDecisions, estimateCostUsd } = requireSibling('external-model-bridge.cjs');
 
-// Запасное имя модели: совпадает с PROJECT.md (ключ routes.plumb_model); источник — PROJECT.md.
+// The fallback model name: matches PROJECT.md (the routes.plumb_model key); the source is PROJECT.md.
 const FALLBACK_MODEL = 'typesafe/jev-1.14';
 
-// Модель jev из PROJECT.md: первое `провайдер/модель` в строке с ключом routes.plumb_model.
+// The jev model from PROJECT.md: the first `provider/model` in the line with the routes.plumb_model key.
 function readModel(root) {
   try {
     const md = fs.readFileSync(path.join(root, 'project', 'config', 'PROJECT.md'), 'utf8');
     const row = md.split(/\r?\n/).find((l) => l.includes('routes.plumb_model'));
     const m = row && /`([\w.-]+\/[\w.:-]+)`/.exec(row.split('-->').slice(1).join('-->'));
     if (m) return m[1];
-  } catch (e) { /* PROJECT.md нет или не читается — запасное имя */ }
+  } catch (e) { /* no PROJECT.md or unreadable - the fallback name */ }
   return FALLBACK_MODEL;
 }
 const DEFAULT_ROLES_REL = '.claude/agents/run';
@@ -67,7 +67,7 @@ function parseArgs(argv) {
   return a;
 }
 
-// Каталог ролей: --roles-dir > runRolesDir адаптера --engine > каталог Claude.
+// Roles catalog: --roles-dir > the --engine adapter's runRolesDir > the Claude catalog.
 function resolveRolesDir(a) {
   if (a.rolesDir) return path.resolve(a.root, a.rolesDir);
   if (a.engine) {
@@ -93,19 +93,19 @@ function buildCatalog(roleDir) {
   return roles;
 }
 
-// Пороги из PROJECT.md (строка таблицы «Отвес»), набор исполнителя: jev — текст после «jev:»,
-// haiku — до «jev:». Ключи английские (leader, gap, noul, clarity); локальные слова — алиасы.
-// Все значения — числа 0..100 (проценты). У haiku noul и clarity могут быть null.
+// The thresholds from PROJECT.md (the "Plumb" table row), the executor's set: jev - the text after "jev:",
+// haiku - before "jev:". The keys are English (leader, gap, noul, clarity); local words are aliases.
+// All values are numbers 0..100 (percents). For haiku, noul and clarity may be null.
 function readThresholds(root, executor) {
   try {
     const md = fs.readFileSync(path.join(root, 'project', 'config', 'PROJECT.md'), 'utf8');
-    // Пороги отдельными строками таблицы по ключам plumb.<исполнитель>.<порог>.
+    // The thresholds as separate table rows by the plumb.<executor>.<threshold> keys.
     const who = executor === 'haiku' ? 'haiku' : 'jev';
     const byRow = { leader: null, gap: null, noul: null, clarity: null };
     for (const f of Object.keys(byRow)) byRow[f] = i18n.rowNumber(md, `plumb.${who}.${f}`);
     const needed = who === 'jev' ? Object.values(byRow) : [byRow.leader, byRow.gap];
     if (needed.every((v) => v !== null)) return who === 'jev' ? byRow : { ...byRow, noul: null, clarity: null };
-    // Прежний вид: пороги внутри строки «Plumb» текстом «лидер ≥ 60 %».
+    // The older shape: the thresholds inside the "Plumb" row as the text "leader >= 60 %".
     let row = md.split(/\r?\n/).find((l) => /plumb/i.test(l) && /≥/.test(l));
     if (!row) return null;
     const cut = row.search(/jev\s*:/i);
@@ -126,10 +126,10 @@ function readThresholds(root, executor) {
   }
 }
 
-// noul приходит долей 0..1; порог — в процентах. Значение ≤ 1 — доля.
+// noul arrives as a fraction 0..1; the threshold is in percents. A value <= 1 is a fraction.
 function toPercent(v) { return v <= 1 ? v * 100 : v; }
 
-// Строка Отвеса для истории карточки.
+// The Plumb line for the card's history.
 function plumbLine(result, root) {
   const { choice, score, noul, meta } = result;
   const probs = Object.entries(choice.probabilities).sort((x, y) => y[1] - x[1]);
@@ -139,32 +139,40 @@ function plumbLine(result, root) {
   const leadNoul = noul[choice.role];
   const t = readThresholds(root, meta.executor);
   let outcome;
-  if (!t) outcome = 'пороги PROJECT.md не прочитаны';
+  if (!t) outcome = i18n.message('plumb.thresholds_unread', null, 'ru');
   else {
     const miss = [];
-    if (lead < t.leader) miss.push(`лидер ${lead} < ${t.leader}`);
-    if (gap < t.gap) miss.push(`зазор ${gap} < ${t.gap}`);
+    if (lead < t.leader) miss.push(i18n.message('plumb.miss_leader', { v: lead, t: t.leader }, 'ru'));
+    if (gap < t.gap) miss.push(i18n.message('plumb.miss_gap', { v: gap, t: t.gap }, 'ru'));
     if (t.noul !== null) {
-      if (typeof leadNoul !== 'number') miss.push(`noul нет < ${t.noul}`);
+      if (typeof leadNoul !== 'number') miss.push(i18n.message('plumb.miss_noul_missing', { t: t.noul }, 'ru'));
       else if (toPercent(leadNoul) < t.noul) miss.push(`noul ${Math.round(toPercent(leadNoul))} < ${t.noul}`);
     }
-    if (t.clarity !== null && score.clarity < t.clarity) miss.push(`ясность ${score.clarity} < ${t.clarity}`);
-    outcome = miss.length ? `ниже порога (${miss.join('; ')})` : 'пороги пройдены';
+    if (t.clarity !== null && score.clarity < t.clarity) miss.push(i18n.message('plumb.miss_clarity', { v: score.clarity, t: t.clarity }, 'ru'));
+    outcome = miss.length ? i18n.message('plumb.below_threshold', { miss: miss.join('; ') }, 'ru') : i18n.message('plumb.thresholds_passed', null, 'ru');
   }
   const u = meta.usage || {};
   const d = new Date();
   const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const spend = `${meta.model_requested}, ${meta.id || 'id unknown'}, ${u.prompt_tokens ?? 'unknown'} in / ${u.completion_tokens ?? 'unknown'} out, ${meta.duration_ms} мс, ${meta.cost_usd === null ? 'cost unknown' : '$' + meta.cost_usd}`;
-  return `- \`Plumb\`, ${date}: ${meta.executor} (${spend}) — роль ${choice.role}, уверенность ${lead}, зазор ${gap}, ясность ${score.clarity}/4, noul ${leadNoul ?? 'нет'}; ${outcome}. Строку записал драйвер (--write).`;
+  const spend = i18n.message('plumb.spend_line', {
+    model: meta.model_requested, id: meta.id || 'id unknown',
+    tok_in: u.prompt_tokens ?? 'unknown', tok_out: u.completion_tokens ?? 'unknown',
+    ms: meta.duration_ms, cost: meta.cost_usd === null ? 'cost unknown' : '$' + meta.cost_usd,
+  }, 'ru');
+  return i18n.message('plumb.history_line', {
+    date, executor: meta.executor, spend, role: choice.role, lead, gap, clarity: score.clarity,
+    noul: leadNoul ?? i18n.message('plumb.no_value', null, 'ru'),
+    outcome,
+  }, 'ru');
 }
 
-// Дописывает строку в конец зоны «## История / ## History»; нет зоны — ошибка.
+// Appends the line to the end of the "## History / ## History" zone; no zone - an error.
 function appendHistory(cardFile, line) {
   const md = fs.readFileSync(cardFile, 'utf8');
   const nl = md.includes('\r\n') ? '\r\n' : '\n';
   const lines = md.split(/\r?\n/);
   const start = lines.findIndex((l) => i18n.headingRe('zone.history', '').test(l));
-  if (start < 0) throw new Error('card has no ## History / ## История zone');
+  if (start < 0) throw new Error(i18n.message('plumb.no_history_zone', null, 'ru'));
   let end = lines.findIndex((l, i) => i > start && /^##\s/.test(l));
   if (end < 0) end = lines.length;
   let at = end;
@@ -209,7 +217,7 @@ async function main() {
   }
   const task = extractTask(md);
   if (!task) {
-    console.error('card has no ## Task / ## Задача zone');
+    console.error(i18n.message('plumb.no_task_zone', null, 'ru'));
     process.exit(1);
   }
 
@@ -240,8 +248,8 @@ async function main() {
   const catalogResidue = residue(scrubbedCatalog, secrets);
   if (catalogResidue.length) return fallback('scrub-refused', { report: { refused: catalogResidue } }, a.out);
 
-  // Разбираем очищенный каталог обратно по ролям (порядок и границы те же, что при склейке) —
-  // так noul-критерии каждой роли видят её же текст, уже очищенный, не исходный.
+  // We split the scrubbed catalog back by roles (the order and boundaries are the same as when gluing) -
+  // this way each role's noul criteria see its own text, already scrubbed, not the original one.
   const scrubbedSections = scrubbedCatalog.split(/\n(?=### )/);
   const byRole = {};
   for (const sec of scrubbedSections) {

@@ -1,6 +1,6 @@
-// Вкладка «Форма»: карточка узла и карточка роли Run — модель, tier, effort, скиллы,
-// коннекторы (MCP), плагины. Источник — generate.js → formaCatalog (.forma/dashboard/data/forma.cjs,
-// фронтматтер .claude/agents/*.md и .claude/agents/run/*.md). Только показ.
+// The "Forma" tab: the node card and the Run role card - model, tier, effort, skills,
+// connectors (MCP), plugins. The source is generate.js -> formaCatalog (.forma/dashboard/data/forma.cjs,
+// the frontmatter of .claude/agents/*.md and .claude/agents/run/*.md). Display only.
 
 const formaEmpty = () => `<span class="set-empty">${t('fm.notSet')}</span>`;
 
@@ -22,7 +22,7 @@ function formaSkillsHtml(skills) {
   return skills.map(s => `<span class="tag">${esc(s)}</span>`).join(' ');
 }
 
-// Узлы «Борта», на которые ссылаются полосы текущей отрисовки (попап берёт по индексу).
+// The "Bort" nodes referenced by the bars of the current render (the popup looks them up by index).
 let formaBortNodes = [];
 
 function formaCardHtml(row, bortNode) {
@@ -48,8 +48,8 @@ function formaPluginsHtml(plugins) {
     return `<div class="chain-clean">${t('fm.pluginsErr', {reason})}</div>`;
   }
   const row = (p) => `<span class="tag" title="${p.enabled ? t('fm.enabled') : t('fm.disabled')}">${esc(p.id)}${p.enabled ? '' : ' ' + t('fm.disabledParen')}</span>`;
-  // Область пользователя не показана построчно: личная среда разработчика, не относится к проекту (запрет 16) —
-  // только число, чтобы было видно, что источник живой, а не пустой.
+  // The user scope is not shown line by line: the developer's personal environment, not the project's (prohibition 16) -
+  // only the count, to show the source is alive rather than empty.
   return `<div class="forma-plugins">
     <p class="chain-lead">${t('fm.pluginsLead')}</p>
     <p><b>${t('fm.projectScope')}</b> ${plugins.project.length ? plugins.project.map(row).join(' ') : `<span class="dim">${t('fm.no')}</span>`}</p>
@@ -57,11 +57,11 @@ function formaPluginsHtml(plugins) {
   </div>`;
 }
 
-let formaShown = null; // выбранный движок: renderPanels перерисовывает вкладку при каждом SSE-обновлении
+let formaShown = null; // the selected engine: renderPanels redraws the tab on every SSE update
 
 function formaEngineHtml(e) {
   formaBortNodes = [];
-  // Борт считается по одному движку — тому, чей адаптер объявил журнал вызовов (`bort.engine`); остальным полосы не рисуются.
+  // The bort is computed for one engine - the one whose adapter declared the call log (`bort.engine`); no bars are drawn for the others.
   const bort = latestData && latestData.bort && latestData.bort.engine === e.engine && latestData.bort.source ? latestData.bort : null;
   const card = (r) => formaCardHtml(r, bort && bortFind(bort, r.name));
   const nodesPart = e.rolesMissing

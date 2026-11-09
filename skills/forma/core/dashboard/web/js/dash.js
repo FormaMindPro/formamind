@@ -1,19 +1,19 @@
-// Вкладка «Дашборд» — первая, общий вид доски: KPI, прогресс по эпикам, критический путь,
-// таблица карточек с поиском/фильтрами и переключателем Таблица/Канбан. Данные — из общего
-// среза (`d.board.cards`, `d.epics`, `d.totals`), ничего не вшито; числа совпадают с доской.
-// dashInit(d) вызывается на каждый срез данных (как boardInit), DASH хранит выбор между перерисовками.
+// The "Dashboard" tab - the first one, the board's common view: KPI, the progress by epics, the critical path,
+// the card table with search/filters and a Table/Kanban toggle. The data comes from the shared
+// snapshot (`d.board.cards`, `d.epics`, `d.totals`), nothing is hardwired; the numbers match the board.
+// dashInit(d) runs on every data snapshot (like boardInit); DASH keeps the selection between redraws.
 
 let DASH = null;
 
 function dashLoadState() {
   const S = { q: '', status: null, epic: null, view: 'table' };
-  try { Object.assign(S, JSON.parse(localStorage.getItem('dashView') || '{}')); } catch { /* localStorage закрыт — значения по умолчанию */ }
+  try { Object.assign(S, JSON.parse(localStorage.getItem('dashView') || '{}')); } catch { /* localStorage closed - the defaults */ }
   return S;
 }
-function dashSave(S) { try { localStorage.setItem('dashView', JSON.stringify(S)); } catch { /* закрыт — выбор не запомнится */ } }
+function dashSave(S) { try { localStorage.setItem('dashView', JSON.stringify(S)); } catch { /* closed - the selection will not be remembered */ } }
 
-// Расход по движкам (токены + поправка «mixed»): кэш больше N у записи — строка написана
-// без кэша в общем числе (board-card.cjs, addSpendLine), добавляем кэш к токенам.
+// The spend by engines (tokens + the "mixed" correction): a cache larger than N on a record means the line was written
+// without the cache in the total (board-card.cjs, addSpendLine); we add the cache to the tokens.
 function dashSpendByEngine(c) {
   const out = {};
   for (const [k, e] of Object.entries((c.spend || {}).byEngine || {})) out[k] = { tokens: e.tokens + (e.mixed ? e.cache : 0), cache: e.cache };
@@ -38,7 +38,7 @@ function dashKpiHtml(totals, epics, cards) {
     const o = byEngine[k] || (byEngine[k] = { tokens: 0, cache: 0 }); o.tokens += v.tokens; o.cache += v.cache;
   }
   const keys = Object.keys(byEngine).sort((a, b) => byEngine[b].tokens - byEngine[a].tokens);
-  // Плитка — сумма по всем движкам; разбивка по движкам строкой ниже
+  // The tile is the sum over all engines; the breakdown by engines is the row below
   const tok = keys.length ? keys.reduce((s, k) => ({ tokens: s.tokens + byEngine[k].tokens, cache: s.cache + byEngine[k].cache }), { tokens: 0, cache: 0 }) : null;
   const cachePct = tok && tok.tokens ? Math.round(tok.cache / tok.tokens * 100) : 0;
   const split = keys.length > 1 ? `<div class="lbl">${keys.map(k => `${esc(engineLabel(k))} ${fmt(byEngine[k].tokens)}`).join(' · ')}</div>` : '';

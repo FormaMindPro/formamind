@@ -1,17 +1,17 @@
 'use strict';
 
 /**
- * Graphify — четыре корпуса графов (project, manual, site, engine), у каждого свой последний прогон,
- * стоимость и число узлов/рёбер/кластеров/предупреждений (не агрегат по всем сразу). Все графы механические (без модели).
- * project и manual получают «протухло» по хешу содержимого корпуса (`checkCorpusStale`);
- * site и engine строятся отдельными скриптами (`build-site-graph.cjs`, `build-engine-graph.cjs`) со своим
- * снимком каждый — без файлового протухания здесь.
+ * Graphify - four graph corpora (project, manual, site, engine), each with its own last run,
+ * cost and the number of nodes/edges/clusters/warnings (not an aggregate over all at once). All graphs are mechanical (no model).
+ * project and manual get "stale" by the corpus content's hash (`checkCorpusStale`);
+ * site and engine are built by separate scripts (`build-site-graph.cjs`, `build-engine-graph.cjs`) with their own
+ * snapshot each - no file staleness here.
  *
- * Журнал `.forma/dashboard/graphify.log` — не карточка, не круг: одна строка на запуск.
- * Формат базовый (все старые строки): ГГГГ-ММ-ДД ЧЧ:ММ | mode=... | agents=N | tokens=N | $X.XXXX | <что сделано>
- * Расширенный — между $-сегментом и свободной сводкой стоят необязательные поля key=value, в этом порядке:
+ * The `.forma/dashboard/graphify.log` journal - not a card, not a cycle: one line per run.
+ * The basic format (all old lines): YYYY-MM-DD HH:MM | mode=... | agents=N | tokens=N | $X.XXXX | <what was done>
+ * The extended one - between the $ segment and the free summary sit optional key=value fields, in this order:
  * corpus=<project|manual|site|engine> | trigger=<manual|auto-accum|human> | nodes=N | edges=N | communities=N | warnings=N.
- * Каждое поле распознаётся независимо: старая строка без них разбирается так же, как раньше.
+ * Each field is recognized independently: an old line without them parses just as before.
  */
 
 const fs = require('fs');
@@ -24,7 +24,7 @@ const GRAPHIFY_HEAD_RE =
   /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*\|\s*mode=(\S+)\s*\|\s*agents=(\d+)\s*\|\s*tokens=(\d+)\s*\|\s*\$([\d.]+)\s*\|\s*(.*)$/;
 const GRAPHIFY_EXTRA_KEY_RE = /^(corpus|trigger|nodes|edges|communities|warnings)=(.+)$/;
 
-/** Корпуса графов — те же имена, что у вкладок. */
+/** The graph corpora - the same names as the tabs. */
 const GRAPHIFY_CORPORA = ['project', 'manual', 'site', 'engine'];
 
 function parseGraphifyLine(trimmed) {
@@ -64,7 +64,7 @@ function readRuns(file) {
 }
 
 /**
- * Разбивка по корпусам. Строки без явного `corpus=` — старые записи, относятся к корпусу `legacy`.
+ * The breakdown by corpora. Lines without an explicit `corpus=` - old records, they belong to the `legacy` corpus.
  */
 function byCorpusOf(runs) {
   const byCorpus = {};
@@ -75,7 +75,7 @@ function byCorpusOf(runs) {
     c.runCount += 1;
     c.tokensTotal += r.tokens;
     c.costUsdTotal += r.costUsd;
-    c.lastRun = r; // строки идут по порядку файла — последняя перезапись и есть последний запуск
+    c.lastRun = r; // the lines go in file order - the last overwrite is the last run
   }
   for (const c of Object.values(byCorpus)) c.costUsdTotal = Number(c.costUsdTotal.toFixed(6));
   return byCorpus;
@@ -98,13 +98,13 @@ function readGraphifyLog(projectRoot) {
   };
 }
 
-// Метка от graphify-trigger.cjs — накопление событий перевалило за порог из graphify.config.json, граф
-// просит пересборки.
+// The marker from graphify-trigger.cjs - the accumulation of events passed the threshold from graphify.config.json, the graph
+// asks for a rebuild.
 const readGraphifyPending = (projectRoot) => readJson(cachePath(projectRoot, 'graphify-pending.json'), null);
 
-// Каталог корпуса на диске для каждого имени вкладки.
+// The corpus directory on disk for each tab name.
 const CORPUS_SOURCE_DIR = { project: 'project', manual: '.forma/manual' };
-// Служебные подкаталоги не считаем содержимым корпуса: они меняются от кэша и версий, не от правки содержимого.
+// Service subdirectories are not counted as corpus content: they change with cache and versions, not with content edits.
 const FINGERPRINT_SKIP_DIRS = new Set(['.cache', 'node_modules', '.git']);
 
 function hashCorpus(dirAbs) {
@@ -118,17 +118,17 @@ function hashCorpus(dirAbs) {
 }
 
 /**
- * Хеш содержимого корпуса (project/ или .forma/manual/) на момент последней сборки графа, сравнённый с текущим —
- * «протухло» без непрерывного счёта событий. Точка отсчёта — mtime .forma/living/graphs/<corpus>/graph.json:
- * когда он меняется (новая сборка /graphify), содержимое корпуса и хеш совпадают по определению, и тогда
- * снимок хеша перезаписывается заново. Пока graph.json не менялся — сверяем текущий хеш с сохранённым снимком.
- * Состояние — .forma/dashboard/.cache/corpus-fingerprint-<corpus>.json, читает и пишет только эта функция.
+ * The corpus content's hash (project/ or .forma/manual/) at the moment of the last graph build, compared with the current one -
+ * "stale" without a continuous event count. The reference point is the mtime of .forma/living/graphs/<corpus>/graph.json:
+ * when it changes (a new /graphify build), the corpus content and the hash match by definition, and then
+ * the hash snapshot is overwritten anew. While graph.json has not changed - the current hash is checked against the stored snapshot.
+ * The state - .forma/dashboard/.cache/corpus-fingerprint-<corpus>.json; only this function reads and writes it.
  */
 function checkCorpusStale(projectRoot, corpus) {
   const dirName = CORPUS_SOURCE_DIR[corpus];
   if (!dirName) return null;
   const graphFile = path.join(projectRoot, '.forma/living', 'graphs', corpus, 'graph.json');
-  if (!fs.existsSync(graphFile)) return null; // граф ещё ни разу не собирался
+  if (!fs.existsSync(graphFile)) return null; // the graph has never been built yet
 
   const stateFile = cachePath(projectRoot, `corpus-fingerprint-${corpus}.json`);
   const graphMtime = fs.statSync(graphFile).mtimeMs;
@@ -136,7 +136,7 @@ function checkCorpusStale(projectRoot, corpus) {
   const currentHash = hashCorpus(path.join(projectRoot, dirName));
 
   if (!state || state.graphMtimeAtBuild !== graphMtime) {
-    // graph.json новее прошлого снимка (или снимка ещё не было) — новая точка отсчёта.
+    // graph.json is newer than the last snapshot (or there was no snapshot yet) - a new reference point.
     fs.mkdirSync(path.dirname(stateFile), { recursive: true });
     fs.writeFileSync(stateFile, JSON.stringify({ graphMtimeAtBuild: graphMtime, hashAtBuild: currentHash }, null, 2), 'utf8');
     return false;
@@ -157,7 +157,7 @@ function corpusView(projectRoot, corpus, marks) {
   };
 }
 
-/** `{ graphify, graphifyPending, graphifyByCorpus }` — журнал запусков, метка накопления и корпуса. */
+/** `{ graphify, graphifyPending, graphifyByCorpus }` - the run journal, the accumulation marker and the corpora. */
 function buildGraphify(projectRoot) {
   const log = readGraphifyLog(projectRoot);
   const pending = readGraphifyPending(projectRoot);
@@ -168,7 +168,7 @@ function buildGraphify(projectRoot) {
   return { graphify: log, graphifyPending: pending, graphifyByCorpus };
 }
 
-/** Собран ли `graph.html` каждого корпуса: `{ manual, project, site, engine, goals, arsenal, structure, resources, board, central }`. */
+/** Whether each corpus's `graph.html` is built: `{ manual, project, site, engine, goals, arsenal, structure, resources, board, central }`. */
 function graphsBuilt(projectRoot) {
   return Object.fromEntries(['manual', 'project', 'site', 'engine', 'goals', 'arsenal', 'structure', 'resources', 'board', 'central'].map((c) => [c, fs.existsSync(path.join(projectRoot, '.forma/living', 'graphs', c, 'graph.html'))]));
 }

@@ -1,15 +1,15 @@
 'use strict';
 
 /**
- * Вкладка «Документация» — две книги, структура каждой задаётся файлом `_toc.json`, не папками.
- * Формат TOC — `.forma/templates/README-toc.md` и `.forma/templates/toc.json` (образец без следов проекта).
+ * The "Documentation" tab - two books; each book's structure is set by a `_toc.json` file, not by folders.
+ * The TOC format - `.forma/templates/README-toc.md` and `.forma/templates/toc.json` (a sample without project traces).
  *
- * Книга «Документация проекта» (`project/docs/_toc.json`) — один язык, `title` строкой.
- * Книга «Мануал движка» (`.forma/manual/_toc.json`) — общий TOC на обе ветки `.forma/manual/en/` и `.forma/manual/ru/`
- * (дерево файлов идентично по контракту `.forma/manual/README.md`), `title` — `{en, ru}`.
+ * The "Project documentation" book (`project/docs/_toc.json`) - one language, `title` as a string.
+ * The "Engine manual" book (`.forma/manual/_toc.json`) - one TOC over both branches `.forma/manual/en/` and `.forma/manual/ru/`
+ * (the file tree is identical by the contract in `.forma/manual/README.md`), `title` - `{en, ru}`.
  *
- * Битая ссылка TOC — не сообщение в данных, а брошенная ошибка с адресом пункта (`items[0].items[1].page`):
- * `node .forma/dashboard/generate.js` падает на ней явно, а не публикует дашборд с тихой дырой в содержании.
+ * A broken TOC link is not a message in the data but a thrown error with the item's address (`items[0].items[1].page`):
+ * `node .forma/dashboard/generate.js` falls on it explicitly instead of publishing a dashboard with a silent hole in the contents.
  */
 
 const fs = require('fs');
@@ -19,7 +19,7 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
-// Все .md-файлы под `base`, путь — относительно `base`, с прямым слэшем (сравнимо с `page` из TOC).
+// All .md files under `base`, the path relative to `base`, with a forward slash (comparable to `page` from the TOC).
 function walkMd(dir, base, out) {
   for (const name of fs.readdirSync(dir)) {
     if (name.startsWith('.')) continue;
@@ -31,9 +31,9 @@ function walkMd(dir, base, out) {
   return out;
 }
 
-// Обходит дерево TOC, на каждом листе (есть `page`) зовёт walk.onLeaf(item, trail-заголовков, адрес-для-ошибки);
-// walk.sourceLabel — имя файла TOC для сообщения об ошибке.
-// Ни `page`, ни `items` на узле — сломанный пункт, адресом и падаем, это тоже «ссылка на несуществующее».
+// Walks the TOC tree; at every leaf (one with `page`) it calls walk.onLeaf(item, the trail of headings, the address for errors);
+// walk.sourceLabel - the TOC file's name for the error message.
+// Neither `page` nor `items` on a node - a broken item; we fall with its address, this too is a "link to nothing".
 function walkToc(items, trail, addrPrefix, walk) {
   items.forEach((item, i) => {
     const addr = `${addrPrefix}[${i}]`;

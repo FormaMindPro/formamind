@@ -1,6 +1,6 @@
-// Вкладка «Узлы»: простой список узлов и их оснастки по умолчанию.
-// Источник — generate.js → nodeConfig (.forma/dashboard/data/nodes.cjs, nodeModels адаптеров, инструменты — роли каталога адаптера).
-// Наборы ролей раннеров и дизайн вкладки — отдельная задача.
+// The "Nodes" tab: a plain list of the nodes and their default arsenal.
+// The source is generate.js -> nodeConfig (.forma/dashboard/data/nodes.cjs, the adapters' nodeModels, the tools - the adapter catalog's roles).
+// The runner role sets and the tab's design are a separate task.
 
 function nodesHtml(nodes) {
   if (!nodes || !nodes.length) {

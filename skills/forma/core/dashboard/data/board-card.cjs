@@ -1,20 +1,20 @@
 'use strict';
 
 /**
- * Карточка для доски и «Закона»: поля целиком — снаряжение по единицам, готовность к запуску, расход из строк
- * истории, связи по меткам. Отдельный разбор от счёта расхода (`cards.cjs`): доске нужна вся карточка,
- * счёту — только строки расхода.
+ * A card for the board and the "Law": the fields whole - kit by units, launch readiness, spend from history
+ * lines, links by labels. A separate parse from the spend count (`cards.cjs`): the board needs the whole card,
+ * the count - only the spend lines.
  */
 
 const { parseFrontmatterJson, zone } = require('../lib/card.cjs');
 const i18n = require('../../i18n/index.cjs');
 const APPROVAL_RE = new RegExp(i18n.alt('hist.approved'), 'i');
 
-// Единицы снаряжения — английские ключи (kit.role …); лейблы по языкам — в i18n/keys.json.
+// Kit units are English keys (kit.role ...); per-language labels live in i18n/keys.json.
 const KIT_UNITS = ['role', 'skill', 'tool', 'access', 'data', 'model'];
 
-// Снаряжение пишут и списком «- **Role:** …», и строкой «Role: … · Skill: …» — режем текст по лейблам единиц
-// с заглавной (после лейбла допустимо до трёх букв окончания: Скиллы, Tools).
+// The kit is written both as a list "- **Role:** ..." and as a line "Role: ... · Skill: ..." - the text is cut at unit labels
+// starting with a capital (up to three letters of ending after the label are allowed - e.g. "Skills" in Russian, or "Tools").
 const KIT_KEY = new RegExp('(?:^|[\\s.·(;])((?:' + i18n.alt(...KIT_UNITS.map((u) => 'kit.' + u)) + ')\\p{L}{0,3})(?![\\p{L}])\\s*[:—–·-]?\\s*', 'gu');
 
 const ATTEMPT_LINE = /: attempt,/;
@@ -23,7 +23,7 @@ const CACHE_RE = /\(([\d\s\u00a0\u202f]+)\s*cache-read\)/;
 
 const spaceless = (s) => Number(String(s).replace(/[\s\u00a0\u202f]/g, ''));
 
-/** Снаряжение по единицам: `{ role: '…', skill: '…' }`; несколько записей одной единицы склеиваются через « · ». */
+/** Kit by units: `{ role: '…', skill: '…' }`; several entries of one unit are glued with " · ". */
 function kitPartsOf(kit) {
   const parts = {};
   const flat = kit.replace(/\*\*/g, '');
@@ -38,7 +38,7 @@ function kitPartsOf(kit) {
   return parts;
 }
 
-/** Расход из одной строки истории (§3): `N tokens (R cache-read), T s`; токены и кэш — по тегу движка. */
+/** Spend from one history line (§3): `N tokens (R cache-read), T s`; tokens and cache go by the engine tag. */
 function addSpendLine(spend, l) {
   spend.lines++;
   const tg = /—\s*([a-z][a-z0-9-]*):/.exec(l);
@@ -47,15 +47,15 @@ function addSpendLine(spend, l) {
   const sm = l.match(/,\s*(\d+)\s*s,/);
   if (sm) spend.sec += +sm[1];
   const t = l.match(TOKENS_RE);
-  if (!t || spaceless(t[1]) === 0) { spend.unknown++; E.unknown++; return; } // «0 tokens» по §3 — не число, а пропуск
+  if (!t || spaceless(t[1]) === 0) { spend.unknown++; E.unknown++; return; } // "0 tokens" per §3 is not a number but an omission
   E.tokens += spaceless(t[1]);
   const r = l.match(CACHE_RE);
   if (!r) return;
   E.cache += spaceless(r[1]);
-  if (spaceless(r[1]) > spaceless(t[1])) E.mixed = true; // кэш больше итога — N записан без кэша
+  if (spaceless(r[1]) > spaceless(t[1])) E.mixed = true; // cache greater than the total - N was written without cache
 }
 
-/** Токены и кэш — по тегу движка (`spend.byEngine`): разные движки в одну сумму не идут. */
+/** Tokens and cache go by the engine tag (`spend.byEngine`): different engines do not go into one sum. */
 function spendOf(history) {
   const spend = { sec: 0, lines: 0, unknown: 0, byEngine: {} };
   for (const l of history) {
@@ -65,8 +65,8 @@ function spendOf(history) {
 }
 
 /**
- * Доступ: строка «Доступ» в снаряжении со статусом «подтверждён»/confirmed. Берём отрезок после «Доступ:»
- * до следующей единицы. `null` — строки нет; `'unknown'` — назван, но статус (запрет 15) не записан.
+ * Access: an "Access" line in the kit with status "confirmed"/confirmed. We take the segment after the access label
+ * up to the next unit. `null` - no line; `'unknown'` - named, but the status (prohibition 15) is not recorded.
  */
 function accessStatus(kit) {
   const am = kit.match(new RegExp('(?:' + i18n.alt('kit.access') + ')\\W*?:\\**\\s*([^·\\n]*)', 'i'));
@@ -77,7 +77,7 @@ function accessStatus(kit) {
   return accessText ? 'unknown' : false;
 }
 
-// Даты этапов маршрута и строки о маршруте — по ключам истории (hist.approved / check / accepted / route); браузер слов не знает.
+// Route stage dates and route lines go by history keys (hist.approved / check / accepted / route); the browser knows no words.
 const dateOfLine = (history, key) => {
   const re = new RegExp(i18n.alt(key), 'i');
   const l = history.find((x) => re.test(x));
@@ -89,7 +89,7 @@ const routeDatesOf = (history) => ({
 });
 const routeLinesOf = (history) => history.filter((l) => /route-\d/i.test(l) || new RegExp(i18n.alt('hist.route'), 'i').test(l));
 
-/** Готовность к запуску: цель, пять полей, снаряжение, маршрут, одобрение, доступ, остаток бюджета, зависимости. */
+/** Launch readiness: the goal, five fields, kit, route, approval, access, budget remainder, dependencies. */
 function readiness({ labels, fields, kit, history }, kitParts) {
   const route = labels.find((l) => /^route-\d$/.test(l)) || null;
   const kitUnits = KIT_UNITS.filter((n) => kitParts[n]);
@@ -109,8 +109,8 @@ function readiness({ labels, fields, kit, history }, kitParts) {
 }
 
 /**
- * Карточка доски из файла `f` с текстом `text`; `.forma/skills` — имена скиллов проекта (какие из них названы в снаряжении).
- * Поле `text` временное — для поиска связей; из данных его удаляет `board.cjs`.
+ * A board card from file `f` with text `text`; `.forma/skills` - the project's skill names (which of them are named in the kit).
+ * The `text` field is temporary - for link search; `board.cjs` removes it from the data.
  */
 function parseBoardCard(f, text, skills) {
   const fm = parseFrontmatterJson(text);

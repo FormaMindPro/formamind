@@ -33,8 +33,8 @@ test('every required key is in the dictionary with en and ru labels', () => {
 });
 
 test('keys are English: no Cyrillic in any key', () => {
-  for (const key of Object.keys(KEYS.labels)) assert.ok(!/[А-Яа-яЁё]/.test(key), key);
-  for (const key of Object.keys(KEYS.phrases)) assert.ok(!/[А-Яа-яЁё]/.test(key), key);
+  for (const key of Object.keys(KEYS.labels)) assert.ok(!/[\u0410-\u042f\u0430-\u044f\u0401\u0451]/.test(key), key);
+  for (const key of Object.keys(KEYS.phrases)) assert.ok(!/[\u0410-\u042f\u0430-\u044f\u0401\u0451]/.test(key), key);
 });
 
 for (const key of Object.keys(KEYS.labels)) {
@@ -52,19 +52,19 @@ for (const key of Object.keys(KEYS.labels)) {
 }
 
 test('group lookup: keyOf maps a label to its key, longest label wins', () => {
-  assert.equal(i18n.keyOf('Роль', 'kit'), 'kit.role');
+  assert.equal(i18n.keyOf('\u0420\u043e\u043b\u044c', 'kit'), 'kit.role');
   assert.equal(i18n.keyOf('Skills', 'kit'), 'kit.skill');
-  assert.equal(i18n.keyOf('Умение', 'kit'), 'kit.skill');
-  assert.equal(i18n.keyOf('Инструменты', 'kit'), 'kit.tool');
-  assert.equal(i18n.keyOf('закрыто', 'hist'), 'hist.closed');
+  assert.equal(i18n.keyOf('\u0423\u043c\u0435\u043d\u0438\u0435', 'kit'), 'kit.skill');
+  assert.equal(i18n.keyOf('\u0418\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u044b', 'kit'), 'kit.tool');
+  assert.equal(i18n.keyOf('\u0437\u0430\u043a\u0440\u044b\u0442\u043e', 'hist'), 'hist.closed');
   assert.equal(i18n.keyOf('closed', 'hist'), 'hist.closed');
-  assert.equal(i18n.keyOf('зазор', 'plumb'), 'plumb.gap');
+  assert.equal(i18n.keyOf('\u0437\u0430\u0437\u043e\u0440', 'plumb'), 'plumb.gap');
   assert.equal(i18n.keyOf('nothing', 'kit'), null);
 });
 
 test('zone headings: anchor, English and Russian read as one key', () => {
-  for (const [key, en, ru] of [['zone.task', 'Task', 'Задача'], ['zone.kit', 'Kit', 'Снаряжение'],
-    ['zone.history', 'History', 'История'], ['zone.result', 'Result', 'Результат']]) {
+  for (const [key, en, ru] of [['zone.task', 'Task', '\u0417\u0430\u0434\u0430\u0447\u0430'], ['zone.kit', 'Kit', '\u0421\u043d\u0430\u0440\u044f\u0436\u0435\u043d\u0438\u0435'],
+    ['zone.history', 'History', '\u0418\u0441\u0442\u043e\u0440\u0438\u044f'], ['zone.result', 'Result', '\u0420\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442']]) {
     for (const h of [`## ${en}`, `## ${ru}`, `## ${ru} ${i18n.anchor(key)}`, `## ${en}\r`]) {
       assert.ok(i18n.headingRe(key, '').test(h), `${key} ← ${JSON.stringify(h)}`);
     }
@@ -73,7 +73,7 @@ test('zone headings: anchor, English and Russian read as one key', () => {
 });
 
 test('rowNumber: volume by anchor and by every label, in a table', () => {
-  for (const cell of ['Cycle volume', 'Volume', 'Объём цикла, карточек (на эпик)', `Whatever ${i18n.anchor('volume')}`]) {
+  for (const cell of ['Cycle volume', 'Volume', '\u041e\u0431\u044a\u0451\u043c \u0446\u0438\u043a\u043b\u0430, \u043a\u0430\u0440\u0442\u043e\u0447\u0435\u043a (\u043d\u0430 \u044d\u043f\u0438\u043a)', `Whatever ${i18n.anchor('volume')}`]) {
     assert.equal(i18n.rowNumber(`| ${cell} | 25 |`, 'volume'), 25, cell);
   }
   assert.equal(i18n.rowNumber('| Cycle volume | not set |', 'volume'), null);
@@ -82,10 +82,10 @@ test('rowNumber: volume by anchor and by every label, in a table', () => {
 
 test('hasPhrase: awaiting decision and access statuses in both languages', () => {
   assert.ok(i18n.hasPhrase('Awaiting a decision from the human', 'awaiting_decision'));
-  assert.ok(i18n.hasPhrase('карточка ожидает решения человека', 'awaiting_decision'));
-  assert.ok(i18n.hasPhrase('неподтверждён', 'access_unconfirmed'));
+  assert.ok(i18n.hasPhrase('\u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0430 \u043e\u0436\u0438\u0434\u0430\u0435\u0442 \u0440\u0435\u0448\u0435\u043d\u0438\u044f \u0447\u0435\u043b\u043e\u0432\u0435\u043a\u0430', 'awaiting_decision'));
+  assert.ok(i18n.hasPhrase('\u043d\u0435\u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0451\u043d', 'access_unconfirmed'));
   assert.ok(i18n.hasPhrase('unconfirmed', 'access_unconfirmed'));
-  assert.ok(i18n.hasPhrase('подтверждён', 'access_ok'));
+  assert.ok(i18n.hasPhrase('\u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0451\u043d', 'access_ok'));
   assert.ok(!i18n.hasPhrase('nothing here', 'access_ok'));
 });
 
@@ -116,7 +116,7 @@ test('plumb-run reads each threshold under every label of its key', () => {
 
 test('plumb-run and plumb-scrub find the zone by key', () => {
   const { extractTask } = require(path.join(ROOT, '.claude', 'scripts', 'plumb-scrub.cjs'));
-  for (const h of ['## Task', '## Задача', `## Task ${i18n.anchor('zone.task')}`]) {
+  for (const h of ['## Task', '## \u0417\u0430\u0434\u0430\u0447\u0430', `## Task ${i18n.anchor('zone.task')}`]) {
     assert.ok(extractTask(`# t\n\n${h}\nonly this\n\n## Kit\nnot this\n`), h);
   }
 });
@@ -135,7 +135,7 @@ test('board-card splits the kit by unit key, English and Russian labels alike', 
   const { parseBoardCard } = require(path.join(ROOT, '.forma', 'dashboard', 'data', 'board-card.cjs'));
   const card = (kit) => parseBoardCard('card-1-x.md', `---\nstatus: "backlog"\nlabels: ["route-1"]\n---\n# card-1 · x\n\n## Task\na | b | c | 3 | d\n\n## Kit\n${kit}\n\n## History\n- \`Intent\`, 1999-01-01: human approved.\n`, []);
   const en = card('- **Role:** run · **Skill:** s1 · **Tool:** t · **Access:** confirmed · **Data:** d · **Model:** haiku');
-  const ru = card('- **Роль:** run · **Скилл:** s1 · **Инструмент:** t · **Доступ:** подтверждён · **Данные:** d · **Модель:** haiku');
+  const ru = card('- **\u0420\u043e\u043b\u044c:** run · **\u0421\u043a\u0438\u043b\u043b:** s1 · **\u0418\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442:** t · **\u0414\u043e\u0441\u0442\u0443\u043f:** \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0451\u043d · **\u0414\u0430\u043d\u043d\u044b\u0435:** d · **\u041c\u043e\u0434\u0435\u043b\u044c:** haiku');
   for (const c of [en, ru]) {
     assert.deepEqual(c.ready.kitUnits, ['role', 'skill', 'tool', 'access', 'data', 'model']);
     assert.equal(c.kitParts.role, 'run');
@@ -156,7 +156,7 @@ test('PROJECT.md: every field the code reads carries its anchor; anchorise is id
 });
 
 test('anchorise puts anchors on a legacy routes table (every language)', () => {
-  const legacy = '**Маршруты**\n\n| Поле | Значение |\n|---|---|\n| Диспетчер | |\n| Plumb haiku: порог лидера, % | 60 |\n| Plumb `plumb` (x) | `jev` |\n';
+  const legacy = '**\u041c\u0430\u0440\u0448\u0440\u0443\u0442\u044b**\n\n| \u041f\u043e\u043b\u0435 | \u0417\u043d\u0430\u0447\u0435\u043d\u0438\u0435 |\n|---|---|\n| \u0414\u0438\u0441\u043f\u0435\u0442\u0447\u0435\u0440 | |\n| Plumb haiku: \u043f\u043e\u0440\u043e\u0433 \u043b\u0438\u0434\u0435\u0440\u0430, % | 60 |\n| Plumb `plumb` (x) | `jev` |\n';
   const out = i18n.anchorise(legacy);
   for (const key of ['routes', 'routes.dispatcher', 'plumb.haiku.leader', 'routes.plumb']) assert.ok(out.includes(i18n.anchor(key)), key);
   assert.equal(i18n.rowNumber(out, 'plumb.haiku.leader'), 60);
@@ -168,13 +168,13 @@ test('writers: a new card on a Russian project gets English zone headings and ki
   assert.equal(r.status, 0, r.stderr);
   for (const h of ['## Task', '## Kit', '## History', '## Result']) assert.ok(r.stdout.includes('\n' + h + '\n'), h);
   assert.ok(/\n\d+ · tooling \|/.test(r.stdout), 'kind is English');
-  assert.ok(!/## (Задача|Снаряжение|История|Результат)/.test(r.stdout));
+  assert.ok(!/## (\u0417\u0430\u0434\u0430\u0447\u0430|\u0421\u043d\u0430\u0440\u044f\u0436\u0435\u043d\u0438\u0435|\u0418\u0441\u0442\u043e\u0440\u0438\u044f|\u0420\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442)/.test(r.stdout));
 });
 
 test('card.cjs: zoneHeading is English; zoneHeadingIn finds the heading as written in the card', () => {
   const card = require(path.join(ROOT, '.forma', 'dashboard', 'lib', 'card.cjs'));
   assert.equal(card.zoneHeading('history', 'ru', true), 'History');
-  assert.equal(card.zoneHeadingIn('## Задача\n\n## История\n', 'history'), 'История');
+  assert.equal(card.zoneHeadingIn('## \u0417\u0430\u0434\u0430\u0447\u0430\n\n## \u0418\u0441\u0442\u043e\u0440\u0438\u044f\n', 'history'), '\u0418\u0441\u0442\u043e\u0440\u0438\u044f');
   assert.equal(card.zoneHeadingIn('## History <!-- k:zone.history -->\n', 'history'), 'History <!-- k:zone.history -->');
   assert.equal(card.zoneHeadingIn('## Task\n', 'history'), null);
 });
@@ -182,29 +182,29 @@ test('card.cjs: zoneHeading is English; zoneHeadingIn finds the heading as writt
 test('session spend writer: window end key and manual mark are English, readers still take the old spelling', () => {
   const spend = require(path.join(ROOT, '.forma', 'dashboard', 'spend-line.cjs'));
   assert.ok(spend.sessionWindowEnd('desc, window end 1999-01-02T03:04:05.000Z') > 0);
-  assert.ok(spend.sessionWindowEnd('desc, граница 1999-01-02T03:04:05.000Z') > 0);
+  assert.ok(spend.sessionWindowEnd('desc, \u0433\u0440\u0430\u043d\u0438\u0446\u0430 1999-01-02T03:04:05.000Z') > 0);
   assert.ok(i18n.hasPhrase('x (set by --from/--to)', 'manual_window'));
-  assert.ok(i18n.hasPhrase('x (задано --from/--to)', 'manual_window'));
+  assert.ok(i18n.hasPhrase('x (\u0437\u0430\u0434\u0430\u043d\u043e --from/--to)', 'manual_window'));
 });
 
 test('migrate-keys: Russian keys become English, texts stay, second pass changes nothing', () => {
   const { migrate } = require(path.join(ROOT, '.forma', 'board', 'migrate-keys.cjs'));
   const src = [
     '---', 'id: "card-1-x"', '---', '# card-1 · x', '',
-    '## Задача', '001 · оснастка | делает | критерий | 3 | дальше', '',
-    '## Снаряжение', '- **Роль:** run-text · **Скилл:** s1 · **Инструменты:** t', '- Доступ: подтверждён', 'Данные: файл. Модель: haiku', '',
-    '## История',
-    '- `Intent`, 1999-01-01: человек одобрил пять полей.',
-    '- `Run`, 1999-01-02: заход, 5 tokens (cache-read unknown), 2 s, `id unknown` — тест.',
-    '- `Core`, 1999-01-03: закрыто — принято.',
-    '- Сервис, 1999-01-04: 5 кредитов (a/b) — тест.',
-    '', '## Результат', 'Роль: не ключ в результате', '',
+    '## \u0417\u0430\u0434\u0430\u0447\u0430', '001 · \u043e\u0441\u043d\u0430\u0441\u0442\u043a\u0430 | \u0434\u0435\u043b\u0430\u0435\u0442 | \u043a\u0440\u0438\u0442\u0435\u0440\u0438\u0439 | 3 | \u0434\u0430\u043b\u044c\u0448\u0435', '',
+    '## \u0421\u043d\u0430\u0440\u044f\u0436\u0435\u043d\u0438\u0435', '- **\u0420\u043e\u043b\u044c:** run-text · **\u0421\u043a\u0438\u043b\u043b:** s1 · **\u0418\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u044b:** t', '- \u0414\u043e\u0441\u0442\u0443\u043f: \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0451\u043d', '\u0414\u0430\u043d\u043d\u044b\u0435: \u0444\u0430\u0439\u043b. \u041c\u043e\u0434\u0435\u043b\u044c: haiku', '',
+    '## \u0418\u0441\u0442\u043e\u0440\u0438\u044f',
+    '- `Intent`, 1999-01-01: \u0447\u0435\u043b\u043e\u0432\u0435\u043a \u043e\u0434\u043e\u0431\u0440\u0438\u043b \u043f\u044f\u0442\u044c \u043f\u043e\u043b\u0435\u0439.',
+    '- `Run`, 1999-01-02: \u0437\u0430\u0445\u043e\u0434, 5 tokens (cache-read unknown), 2 s, `id unknown` — \u0442\u0435\u0441\u0442.',
+    '- `Core`, 1999-01-03: \u0437\u0430\u043a\u0440\u044b\u0442\u043e — \u043f\u0440\u0438\u043d\u044f\u0442\u043e.',
+    '- \u0421\u0435\u0440\u0432\u0438\u0441, 1999-01-04: 5 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432 (a/b) — \u0442\u0435\u0441\u0442.',
+    '', '## \u0420\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442', '\u0420\u043e\u043b\u044c: \u043d\u0435 \u043a\u043b\u044e\u0447 \u0432 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u0435', '',
   ].join('\r\n');
   const r = migrate(src);
   assert.ok(r.changed);
   for (const want of ['## Task', '## Kit', '## History', '## Result', '001 · tooling |', '**Role:**', '**Skill:**', '**Tools:**', 'Access:', 'Data:', 'Model:',
-    'human approved пять полей', 'attempt, 5 tokens', 'closed — принято', '- Service, 1999-01-04']) assert.ok(r.text.includes(want), want);
-  assert.ok(r.text.includes('Роль: не ключ в результате'), 'only the Kit zone is rewritten');
+    'human approved \u043f\u044f\u0442\u044c \u043f\u043e\u043b\u0435\u0439', 'attempt, 5 tokens', 'closed — \u043f\u0440\u0438\u043d\u044f\u0442\u043e', '- Service, 1999-01-04']) assert.ok(r.text.includes(want), want);
+  assert.ok(r.text.includes('\u0420\u043e\u043b\u044c: \u043d\u0435 \u043a\u043b\u044e\u0447 \u0432 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u0435'), 'only the Kit zone is rewritten');
   assert.ok(r.text.includes('\r\n') && !/[^\r]\n/.test(r.text), 'line endings kept');
   assert.equal(migrate(r.text).changed, false, 'idempotent');
 });
@@ -214,10 +214,10 @@ test('check key-language: a Russian key in a card is a finding with address and 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kl-'));
   const dir = path.join(root, '.devtool', 'features');
   fs.mkdirSync(dir, { recursive: true });
-  const body = (task, hist) => `---\nid: "card-1-x"\nstatus: "backlog"\nlabels: []\n---\n# card-1 · x\n\n## ${task}\n1 · ${task === 'Task' ? 'work' : 'дело'} | a | b | 1 | c\n\n## ${hist}\n- \`Intent\`, 1999-01-01: ok\n`;
+  const body = (task, hist) => `---\nid: "card-1-x"\nstatus: "backlog"\nlabels: []\n---\n# card-1 · x\n\n## ${task}\n1 · ${task === 'Task' ? 'work' : '\u0434\u0435\u043b\u043e'} | a | b | 1 | c\n\n## ${hist}\n- \`Intent\`, 1999-01-01: ok\n`;
   fs.writeFileSync(path.join(dir, 'card-1-x.md'), body('Task', 'History'));
   assert.deepEqual(check.run({ root }), []);
-  fs.writeFileSync(path.join(dir, 'card-1-x.md'), body('Задача', 'История'));
+  fs.writeFileSync(path.join(dir, 'card-1-x.md'), body('\u0417\u0430\u0434\u0430\u0447\u0430', '\u0418\u0441\u0442\u043e\u0440\u0438\u044f'));
   const found = check.run({ root });
   assert.equal(found.length, 1);
   assert.match(found[0], /card-1-x\.md:\d+/);
@@ -230,7 +230,7 @@ test('routeNames: every route-0…8 and over-1…4 has an English name and a Rus
   const en = require('../dashboard/locales/en.json'), ru = require('../dashboard/locales/ru.json');
   for (const c of codes) {
     const r = KEYS.routeNames[c];
-    assert.ok(r && /^[a-z]+(-[a-z]+)*$/.test(r.en) && /[А-Яа-яЁё]|Intent|Kit|Spec|Run/.test(r.ru), c);
+    assert.ok(r && /^[a-z]+(-[a-z]+)*$/.test(r.en) && /[\u0410-\u042f\u0430-\u044f\u0401\u0451]|Intent|Kit|Spec|Run/.test(r.ru), c);
     assert.equal(en['board.rn.' + c.replace('-', '')], r.en, c);
     assert.equal(ru['board.rn.' + c.replace('-', '')], r.ru, c);
   }

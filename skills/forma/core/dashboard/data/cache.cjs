@@ -1,22 +1,22 @@
 'use strict';
 
 /**
- * Кэш дашборда — `.forma/dashboard/.cache/<имя>`: путь к файлу и чтение ведомостей, которые пишут отдельные скрипты.
- * Обход стенограмм стоит секунды и гигабайты, поэтому сборка данных только читает готовое.
+ * The dashboard cache - `.forma/dashboard/.cache/<name>`: the file path and reading of the returns that separate scripts write.
+ * Walking the transcripts costs seconds and gigabytes, so the data assembly only reads what is ready.
  */
 
 const path = require('path');
 const { readJson } = require('../lib/fs.cjs');
 
-/** Путь к файлу в кэше дашборда проекта. */
+/** Path to a file in the project's dashboard cache. */
 const cachePath = (projectRoot, name) => path.join(projectRoot, '.forma/dashboard', '.cache', name);
 
-/** Возраст в часах по ISO-времени; времени нет — `null`. */
+/** Age in hours from the ISO time; no time - `null`. */
 const hoursSince = (iso) => (iso ? (Date.now() - Date.parse(iso)) / 3600000 : null);
 
 /**
- * Ведомость из кэша без служебных полей `omit` и с возрастом (`ageHours`): вчерашняя ведомость —
- * не то же, что сегодняшняя. Файла нет или он битый — `null`.
+ * A return from the cache without the service fields `omit` and with the age (`ageHours`): yesterday's return is
+ * not the same as today's. No file or a broken one - `null`.
  */
 function readStatement(projectRoot, name, omit) {
   const d = readJson(cachePath(projectRoot, name), null);

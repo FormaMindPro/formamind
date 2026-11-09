@@ -1,12 +1,12 @@
 'use strict';
 
 /**
- * Вкладка «Форма»: по вкладке на каждый установленный движок — карточка узла и карточка роли Run
- * (модель, tier, effort, скиллы, коннекторы, плагины). «Установлен» = в корне есть каталог с точкой
- * и `forma-adapter.cjs` с полем `formaRoles` (шапка `.forma/dashboard/lib/engines.cjs`). Ядро не знает ни имён
- * движков, ни форматов их файлов: срез ролей собирает адаптер (общие разборщики — `lib/forma-roles.cjs`).
- * Адаптер, чей `formaRoles` бросил, пропускается — остальные вкладки живут.
- * Только показ: опись не хранится отдельно, это срез тех же файлов (kit.md, «Арсенал»).
+ * The "Form" tab: a tab per installed engine - the node's card and the Run role's card
+ * (model, tier, effort, skills, connectors, plugins). "Installed" = the root has a dotted directory
+ * and a `forma-adapter.cjs` with a `formaRoles` field (the header of `.forma/dashboard/lib/engines.cjs`). The core knows neither the names
+ * of engines nor their file formats: the adapter assembles the role slice (the common parsers - `lib/forma-roles.cjs`).
+ * An adapter whose `formaRoles` threw is skipped - the other tabs live on.
+ * Display only: the inventory is not stored separately, it is a slice of the same files (kit.md, "Arsenal").
  */
 
 const engines = require('../lib/engines.cjs');
@@ -27,12 +27,12 @@ function readEngineTab(adapter, projectRoot) {
   };
 }
 
-/** Срез вкладки «Форма»: `{ engines: [{ engine, dir, title, nodes, runRoles, runNote, rolesMissing, plugins }] }`. */
+/** The "Form" tab's slice: `{ engines: [{ engine, dir, title, nodes, runRoles, runNote, rolesMissing, plugins }] }`. */
 function readFormaCatalog(projectRoot) {
   const tabs = engines.loadAdapters(projectRoot)
     .filter((a) => typeof a.formaRoles === 'function')
     .map((a) => readEngineTab(a, projectRoot))
-    .filter(Boolean); // порядок — по имени каталога адаптера (`loadAdapters`), ни один движок не стоит первым по имени
+    .filter(Boolean); // the order - by the adapter directory's name (`loadAdapters`), no engine stands first by name
   return { engines: tabs };
 }
 

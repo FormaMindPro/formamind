@@ -1,8 +1,8 @@
-// Вкладка «Доска»: карточки, фильтры, окна карточки, цели и эпика. boardInit вызывается на каждый срез данных.
-// Состояние одного вызова — объект B: { DATA, S (выбор на доске), byCode, dependents, linkLaw }; функции bd* берут его первым параметром.
-// В конце boardInit подключается «Закон» (law.js), которому нужны подписи и маршруты доски.
+// The "Board" tab: cards, filters, the card windows, the goal and the epic. boardInit runs on every data snapshot.
+// One call's state is the B object: { DATA, S (the board's selection), byCode, dependents, linkLaw }; the bd* functions take it as their first parameter.
+// At the end boardInit hooks up the "Law" (law.js), which needs the board's labels and routes.
 
-// --- Подписи доски: коды (route-N, backlog, stage, why) не переводятся, переводится только их показ ---
+// --- The board's labels: codes (route-N, backlog, stage, why) are not translated, only their display is ---
 const BOARD_T = {
   card: n => t('board.card', {n}), route: n => t('board.route', {n}), over: n => t('board.over', {n}), seg: n => t('board.seg', {n}), wave: n => t('board.wave', {n}),
   get noGoal() { return t('board.noGoal'); }, get trial() { return t('board.trial'); }, get demo() { return t('board.demo'); },
@@ -14,10 +14,10 @@ const bdKeyed = (prefix, keys) => Object.fromEntries(keys.map(k => [k, t(prefix 
 const bdStatuses = () => STATUS_ORDER.map(s => [s, t('board.col.' + s), STATUS_VAR[s]]);
 const BOARD_ACTIVE = new Set(['todo','in-progress','review']);
 const BOARD_DONE_LIMIT = 5;
-// Единицы снаряжения: ключ — как в карточке (язык проекта), показ — из словаря.
-const BOARD_UNITS = ['role', 'skill', 'tool', 'access', 'data', 'model']; // ключи единиц снаряжения (kit.*); подписи — board.unit.*
+// The kit units: the key is as in the card (the project's language), the display comes from the dictionary.
+const BOARD_UNITS = ['role', 'skill', 'tool', 'access', 'data', 'model']; // the kit unit keys (kit.*); the labels are board.unit.*
 const BOARD_NODE_C = { Intent: '--accent', Spec: '--st-backlog', Kit: '--st-todo', Run: '--st-progress', Core: '--st-review' };
-// Маршруты (.forma/manual/…/ROUTES.md): этапы с ключом, по которому статус карточки ставит флажок «вы здесь». Тексты — из словаря.
+// Routes (.forma/manual/.../ROUTES.md): stages with the key by which a card's status sets the "you are here" flag. The texts come from the dictionary.
 const BOARD_ROUTE_DEF = {
   'route-0': ['route0', [['card','Intent','card'],['approve','@human','approve5'],['exec','Intent','execSelf'],['check','Intent','checkFact'],['accept','@human','accept'],['close','Core','closeCycle']]],
   'route-1': ['route1', [['card','Intent','card'],['approve','@human','approve'],['exec','@copy','exec'],['check','Intent','check'],['accept','@human','accept'],['close','Core','closeCycle']]],
@@ -39,13 +39,13 @@ function boardRoutes() {
   return bdRoutesMemo.map;
 }
 
-// Код карточки и цели в данных прежний (card-NNN, goal-<код>); на доске — подпись.
+// The card and goal codes in the data stay as before (card-NNN, goal-<code>); on the board - a label.
 const bdCl = code => String(code).replace(/^card-(\d+)$/, (_, n) => BOARD_T.card(n));
 const bdGl = (B, g) => g ? (B.DATA.goals[g] ? B.DATA.goals[g].split('·').pop().trim() : g) : BOARD_T.noGoal;
-// Имя-движение рядом с кодом маршрута или наложения (keys.json, routeNames): route 1 · intent-copy / маршрут 1 · копия Intent.
+// The movement name next to a route or overlay code (keys.json, routeNames): route 1 · intent-copy.
 const bdRn = l => /^(route|over)-d+$/.test(l) ? ' · ' + t('board.rn.' + l.replace('-', '')) : '';
 const bdLbl = l => { if (!l) return '—'; const m = l.match(/^(route|over|seg|wave)-(\d+)$/); return m ? BOARD_T[m[1]](m[2]) + bdRn(l) : l === 'trial' ? BOARD_T.trial : l === 'demo' ? BOARD_T.demo : l; };
-// Этап и причина — из строк истории (AGENTS.md §6): последняя «stage <ключ>», все «route … (why: <код>)».
+// The stage and the reason come from the history lines (AGENTS.md §6): the last "stage <key>", all "route ... (why: <code>)".
 const bdStageLine = c => { let k = null; c.history.forEach(l => { const m = l.match(/:\s*stage\s+(\w+)/); if (m) k = m[1]; }); return k; };
 const bdWhyCodes = c => c.history.map(l => l.match(/:\s*route (route-\d[^(—]*)\(why:\s*(\w+)\)/)).filter(Boolean).map(m => [m[1].trim(), m[2]]);
 const bdGoalName = (B, g) => g ? (B.DATA.goals[g] ? `${g} · ${B.DATA.goals[g].split('·').pop().trim()}` : g) : t('board.noGoal');
@@ -53,16 +53,16 @@ const bdFmtTok = n => new Intl.NumberFormat(curLang(), { notation: 'compact', ma
 const bdFmtSec = s => s >= 3600 ? hhmm(s) : t('time.m', { m: Math.round(s / 60) });
 const bdWho = l => (l.match(/^`?(\w+)`?,/) || [, ''])[1];
 
-// --- Выбор на доске: читается из localStorage, пишется при каждой перерисовке ---
+// --- The board's selection: read from localStorage, written on every redraw ---
 function bdLoadState() {
   const S = {group:'status', state:'active', goal:null, epic:null, assignee:null, route:null, q:'', openDone:{}, view:'.forma/board'};
-  try { Object.assign(S, JSON.parse(localStorage.getItem('boardDemo') || '{}'), {openDone:{}}); if (!['ready', 'notReady'].includes(S.rdy)) delete S.rdy; } catch { /* выбор не сохранялся или localStorage закрыт — остаются значения по умолчанию */ }
+  try { Object.assign(S, JSON.parse(localStorage.getItem('boardDemo') || '{}'), {openDone:{}}); if (!['ready', 'notReady'].includes(S.rdy)) delete S.rdy; } catch { /* the selection was never saved or localStorage is closed - the defaults stay */ }
   return S;
 }
-function bdSave(B) { try { localStorage.setItem('boardDemo', JSON.stringify({...B.S, openDone:undefined})); } catch { /* localStorage закрыт — выбор не запомнится */ } }
+function bdSave(B) { try { localStorage.setItem('boardDemo', JSON.stringify({...B.S, openDone:undefined})); } catch { /* localStorage closed - the selection will not be remembered */ } }
 function bdBase(B) {
   const S = B.S;
-  // Поиск ищет по всей доске: «Показ» при нём не действует; число — это номер карточки.
+  // The search looks across the whole board: the "Show" toggle does not apply then; the number is the card's number.
   const q = S.q.trim().toLowerCase(), num = q.match(/^(?:card-)?(\d{1,3})$/);
   return B.DATA.cards.filter(c =>
     (q || S.state === 'all' || (S.state === 'active' ? BOARD_ACTIVE.has(c.status) : S.state === 'open' ? c.status !== 'done' : c.status === S.state)) &&
@@ -70,7 +70,7 @@ function bdBase(B) {
 }
 function bdApply(B, list, skip) {
   const S = B.S;
-  if (S.q.trim()) return list; // поиск — по всей доске, фильтры при нём не действуют
+  if (S.q.trim()) return list; // the search runs across the whole board, the filters do not apply then
   return list.filter(c =>
     (skip === 'goal' || !S.goal || (c.goal || '—') === S.goal) &&
     (skip === 'epic' || !S.epic || c.epic === S.epic) &&
@@ -78,7 +78,7 @@ function bdApply(B, list, skip) {
     (skip === 'route' || !S.route || (c.route || '—') === S.route) &&
     (skip === 'rdy' || !S.rdy || (bdIsReady(c) ? 'ready' : 'notReady') === S.rdy));
 }
-// Ряд чипов одного фильтра. o: { el, label, key, getter, fmt } — элемент, подпись, ключ в S, значение у карточки, показ значения.
+// A row of chips of one filter. o: { el, label, key, getter, fmt } - element, label, the key in S, the value on the card, the value's display.
 function bdChips(B, o) {
   const { el, label, key, getter, fmt = x => x } = o, S = B.S;
   const counts = {};
@@ -89,7 +89,7 @@ function bdChips(B, o) {
   el.onclick = e => { const ch = e.target.closest('.chip'); if (!ch) return; S[key] = ch.dataset.v || null; bdRender(B); };
 }
 
-// --- Схема зависимостей: слева то, чего ждёт карточка (рекурсивно), в центре она, справа — кто ждёт её ---
+// --- The dependency schema: on the left what the card waits for (recursively), in the center the card, on the right who waits for it ---
 function bdDepLevels(B, code) {
   const level = { [code]: 0 }, edges = [];
   const walk = (c, dir, seen) => {
@@ -147,7 +147,7 @@ function bdDepGraph(B, code) {
     <defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-faint)"/></marker></defs>${bdDepLines(B, uniq, g)}${bdDepNodes(B, code, g)}</svg>`;
 }
 
-// --- Окна карточки: зависимости, снаряжение, расход, маршрут, цель, эпик, сама карточка ---
+// --- The card windows: dependencies, kit, spend, route, goal, epic, the card itself ---
 function bdOpenDeps(B, code) {
   const c = B.byCode[code], d = document.getElementById('dlg');
   d.dataset.code = code;
@@ -195,8 +195,8 @@ function bdOpenSpend(B, code) {
   d.showModal();
 }
 
-// --- Готовность карточки и плашки на ней ---
-// бюджет важен до исполнения; на review/done израсходованные попытки — норма
+// --- The card's readiness and its badges ---
+// the budget matters before execution; on review/done the spent attempts are the norm
 const bdBudgetOut = c => ['backlog','todo','in-progress'].includes(c.status) && c.ready.budgetLeft !== null && c.ready.budgetLeft <= 0;
 const bdIsReady = c => { const r = c.ready; return r.goal && r.task && r.kit && r.route && r.approval !== false &&
   r.access !== false && r.access !== 'unknown' && !r.depsOpen.length && !bdBudgetOut(c); };
@@ -236,7 +236,7 @@ function bdColumns(B, list, laneKey) {
       (items.length < total ? `<div class="more" data-dk="${esc(dk)}">${t('board.more', { n: total - items.length })}</div>` : '') + '</div></div>';
   }).join('') + '</div>';
 }
-// Пилюли целей: всего карточек цели и разбивка по статусам (фильтры кроме цели и «Показа» учтены).
+// The goal pills: the goal's total cards and the breakdown by statuses (the filters except the goal and "Show" are counted).
 function bdGoalPill(S, id, name, list) {
   const n = bdStatuses().map(([s]) => list.filter(c => c.status === s).length), t = list.length;
   return `<span class="gpill ${(id ? S.goal === id : !S.goal) ? 'on' : ''} ${t ? '' : 'zero'}" data-v="${esc(id)}" title="${esc(bdStatuses().map(([, nm], i) => nm + ': ' + n[i]).join(' · '))}">` +
@@ -244,7 +244,7 @@ function bdGoalPill(S, id, name, list) {
     `<span class="gbar">${n.map((v, i) => v ? `<span style="width:${v / (t || 1) * 100}%;background:var(${bdStatuses()[i][2]})"></span>` : '').join('')}</span>` +
     `<span class="gnums">${n.map((v, i) => `<i class="${v ? '' : 'z'}" style="--c:var(${bdStatuses()[i][2]})">${v}</i>`).join('')}</span></span>`;
 }
-// Тумблер «Канбан ⇄ Цели» стоит на месте слова «Цель»: вид «Цели» — бывшая вкладка «Цепь» (chain.js).
+// The "Kanban <-> Goals" toggle sits where the word "Goal" is: the "Goals" view is the former "Chain" tab (chain.js).
 const bdKbToggle = (S) => `<span class="kb-toggle" role="group" aria-label="${t('board.kbAria')}">
   <button type="button" class="kb-opt ${(S.view||'.forma/board')==='.forma/board'?'on':''}" data-kb=".forma/board">${t('board.kb')}</button>
   <button type="button" class="kb-opt ${(S.view||'.forma/board')==='goals'?'on':''}" data-kb="goals">${t('board.goals')}</button>
@@ -260,7 +260,7 @@ function bdGoalPills(B, el) {
     const p = e.target.closest('.gpill'); if (!p) return; S.goal = p.dataset.v || null; bdRender(B);
   };
 }
-// Переключение вида внутри «Канбана»: доска колонок или «Цели» (бывшая «Цепь»).
+// Switching the view inside the "Kanban": a board of columns or "Goals" (the former "Chain").
 function bdApplyView(B) {
   const v = B.S.view || '.forma/board';
   const main = document.getElementById('main'), goals = document.getElementById('view-goals');
@@ -268,7 +268,7 @@ function bdApplyView(B) {
   if (goals) goals.hidden = v !== 'goals';
 }
 
-// --- Перерисовка доски: фильтры, сводка, колонки или дорожки ---
+// --- Redrawing the board: filters, the summary, the columns or the tracks ---
 function bdRenderFilters(B) {
   const S = B.S, byId = id => document.getElementById(id);
   byId('group').innerHTML = ['status','goal','epic','assignee'].map(k =>
@@ -300,7 +300,7 @@ function bdRenderSummary(B, list) {
 }
 function bdRenderMain(B, list) {
   const S = B.S, main = document.getElementById('main');
-  // Прокрутка колонок и доски переживает перерисовку (SSE, фильтры).
+  // The scroll of the columns and the board survives a redraw (SSE, filters).
   const keep = { main: main.scrollTop }; main.querySelectorAll('.col-list').forEach(el => keep[el.dataset.sk] = el.scrollTop);
   const restore = () => { main.scrollTop = keep.main; main.querySelectorAll('.col-list').forEach(el => { if (keep[el.dataset.sk]) el.scrollTop = keep[el.dataset.sk]; }); };
   if (S.group === 'status') { main.innerHTML = bdColumns(B, list, 'all'); restore(); return; }
@@ -321,7 +321,7 @@ function bdRender(B) {
   bdRenderMain(B, list);
 }
 
-// --- Этап и ожидание карточки ---
+// --- The card's stage and waiting ---
 function bdStageNow(c) {
   const w = bdStageLine(c); if (w && BOARD_T.stage[w]) return w === 'close' && c.assignee == null ? 'closed' : w;
   const st = (boardRoutes()[c.route] || [])[1] || [], has = k => st.some(s => s[0] === k);
@@ -332,7 +332,7 @@ function bdStageNow(c) {
   return c.assignee === 'Core' ? 'close' : 'closed';
 }
 const bdAccepted = (B, epic) => B.DATA.cards.filter(c => c.epic === epic && c.status === 'done' && c.assignee === 'Core').length;
-// Чего ждёт карточка, чтобы двинуться: первая преграда по порядку маршрута.
+// What the card waits for to move: the first barrier in the route's order.
 function bdWaiting(B, c) {
   const r = c.ready;
   if (c.status === 'done') return c.assignee === 'Core'
@@ -417,7 +417,7 @@ function bdOpenCard(B, code) {
     <dt>${t('board.history', { n: c.history.length })}</dt><dd><ul class="tl">${tl || `<li>${t('board.empty')}</li>`}</ul></dd></dl>`);
 }
 
-// --- События: переключатель среза, поиск, клики по доске и по окну карточки ---
+// --- Events: the snapshot toggle, the search, clicks on the board and on the card window ---
 function bdBindMain(B) {
   document.getElementById('main').onclick = e => {
     const more = e.target.closest('.more');
@@ -455,7 +455,7 @@ function bdBindSearch(B) {
   };
 }
 
-// --- Доска и Закон ---
+// --- The board and the Law ---
 function boardInit(DATA) {
   const B = { DATA, S: bdLoadState(), byCode: Object.fromEntries(DATA.cards.map(c => [c.code, c])), dependents: {}, linkLaw: null };
   DATA.cards.forEach(c => c.ready.deps.forEach(d => (B.dependents[d] ||= []).push(c.code)));
@@ -468,13 +468,13 @@ function boardInit(DATA) {
   B.linkLaw = lawInit({ DATA, esc, T: BOARD_T, lbl: bdLbl, ROUTES: boardRoutes() }).linkLaw;
 }
 
-// Панель фильтров доски: выбор человека (открыта/свёрнута) — в localStorage; прокрутка вниз сворачивает, наверх — возвращает выбор.
+// The board's filter panel: the human's choice (open/collapsed) lives in localStorage; scrolling down collapses it, scrolling up restores the choice.
 (function(){
   var bar=document.getElementById('bar'), btn=document.getElementById('bar-toggle'), K='boardBarOpen', open=false, auto=false;
-  try{ open=localStorage.getItem(K)==='1'; }catch(e){ /* localStorage закрыт — панель открывается свёрнутой */ }
+  try{ open=localStorage.getItem(K)==='1'; }catch(e){ /* localStorage closed - the panel opens collapsed */ }
   function show(){ var o=open&&!auto; bar.classList.toggle('collapsed',!o); btn.textContent=t('board.filters')+(o?' ▴':' ▾'); btn.setAttribute('aria-expanded',o); }
-  btn.onclick=function(){ if(auto){ auto=false; open=true; } else open=!open; try{ localStorage.setItem(K,open?'1':'0'); }catch(e){ /* localStorage закрыт — выбор не запомнится */ } show(); };
-  // Страница доски не крутится — слушаем прокрутку любого списка карточек и самой доски (capture: scroll не всплывает).
+  btn.onclick=function(){ if(auto){ auto=false; open=true; } else open=!open; try{ localStorage.setItem(K,open?'1':'0'); }catch(e){ /* localStorage closed - the choice will not be remembered */ } show(); };
+  // The board page itself does not scroll - we listen to the scroll of any card list and of the board (capture: scroll does not bubble).
   document.addEventListener('scroll',function(e){ var t=e.target, y=(t===document||t===document.documentElement)?scrollY:t.scrollTop; if(t!==document&&t!==document.documentElement&&!(t.id==='main'||t.classList&&t.classList.contains('col-list')))return; if(y>160&&!auto&&open){ auto=true; show(); } else if(y<20&&auto){ auto=false; show(); } },{passive:true,capture:true});
   new ResizeObserver(function(){ document.documentElement.style.setProperty('--bh',bar.offsetHeight+'px'); }).observe(bar);
   show();

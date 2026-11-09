@@ -1,4 +1,4 @@
-// Вкладка «Структура»: файлы настроек (карточки) и деревья каталогов с попапом «что это» у каждого узла (structure.cjs).
+// The "Structure" tab: the settings files (cards) and directory trees with a "what is this" popup on every node (structure.cjs).
 const STRUCT_INFO = [];
 const WHO_DEF = { human: ["st.who.human", "st-k-static"], nodes: ["st.who.nodes", "st-k-dynamic"], secret: ["st.who.secret", "st-secret"] };
 const whoOf = (k) => WHO_DEF[k] ? [t(WHO_DEF[k][0]), WHO_DEF[k][1]] : null;
@@ -29,7 +29,7 @@ function structSettingsCard(f){
   return `<div class="st-card"><div class="st-card-h"><span class="st-ic">${structIcon({ dir: f.dir, name: f.rel })}</span><b>${esc(f.rel)}</b>${f.exists ? structHelp(f) : ""}</div>
     <div class="st-card-n">${esc(f.note)}</div><div class="st-card-f"><span class="st-who ${w[1]}">${w[0]}</span>${meta}</div></div>`;
 }
-// Заголовок и пояснение группы/рода: перевод по ключу, запас — то, что отдал сервер (группы адаптеров).
+// The group/kind's title and explanation: translated by key, the fallback is what the server gave (the adapters' groups).
 const stTr = (pre, key, part, fb) => { const k = `st.${pre}.${key}.${part}`, v = t(k); return v === k ? fb : v; };
 
 function structureHtml(s){

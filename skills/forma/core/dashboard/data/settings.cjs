@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * Вкладки «Проект» и «Движок»: только чтение. «Проект» — `project/config/PROJECT.md` и `GOAL.md` целей;
- * «Движок» — настройки движка, которые читает адаптер (`engineSettings`), он же держит запрет 15 (у секретов
- * только имя), плюс каталог маршрутов. Нет адаптера — настройки не найдены, а не пустые.
+ * The "Project" and "Engine" tabs: read-only. "Project" - `project/config/PROJECT.md` and the goals' `GOAL.md` files;
+ * "Engine" - the engine settings the adapter reads (`engineSettings`); the same adapter holds prohibition 15 (secrets have
+ * only a name), plus the route catalog. No adapter - the settings are not found, not empty.
  */
 
 const fs = require('fs');
@@ -16,7 +16,7 @@ const { readRoutesCatalog } = require('./routes.cjs');
 
 const { UNKNOWN } = engines;
 
-/** Оснастка узлов: строка считается пустой, если пусты все колонки кроме имени узла. */
+/** The nodes' rig: a row counts as empty if all columns but the node's name are empty. */
 function toolingView(tooling) {
   return {
     columns: tooling ? tooling.columns : [],
@@ -25,17 +25,17 @@ function toolingView(tooling) {
   };
 }
 
-const ORIGIN = { core: 'ядро', project: 'проект', unknown: '—' };
+const ORIGIN = { core: '\u044f\u0434\u0440\u043e', project: '\u043f\u0440\u043e\u0435\u043a\u0442', unknown: '—' };
 
 /**
- * Умения проекта — из каталога скиллов движка: имя папки и `description` из `SKILL.md`. Отдельной описи нет.
- * Признак: `ядро` — имя среди умений, что поставляет шаблон (список отдаёт адаптер, `templateSkills`; он едет
- * с установленным адаптером, клон .forma/protocol/ не нужен), иначе `проект`. Адаптер списка не объявил — источника
- * нет, и признак «—», а не молчаливое «проект».
+ * The project's skills - from the engine's skill catalog: the folder name and the `description` from `SKILL.md`. There is no separate inventory.
+ * The origin marker: "core" - the name is among the skills the template supplies (the list is given by the adapter, `templateSkills`; it travels
+ * with the installed adapter, the .forma/protocol/ clone is not needed), otherwise "project". The adapter declared no list - there is
+ * no source, and the marker is "-", not a silent "project".
  */
 function readSkills(projectRoot) {
   const dir = engines.firstPath(projectRoot, 'skillsDir');
-  const columns = ['Умение', 'Признак', 'Описание'];
+  const columns = ['\u0423\u043c\u0435\u043d\u0438\u0435', '\u041f\u0440\u0438\u0437\u043d\u0430\u043a', '\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435'];
   if (!dir) return { columns, rows: [], dirs: UNKNOWN };
   const tpl = engines.first(projectRoot, 'templateSkills');
   const fromTemplate = Array.isArray(tpl) ? new Set(tpl) : null;
@@ -49,7 +49,7 @@ function readSkills(projectRoot) {
   return { columns, rows, dirs: names.length };
 }
 
-/** Цели с признаком «образ — черновик». */
+/** Goals with the "end-image is a draft" marker. */
 function readGoalDrafts(projectRoot) {
   const goalsDir = path.join(projectRoot, 'project', 'goals');
   const goals = [];
@@ -91,7 +91,7 @@ const NO_ENGINE_SETTINGS = {
   mcp: { project: [], user: [], userProject: [] }, check: { ran: false },
 };
 
-// Последний по времени файл в каталоге (неглубоко); нет каталога — 0.
+// The newest file in the directory (shallow); no directory - 0.
 function newestMtime(dir) {
   let best = 0;
   const walk = (d, depth) => {
@@ -100,14 +100,14 @@ function newestMtime(dir) {
     for (const e of list) {
       const p = path.join(d, e.name);
       if (e.isDirectory()) { if (depth < 2) walk(p, depth + 1); continue; }
-      try { best = Math.max(best, fs.statSync(p).mtimeMs); } catch { /* файл исчез — пропуск */ }
+      try { best = Math.max(best, fs.statSync(p).mtimeMs); } catch { /* the file vanished - skip */ }
     }
   };
   walk(dir, 0);
   return best;
 }
 
-// Движок вкладки — тот, чья последняя сессия свежее; без стенограмм — первый объявивший настройки.
+// The tab's engine - the one whose last session is freshest; without transcripts - the first that declared settings.
 function activeAdapter(projectRoot) {
   const list = engines.loadAdapters(projectRoot).filter((a) => typeof a.engineSettings === 'function');
   let pick = list[0] || null, best = -1;
@@ -123,10 +123,10 @@ function activeAdapter(projectRoot) {
 function readEngineSettings(projectRoot) {
   const active = activeAdapter(projectRoot);
   const read = active ? active.engineSettings : null;
-  // Адаптер без engineSettings тег движка всё равно объявил: тег — от активного, иначе от первого объявившего.
+  // An adapter without engineSettings still declared the engine tag: the tag - from the active one, else from the first that declared it.
   const tag = (active ? active.engine : engines.first(projectRoot, 'engine')) || null;
   const eng = read ? read(projectRoot) : NO_ENGINE_SETTINGS;
-  // описание хука — из шапки его скрипта (как в «Структуре»); нет шапки — нет описания, не выдумка
+  // a hook's description - from its script's header (as in "Structure"); no header - no description, not an invention
   const { describe } = require('../structure.cjs');
   const hookDescs = {};
   for (const h of eng.hooks || []) for (const cmd of h.commands) {

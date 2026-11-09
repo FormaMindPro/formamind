@@ -1,10 +1,10 @@
-// Вкладка «Схема»: блоки движка карточками (название, задача, счётчики состава по типам); клик раскрывает файлы.
-// Стрелки между блоками (читает, пишет, вызывает, регистрирует, порождает) — SVG поверх сетки, по d.schema.blockLinks.
-// Данные — d.schema (schema-view.cjs); списков блоков, файлов и связей в вёрстке нет.
+// The "Schema" tab: the engine's blocks as cards (name, task, composition counters by type); a click unfolds the files.
+// The arrows between blocks (reads, writes, calls, registers, spawns) are SVG over the grid, by d.schema.blockLinks.
+// The data is d.schema (schema-view.cjs); the layout holds no lists of blocks, files or links.
 const SCHEMA_OPEN = new Set();
-let SC_DATA = null; // последние данные схемы: стрелки считаются из них
-const SC_HIDDEN = new Set(); // скрытые фильтром типы связей
-let SC_SEL = ''; // выбранный блок: подсвечиваются его входящие и исходящие связи
+let SC_DATA = null; // the schema's latest data: the arrows are computed from it
+const SC_HIDDEN = new Set(); // the link types hidden by the filter
+let SC_SEL = ''; // the selected block: its incoming and outgoing links are highlighted
 const scLang = () => (typeof i18nLang === 'function' ? i18nLang() : 'en');
 const scPick = (o, base) => o[base + (scLang() === 'ru' ? 'Ru' : 'En')] || o[base + 'En'] || '';
 function scCaller(f) {
@@ -41,17 +41,17 @@ function schemaHtml(s) {
   const byPath = {}; for (const f of s.files) byPath[f.path] = f;
   const uns = s.unsorted && s.unsorted.length
     ? `<section class="nodes-card sc-unsorted"><h2>${t('sc.unsorted')} (${s.unsorted.length})</h2><ul>${s.unsorted.map((p) => `<li><code>${esc(p)}</code></li>`).join('')}</ul></section>` : '';
-  setTimeout(scRedraw, 0); // вёрстка ещё не вставлена в страницу — стрелки рисуются следом
+  setTimeout(scRedraw, 0); // the layout is not inserted into the page yet - the arrows are drawn right after
   return `<h2 class="st-h">${t('sc.title')}</h2><p class="dim">${t('sc.lede')}</p>
     ${scFilterHtml(s)}
     <div class="sc-bar"><button id="sc-open">${t('sc.openAll')}</button><button id="sc-close">${t('sc.closeAll')}</button></div>
     <div class="sc-wrap" id="sc-wrap"><div class="sc-grid" id="sc-grid">${s.blocks.map((b) => scBlockHtml(b, byPath, s.types)).join('')}</div><svg class="sc-svg" id="sc-svg" aria-hidden="true"></svg></div>${uns}`;
 }
 
-// --- Стрелки ---
+// --- Arrows ---
 const SVGNS = 'http://www.w3.org/2000/svg';
 const scEl = (name, attrs) => { const e = document.createElementNS(SVGNS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
-/** Точка границы прямоугольника r на луче из его центра к (tx, ty). */
+/** The point of rectangle r's boundary on the ray from its center toward (tx, ty). */
 function scEdge(r, tx, ty) {
   const cx = r.x + r.w / 2, cy = r.y + r.h / 2, dx = tx - cx, dy = ty - cy;
   if (!dx && !dy) return [cx, cy];
@@ -63,7 +63,7 @@ function scDraw() {
   if (!wrap || !svg || !SC_DATA || !SC_DATA.blockLinks) return;
   svg.replaceChildren();
   const W = wrap.offsetWidth, H = wrap.offsetHeight;
-  if (!wrap.offsetParent || !W) return; // вкладка скрыта — размеров нет, перерисуется при показе
+  if (!wrap.offsetParent || !W) return; // the tab is hidden - no dimensions, it redraws when shown
   svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   const base = wrap.getBoundingClientRect(), rect = {};
   wrap.querySelectorAll('.sc-block').forEach((el) => {
@@ -79,7 +79,7 @@ function scDraw() {
   svg.appendChild(defs);
   const label = {}; for (const k of SC_DATA.linkTypes) label[k.key] = k[scLang()] || k.en;
   const links = SC_DATA.blockLinks.filter((l) => l.from !== l.to && rect[l.from] && rect[l.to] && !SC_HIDDEN.has(l.type));
-  const groups = {}; // параллельные стрелки одной пары блоков разводятся в стороны
+  const groups = {}; // parallel arrows of one pair of blocks are spread apart
   for (const l of links) (groups[[l.from, l.to].sort().join('|')] ||= []).push(l);
   const drawn = [];
   for (const g of Object.values(groups)) g.forEach((l, i) => {
@@ -100,7 +100,7 @@ function scDraw() {
     }
     drawn.push({ grp, hot: SC_SEL && hot });
   });
-  drawn.sort((p, q) => (p.hot ? 1 : 0) - (q.hot ? 1 : 0)).forEach((d) => svg.appendChild(d.grp)); // подсвеченные — поверх
+  drawn.sort((p, q) => (p.hot ? 1 : 0) - (q.hot ? 1 : 0)).forEach((d) => svg.appendChild(d.grp)); // the highlighted ones on top
 }
 function scRedraw() { requestAnimationFrame(scDraw); }
 function scSelect(key) {
@@ -122,7 +122,7 @@ function scSet(block, open) {
   block.querySelector('.sc-arrow').textContent = open ? '▾' : '▸';
   document.dispatchEvent(new CustomEvent('schema-layout'));
 }
-document.addEventListener('schema-layout', scRedraw); // раскрытие блока меняет раскладку
+document.addEventListener('schema-layout', scRedraw); // unfolding a block changes the layout
 window.addEventListener('resize', scRedraw);
 if (typeof ResizeObserver === 'function') document.addEventListener('DOMContentLoaded', () => {
   const w = document.getElementById('schema'); if (w) new ResizeObserver(scRedraw).observe(w);
@@ -137,7 +137,7 @@ document.addEventListener('click', (e) => {
   }
   const pk = c.closest('[data-sc-pick]');
   if (pk) { scSelect(pk.dataset.scPick); return; }
-  if (c.closest('[data-stab="schema"]')) scRedraw(); // вкладка стала видимой
+  if (c.closest('[data-stab="schema"]')) scRedraw(); // the tab became visible
   const h = c.closest('[data-sc-toggle]');
   if (h) { const b = h.closest('.sc-block'); scSet(b, !b.classList.contains('sc-open')); return; }
   if (e.target.id === 'sc-open' || e.target.id === 'sc-close')

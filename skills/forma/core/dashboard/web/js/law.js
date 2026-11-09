@@ -1,9 +1,9 @@
-// Вкладка «Закон» и переключатель вкладок. Зовётся из boardInit (board.js) и получает то, что живёт в его области:
-// DATA, esc, T (подписи), lbl (подпись метки), ROUTES (карта маршрутов). Возвращает linkLaw — ссылки «§N» в окнах доски.
-// Состояние вызова — объект L ({ DATA, esc, T, lbl, ROUTES, tab }); каждый вызов lawInit начинает с вкладки «Закон §1–7».
+// The "Law" tab and the tab switcher. Called from boardInit (board.js) and receives what lives in its scope:
+// DATA, esc, T (labels), lbl (a marker's label), ROUTES (the route map). Returns linkLaw - the "§N" links in the board windows.
+// One call's state is the L object ({ DATA, esc, T, lbl, ROUTES, tab }); every lawInit call starts on the "Law §1-7" tab.
 
-// --- Вкладка «Закон»: AGENTS.md и всё, чем он управляет (данные — DATA.law, собирает build-board-demo.cjs) ---
-// Подписи вычисляются при обращении: язык меняется без перезагрузки.
+// --- The "Law" tab: AGENTS.md and everything it governs (the data is DATA.law, assembled by build-board-demo.cjs) ---
+// The labels are computed on access: the language changes without a reload.
 const LAW_SEC = new Proxy({}, { get: (_, k) => (typeof k === 'string' ? t('law.sec.' + k) : '') });
 const prohibList = () => Array.from({ length: 15 }, (_, i) => t('law.prohib.' + (i + 1)));
 const lawCheckText = (k) => { const x = t('law.check.' + k); return x === 'law.check.' + k ? '' : x; };
@@ -11,12 +11,12 @@ const LAW_ROLES = ['intent', 'spec', 'kit', 'run', 'core', 'extractor'];
 const lawRoleText = (r) => (LAW_ROLES.includes(r.name) ? t('law.role.' + r.name) : r.desc);
 const lawNav = () => [['law', t('law.nav.law')], ['engine', t('law.nav.engine')], ['routes', t('law.nav.routes')], ['roles', t('law.nav.roles')], ['ondemand', t('law.nav.ondemand')], ['checks', t('law.nav.checks')], ['project', t('law.nav.project')], ['.forma/manual', t('law.nav.manual')]];
 
-function lawMd(L, t) { // marked с CDN; без сети — простой показ
+function lawMd(L, t) { // marked from a CDN; without a network - a plain display
   t = String(t || '').replace(/\r/g, '');
   if (window.marked) return marked.parse(t);
   return '<pre class="raw">' + L.esc(t) + '</pre>';
 }
-function lawSplitSections(t) { // AGENTS.md → вступление + §1…§7
+function lawSplitSections(t) { // AGENTS.md -> the intro + §1...§7
   const parts = t.replace(/\r/g, '').split(/^## (?=\d+\. )/m);
   return { intro: parts[0], secs: parts.slice(1).map(p => { const n = +p.match(/^(\d+)/)[1]; const nl = p.indexOf('\n'); return { n, title: p.slice(0, nl).replace(/^\d+\.\s*/, ''), body: p.slice(nl + 1) }; }) };
 }
@@ -80,7 +80,7 @@ function lawRender(L, anchor) {
   el.innerHTML = nav + lawBodyHtml(L, anchor);
   if (anchor) { const a = document.getElementById(anchor); if (a) { a.closest('details')?.setAttribute('open', ''); a.scrollIntoView({ block: 'start' }); } }
 }
-// Вкладка «Настройки» — контейнер, внутри подвкладки «Закон», «Движок», «Борт», «Структура» (переносятся как есть).
+// The "Settings" tab - a container holding the "Law", "Engine", "Bort", "Structure" sub-tabs (carried over as they are).
 const SETTINGS_TABS = ['law', 'project', 'engine', 'structure', 'schema'];
 function settingsSetTab(tab) {
   SETTINGS_TABS.forEach(t => { const el = document.getElementById('view-' + t); if (el) el.hidden = t !== tab; });
@@ -90,7 +90,7 @@ function settingsRender(L, tab, anchor) {
   settingsSetTab(tab);
   if (tab === 'law') { if (anchor) L.tab = 'law'; lawRender(L, anchor); }
 }
-// Вкладки наверху; «§N» на доске и в окнах — ссылка в закон (вкладка «Настройки», подвкладка «Закон»).
+// The tabs are at the top; "§N" on the board and in the windows links into the law (the "Settings" tab, the "Law" sub-tab).
 function lawSetView(L, v, settingsTab, anchor) {
   document.getElementById('view-board').hidden = v !== '.forma/board';
   document.getElementById('view-settings').hidden = v !== 'settings';
@@ -98,16 +98,16 @@ function lawSetView(L, v, settingsTab, anchor) {
   const tab = document.querySelector(`.tab[data-view="${v}"]`);
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.view === v));
   document.title = `${L.DATA.project} · ${v === '.forma/board' ? t('law.kanban') : tab.textContent}`;
-  // Переключение вкладки — это новая страница: старая прокрутка body, унаследованная
-  // от предыдущей вкладки, иначе оставляет контент визуально «ниже» верхних вкладок.
+  // Switching a tab is a new page: the old body scroll inherited from the previous tab
+  // would otherwise leave the content visually "below" the top tabs.
   window.scrollTo(0, 0);
   if (v === 'settings') settingsRender(L, settingsTab || L.settingsTab || 'law', anchor);
-  try { history.replaceState(null, '', v === '.forma/board' ? '#' : '#' + v); } catch { /* адрес не меняется (file://, песочница) — вкладка всё равно переключена */ }
+  try { history.replaceState(null, '', v === '.forma/board' ? '#' : '#' + v); } catch { /* the address cannot change (file://, sandbox) - the tab is switched anyway */ }
 }
-// Выбранная подвкладка Настроек переживает перерисовку среза (смена языка, живое обновление): lawInit зовётся заново.
+// The chosen Settings sub-tab survives a snapshot redraw (a language switch, live update): lawInit is called again.
 let SETTINGS_LAST = 'law';
-try { SETTINGS_LAST = sessionStorage.getItem('settingsTab') || 'law'; } catch { /* хранилище недоступно — по умолчанию «Закон» */ }
-function settingsRemember(t) { SETTINGS_LAST = t; try { sessionStorage.setItem('settingsTab', t); } catch { /* не критично */ } return t; }
+try { SETTINGS_LAST = sessionStorage.getItem('settingsTab') || 'law'; } catch { /* the storage is unavailable - "Law" by default */ }
+function settingsRemember(t) { SETTINGS_LAST = t; try { sessionStorage.setItem('settingsTab', t); } catch { /* not critical */ } return t; }
 function lawInit({ DATA, esc, T, lbl, ROUTES }) {
   const L = { DATA, esc, T, lbl, ROUTES, tab: 'law', settingsTab: SETTINGS_LAST };
   document.getElementById('view-law').onclick = e => {

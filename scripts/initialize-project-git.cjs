@@ -18,7 +18,7 @@ if (gitVersion.error || gitVersion.status !== 0) {
   process.exit(1)
 }
 
-// Секреты окружения (AGENTS.md, запрет 15): .env в корне, вне git — в любом репозитории, новом или существующем.
+// Environment secrets (AGENTS.md, prohibition 15): .env in the root, outside git - in any repository, new or existing.
 function ensureEnv() {
   const gitignore = join(projectRoot, '.gitignore')
   let ignoreState = 'unchanged'

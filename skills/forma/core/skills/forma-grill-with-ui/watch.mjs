@@ -1,27 +1,28 @@
 #!/usr/bin/env node
-// Слежение за сессией, которое не умирает после первого события.
+// Watching a session in a way that does not die after the first event.
 //
-// `server.mjs wait` возвращает одно событие и завершается. Под фоновым наблюдателем это значит:
-// пришёл ответ — слежение кончилось, и следующий ответ человека уходит в тишину.
-// Незаметно ровно до того мгновения, когда агент отвлёкся на работу, — а отвлекается
-// он всегда, потому что разбирать ответ и есть его работа. Человек в это время видит
-// «ожидание агента» без предела и не может отличить отлучку от поломки.
+// `server.mjs wait` returns one event and exits. Under a background watcher that means:
+// an answer arrives - the watching is over, and the human's next answer goes into silence.
+// Unnoticeable exactly until the moment the agent gets distracted by work - and it always does,
+// because parsing the answer is its very work. The human then sees a boundless
+// "waiting for the agent" and cannot tell an absence from a breakage.
 //
-// Здесь слежение живёт, пока живёт монитор, и говорит обо всём, что меняет положение:
-// о каждом новом событии и о смерти сервера. Молчание тогда значит ровно одно —
-// ничего не произошло.
+// Here the watching lives as long as the monitor lives, and reports everything that changes the picture:
+// every new event, and the server's death. Silence then means exactly one thing -
+// nothing happened.
 //
 //   node watch.mjs --session <dir> [--after N]
 import fs from 'node:fs';
 import path from 'node:path';
+import i18n from '../../i18n/index.cjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const dir = arg('--session');
 const root = arg('--root');
-if (!dir && !root) { console.error('нужен --session <dir> или --root <dir>'); process.exit(2); }
+if (!dir && !root) { console.error(i18n.message('grill.need_session_or_root', null, 'ru')); process.exit(2); }
 let after = Number(arg('--after', 0)) || 0;
 
-// В режиме --root у каждой сессии свой счётчик: номера событий в них независимы.
+// In --root mode each session has its own counter: the event numbers in them are independent.
 const seenBySession = new Map();
 const sessionDirs = () => {
   if (dir) return [dir];
@@ -39,33 +40,33 @@ const readEvents = (d) => {
   } catch { return []; }
 };
 
-// Что именно пришло, одной строкой: тип события, номер и по чему ответили. Полный
-// текст лежит в events.jsonl — тащить его сюда значит засыпать агента байтами.
+// What exactly arrived, one line: the event type, the number and what was answered. The full
+// text lives in events.jsonl - dragging it here means putting the agent to sleep with bytes.
 const describe = (e) => {
   const kinds = {};
   for (const a of e.actions || []) kinds[a.type] = (kinds[a.type] || 0) + 1;
   const qs = [...new Set((e.actions || []).map((a) => a.q).filter(Boolean))];
   const bits = Object.entries(kinds).map(([k, n]) => (n > 1 ? `${k}×${n}` : k)).join(', ');
-  return `событие #${e.seq} · ${bits || e.type}${qs.length ? ' · ' + qs.join(' ') : ''}`;
+  return i18n.message('grill.event_line', { seq: e.seq, what: (bits || e.type) + (qs.length ? ' · ' + qs.join(' ') : '') }, 'ru');
 };
 
 const serverAlive = (d) => {
   try {
     const pid = JSON.parse(fs.readFileSync(path.join(d, 'server.json'), 'utf8')).pid;
-    if (!pid) return true; // нечем проверить — не выдумываем тревогу
+    if (!pid) return true; // nothing to check against - no invented alarm
     process.kill(pid, 0);
     return true;
   } catch (e) {
-    return e && e.code === 'EPERM'; // живой, но чужой
+    return e && e.code === 'EPERM'; // alive, but someone else's
   }
 };
 
 console.log(dir
-  ? `слежу за сессией ${path.basename(dir)}, после #${after}`
-  : `слежу за всеми сессиями проекта в ${path.basename(root)}`);
+  ? i18n.message('grill.watch_one', { name: path.basename(dir), after }, 'ru')
+  : i18n.message('grill.watch_all', { name: path.basename(root) }, 'ru'));
 
-// В режиме --root уже лежащие события не пересказываются: монитор заводят, чтобы
-// узнавать о новом, а вываливать на агента весь прошлый разговор — это шум.
+// In --root mode the already-stored events are not retold: the monitor is set up to learn
+// about the new, and dumping the whole past conversation onto the agent is noise.
 if (root) for (const d of sessionDirs()) {
   seenBySession.set(d, Math.max(0, ...readEvents(d).map((e) => Number(e.seq) || 0)));
 }
@@ -82,10 +83,10 @@ const tick = () => {
     }
     if (dir) after = last; else seenBySession.set(d, last);
   }
-  // Одна названная сессия кончилась вместе со своим сервером. В режиме --root
-  // смерть одной сессии ничего не значит: остальные живут, и новые ещё будут.
+  // One named session ended together with its server. In --root mode
+  // one session's death means nothing: the others live, and new ones are still coming.
   if (dir && !serverAlive(dir)) {
-    console.log('сервер сессии остановлен — слежение закончено');
+    console.log(i18n.message('grill.server_stopped', null, 'ru'));
     process.exit(0);
   }
 };

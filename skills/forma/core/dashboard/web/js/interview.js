@@ -1,15 +1,15 @@
-// Вкладка «Интервью»: живая картина проекта к брифу, разбор Markdown документа идеи.
+// The "Interview" tab: the live picture of the project toward the brief, a Markdown parser of the idea document.
 
-// ---------------------------------------------------------------- интервью ---
-// Живая картина проекта к брифу.
-//   Q1·D  пять позиций слева, дерево предмета справа;
-//   Q2·B  перерисовка по раунду ответов (раунд приходит в данных, не по фразе);
-//   Q4·C  догадка помечается поузлово, а не областью;
-//   Q5·C  у догадки ровно два действия — подтвердить и отклонить;
-//   Q6·C/Q7·B неподтверждённое к концу интервью уходит в «ещё не уточнено» рядом с брифом.
-// `updated` в картине — настоящий ISO с зоной, а timeAgo() выше разбирает свой формат
-// «ГГГГ-ММ-ДД ЧЧ:ММ» и намеренно не трогает часовые пояса. Расширять его под второй формат
-// значило бы завести в одной функции две разные договорённости о том, что такое время.
+// ------------------------------------------------------------- interview ---
+// The live picture of the project toward the brief.
+//   Q1.D  five positions on the left, the subject's tree on the right;
+//   Q2.B  redrawn by the round of answers (the round comes in the data, not by a phrase);
+//   Q4.C  a guess is marked node by node, not by an area;
+//   Q5.C  a guess has exactly two actions - confirm and decline;
+//   Q6.C/Q7.B what stayed unconfirmed by the end of the interview goes into "not yet clarified" next to the brief.
+// `updated` in the picture is a real ISO with a zone, while timeAgo() above parses its own
+// "YYYY-MM-DD HH:MM" format and deliberately does not touch time zones. Extending it for a second format
+// would mean keeping two different agreements about what time is inside one function.
 function agoIso(iso){
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return iso;
@@ -21,9 +21,9 @@ function agoIso(iso){
 const POS_STATE_LABEL = new Proxy({}, { get: (_, k) => (typeof k === 'string' ? t('iv.state.' + k) : '') });
 const POS_STATE_CLASS_MAP = {answered:'full', now:'now', available:'available', blocked:'blocked', ready:'ready', sent:'sent', partial:'sent'};
 
-// Доска показывает результат, а не список неулаженного. Узел, о котором ещё не
-// договорились, помечен «уточняется» — это сведение, а не предложение решить:
-// решается он вопросом в интервью, а не кликом здесь.
+// The board shows the result, not a list of the unsettled. A node not yet agreed on
+// is marked "being clarified" - that is information, not an offer to decide it:
+// it is decided by a question in the interview, not by a click here.
 function guessTagHtml(status){
   if(status === 'confirmed') return `<span class="tag">${t('iv.confirmed')}</span>`;
   if(status === 'rejected') return `<span class="tag">${t('iv.rejected')}</span>`;
@@ -45,7 +45,7 @@ function treeNodeHtml(n){
   const from = n.from ? ` <span class="from">← ${esc(n.from)}</span>` : '';
   const kids = (n.children && n.children.length)
     ? `<ul>${n.children.map(treeNodeHtml).join('')}</ul>` : '';
-  // Раскрутить можно то, что человек сказал: догадка и ожидание — ещё не материал.
+  // What can be unwound is what the human said: a guess and an expectation are not material yet.
   const grow = (kind === 'said' && n.id)
     ? `<button class="grow-btn" title="${esc(t('iv.grow'))}" onclick="expandNode('${esc(n.id)}')">+</button>`
     : '';
@@ -55,38 +55,38 @@ function treeNodeHtml(n){
 function posHtml(p){
   const cls = POS_STATE_CLASS_MAP[p.state] || 'blocked';
 
-  // Три разных случая, и путать их нельзя: ответ человека, объяснение чего ждут,
-  // подсказка о чём спросят.
+  // Three different cases, and they must not be confused: the human's answer, an explanation of what is awaited,
+  // a hint about what will be asked.
   let body;
   if (p.text) body = `<p class="pos-text">${esc(p.text)}</p>`;
   else if (p.state === 'blocked' && p.waitingFor.length)
     body = `<p class="pos-hint">${t('iv.waits', {what: p.waitingFor.map(n => t('iv.posN', {n})).join(t('iv.and')), hint: esc(p.hint)})}</p>`;
   else body = `<p class="pos-hint">${esc(p.hint)}</p>`;
 
-  // Сколько вопросов захода закрыто: «отвечено» о позиции, у которой два вопроса
-  // ещё открыты, — неправда, и человеку надо видеть, что именно осталось.
+  // How many of the approach's questions are closed: "answered" about a position that still has two questions
+  // open would be a lie, and the human needs to see what exactly remains.
   const asked = (p.questions || []).length;
   const got = (p.questions || []).filter((q) => q.given).length;
   if (asked) body += `<p class="pos-hint">${t('iv.asked', {got, asked})}</p>`;
 
-  // Слои позиций 3 и 4 — видно, что заходов здесь два, а не один.
+  // The layers of positions 3 and 4 - it is visible that there are two approaches here, not one.
   const layers = p.layers && p.layers.length
     ? `<ul class="layers">${p.layers.map(l => `<li class="layer${l.answered ? ' done' : ''}">
         <span class="lk">${esc(l.label || l.key)}</span><span>${esc(l.text || l.hint)}</span></li>`).join('')}</ul>`
     : '';
 
-  // Кнопка только у того, кого спрашивают, и только когда предпосылки осели.
-  // У пятой позиции её нет никогда: маршрут — работа `Intent`, и звать человека
-  // отвечать за узел значило бы перекладывать на него чужую работу.
-  // Кнопка только у того, кого спрашивают, и только когда предпосылки осели.
-  // Вопросов для позиции ещё нет — кнопка говорит это прямо, а не открывает
-  // пустую форму: раунды позиций пишутся вместе с человеком, когда до них
-  // доходит очередь.
+  // The button only on the one being asked, and only when the prerequisites have settled.
+  // The fifth position never has it: the route is `Intent`'s work, and calling the human
+  // to answer for a node would mean shifting someone else's work onto them.
+  // The button only on the one being asked, and only when the prerequisites have settled.
+  // There are no questions for the position yet - the button says so outright instead of opening
+  // an empty form: the position rounds are written together with the human when their
+  // turn comes.
   let open = '';
-  // Закрытая позиция кнопки не получает. Её сессия отработана и не возобновляется:
-  // «Открыть интервью» здесь обещало бы продолжение того разговора, а продолжить его
-  // нельзя — он закончен и записан. Понадобится уточнение — это новый заход, и заводит
-  // его `Intent`, после чего позиция перестаёт быть закрытой и кнопка вернётся сама.
+  // A closed position gets no button. Its session has run its course and is not resumed:
+  // "Open the interview" here would promise a continuation of that conversation, and continuing it
+  // is impossible - it is finished and recorded. If a clarification is needed, that is a new approach,
+  // opened by `Intent`, after which the position stops being closed and the button returns by itself.
   if (p.asks === 'human' && p.state !== 'blocked' && p.state !== 'answered') {
     open = p.questions.length
       ? `<div class="pos-open">
@@ -96,19 +96,19 @@ function posHtml(p){
               : p.session ? t('iv.restart') : t('iv.open')
           }</button>
           ${p.session && !p.session.alive
-            // Адрес живой сессии рядом с кнопкой не пишется: он вёл туда же, куда она.
-            // Два пути к одному месту — не выбор, а шум рядом с действием. Сказать
-            // стоит только о том, чего по кнопке не видно: страница не отвечает.
+            // The live session's address is not written next to the button: it led to the same place the button does.
+            // Two paths to one place is not a choice but noise next to an action. The only thing
+            // worth saying is what the button cannot show: the page is not responding.
             ? `<span class="sess dead">${t('iv.dead')}</span>` : ''}
         </div>`
       : `<p class="pos-note">${t('iv.notWritten')}</p>`;
   }
 
-  // У закрытой позиции вместо кнопки — то единственное, что здесь ещё имеет значение:
-  // куда лёг результат. Дальше смотрят туда, а не сюда.
-  // Закрытая позиция закрыта не навсегда. Возобновление — не продолжение того же
-  // разговора (он записан и сдан), а новый заход по этой же позиции: один открытый
-  // вопрос о том, что человек хочет добавить, дальше раскручивается вопросами.
+  // On a closed position, instead of the button - the only thing that still matters here:
+  // where the result landed. From there one looks further, not here.
+  // A closed position is not closed forever. Resuming is not a continuation of the same
+  // conversation (it is recorded and handed over) but a new approach on this same position: one open
+  // question about what the human wants to add, then it unwinds by questions.
   const done = p.state === 'answered'
     ? `<div class="pos-open">
         <button class="ghost-btn resume-btn" data-pos="${p.n}" onclick="openPosition(${p.n}, true)">${t('iv.resume')}</button>
@@ -135,17 +135,17 @@ function posHtml(p){
   </div>`;
 }
 
-// Какая сторона показана справа. Выбор переживает пересборку данных, но не
-// перезагрузку страницы: это взгляд, а не состояние проекта.
+// Which side is shown on the right. The choice survives a data rebuild but not
+// a page reload: it is a glance, not the project's state.
 let sideView = 'tree';
 function setSideView(v){
   sideView = v;
   if (latestData) document.getElementById('interview').innerHTML = interviewHtml(latestData.interview);
 }
 
-// Крошечный разбор Markdown — ровно то, чем пишется документ идеи: заголовки,
-// списки, таблицы, цитаты, жирное и курсив. Полноценная библиотека сюда не тянется:
-// у дашборда нет сборки и нет зависимостей, и заводить их ради одного файла нечем.
+// A tiny Markdown parser - exactly what the idea document is written with: headings,
+// lists, tables, quotes, bold and italic. A full library is not pulled in here:
+// the dashboard has no build and no dependencies, and there is nothing to start them for one file's sake.
 function mdHtml(src){
   const esc2 = (t) => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const inline = (t) => esc2(t)
@@ -155,7 +155,7 @@ function mdHtml(src){
   const out = [];
   const lines = String(src).split(/\r?\n/);
   let list = null, quote = false, table = null;
-  // Строки копятся, пока абзац не кончится пустой строкой или чем-то другим.
+  // Lines accumulate until the paragraph ends with an empty line or something else.
   let para = [];
   const closePara = () => { if (para.length) { out.push('<p>' + inline(para.join(' ')) + '</p>'); para = []; } };
   let qpara = [];
@@ -165,11 +165,11 @@ function mdHtml(src){
   const closeTable = () => { if (table) { out.push('</tbody></table>'); table = null; } };
   for (const raw of lines) {
     const l = raw.trimEnd();
-    // Таблица: строка-разделитель отделяет шапку от тела.
+    // A table: the separator row divides the header from the body.
     if (/^\|/.test(l)) {
       closePara();
       const cells = l.replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
-      if (/^[-: ]+$/.test(cells.join(''))) continue;        // разделитель
+      if (/^[-: ]+$/.test(cells.join(''))) continue;        // separator
       if (!table) { closeList(); closeQuote(); out.push('<table><tbody>'); table = 1; }
       out.push('<tr>' + cells.map((c) => '<td>' + inline(c) + '</td>').join('') + '</tr>');
       continue;
@@ -180,7 +180,7 @@ function mdHtml(src){
     const h = /^(#{1,4})\s+(.*)$/.exec(l);
     if (h) { closePara(); closeList(); closeQuote(); out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>'); continue; }
     const q = /^>\s?(.*)$/.exec(l);
-    // В цитате пустая строка тоже разделяет абзацы — иначе весь блок слипнется в один.
+    // Inside a quote an empty line separates paragraphs too - otherwise the whole block clumps into one.
     if (q) { closePara(); closeList(); if (!quote) { out.push('<blockquote>'); quote = true; }
       if (q[1].trim()) qpara.push(q[1]); else closeQPara();
       continue; }
@@ -200,11 +200,11 @@ function mdHtml(src){
   return out.join('');
 }
 
-// Пункт дерева становится темой следующего вопроса.
+// A tree item becomes the next question's topic.
 //
-// Человек смотрит на разобранное дерево и видит, где сказано мало. Спрашивать его
-// при этом «о чём ещё поговорим» значило бы заставлять вспоминать то, что у него
-// перед глазами. Вопрос собирается из самого пункта, на сервере.
+// The human looks at the parsed tree and sees where little was said. Asking them
+// meanwhile "what else shall we talk about" would mean making them recall what is
+// right in front of their eyes. The question is assembled from the item itself, on the server.
 function expandNode(id){
   fetch('/interview/expand?node=' + encodeURIComponent(id)).then(r => r.json()).then(r => {
     if (!r.ok) { alert(t('iv.err.grow', {err: r.error})); return; }
@@ -213,10 +213,10 @@ function expandNode(id){
   }).catch(e => alert(t('iv.err.grow', {err: String(e)})));
 }
 
-// Кнопка ведёт в привычный формат разговора — страницу интервью
-// `forma-grill-with-ui`, отдельной вкладкой. Формы внутри дашборда намеренно нет:
-// два места ввода под одни и те же вопросы — это и есть усталость от разных
-// окошек, ради которой всё сведено в один канал.
+// The button leads into the familiar conversation format - the interview page
+// `forma-grill-with-ui`, as a separate tab. There is deliberately no form inside the dashboard:
+// two input places for the same questions is exactly the fatigue of many little
+// windows, which everything was gathered into one channel to avoid.
 //
 function openPosition(n, resume){
   const btn = document.querySelector(`#interview [data-pos="${n}"]`);
@@ -224,8 +224,8 @@ function openPosition(n, resume){
   fetch('/interview/open?position=' + n + (resume ? '&resume=1' : '')).then(r => r.json()).then(r => {
     if (btn) { btn.disabled = false; btn.textContent = t('iv.openBtn'); }
     if (!r.ok) { alert(t('iv.err.open', {err: r.error})); return; }
-    // Именованное окно, а не безымянное: второй клик по той же позиции вернёт
-    // ту же вкладку, а не заведёт вторую страницу одного разговора.
+    // A named window, not an unnamed one: a second click on the same position returns
+    // the same tab instead of starting a second page of one conversation.
     const w = window.open(r.url, 'forma-grill-' + n);
     if (!w) alert(t('iv.err.popup', {url: r.url}));
   }).catch(e => {
@@ -262,7 +262,7 @@ function interviewRightHtml(iv){
   </div>`;
 }
 
-// С доски можно прыгнуть в интервью — там, и только там, уточняется неясное.
+// From the board one can jump into the interview - there, and only there, the unclear gets clarified.
 function interviewUnconfHtml(iv){
   const open = (iv.positions || []).find((x) => x.asks === 'human' && x.questions && x.questions.length
     && (x.state === 'available' || x.state === 'sent' || x.state === 'answered'));
@@ -278,8 +278,8 @@ function interviewUnconfHtml(iv){
 function interviewHtml(iv){
   if(!iv) return '';
 
-  // Интервью не идёт — но скелет показывается всё равно: человеку видно, о чём
-  // спросят, и он может собраться с мыслями до разговора, а не в нём.
+  // The interview is not running - but the skeleton is shown anyway: the human sees what
+  // will be asked and can gather their thoughts before the conversation, not during it.
   const off = !iv.present;
   const warn = off
     ? (iv.reason === 'bad-json'

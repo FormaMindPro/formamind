@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * Реестр постоянных субагентов (`.forma/dashboard/.cache/subagents-registry.json`) — пишет `.forma/dashboard/subagents-log.cjs`
- * при каждой записи в `subagents.log`; здесь только читаем для панели дашборда. Мягкое предупреждение
- * вместо точного обратного отсчёта: семантика retention документацией однозначно не подтверждена.
+ * The registry of standing subagents (`.forma/dashboard/.cache/subagents-registry.json`) - `.forma/dashboard/subagents-log.cjs` writes it
+ * on every entry into `subagents.log`; this module only reads it for the dashboard panel. A soft warning
+ * instead of an exact countdown: the retention semantics are not unambiguously confirmed by the documentation.
  */
 
 const { readJson } = require('../lib/fs.cjs');
@@ -11,8 +11,8 @@ const { cachePath } = require('./cache.cjs');
 
 const SUBAGENT_STALE_DAYS = 25;
 
-// Тот же casual-парсинг времени, что и `timeAgo()` в index.html — формат «ГГГГ-ММ-ДД ЧЧ:ММ», не строгий ISO
-// (единая конвенция логов проекта).
+// The same casual time parsing as `timeAgo()` in index.html - the "YYYY-MM-DD HH:MM" format, not strict ISO
+// (the project's single log convention).
 function parseLogTimestamp(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/.exec(s || '');
   if (!m) return null;
@@ -33,7 +33,7 @@ function subagentRow(agent, r, now) {
   };
 }
 
-/** Постоянные субагенты, свежие сверху; реестра нет — пусто. */
+/** Standing subagents, freshest first; no registry - empty. */
 function readSubagentsRegistry(projectRoot) {
   const registry = readJson(cachePath(projectRoot, 'subagents-registry.json'), null);
   if (registry === null) return [];

@@ -1,10 +1,10 @@
 'use strict';
 
 /**
- * Пять узлов и их оснастка по движкам — модель, усилие (из `nodeModels` адаптера), число инструментов и доступ
- * к внешней модели (из фронтматтера файла роли в каталоге ролей того же адаптера). Строка несёт `engine`.
- * Движок без `nodeModels` даёт одну пустую строку (`empty: true`) — пустая группа, а не падение.
- * Ни одно имя движка не сравнивается: список движков — это список адаптеров (.forma/manual/en/03-protocol/SCHEME.md).
+ * The five nodes and their rig per engine - model, effort (from the adapter's `nodeModels`), the tool count and access
+ * to the external model (from the role file's frontmatter in the same adapter's role catalog). The row carries `engine`.
+ * An engine without `nodeModels` yields one empty row (`empty: true`) - an empty group, not a fall.
+ * No engine name is ever compared: the list of engines is the list of adapters (.forma/manual/en/03-protocol/SCHEME.md).
  */
 
 const fs = require('fs');
@@ -12,10 +12,10 @@ const path = require('path');
 const { parseFrontmatter } = require('../lib/card.cjs');
 const engines = require('../lib/engines.cjs');
 
-/** Порядок узлов в таблицах. */
+/** The order of nodes in the tables. */
 const NODE_ORDER = ['Intent', 'Spec', 'Kit', 'Run', 'Core'];
 
-/** Инструменты роли: `{ toolCount, externalModel }`; нет каталога или файла — 0 и false. */
+/** A role's tools: `{ toolCount, externalModel }`; no catalog or file - 0 and false. */
 function toolsOf(rolesDir, label) {
   const file = rolesDir ? path.join(rolesDir, `${label.toLowerCase()}.md`) : null;
   if (!file || !fs.existsSync(file)) return { toolCount: 0, externalModel: false };
@@ -26,7 +26,7 @@ function toolsOf(rolesDir, label) {
 
 const emptyRow = (engine) => ({ engine, node: null, model: null, effort: null, toolCount: 0, externalModel: false, empty: true });
 
-/** Оснастка пяти узлов по всем адаптерам; нет адаптеров — пусто. */
+/** The rig of the five nodes across all adapters; no adapters - empty. */
 function readNodeConfig(projectRoot) {
   const tables = engines.nodeModelTables(projectRoot);
   const rows = [];

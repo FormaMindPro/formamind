@@ -38,10 +38,10 @@ function parseArgs(argv) {
 }
 const print = (obj) => process.stdout.write(JSON.stringify(obj) + "\n");
 const die = (msg, code = 2) => { process.stderr.write(`grill: ${msg}\n`); process.exit(code); };
-// Порт прошлого запуска и проверка живости pid — общий с дашбордом модуль сессий интервью
-// (.forma/dashboard/lib/interview-sessions.cjs): одна копия, а не две. Путь от движка не зависит: скилл лежит на
-// разной глубине (ядро — .forma/skills/<имя>/, доставленная копия — <каталог движка>/.forma/skills/<имя>/), поэтому модуль
-// ищется вверх от этого файла, пока не встретится .forma/dashboard/lib/. Нужен только командам serve и url — остальные его не грузят.
+// The previous run's port and the pid liveness check - the interview-sessions module shared with the dashboard
+// (.forma/dashboard/lib/interview-sessions.cjs): one copy, not two. The path does not depend on the engine: the skill sits at
+// different depths (the core - .forma/skills/<name>/, a delivered copy - <engine directory>/.forma/skills/<name>/), so the module
+// is searched upward from this file until .forma/dashboard/lib/ is met. Only the serve and url commands need it - the rest do not load it.
 let sharedSessions = null;
 function shared() {
   if (sharedSessions) return sharedSessions;
@@ -142,7 +142,7 @@ function cmdPending(o) {
 }
 
 // ---- serve ----
-const MAX_UPLOAD = 10 * 1024 * 1024;   // потолок на один файл; выше — это уже не референс, а выгрузка
+const MAX_UPLOAD = 10 * 1024 * 1024;   // the ceiling per file; above it this is no longer a reference but an upload
 
 const send = (res, code, body, type) => { res.writeHead(code, { "content-type": type, "cache-control": "no-store" }); res.end(body); };
 const json = (res, code, obj) => send(res, code, JSON.stringify(obj), "application/json");
@@ -157,27 +157,27 @@ const readBytes = (req) => new Promise((resolve, reject) => {
   req.on("end", () => resolve(Buffer.concat(chunks)));
   req.on("error", reject);
 });
-// Имя приходит от человека и уходит в файловую систему: всё, что может увести из
-// папки сессии, обрезается. Расширение сохраняется — по нему потом видно, что это.
+// The name comes from the human and goes into the filesystem: everything that could lead out of
+// the session folder is cut off. The extension is kept - it later shows what this is.
 const safeName = (name) => {
   const base = String(name || "file").split(/[\/]/).pop().replace(/[ -<>:"|?*]/g, "").trim();
   return (base && base !== "." && base !== ".." ? base : "file").slice(0, 120);
 };
 
-// Один и тот же файл могут прислать дважды; второй не затирает первый молча.
+// The same file may be sent twice; the second does not silently overwrite the first.
 function freeName(dir, name) {
   const ext = path.extname(name); const stem = name.slice(0, name.length - ext.length);
   let i = 1; while (fs.existsSync(path.join(dir, name))) name = `${stem}-${++i}${ext}`;
   return name;
 }
 
-// Одна сессия: её файлы и счётчик событий. Сервер — отдельный процесс, состояние живёт в ctx.
+// One session: its files and event counter. The server is a separate process; the state lives in ctx.
 function sessionContext(session) {
   const events = path.join(session, "events.jsonl");
   return { session, events, stateFile: path.join(session, "state.json"), page: path.join(HERE, "page.html"), seq: lastSeq(events), lastGoodState: null };
 }
 
-// Событие Send: строка в events.jsonl и та же строка в stdout — она будит агента.
+// The Send event: a line in events.jsonl and the same line in stdout - it wakes the agent.
 function recordSend(ctx, actions) {
   const line = JSON.stringify({ type: "send", seq: ++ctx.seq, at: new Date().toISOString(), session: ctx.session, actions });
   fs.appendFileSync(ctx.events, line + "\n");
@@ -210,7 +210,7 @@ async function handleUpload(ctx, req, res) {
   const action = { type: "upload", file: name, bytes: buf.length };
   const q = u.get("q"); if (q) action.q = q;
   const note = u.get("note"); if (note) action.note = note;
-  return json(res, 200, { ok: true, seq: recordSend(ctx, [action]), file: name });   // загрузка будит агента так же, как ответ
+  return json(res, 200, { ok: true, seq: recordSend(ctx, [action]), file: name });   // an upload wakes the agent just like an answer
 }
 
 async function handleSend(ctx, req, res) {

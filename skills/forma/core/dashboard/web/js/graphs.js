@@ -1,9 +1,9 @@
-// Вкладка «Графы»: панели graphify и рамка выбранного графа.
+// The "Graphs" tab: the graphify panels and the frame of the selected graph.
 
-// Три отдельные компактные панели (по одной под каждой вкладкой графа), не единая сводная —
-// каждая несёт числа именно своего корпуса, не агрегат по всем трём разом
-// (`kit.md`-задача «механизм контроля создания графов», п.4).
-// Подписи вычисляются при обращении: язык меняется без перезагрузки.
+// Three separate compact panels (one under each graph tab), not a single summary -
+// each carries the numbers of exactly its own corpus, not an aggregate over all three at once
+// (the `kit.md` task "the graph-creation control mechanism", item 4).
+// The labels are computed on access: the language changes without a reload.
 const GRAPHIFY_CORPUS_LABEL = { get project(){ return t('gr.label.project'); }, get manual(){ return t('gr.label.manual'); }, get site(){ return t('gr.label.site'); }, get engine(){ return t('gr.label.engine'); } };
 const GRAPHIFY_CORPUS_HINT = {
   project: '/graphify project --update',
@@ -53,7 +53,7 @@ function renderGraphifyPanels(data){
   }
 }
 
-// Графы Kit строятся скриптом без модели — журнала Graphify у них нет.
+// The Kit graphs are built by a script without a model - they have no Graphify log.
 const KIT_GRAPHS = ['goals', 'arsenal', 'structure', 'resources', 'board', 'manual', 'project', 'central'];
 
 function showGraph(c) {

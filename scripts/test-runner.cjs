@@ -5,11 +5,13 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const i18n = require('../skills/forma/core/i18n/index.cjs');
+const tr = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..');
 const TEST_DIR = path.join(ROOT, 'test');
 
-// Подкаталог проекта: несколько открытых проектов не делят один временный каталог
+// A per-project subdirectory: several open projects do not share one temp directory
 const PROJECT_SLUG =
   path
     .basename(ROOT)
@@ -17,7 +19,7 @@ const PROJECT_SLUG =
     .replace(/[^a-z0-9_-]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'project';
 
-// 1. Определение временной папки (RAM-диск или системный откат)
+// 1. Resolving the temp folder (a RAM disk or the system fallback)
 function resolveTmpDir() {
   if (process.env.FORMA_TEST_TMP) {
     const custom = path.resolve(process.env.FORMA_TEST_TMP);
@@ -26,12 +28,12 @@ function resolveTmpDir() {
       fs.accessSync(custom, fs.constants.W_OK);
       return { path: path.join(custom, PROJECT_SLUG), type: 'FORMA_TEST_TMP' };
     } catch {
-      // переменная задана, но путь мёртв: предупреждение и откат на автоопределение — слепая вера в переменную запрещена
-      console.warn(`[test-runner] FORMA_TEST_TMP задана, но путь недоступен (${custom}) — откат на автоопределение`);
+      // the variable is set but the path is dead: a warning and a fallback to autodetection - blind trust in the variable is forbidden
+      console.warn(tr('trun.tmp_dead', { custom }));
     }
   }
 
-  // Windows: RAM-диск R:\
+  // Windows: RAM disk R:\
   if (process.platform === 'win32') {
     const winRam = 'R:\\forma-tmp';
     try {
@@ -39,10 +41,10 @@ function resolveTmpDir() {
         const winDir = path.join(winRam, PROJECT_SLUG);
         fs.mkdirSync(winDir, { recursive: true });
         fs.accessSync(winDir, fs.constants.W_OK);
-        return { path: winDir, type: 'RAM-диск (R:)' };
+        return { path: winDir, type: tr('trun.ramdisk_win') };
       }
     } catch {
-      // откат при ошибке доступа к R:
+      // a fallback when access to R: fails
     }
   }
 
@@ -54,14 +56,14 @@ function resolveTmpDir() {
         const shmDir = path.join(shmRam, PROJECT_SLUG);
         fs.mkdirSync(shmDir, { recursive: true });
         fs.accessSync(shmDir, fs.constants.W_OK);
-        return { path: shmDir, type: 'RAM-диск (/dev/shm)' };
+        return { path: shmDir, type: tr('trun.ramdisk_shm') };
       }
     } catch {
-      // откат
+      // the fallback
     }
   }
 
-  // Системный откат (Graceful degradation)
+  // The system fallback (graceful degradation)
   const fallback = path.join(os.tmpdir(), 'forma-tmp', PROJECT_SLUG);
   try {
     fs.mkdirSync(fallback, { recursive: true });
@@ -71,7 +73,7 @@ function resolveTmpDir() {
   }
 }
 
-// 2. Рекурсивный поиск файлов тестов *.test.cjs
+// 2. Recursive search for *.test.cjs test files
 function findTestFiles(dir) {
   const results = [];
   if (!fs.existsSync(dir)) return results;
@@ -103,13 +105,13 @@ function main() {
   }
 
   const tmpInfo = resolveTmpDir();
-  // Экспортируем во временные переменные для всех дочерних процессов
+  // Exported into env vars for all child processes
   process.env.FORMA_TEST_TMP = tmpInfo.path;
   process.env.TMPDIR = tmpInfo.path;
   process.env.TEMP = tmpInfo.path;
   process.env.TMP = tmpInfo.path;
 
-  // Определение уровня параллелизма
+  // Resolving the concurrency level
   const cpus = Array.isArray(os.cpus()) ? os.cpus().length : 1;
   const concurrency = process.env.FORMA_TEST_CONCURRENCY
     ? parseInt(process.env.FORMA_TEST_CONCURRENCY, 10)
@@ -128,16 +130,16 @@ function main() {
 
   if (targetTests.length === 0) {
     if (patterns.length > 0) {
-      console.log(`[test-runner] Не найдено тестов по шаблону: ${patterns.join(', ')}`);
+      console.log(tr('trun.no_tests_pattern', { patterns: patterns.join(', ') }));
     } else {
-      console.log('[test-runner] В каталоге test/ не найдено файлов *.test.cjs');
+      console.log(tr('trun.no_tests_dir'));
     }
     process.exit(0);
   }
 
   const relTargets = targetTests.map((f) => path.relative(ROOT, f));
   console.log(
-    `[test-runner] Тестов: ${relTargets.length}/${allTests.length} | Память: ${tmpInfo.type} [${tmpInfo.path}] | Потоков: ${concurrency}`
+    tr('trun.header', { n: relTargets.length, total: allTests.length, type: tmpInfo.type, path: tmpInfo.path, concurrency })
   );
 
   const nodeArgs = ['--test'];

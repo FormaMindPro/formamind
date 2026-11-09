@@ -1,21 +1,23 @@
 #!/usr/bin/env node
-// Публикация обезличенных файлов проекта в шаблон проекта (templates/<шаблон>/skills/<шаблон>/template/):
-// скрипты .claude/scripts → template/scripts, профили Run .claude/agents/run → template/agents/run,
-// манифест коннекторов → template/mcp.json (имя, тип, имена переменных; значений нет).
-// Только для автора: protocol/ должен быть git-клоном. По умолчанию — dry-run, ничего не пишет.
-//   node .forma/protocol/scripts/template-push.cjs --template <имя> --add <путь> [--add ...] [--mcp имя[=алиас] ...] [--apply]
-//   --add <путь>   файл или каталог внутри .claude/scripts или .claude/agents/run (путь от корня проекта)
-//   --mcp <имя>    коннектор из .mcp.json, .claude/.mcp.json или ~/.claude.json (user / проект); алиас — имя в манифесте
-//   --note <текст> строка для CHANGELOG.md шаблона под новой версией (без неё — только список файлов)
-//   --apply        записать; patch-версия плагина шаблона растёт, README «Состав» и CHANGELOG.md пересобираются
-// Обезличивание: значения из .env → [[ИМЯ]], хосты из .env-URL → <site-host>. Отказ (код 1, файл не пишется), если
-// остался след проекта (check-release TRACES), e-mail, литерал-секрет или длинная токен-строка.
+// Publishing the project's anonymized files into the project's template (templates/<template>/skills/<template>/template/):
+// .claude/scripts scripts -> template/scripts, Run profiles .claude/agents/run -> template/agents/run,
+// the connector manifest -> template/mcp.json (name, type, variable names; no values).
+// For the author only: protocol/ must be a git clone. Dry-run by default, writes nothing.
+//   node .forma/protocol/scripts/template-push.cjs --template <name> --add <path> [--add ...] [--mcp name[=alias] ...] [--apply]
+//   --add <path>   a file or directory inside .claude/scripts or .claude/agents/run (a path from the project root)
+//   --mcp <name>    a connector from .mcp.json, .claude/.mcp.json or ~/.claude.json (user / project); the alias is its name in the manifest
+//   --note <text> a line for the template's CHANGELOG.md under the new version (without it - the file list only)
+//   --apply        write; the template plugin's patch version grows, the README "Contents" and CHANGELOG.md are rebuilt
+// Anonymization: .env values -> [[NAME]], hosts from .env URLs -> <site-host>. A refusal (exit code 1, no file written) when
+// a project trace remains (check-release TRACES), an e-mail, a secret literal or a long token-like string.
 'use strict';
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { TRACES } = require('./check-release.cjs');
 const { FORBIDDEN_PREFIX } = require('./lib/forbidden-transfer.cjs');
+const i18n = require('../skills/forma/core/i18n/index.cjs');
+const tr = (code, params) => i18n.message(code, params, 'ru');
 
 const root = process.cwd();
 const protoDir = path.join(root, '.forma/protocol');
@@ -35,12 +37,12 @@ function parseArgs(argv) {
     else if (v === '--mcp') a.mcp.push(argv[++i]);
     else if (v === '--note') a.note = argv[++i];
     else if (v === '--apply') a.apply = true;
-    else { console.error('СТОП: неизвестный аргумент ' + v); process.exit(2); }
+    else { console.error(tr('tp.bad_arg', { arg: v })); process.exit(2); }
   }
   return a;
 }
 
-// .env: значение → имя; хосты URL-значений.
+// .env: a value -> its name; the hosts of URL values.
 function loadEnv(dir) {
   const secrets = new Map(), hosts = new Set();
   const f = path.join(dir, '.env');
@@ -67,7 +69,7 @@ function scrub(text, env) {
   return { text: t, counts };
 }
 
-// Остаток после обезличивания: [{rule, line}] — без значений.
+// The residue after anonymization: [{rule, line}] - no values.
 function residue(text, env) {
   const found = [];
   text.split(/\r?\n/).forEach((line, i) => {
@@ -86,7 +88,7 @@ function walk(abs, rel) {
   return fs.readdirSync(abs).flatMap((n) => walk(path.join(abs, n), rel + '/' + n));
 }
 
-// Коннекторы: .mcp.json, .claude/.mcp.json, ~/.claude.json (user, затем проект).
+// Connectors: .mcp.json, .claude/.mcp.json, ~/.claude.json (user first, then the project).
 function readServers() {
   const out = {};
   const take = (o) => Object.assign(out, (o && (o.mcpServers || o)) || {});
@@ -94,9 +96,9 @@ function readServers() {
     const j = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude.json'), 'utf8'));
     take(j.mcpServers);
     for (const [p, v] of Object.entries(j.projects || {})) if (path.resolve(p).toLowerCase() === root.toLowerCase()) take(v.mcpServers);
-  } catch { /* нет файла — не беда */ }
+  } catch { /* no file - no problem */ }
   for (const f of ['.claude/.mcp.json', '.mcp.json']) {
-    try { take(JSON.parse(fs.readFileSync(path.join(root, f), 'utf8'))); } catch { /* нет */ }
+    try { take(JSON.parse(fs.readFileSync(path.join(root, f), 'utf8'))); } catch { /* none */ }
   }
   return out;
 }
@@ -116,31 +118,31 @@ function manifestEntry(srv, env) {
 
 function main() {
   const a = parseArgs(process.argv.slice(2));
-  if (!fs.existsSync(path.join(protoDir, '.git'))) { console.error('СТОП: .forma/protocol не git-клон. Механизм только для автора; запускать из корня проекта.'); process.exit(2); }
+  if (!fs.existsSync(path.join(protoDir, '.git'))) { console.error(tr('tp.no_git')); process.exit(2); }
   const pm = path.join(root, 'project/config/PROJECT.md');
   const tplName = a.template || (fs.existsSync(pm) && (fs.readFileSync(pm, 'utf8').match(/k:name\s*--> \| `([^`]+)`/) || [])[1]);
-  if (!tplName) { console.error('СТОП: укажите --template <имя>.'); process.exit(2); }
+  if (!tplName) { console.error(tr('tp.no_template')); process.exit(2); }
   const tplRoot = path.join(protoDir, 'templates', tplName, 'skills', tplName);
-  if (!fs.existsSync(tplRoot)) { console.error('СТОП: нет шаблона ' + path.relative(root, tplRoot)); process.exit(2); }
-  if (!a.adds.length && !a.mcp.length) { console.error('СТОП: нечего публиковать — нужен --add и/или --mcp.'); process.exit(2); }
+  if (!fs.existsSync(tplRoot)) { console.error(tr('tp.no_tpl_dir', { path: path.relative(root, tplRoot) })); process.exit(2); }
+  if (!a.adds.length && !a.mcp.length) { console.error(tr('tp.nothing_to_publish')); process.exit(2); }
 
   const env = loadEnv(root);
   const plan = [];   // {rel, dst, text, state, counts, bad}
   let refused = 0;
 
   for (const add of a.adds) {
-    if (FORBIDDEN_PREFIX.some((p) => add.startsWith(p))) { console.error('СТОП: продуктовая зона не публикуется: ' + add); process.exit(1); }
+    if (FORBIDDEN_PREFIX.some((p) => add.startsWith(p))) { console.error(tr('tp.forbidden_zone', { path: add })); process.exit(1); }
     const zone = ZONES.find(([p]) => add === p.slice(0, -1) || add.startsWith(p));
-    if (!zone) { console.error('СТОП: путь вне зон ' + ZONES.map((z) => z[0]).join(', ') + ': ' + add); process.exit(1); }
+    if (!zone) { console.error(tr('tp.outside_zones', { zones: ZONES.map((z) => z[0]).join(', '), path: add })); process.exit(1); }
     const abs = path.join(root, add);
-    if (!fs.existsSync(abs)) { console.error('СТОП: нет файла ' + add); process.exit(1); }
+    if (!fs.existsSync(abs)) { console.error(tr('tp.no_file', { path: add })); process.exit(1); }
     for (const rel of walk(abs, add)) {
-      if (!/\.(cjs|js|py|md|json|sh)$/i.test(rel)) { console.error('СТОП: не текстовый файл скрипта/роли: ' + rel); process.exit(1); }
+      if (!/\.(cjs|js|py|md|json|sh)$/i.test(rel)) { console.error(tr('tp.not_text', { path: rel })); process.exit(1); }
       const dst = path.join(tplRoot, zone[1] + rel.slice(zone[0].length));
       const raw = fs.readFileSync(path.join(root, rel), 'utf8');
       const { text, counts } = scrub(raw, env);
       const bad = residue(text, env);
-      const state = bad.length ? 'ОТКАЗ' : !fs.existsSync(dst) ? 'новый' : norm(fs.readFileSync(dst, 'utf8')) === norm(text) ? 'без изменений' : 'изменён';
+      const state = bad.length ? tr('tp.state_refuse') : !fs.existsSync(dst) ? tr('tp.state_new') : norm(fs.readFileSync(dst, 'utf8')) === norm(text) ? tr('tp.state_same') : tr('tp.state_changed');
       if (bad.length) refused++;
       plan.push({ rel, dst, text, state, counts, bad });
     }
@@ -151,32 +153,32 @@ function main() {
     const servers = readServers(), entries = {};
     for (const spec of a.mcp) {
       const [name, alias] = spec.split('=');
-      if (!servers[name]) { console.error('СТОП: коннектор не найден: ' + name); process.exit(1); }
+      if (!servers[name]) { console.error(tr('tp.connector_missing', { name })); process.exit(1); }
       entries[alias || name] = manifestEntry(servers[name], env);
     }
     manifest = JSON.stringify({ note: 'Connector manifest: names, types and variable names only. Values live in the project .env and the client connector settings.', servers: entries }, null, 2) + '\n';
     const residual = residue(manifest, env);
     const mf = path.join(tplRoot, 'template/mcp.json');
-    manifestState = residual.length ? 'ОТКАЗ' : !fs.existsSync(mf) ? 'новый' : norm(fs.readFileSync(mf, 'utf8')) === norm(manifest) ? 'без изменений' : 'изменён';
-    if (residual.length) { refused++; console.error('манифест: след ' + residual.map((r) => r.rule).join(', ')); }
+    manifestState = residual.length ? tr('tp.state_refuse') : !fs.existsSync(mf) ? tr('tp.state_new') : norm(fs.readFileSync(mf, 'utf8')) === norm(manifest) ? tr('tp.state_same') : tr('tp.state_changed');
+    if (residual.length) { refused++; console.error(tr('tp.manifest_trace', { rules: residual.map((r) => r.rule).join(', ') })); }
   }
 
-  console.log('Шаблон: ' + tplName + (a.apply ? ' (запись)' : ' (dry-run, ничего не пишется)'));
+  console.log(tr('tp.header', { name: tplName, mode: a.apply ? tr('tp.mode_apply') : tr('tp.mode_dry') }));
   for (const p of plan) {
     const rep = Object.entries(p.counts).map(([k, v]) => k + ':' + v).join(' ');
-    console.log(`  ${p.state.padEnd(13)} ${p.rel}${rep ? '   [обезличено ' + rep + ']' : ''}`);
-    for (const b of p.bad.slice(0, 10)) console.log(`      строка ${b.line}: ${b.rule}`);
+    console.log(`  ${p.state.padEnd(13)} ${p.rel}${rep ? tr('tp.row_redacted', { rep }) : ''}`);
+    for (const b of p.bad.slice(0, 10)) console.log(tr('tp.row_bad_line', { line: b.line, rule: b.rule }));
   }
-  if (manifest) console.log(`  ${manifestState.padEnd(13)} template/mcp.json   [${a.mcp.length} коннектор(ов)]`);
+  if (manifest) console.log(tr('tp.manifest_row', { state: manifestState, n: a.mcp.length }));
 
-  if (refused) { console.error(`\nСТОП: отказ по ${refused} файл(ам) — следы проекта или секреты. Ничего не записано.`); process.exit(1); }
-  const changes = plan.filter((p) => p.state === 'новый' || p.state === 'изменён');
-  const mChange = manifestState === 'новый' || manifestState === 'изменён';
-  if (!a.apply) { console.log(`\nК записи: ${changes.length + (mChange ? 1 : 0)}. Записать: --apply.`); return; }
+  if (refused) { console.error(tr('tp.stop_refused', { n: refused })); process.exit(1); }
+  const changes = plan.filter((p) => p.state === tr('tp.state_new') || p.state === tr('tp.state_changed'));
+  const mChange = manifestState === tr('tp.state_new') || manifestState === tr('tp.state_changed');
+  if (!a.apply) { console.log(tr('tp.to_write', { n: changes.length + (mChange ? 1 : 0) })); return; }
 
   for (const p of changes) { fs.mkdirSync(path.dirname(p.dst), { recursive: true }); fs.writeFileSync(p.dst, p.text); }
   if (mChange) { const mf = path.join(tplRoot, 'template/mcp.json'); fs.mkdirSync(path.dirname(mf), { recursive: true }); fs.writeFileSync(mf, manifest); }
-  if (!changes.length && !mChange) { console.log('\nЗаписывать нечего.'); return; }
+  if (!changes.length && !mChange) { console.log(tr('tp.nothing_to_write')); return; }
   bump({ tplName, tplRoot, note: a.note, changes, mChange, manifestState });
 }
 
@@ -188,14 +190,14 @@ function bump({ tplName, tplRoot, note, changes, mChange, manifestState }) {
   const old = j.version, v = old.split('.'); v[2] = String(Number(v[2]) + 1); j.version = v.join('.');
   fs.writeFileSync(pj, JSON.stringify(j, null, 2) + '\n');
   const rel = (p) => path.relative(tplFiles, p).replace(/\\/g, '/');
-  const lines = changes.map((p) => `- ${p.state === 'новый' ? 'Added' : 'Changed'}: \`${rel(p.dst)}\``);
-  if (mChange) lines.push(`- ${manifestState === 'новый' ? 'Added' : 'Changed'}: \`mcp.json\` (connector manifest)`);
+  const lines = changes.map((p) => `- ${p.state === tr('tp.state_new') ? 'Added' : 'Changed'}: \`${rel(p.dst)}\``);
+  if (mChange) lines.push(`- ${manifestState === tr('tp.state_new') ? 'Added' : 'Changed'}: \`mcp.json\` (connector manifest)`);
   writeChangelog(tplDir, j.version, note, lines);
   writeInventory(tplDir, tplRoot, j.version);
-  console.log(`\nЗаписано: ${changes.length + (mChange ? 1 : 0)}. Версия шаблона ${old} → ${j.version}; CHANGELOG.md и README «Состав» пересобраны. Дальше: коммит в protocol/, check-release, pull --rebase, --before-push, push — по команде человека.`);
+  console.log(tr('tp.written', { n: changes.length + (mChange ? 1 : 0), old, new: j.version }));
 }
 
-// --- CHANGELOG.md шаблона: новая запись сверху, без дат (чистая зона, запрет 16) ---
+// --- The template's CHANGELOG.md: the newest entry on top, no dates (a clean zone, prohibition 16) ---
 function writeChangelog(tplDir, version, note, lines) {
   const f = path.join(tplDir, 'CHANGELOG.md');
   const head = '# Changelog\n\nNewest first. The version is `.claude-plugin/plugin.json`; no dates (clean zone).\n';
@@ -205,9 +207,9 @@ function writeChangelog(tplDir, version, note, lines) {
   fs.writeFileSync(f, at === -1 ? old.trimEnd() + '\n\n' + entry : old.slice(0, at) + entry + old.slice(at));
 }
 
-// --- README.md: блок между маркерами пересобирается из фактического дерева ---
+// --- README.md: the block between the markers is rebuilt from the actual tree ---
 const frontmatter = (text, key) => { const m = new RegExp('^' + key + ':\\s*(.+)$', 'm').exec(text.replace(/\r/g, '')); return m ? m[1].trim() : ''; };
-// описание из шапки файла: до трёх строк комментария (//, #, /* */, docstring), без имени файла в начале, до первой точки
+// the description from the file's header: up to three comment lines (//, #, /* */, docstring), no file name at the start, up to the first period
 const firstComment = (text, name) => {
   const got = [];
   for (const raw of text.replace(/\r/g, '').split('\n')) {
@@ -260,7 +262,7 @@ function writeInventory(tplDir, tplRoot, version) {
   const START = '<!-- inventory:start -->', END = '<!-- inventory:end -->';
   const md = fs.readFileSync(f, 'utf8');
   const a = md.indexOf(START), b = md.indexOf(END);
-  if (a === -1 || b === -1) { console.error('СТОП: в README шаблона нет маркеров ' + START + ' / ' + END); process.exit(1); }
+  if (a === -1 || b === -1) { console.error(tr('tp.no_markers', { start: START, end: END })); process.exit(1); }
   fs.writeFileSync(f, md.slice(0, a) + START + '\n' + inventory(tplDir, tplRoot, version) + '\n' + END + md.slice(b + END.length));
 }
 
