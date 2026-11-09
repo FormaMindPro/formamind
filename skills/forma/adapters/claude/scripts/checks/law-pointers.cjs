@@ -12,7 +12,7 @@ const path = require('path');
 const i18n = require('../../../.forma/i18n/index.cjs');
 const msg = (code, params) => i18n.message(code, params, 'ru');
 
-const NOT_ROLE = new Set(['PROJECT.md', 'JOURNAL.md', 'GOAL.md', 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md', 'README.md', 'ECONOMY.md', 'ROUTES.md']);
+const NOT_ROLE = new Set(['PROJECT.md', 'JOURNAL.md', 'GOAL.md', 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md', 'README.md', 'ECONOMY.md', 'ROUTES.md', 'SKILL.md']);
 
 /** Bare `*.md` names in backticks, in the law text. */
 function pointers(text) {

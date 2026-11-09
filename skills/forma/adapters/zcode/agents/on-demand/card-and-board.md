@@ -1,7 +1,3 @@
----
-model: glm-5.3-flash
-effort: high
----
 # Card, form check and board (law §6–§7)
 
 Sections 6 and 7 of the law, verbatim; numbers kept, so "§6" and "§7" elsewhere point here. Read before creating, editing or moving a card, or touching the board.
@@ -144,6 +140,25 @@ There is no separate file for history or result — the task's whole life is in 
 | --- | --- |
 | Resource or tool | `Kit` — directly, or via `Run` when site access is needed that `Kit` lacks (`kit.md`, "Infrastructure") |
 | Schema or reference file | `Intent` — directly, outside the production route (`intent-housekeeping.md`) |
+
+<!-- moved-from-law: epic-3-requirements -->
+**Epic "3. Project protocol" (`kind: protocol`) — scope, requirements, and mandatory skills:**
+- **Tasks in Epic 3:**
+  1. Engine tooling: scripts (`.cjs`, `.js`, `.sh`, `.ps1`), dashboard, board tools, hooks, installers.
+  2. Skills and roles: creating, modifying, or testing agent skills (`SKILL.md`) and role definitions.
+  3. Engine adapters: configuring or reconciling `.claude/`, `.agents/`, `.codex/`, `.minimax/`, and `.forma/engines.json`.
+  4. Scaffold templates: managing and syncing canonical packages (`templates/_scaffold/`).
+  5. Human row decisions: tasks arriving from the route table's "human" row (`human-row-trace`).
+  6. Protocol releases: upstream transfers and releases to `.forma/protocol`.
+- **Requirements for Epic 3:**
+  - **Language: English only.** All code, scripts, tools, tests, and agent skills (`SKILL.md`, role files) created or modified in Epic 3 must be authored strictly in English. Localized text is permitted only in user manuals (`manual/<lang>/`) and i18n message catalogs (`.forma/i18n/`).
+  - **Clean zone compliance (prohibition 16):** zero project traces in files that ship with the protocol.
+  - **Verification gates:** must pass `node .forma/protocol/skills/forma/core/board/checks/check-english-code.cjs` and `node .claude/scripts/sync-engines.cjs --check` before closing the card.
+- **Mandatory skills for Epic 3:**
+  - `skill-authoring`: mandatory when creating or modifying skills in the arsenal.
+  - `vdisk-setup`: mandatory when running test suites, web page builds, or batch file I/O operations.
+  - `scaffold-sync`: mandatory when touching scaffold templates or verifying localized parity.
+  - `engine-switch`: mandatory when changing engine adapter configurations.
 
 Full registry of process epics (eight, plus the `channels` lane for the product — nine kinds of goal, a closed list) — `intent-goal-opening.md`, "Epic".
 
