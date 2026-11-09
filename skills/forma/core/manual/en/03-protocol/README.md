@@ -28,6 +28,28 @@ Complete reference documents of the engine live here — they are not divided in
 | [ENGINE-MAP.md](ENGINE-MAP.md) | the engine map: three levels of rules with sizes, sources outside them, machinery, hooks, what the engine produces, gaps found |
 | [FUNCTIONS.md](FUNCTIONS.md) | engine functions and architecture: virtual disk (RAM disk), CPU interaction, comparative benchmark results |
 
+## Tasks, requirements, and mandatory skills
+
+### Tasks in Epic 3
+Tasks of the project's own form and engine infrastructure:
+1. Engine and tooling: modifying or adding scripts (`.cjs`, `.js`, `.sh`, `.ps1`), dashboard code, board tools (`new-card`, `check-board`, `card-move`), hooks, installers.
+2. Skills and roles: creating, modifying, or testing agent skills (`SKILL.md`) and role definitions.
+3. Engine adapters: configuring or reconciling `.claude/`, `.agents/`, `.codex/`, `.minimax/`, and `.forma/engines.json`.
+4. Scaffold packages: managing and syncing canonical packages (`templates/_scaffold/`).
+5. Human row decisions: tasks arriving from the route table's "human" row (`human-row-trace`).
+6. Protocol releases: upstream transfers and releases to `.forma/protocol`.
+
+### Requirements
+- **Language: English only.** All code, scripts, tools, tests, and agent skills (`SKILL.md`, role files) created or modified in Epic 3 must be authored strictly in English. Localized text is permitted only in user manuals (`manual/<lang>/`) and i18n catalogs (`.forma/i18n/`).
+- **Clean zone compliance (prohibition 16):** zero project traces in files that ship with the protocol.
+- **Verification gates:** must pass `node .forma/protocol/skills/forma/core/board/checks/check-english-code.cjs` and `node .claude/scripts/sync-engines.cjs --check` before completion.
+
+### Mandatory skills for Epic 3
+- `skill-authoring`: mandatory when creating or modifying skills in the arsenal.
+- `vdisk-setup`: mandatory when running test suites, web page builds, or batch file I/O operations.
+- `scaffold-sync`: mandatory when touching scaffold templates or verifying localized parity.
+- `engine-switch`: mandatory when changing engine adapter configurations.
+
 ## Demo cycle
 
 A fresh project (start gate closed, empty board) gets one offer in the first session: a short demonstration of the whole route on two small cards. The human answers **start**, **skip** or **later**; the answer is kept in `project/config/DEMO` (`none`, `declined`, `later:<n>`, `done`), so it is asked once. The demo cards carry the label `demo`: they are the only cards allowed under a closed gate, they stay out of the dashboard's spend and statistics, and the demo ends with a node-by-node table (attempts, tokens, time) and a clean-up — remove or keep. Procedure: `intent-demo.md`.

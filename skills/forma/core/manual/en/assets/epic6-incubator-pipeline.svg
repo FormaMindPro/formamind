@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 740" width="100%" height="100%" style="background:#0f172a; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#94a3b8" />
+    </marker>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Title -->
+  <text x="460" y="32" text-anchor="middle" fill="#f8fafc" font-size="18" font-weight="700">Процесс 1: Инкубатор (Эпик 6) → Спек + Отвес → Производство</text>
+
+  <!-- Human -->
+  <g filter="url(#shadow)">
+    <rect x="330" y="55" width="260" height="48" rx="8" fill="#1e3a8a" stroke="#3b82f6" stroke-width="2"/>
+    <text x="460" y="85" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="600">Человек (голос / диалог / мысли)</text>
+  </g>
+
+  <!-- Arrow to E6 -->
+  <path d="M 460 103 L 460 137" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="380" y="112" width="160" height="18" rx="4" fill="#0f172a"/>
+  <text x="460" y="125" text-anchor="middle" fill="#38bdf8" font-size="11">мгновенно, без проверок</text>
+
+  <!-- E6 Incubator -->
+  <g filter="url(#shadow)">
+    <rect x="300" y="140" width="320" height="52" rx="8" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
+    <text x="460" y="163" text-anchor="middle" fill="#a7f3d0" font-size="11" font-weight="600">ЭПИК 6 · goal-discussion</text>
+    <text x="460" y="181" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="700">Обсуждение дел (Инкубатор)</text>
+  </g>
+
+  <!-- Arrow to Spec -->
+  <path d="M 460 192 L 460 226" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="375" y="201" width="170" height="18" rx="4" fill="#0f172a"/>
+  <text x="460" y="214" text-anchor="middle" fill="#34d399" font-size="11">черновик собран: «В дело!»</text>
+
+  <!-- Subgraph Spec + Plumb -->
+  <rect x="180" y="230" width="560" height="155" rx="12" fill="#1e1e38" stroke="#475569" stroke-dasharray="6 6" stroke-width="1.5"/>
+  <text x="200" y="250" fill="#94a3b8" font-size="12" font-weight="600">Анализ и Снаряжение</text>
+
+  <!-- Spec -->
+  <g filter="url(#shadow)">
+    <rect x="210" y="265" width="220" height="46" rx="8" fill="#4c1d95" stroke="#8b5cf6" stroke-width="2"/>
+    <text x="320" y="293" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">Спек (Анализ / Нарезка)</text>
+  </g>
+
+  <!-- Plumb -->
+  <g filter="url(#shadow)">
+    <rect x="490" y="265" width="220" height="46" rx="8" fill="#831843" stroke="#ec4899" stroke-width="2"/>
+    <text x="600" y="293" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">Отвес (Plumb: роли / ясность)</text>
+  </g>
+
+  <!-- Plumb <-> Spec arrow -->
+  <path d="M 430 288 L 490 288" stroke="#f472b6" stroke-width="2" stroke-dasharray="4 4"/>
+  <circle cx="430" cy="288" r="3" fill="#f472b6"/>
+  <circle cx="490" cy="288" r="3" fill="#f472b6"/>
+
+  <!-- Decision -->
+  <g filter="url(#shadow)">
+    <rect x="330" y="325" width="260" height="44" rx="8" fill="#78350f" stroke="#f59e0b" stroke-width="2"/>
+    <text x="460" y="352" text-anchor="middle" fill="#fef3c7" font-size="13" font-weight="600">Куда и как нарезать?</text>
+  </g>
+  <path d="M 320 311 L 330 330" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- 3 Target Epics -->
+  <!-- Branch 1: Channels -->
+  <path d="M 360 369 L 180 430" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="180" y="388" width="150" height="16" rx="4" fill="#0f172a"/>
+  <text x="255" y="400" text-anchor="middle" fill="#38bdf8" font-size="10">Внешняя публикация / фича</text>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="432" width="220" height="52" rx="8" fill="#083344" stroke="#06b6d4" stroke-width="2"/>
+    <text x="180" y="454" text-anchor="middle" fill="#67e8f9" font-size="11" font-weight="600">ЭПИК 7 · goal-channels</text>
+    <text x="180" y="473" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Каналы производства</text>
+  </g>
+
+  <!-- Branch 2: Comp -->
+  <path d="M 460 369 L 460 430" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="390" y="392" width="140" height="16" rx="4" fill="#0f172a"/>
+  <text x="460" y="404" text-anchor="middle" fill="#818cf8" font-size="10">Опыт / бенчмарк моделей</text>
+
+  <g filter="url(#shadow)">
+    <rect x="350" y="432" width="220" height="52" rx="8" fill="#1e1b4b" stroke="#6366f1" stroke-width="2"/>
+    <text x="460" y="454" text-anchor="middle" fill="#a5b4fc" font-size="11" font-weight="600">ЭПИК 8 · goal-competencies</text>
+    <text x="460" y="473" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Компетенции (Опыт)</text>
+  </g>
+
+  <!-- Branch 3: Proto -->
+  <path d="M 560 369 L 730 430" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="610" y="388" width="140" height="16" rx="4" fill="#0f172a"/>
+  <text x="680" y="400" text-anchor="middle" fill="#94a3b8" font-size="10">Правила движков / ADR</text>
+
+  <g filter="url(#shadow)">
+    <rect x="620" y="432" width="220" height="52" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="2"/>
+    <text x="730" y="454" text-anchor="middle" fill="#cbd5e1" font-size="11" font-weight="600">ЭПИК 3 · goal-protocol</text>
+    <text x="730" y="473" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Протокол проекта</text>
+  </g>
+
+  <!-- Downstream from Channels to Kit+Run -->
+  <path d="M 180 484 L 180 528" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <g filter="url(#shadow)">
+    <rect x="60" y="530" width="240" height="54" rx="8" fill="#0c4a6e" stroke="#0ea5e9" stroke-width="2"/>
+    <text x="180" y="552" text-anchor="middle" fill="#bae6fd" font-size="11" font-weight="600">СНАРЯЖЕНИЕ И ИСПОЛНЕНИЕ</text>
+    <text x="180" y="572" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Kit + Run: Текст + Magnific</text>
+  </g>
+
+  <!-- Downstream to Done -->
+  <path d="M 180 584 L 180 638" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <g filter="url(#shadow)">
+    <rect x="50" y="640" width="260" height="54" rx="8" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="180" y="662" text-anchor="middle" fill="#bbf7d0" font-size="11" font-weight="600">РЕЗУЛЬТАТ</text>
+    <text x="180" y="682" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">Готовая публикация человеку</text>
+  </g>
+</svg>

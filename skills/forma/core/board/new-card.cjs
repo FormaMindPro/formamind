@@ -6,6 +6,9 @@
 //                                     [--route N] [--over N]… [--seg N] [--wave N] [--after NNN]… [--trial] [--demo]
 //                                     [--delivers "<what it gives>"] [--criterion "<criterion>"] [--budget "<attempts>"] [--next "<where next>"]
 //                                     [--why <code>] [--why-detail "<a note>"] [--stage card|approve]
+//   node .forma/board/new-card.cjs --quick "<title>" [--dry]
+//                                     (fast incubator mode: kind=discussion, goal=goal-discussion, route=0,
+//                                      creates card and materials folder project/cards/card-NNN/)
 //
 // --kind   - the kind code from PROJECT.md, "Project epics" (analytics, structure, protocol, resources, balance, discussion, channels, competencies, results).
 //            The epic name is substituted exactly from the table - the `epic` field (AGENTS.md §7).
@@ -41,11 +44,24 @@ const lanes = new Map();
 for (const m of projectMd.matchAll(/^\|\s*`([a-z-]+)`\s*\|\s*([^|]+?)\s*\|/gm)) lanes.set(m[1], m[2]);
 if (!lanes.size) die(msg('board.new-card.no_lanes'));
 
-const kind = arg('kind');
-const title = arg('title');
+const quick = arg('quick');
+const kind = arg('kind', quick ? 'discussion' : undefined);
+const title = arg('title', quick);
 if (!kind || !title) die(msg('board.new-card.need_kind', { codes: [...lanes.keys()].join(', ') }));
 if (!lanes.has(kind)) die(msg('board.new-card.unknown_kind', { kind, codes: [...lanes.keys()].join(', ') }));
 const epic = lanes.get(kind);
+
+// 1c. Similar cards duplicate check (graph-based)
+if (!flag('no-dup-check')) {
+  const similar = checkDuplicates(title, ROOT);
+  if (similar.length) {
+    console.log('notice: found similar cards in the task graph:');
+    for (const s of similar) console.log(`  · ${s.id} (${s.status || 'open'}) — ${s.label.slice(0, 75)}`);
+    if (flag('strict-dup') && similar.some(s => s.matchCount >= 2) && !flag('force')) {
+      die('potential duplicates found (pass --force to proceed)');
+    }
+  }
+}
 
 // 1b. The isolation gate (AGENTS.md §2, prohibitions 1 and 7)
 // The probes file - every adapter has it in its folder (`<folder>/.state/capabilities.json`); the core walks the adapters, knowing no names.
@@ -69,7 +85,8 @@ if (fs.existsSync(goalsDir) && !fs.readdirSync(goalsDir).some(d => d === goal ||
 
 // 2b. The route labels
 const routeLabels = [];
-const route = arg('route');
+let route = arg('route');
+if (route === undefined && quick) route = '0';
 if (route !== undefined) { if (!/^[0-8]$/.test(route)) die(msg('board.new-card.bad_route', { route })); routeLabels.push('route-' + route); }
 for (const o of args('over')) { if (!/^[1-4]$/.test(o || '')) die(msg('board.new-card.bad_over', { o })); routeLabels.push('over-' + o); }
 for (const k of ['seg', 'wave']) { const v = arg(k); if (v === undefined) continue; if (!/^[1-9]\d*$/.test(v)) die(msg('board.new-card.bad_natural', { k, v })); routeLabels.push(k + '-' + v); }
@@ -86,14 +103,24 @@ const Z = {
   task: zoneHeading('task'), kit: zoneHeading('kit'), hist: zoneHeading('history'), res: zoneHeading('result'),
   types: ['work', 'tooling', 'decision'],
 };
-const type = arg('type', Z.types[kind === 'channels' ? 0 : 1]);
-const fields = [['delivers', 'board.new-card.ph_delivers'], ['criterion', 'board.new-card.ph_criterion'], ['budget', 'board.new-card.ph_budget'], ['next', 'board.new-card.ph_next']]
-  .map(([k, ph]) => { const v = arg(k); if (v !== undefined && /[|\n]/.test(v)) die(msg('board.new-card.bad_field_chars', { k })); return v || msg(ph); });
+const defaultType = quick ? 'work' : Z.types[kind === 'channels' ? 0 : 1];
+const type = arg('type', defaultType);
+
+const defaultDelivers = quick ? title : msg('board.new-card.ph_delivers');
+const defaultCriterion = quick ? 'check: node .forma/board/check-board.cjs ; verdict: task discussion and acceptance by the human' : msg('board.new-card.ph_criterion');
+const defaultBudget = quick ? '2' : msg('board.new-card.ph_budget');
+const defaultNext = quick ? 'Intent: triage; human' : msg('board.new-card.ph_next');
+
+const fields = [['delivers', defaultDelivers], ['criterion', defaultCriterion], ['budget', defaultBudget], ['next', defaultNext]]
+  .map(([k, ph]) => { const v = arg(k); if (v !== undefined && /[|\n]/.test(v)) die(msg('board.new-card.bad_field_chars', { k })); return v || ph; });
 
 // 3b. The history lines: the route reason and the stage (§6)
 const WHY_CODES = ['human', 'ready', 'scale', 'risk', 'decision', 'tooling', 'plumb'];
 const STAGE_KEYS = ['card', 'approve'];
-const why = arg('why'), stage = arg('stage');
+let why = arg('why'), stage = arg('stage');
+if (quick && why === undefined) why = 'human';
+if (quick && stage === undefined) stage = 'card';
+
 if (why !== undefined && !WHY_CODES.includes(why)) die(msg('board.new-card.bad_why', { why, codes: WHY_CODES.join('|') }));
 if (stage !== undefined && !STAGE_KEYS.includes(stage)) die(msg('board.new-card.bad_stage', { stage, keys: STAGE_KEYS.join('|') }));
 const routeLabel = routeLabels.find(l => l.startsWith('route-'));
@@ -116,7 +143,7 @@ const slug = title.toLowerCase().split('').map(c => TR[c] ?? c).join('')
 const id = `card-${num}-${slug || 'task'}`;
 const now = new Date().toISOString();
 const day = now.slice(0, 10);
-const detail = arg('why-detail');
+const detail = arg('why-detail', quick ? 'quick incubator without project scanning' : undefined);
 const history = [
   why !== undefined ? `- \`Intent\`, ${day}: route ${routeLabel} (why: ${why})${detail ? ' — ' + detail.replace(/\.?$/, '.') : '.'}` : '',
   stage !== undefined ? '- `Intent`, ' + day + ': stage ' + stage + msg('board.new-card.stage_created') : '',
@@ -153,6 +180,16 @@ fs.mkdirSync(BOARD, { recursive: true });
 fs.writeFileSync(file, text);
 console.log(path.relative(ROOT, file).replace(/\\/g, '/'));
 
+// Auto-create card materials folder for quick mode (or --materials flag)
+if (quick || flag('materials')) {
+  const cardDir = path.join(ROOT, 'project', 'cards', `card-${num}`);
+  if (!fs.existsSync(cardDir)) {
+    fs.mkdirSync(cardDir, { recursive: true });
+    const draftFile = path.join(cardDir, 'draft.md');
+    fs.writeFileSync(draftFile, `# card-${num} · ${title}\n\n## Input materials\n- Recorded: ${day}\n`);
+  }
+}
+
 // 6. The check over this card
 let out = '';
 try { out = execFileSync(process.execPath, [path.join(__dirname, 'check-board.cjs'), id], { cwd: ROOT, encoding: 'utf8' }); }
@@ -160,3 +197,77 @@ catch (e) { out = (e.stdout || '') + (e.stderr || ''); }
 const mine = out.split('\n').filter(l => l.includes(id));
 if (mine.length) { console.error(mine.join('\n')); process.exit(1); }
 console.log(`ok: ${epic} · ${goal} · ${status}/${assignee}`);
+
+// 7. Auto-update board task graph
+if (!flag('no-graph')) updateBoardGraph(ROOT);
+
+// --- Helpers: duplicate check and graph update ---
+function checkDuplicates(targetTitle, root) {
+  const STOP = new Set([
+    '\u0432', '\u043D\u0430', '\u0438', '\u0434\u043B\u044F', '\u043F\u043E', '\u043A\u0430\u043A',
+    '\u0441\u0434\u0435\u043B\u0430\u0442\u044C', '\u0441\u043E\u0437\u0434\u0430\u0442\u044C', '\u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C',
+    '\u0438\u0437', '\u043F\u043E\u0434', '\u043D\u0430\u0434', '\u043F\u0440\u0438', '\u043F\u043E\u0441\u043B\u0435',
+    '\u0438\u043B\u0438', '\u0447\u0442\u043E', '\u044D\u0442\u043E', '\u0432\u0441\u0435', '\u043F\u0440\u043E',
+    '\u043D\u0435', '\u0436\u0435', '\u0442\u0430\u043A', 'card', '\u0437\u0430\u0434\u0430\u0447\u0430',
+    '\u043D\u043E\u0432\u044B\u0439', '\u043D\u043E\u0432\u0430\u044F',
+    'in', 'on', 'and', 'for', 'to', 'the', 'a', 'an', 'with', 'from', 'by', 'task', 'new'
+  ]);
+  const getStems = str => str.toLowerCase()
+    .replace(/[^a-z\u0400-\u04FF0-9\s]/gi, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 4 && !STOP.has(w))
+    .map(w => w.slice(0, 5));
+
+  const qStems = [...new Set(getStems(targetTitle))];
+  if (!qStems.length) return [];
+
+  const graphFile = path.join(root, '.forma', 'living', 'graphs', 'board', 'graph.json');
+  let candidates = [];
+  if (fs.existsSync(graphFile)) {
+    try {
+      const g = JSON.parse(fs.readFileSync(graphFile, 'utf8'));
+      candidates = (g.nodes || []).filter(n => n.type === 'card').map(n => ({ id: n.id, label: n.label || n.id, status: n.status || '' }));
+    } catch {}
+  }
+  if (!candidates.length) {
+    for (const f of cardFiles(root, /^card-\d+/)) {
+      const base = path.basename(f, '.md');
+      const m = base.match(/^(card-\d+)-(.*)/);
+      candidates.push({ id: m ? m[1] : base, label: base, status: f.includes('done') ? 'done' : 'open' });
+    }
+  }
+
+  const hits = [];
+  for (const c of candidates) {
+    const cStems = new Set(getStems(c.label || c.id));
+    const common = qStems.filter(s => cStems.has(s));
+    if (common.length >= 1) {
+      hits.push({ id: c.id, label: c.label, status: c.status, matchCount: common.length });
+    }
+  }
+  return hits.sort((a, b) => b.matchCount - a.matchCount).slice(0, 4);
+}
+
+function updateBoardGraph(root) {
+  try {
+    const buildScript = path.join(root, '.claude', 'scripts', 'build-kit-graphs.cjs');
+    if (!fs.existsSync(buildScript)) return;
+    const { build, sources } = require(buildScript);
+    const outDir = path.join(root, '.forma', 'living', 'graphs');
+    const cacheFile = path.join(outDir, '.kit-cache.json');
+    const cache = fs.existsSync(cacheFile) ? JSON.parse(fs.readFileSync(cacheFile, 'utf8')) : {};
+    const src = sources();
+    if (src && src.board) {
+      const res = build('board', src.board, cache, null);
+      fs.writeFileSync(cacheFile, JSON.stringify(cache));
+      console.log(`graph: board updated (+${res.miss} parsed, ${res.nodes} nodes)`);
+    }
+  } catch (err) {}
+
+  try {
+    const autoGraphs = path.join(root, '.claude', 'scripts', 'auto-graphs.cjs');
+    if (fs.existsSync(autoGraphs)) {
+      require('child_process').spawn(process.execPath, [autoGraphs, 'touch'], { cwd: root, detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    }
+  } catch {}
+}

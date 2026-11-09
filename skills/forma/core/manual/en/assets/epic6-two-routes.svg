@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 760" width="100%" height="100%" style="background:#0f172a; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#94a3b8" />
+    </marker>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Title -->
+  <text x="480" y="32" text-anchor="middle" fill="#f8fafc" font-size="18" font-weight="700">Процесс 2: Два пути — Простой (Экспресс) vs Сложный (Полный конвейер)</text>
+
+  <!-- Top: E6 -->
+  <g filter="url(#shadow)">
+    <rect x="330" y="55" width="300" height="50" rx="8" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
+    <text x="480" y="85" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="700">Разговор в Эпике 6 (Черновик готов)</text>
+  </g>
+
+  <!-- Arrow to Choice -->
+  <path d="M 480 105 L 480 138" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Choice Diamond/Box -->
+  <g filter="url(#shadow)">
+    <polygon points="480,140 600,175 480,210 360,175" fill="#78350f" stroke="#f59e0b" stroke-width="2"/>
+    <text x="480" y="179" text-anchor="middle" fill="#fef3c7" font-size="13" font-weight="700">Сложность задачи?</text>
+  </g>
+
+  <!-- LEFT: Express Route -->
+  <path d="M 360 175 L 240 240" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="160" y="195" width="170" height="18" rx="4" fill="#0f172a"/>
+  <text x="245" y="208" text-anchor="middle" fill="#38bdf8" font-size="11">Простая (пост, арт, фикс)</text>
+
+  <!-- Group Left Box -->
+  <rect x="40" y="235" width="410" height="495" rx="12" fill="#0b2438" stroke="#0284c7" stroke-width="1.5"/>
+  <text x="245" y="260" text-anchor="middle" fill="#38bdf8" font-size="14" font-weight="700">Простой путь (Экспресс: route-4 / route-2)</text>
+  <text x="245" y="278" text-anchor="middle" fill="#94a3b8" font-size="11">Без промежуточной нарезки Спека и Кита</text>
+
+  <!-- Step 1 Fast -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="295" width="330" height="50" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="245" y="325" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">1. Intent формулирует 5 полей задачи</text>
+  </g>
+  <path d="M 245 345 L 245 375" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 2 Fast: Plumb -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="377" width="330" height="50" rx="8" fill="#831843" stroke="#ec4899" stroke-width="1.5"/>
+    <text x="245" y="407" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">2. Плюмб: роль есть в каталоге? (Да)</text>
+  </g>
+  <path d="M 245 427 L 245 467" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="250" y="450" fill="#34d399" font-size="11" font-weight="600">Готовая роль (Magnific / Nano Banana)</text>
+
+  <!-- Step 3 Fast: Run -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="470" width="330" height="50" rx="8" fill="#0c4a6e" stroke="#0ea5e9" stroke-width="1.5"/>
+    <text x="245" y="500" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">3. Run: Исполнитель генерит визуал и пост</text>
+  </g>
+  <path d="M 245 520 L 245 550" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 4 Fast: Accept -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="552" width="330" height="50" rx="8" fill="#14532d" stroke="#22c55e" stroke-width="1.5"/>
+    <text x="245" y="582" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">4. Intent проверяет → Человек принимает</text>
+  </g>
+  <rect x="100" y="625" width="290" height="40" rx="6" fill="#0284c7" fill-opacity="0.2"/>
+  <text x="245" y="650" text-anchor="middle" fill="#7dd3fc" font-size="12" font-weight="600">Скорость: 1–3 минуты · Ноль бюрократии</text>
+
+
+  <!-- RIGHT: Full Pipeline Route -->
+  <path d="M 600 175 L 720 240" stroke="#f43f5e" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="630" y="195" width="180" height="18" rx="4" fill="#0f172a"/>
+  <text x="720" y="208" text-anchor="middle" fill="#fb7185" font-size="11">Сложная (архитектура, фичи)</text>
+
+  <!-- Group Right Box -->
+  <rect x="510" y="235" width="410" height="495" rx="12" fill="#2d1522" stroke="#e11d48" stroke-width="1.5"/>
+  <text x="715" y="260" text-anchor="middle" fill="#fb7185" font-size="14" font-weight="700">Сложный путь (Полный цикл: route-7)</text>
+  <text x="715" y="278" text-anchor="middle" fill="#94a3b8" font-size="11">Гарантия надёжности, защита бюджета</text>
+
+  <!-- Step 1 Deep: Spec -->
+  <g filter="url(#shadow)">
+    <rect x="550" y="295" width="330" height="46" rx="8" fill="#4c1d95" stroke="#8b5cf6" stroke-width="1.5"/>
+    <text x="715" y="323" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">1. Spec: Декомпозиция на волны и эпики</text>
+  </g>
+  <path d="M 715 341 L 715 363" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 2 Deep: Plumb -->
+  <g filter="url(#shadow)">
+    <rect x="550" y="365" width="330" height="46" rx="8" fill="#831843" stroke="#ec4899" stroke-width="1.5"/>
+    <text x="715" y="393" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">2. Plumb: Замер ясности (C) и ролей (G)</text>
+  </g>
+  <path d="M 715 411 L 715 433" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 3 Deep: Kit -->
+  <g filter="url(#shadow)">
+    <rect x="550" y="435" width="330" height="46" rx="8" fill="#78350f" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="715" y="463" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">3. Kit: Снаряжение (роли, ключи, тесты)</text>
+  </g>
+  <path d="M 715 481 L 715 503" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 4 Deep: Run -->
+  <g filter="url(#shadow)">
+    <rect x="550" y="505" width="330" height="46" rx="8" fill="#0c4a6e" stroke="#0ea5e9" stroke-width="1.5"/>
+    <text x="715" y="533" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="600">4. Run: Пошаговое исполнение волнами</text>
+  </g>
+  <path d="M 715 551 L 715 573" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 5 Deep: Core -->
+  <g filter="url(#shadow)">
+    <rect x="550" y="575" width="330" height="46" rx="8" fill="#14532d" stroke="#22c55e" stroke-width="1.5"/>
+    <text x="715" y="603" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">5. Core: Вердикт круга и закрытие пачки</text>
+  </g>
+  <rect x="570" y="640" width="290" height="40" rx="6" fill="#e11d48" fill-opacity="0.2"/>
+  <text x="715" y="665" text-anchor="middle" fill="#fda4af" font-size="12" font-weight="600">Контроль качества · Гейты и линтеры</text>
+</svg>
