@@ -347,6 +347,17 @@ function templateFiles(name) {
   }
   add(path.join(own, 'project'), 'project')
   add(path.join(own, 'scripts'), path.join('.claude', 'scripts'))
+  // the template's own skill: SKILL.md and template/mcp.json lie down into .claude/skills/<name>/
+  // (mcp.json is data next to the skill - it connects nothing by itself, the SKILL.md step 5b semantics)
+  if (fs.existsSync(path.join(T, name, 'SKILL.md'))) out.push([path.join(T, name, 'SKILL.md'), path.join('.claude', 'skills', name, 'SKILL.md')])
+  if (fs.existsSync(path.join(own, 'mcp.json'))) out.push([path.join(own, 'mcp.json'), path.join('.claude', 'skills', name, 'mcp.json')])
+  // the template's Run roles: .claude/agents/run/ - the names are recorded in .claude/project-layer.txt
+  const runDir = path.join(own, 'agents', 'run')
+  if (fs.existsSync(runDir)) {
+    for (const e of fs.readdirSync(runDir, { withFileTypes: true })) {
+      if (e.isFile() && /\.md$/.test(e.name)) out.push([path.join(runDir, e.name), path.join('.claude', 'agents', 'run', e.name)])
+    }
+  }
   for (const e of fs.readdirSync(T, { withFileTypes: true })) {
     if (e.isDirectory() && e.name !== name) add(path.join(T, e.name), path.join('.claude', 'skills', e.name))
   }
@@ -355,12 +366,29 @@ function templateFiles(name) {
 function installTemplate(root, name, projectCreated) {
   const files = templateFiles(name)
   let written = 0, kept = 0
+  const runRoles = { written: [], kept: [] }
+  const layerLines = []
   for (const [src, rel] of files) {
     const dst = path.join(root, rel)
     const inProject = rel.split(path.sep)[0] === 'project'
-    if (inProject && !projectCreated) { kept++; continue }
-    if (fs.existsSync(dst) && !projectCreated) { kept++; continue }
-    copyFile(src, dst); written++
+    const inRun = rel.startsWith(path.join('.claude', 'agents', 'run') + path.sep)
+    if (inRun) layerLines.push('.claude/agents/run/' + path.basename(rel))
+    if (inProject && !projectCreated) { if (inRun) runRoles.kept.push(path.basename(rel)); kept++; continue }
+    if (fs.existsSync(dst) && !projectCreated) { if (inRun) runRoles.kept.push(path.basename(rel)); kept++; continue }
+    copyFile(src, dst); if (inRun) runRoles.written.push(path.basename(rel)); written++
+  }
+  // the template's run roles travel into .claude/project-layer.txt (the layer-4 list): the names are
+  // appended, an existing line and an existing role file are never overwritten silently
+  if (layerLines.length) {
+    const layerPath = path.join(root, '.claude', 'project-layer.txt')
+    let layer = ''
+    try { layer = fs.readFileSync(layerPath, 'utf8') } catch { /* no file yet */ }
+    const have = new Set(layer.split(/\r?\n/).map((l) => l.trim()).filter(Boolean))
+    const add = layerLines.filter((l) => !have.has(l))
+    if (add.length) {
+      fs.mkdirSync(path.dirname(layerPath), { recursive: true })
+      fs.writeFileSync(layerPath, layer + (layer && !layer.endsWith('\n') ? '\n' : '') + add.join('\n') + '\n')
+    }
   }
   if (projectCreated) {
     const f = projectFile(root, 'PROJECT.md')
@@ -371,7 +399,7 @@ function installTemplate(root, name, projectCreated) {
     t = i18n.setRow(t, 'status', '`forming with the human`')
     fs.writeFileSync(f, t)
   }
-  return { written, kept }
+  return { written, kept, runRoles }
 }
 
 // ---------- Kanban Markdown ----------
@@ -620,7 +648,10 @@ function installTemplateStep({ root, template, existingTemplate }, core, report)
     report.push(`template: project/config/PROJECT.md already records «${existingTemplate}» — not installing «${template}», project/ untouched`)
   } else {
     const t = installTemplate(root, template, core.projectCreated)
-    report.push(`template ${template}: written ${t.written}, left as is ${t.kept}${core.projectCreated ? '' : ' (project/ already existed — its template files are untouched)'}`)
+    let line = `template ${template}: written ${t.written}, left as is ${t.kept}${core.projectCreated ? '' : ' (project/ already existed — its template files are untouched)'}`
+    if (t.runRoles.written.length) line += `; run roles written: ${t.runRoles.written.length}`
+    if (t.runRoles.kept.length) line += `; run roles kept (an existing profile is not overwritten): ${t.runRoles.kept.join(', ')}`
+    report.push(line)
   }
 }
 
@@ -640,7 +671,7 @@ function writeManifest(root, { engines, lang, template, projectCreated }) {
   try { previous = verifyInstall.readManifest(root) } catch { /* a broken earlier manifest is recreated */ }
   const rows = engines.map((id) => (id === 'claude'
     ? { id, profile: '.claude/verify-profile.cjs', expect: claudeExpect() }
-    : { id, note: 'beta — no verify profile yet' }))
+    : { id, note: 'not verified: no profile yet' }))
   const manifest = verifyInstall.buildManifest(root, { owned, projectCreated, previous, engines: rows, lang, version: VERSION, line: LINE, template })
   const f = path.join(root, verifyInstall.MANIFEST)
   fs.mkdirSync(path.dirname(f), { recursive: true })

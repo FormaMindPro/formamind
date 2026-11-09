@@ -120,9 +120,11 @@ function checkCore(root, manifest) {
   return out;
 }
 
-/** Engine profile from the manifest: an adapter file with `check(ctx)`. No file — not installed (red for a ready engine). */
+/** Engine profile from the manifest: an adapter file with `check(ctx)`. No profile declared - not
+ *  verified (the engine may be installed and working, the protocol just cannot check it yet - a note,
+ *  not a finding; only a declared-but-missing or a broken profile is a finding). */
 function loadProfile(root, engine) {
-  if (!engine.profile) return { status: 'not-installed', why: engine.note || 'no verify profile declared — adapter not ready' };
+  if (!engine.profile) return { status: 'not-verified', why: engine.note || 'no verify profile declared yet' };
   const f = path.join(root, engine.profile);
   if (!fs.existsSync(f)) return { status: 'missing', file: engine.profile };
   try { return { status: 'ok', profile: require(f) }; }
@@ -151,7 +153,7 @@ function verify(root, { behavior = true } = {}) {
     const role = i === 0 ? 'main' : 'secondary';
     const row = { id: engine.id, role, notes: [], findings: [] };
     const loaded = loadProfile(root, engine);
-    if (loaded.status === 'not-installed') row.notes.push('not installed: ' + loaded.why);
+    if (loaded.status === 'not-verified') row.notes.push('not verified: no profile yet');
     else if (loaded.status !== 'ok') row.findings.push(finding(loaded.file, 'engine verify profile', loaded.status === 'missing' ? 'file missing' : loaded.why));
     else {
       const ctx = { root, engine, manifest, behavior, finding, syntaxError, mainFindings: result.engines[0] ? result.engines[0].findings : [] };

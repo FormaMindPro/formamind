@@ -104,3 +104,45 @@ test('--engines zcode: claude is installed by the core automatically, the skills
     assert.ok(!fs.existsSync(path.join(d4, '.zcode', '.state')), 'the machine state is not shipped');
   } finally { fs.rmSync(d4, { recursive: true, force: true }); }
 });
+
+// The template ships whole (v0.0.10): the template's own SKILL.md and its mcp.json lie down into
+// .claude/skills/<name>/ (mcp.json connects nothing by itself), the template's Run roles into
+// .claude/agents/run/ with the names recorded in .claude/project-layer.txt.
+const TEMPLATE = 'forma-wordpress-novamira';
+
+test('the template ships whole: SKILL.md, mcp.json, the run roles, project-layer.txt', () => {
+  const d5 = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-template-'));
+  try {
+    const r = spawnSync(process.execPath, [FORMA, 'init', '--dir', d5, '--engines', 'claude', '--template', TEMPLATE, '--board', 'skip', '--yes'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const skill = path.join(d5, '.claude', 'skills', TEMPLATE);
+    assert.ok(fs.existsSync(path.join(skill, 'SKILL.md')), 'the template SKILL.md in .claude/skills/<name>/');
+    assert.ok(fs.existsSync(path.join(skill, 'mcp.json')), 'the template mcp.json next to the skill');
+    const shipped = fs.readdirSync(path.resolve(__dirname, '..', 'templates', TEMPLATE, 'skills', TEMPLATE, 'template', 'agents', 'run')).filter((f) => /\.md$/.test(f));
+    assert.ok(shipped.length >= 8, 'the template carries its run roles in the source (got ' + shipped.length + ')');
+    const layer = fs.readFileSync(path.join(d5, '.claude', 'project-layer.txt'), 'utf8');
+    for (const f of shipped) {
+      assert.ok(fs.existsSync(path.join(d5, '.claude', 'agents', 'run', f)), f + ' installed into .claude/agents/run/');
+      assert.ok(layer.includes('.claude/agents/run/' + f), f + ' recorded in project-layer.txt');
+    }
+    assert.match(r.stdout, /run roles written: /);
+  } finally { fs.rmSync(d5, { recursive: true, force: true }); }
+});
+
+test('the template run roles: an existing profile is kept and named in the report', () => {
+  const d6 = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-template2-'));
+  try {
+    const first = spawnSync(process.execPath, [FORMA, 'init', '--dir', d6, '--engines', 'claude', '--template', TEMPLATE, '--board', 'skip', '--yes'], { encoding: 'utf8' });
+    assert.equal(first.status, 0, first.stdout + first.stderr);
+    const role = path.join(d6, '.claude', 'agents', 'run', 'run-site-upload.md');
+    assert.ok(fs.existsSync(role), 'the role file from the first install');
+    fs.writeFileSync(role, '# the project edited this profile\n');
+    const layer = path.join(d6, '.claude', 'project-layer.txt');
+    const layerBefore = fs.readFileSync(layer, 'utf8');
+    const second = spawnSync(process.execPath, [FORMA, 'init', '--dir', d6, '--engines', 'claude', '--template', TEMPLATE, '--board', 'skip', '--yes'], { encoding: 'utf8' });
+    assert.equal(second.status, 0, second.stdout + second.stderr);
+    assert.equal(fs.readFileSync(role, 'utf8'), '# the project edited this profile\n', 'an existing profile is not overwritten');
+    assert.equal(fs.readFileSync(layer, 'utf8'), layerBefore, 'project-layer.txt carries no duplicate lines');
+    assert.match(second.stdout, /run roles kept \(an existing profile is not overwritten\): .*run-site-upload\.md/);
+  } finally { fs.rmSync(d6, { recursive: true, force: true }); }
+});
