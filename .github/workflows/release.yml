@@ -2,7 +2,10 @@ name: release
 
 # Срабатывает при каждом пуше в main. Смотрит версию в .claude-plugin/plugin.json;
 # если релиз с таким номером ещё не существует — создаёт git-тег и GitHub Release
-# с названием, равным ровно номеру версии, без дополнительного текста.
+# с названием, равным ровно номеру версии. Тело релиза берётся из CHANGELOG.md —
+# секция под выпускаемую версию (заголовок "## [X.Y.Z]"); если секции нет, тело
+# остаётся пустым и релиз собирается из авто-заметок GitHub (список коммитов
+# с прошлого тега и ссылка Full Changelog). Авто-заметки включены всегда.
 # Ничего не публикует, если версия не изменилась с последнего релиза.
 
 on:
@@ -40,11 +43,38 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create release
-        if: steps.check.outputs.exists == 'false'
+      - name: Extract changelog section
+        id: notes
+        run: |
+          VERSION="${{ steps.v.outputs.version }}"
+          if [ -f CHANGELOG.md ] && awk -v ver="$VERSION" '
+              index($0, "## [" ver "]") == 1 { insec=1; next }
+              /^## / { insec=0 }
+              insec { print }
+            ' CHANGELOG.md | grep -q .; then
+            awk -v ver="$VERSION" '
+              index($0, "## [" ver "]") == 1 { insec=1; next }
+              /^## / { insec=0 }
+              insec { print }
+            ' CHANGELOG.md > release_notes.md
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create release with changelog
+        if: steps.check.outputs.exists == 'false' && steps.notes.outputs.found == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.v.outputs.version }}
           name: ${{ steps.v.outputs.version }}
-          generate_release_notes: false
-          body: ""
+          generate_release_notes: true
+          body_path: release_notes.md
+
+      - name: Create release with auto notes only
+        if: steps.check.outputs.exists == 'false' && steps.notes.outputs.found != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.v.outputs.version }}
+          name: ${{ steps.v.outputs.version }}
+          generate_release_notes: true
