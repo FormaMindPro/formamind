@@ -41,6 +41,17 @@ function detectVDisk() {
   } else if (fs.existsSync(defaultPath)) {
     candidate = defaultPath;
     source = 'detected';
+  } else if (isWin) {
+    // Adaptive scan: check other candidate drive letters for forma-tmp
+    const candidateLetters = ['Z', 'Y', 'X', 'W', 'V', 'U', 'T', 'S', 'Q', 'P'];
+    for (const letter of candidateLetters) {
+      const probePath = `${letter}:\\forma-tmp`;
+      if (fs.existsSync(probePath)) {
+        candidate = probePath;
+        source = 'detected-adaptive';
+        break;
+      }
+    }
   }
 
   const result = {
@@ -99,20 +110,12 @@ function main() {
       process.exit(1);
     }
   } else {
-    console.log(`RAM disk status:   ${info.mounted ? 'MOUNTED' : 'NOT MOUNTED'}`);
-    console.log(`Path:              ${info.path}`);
-    console.log(`Source:            ${info.source}`);
-    console.log(`Write permission:  ${info.writable ? 'YES' : 'NO'}`);
-    if (!info.mounted) {
-      console.log(`\nDegraded fallback path: ${info.degradedFallback}`);
-    }
+    console.log(info.mounted ? info.path : info.degradedFallback);
   }
-
-  process.exit(info.mounted ? 0 : 1);
 }
 
 if (require.main === module) {
   main();
 }
 
-module.exports = { detectVDisk };
+module.exports = { detectVDisk, parseArgs };

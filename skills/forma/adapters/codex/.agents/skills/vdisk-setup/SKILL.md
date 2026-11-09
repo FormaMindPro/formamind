@@ -70,7 +70,7 @@ Ask the user an interactive question outlining the benefits:
   ```powershell
   powershell -ExecutionPolicy Bypass -File scripts/setup-ramdisk.ps1
   ```
-  The script provisions drive `R:` (4 GB size, NTFS), creates directory `R:\forma-tmp`, sets full permissions (`icacls *S-1-1-0:(OI)(CI)F`), adds Windows Defender exclusion, and exports `FORMA_TEST_TMP`.
+  The script provisions drive `R:` (4 GB size, NTFS; automatically selects the next available free letter if `R:` is occupied), creates directory `<drive>:\forma-tmp`, sets full permissions (`icacls *S-1-1-0:(OI)(CI)F`), adds targeted Windows Defender exclusions (`<drive>:\forma-tmp`), and exports `FORMA_TEST_TMP`.
 
 - **User selects "No":**
   Record refusal in the session history and continue in degradation mode using the physical drive via `os.tmpdir()` (`path.join(os.tmpdir(), 'forma-tmp')`). Never abort or throw an error due to RAM disk absence (soft degradation rule).
