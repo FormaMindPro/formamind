@@ -26,6 +26,7 @@ const SKILL = path.join(PKG, 'skills', 'forma')
 const CORE = path.join(SKILL, 'core')
 const ADAPTERS = path.join(SKILL, 'adapters')
 const TEMPLATES = path.join(PKG, 'templates')
+const SCAFFOLD = path.join(TEMPLATES, '_scaffold')
 const EXT_ID = 'LachyFS.kanban-markdown'
 const EDITOR_CLIS = ['code', 'antigravity-ide', 'antigravity']
 const ENGINES = [
@@ -178,7 +179,7 @@ function adoptStep(root, adopt) {
 }
 
 // ---------- core ----------
-function installCore(root, protectedPaths) {
+function installCore(root, protectedPaths, lang = 'en') {
   const skip = (d) => protectedPaths.has(path.resolve(d))
   const forma = path.join(root, '.forma')
   copyFile(path.join(CORE, 'AGENTS.md'), path.join(root, 'AGENTS.md'))
@@ -203,12 +204,19 @@ function installCore(root, protectedPaths) {
   const projectDir = path.join(root, 'project')
   let projectState = 'already existed, untouched'
   if (!fs.existsSync(projectDir)) {
-    copyTree(path.join(CORE, 'project'), projectDir)
+    const scaffoldDir = path.join(SCAFFOLD, lang)
+    const enScaffold = path.join(SCAFFOLD, 'en')
+    const src = fs.existsSync(scaffoldDir) ? scaffoldDir : (fs.existsSync(enScaffold) ? enScaffold : path.join(CORE, 'project'))
+    copyTree(src, projectDir)
     projectState = 'scaffold created'
   }
   // project/extensions/ — the project's own roles, skills, scripts; never overwritten, survives uninstall
   const extReadme = path.join(root, extensions.ROOT_DIR, 'README.md')
-  if (!fs.existsSync(extReadme)) copyFile(path.join(CORE, 'extensions', 'PROJECT-README.md'), extReadme)
+  if (!fs.existsSync(extReadme)) {
+    const langExtReadme = path.join(SCAFFOLD, lang, 'extensions', 'README.md')
+    if (fs.existsSync(langExtReadme)) copyFile(langExtReadme, extReadme)
+    else copyFile(path.join(CORE, 'extensions', 'PROJECT-README.md'), extReadme)
+  }
   ensureLine(path.join(root, '.gitignore'), '.forma/dashboard/.cache/', 'Forma: dashboard runtime')
   ensureLine(path.join(root, '.gitignore'), 'project/cards/*/assets/', 'Forma: card assets stay out of git')
   ensureLine(path.join(root, '.gitignore'), 'project/cards/*/work/', 'Forma: card work files stay out of git')
@@ -313,12 +321,14 @@ function installClaude(root, protectedPaths, compact) {
 // ---------- templates ----------
 function listTemplates() {
   if (!fs.existsSync(TEMPLATES)) return []
-  return fs.readdirSync(TEMPLATES, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => {
-    const readme = path.join(TEMPLATES, e.name, 'README.md')
-    let title = ''
-    if (fs.existsSync(readme)) title = (fs.readFileSync(readme, 'utf8').split(/\r?\n/).find((l) => l.trim() && !l.startsWith('#')) || '').trim()
-    return { name: e.name, title: title.slice(0, 110) }
-  })
+  return fs.readdirSync(TEMPLATES, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !e.name.startsWith('_') && !e.name.startsWith('.'))
+    .map((e) => {
+      const readme = path.join(TEMPLATES, e.name, 'README.md')
+      let title = ''
+      if (fs.existsSync(readme)) title = (fs.readFileSync(readme, 'utf8').split(/\r?\n/).find((l) => l.trim() && !l.startsWith('#')) || '').trim()
+      return { name: e.name, title: title.slice(0, 110) }
+    })
 }
 function readProjectTemplate(root) {
   const f = projectFile(root, 'PROJECT.md')
@@ -441,30 +451,42 @@ async function chooseBoard(o, ask) {
 // (keeping the anchors), the hooks print English.
 const MESSAGES = path.join(CORE, 'i18n', 'messages')
 const catalogLangs = () => fs.readdirSync(MESSAGES).filter((n) => /^[a-z]{2,3}\.json$/.test(n)).map((n) => n.slice(0, -5)).sort((x, y) => (x === 'en' ? -1 : y === 'en' ? 1 : x.localeCompare(y)))
-// the name written into PROJECT.md: the English name of a known language, else the code itself
+const scaffoldLangs = () => {
+  if (!fs.existsSync(SCAFFOLD)) return ['en']
+  return fs.readdirSync(SCAFFOLD, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && /^[a-z]{2,3}$/.test(e.name))
+    .map((e) => e.name)
+    .sort((x, y) => (x === 'en' ? -1 : y === 'en' ? 1 : x.localeCompare(y)))
+}
+// the name written into PROJECT.md: the native name of a known language (from keys.json), else code
 const langName = (code) => { const n = (i18n.KEYS.languages[code] || [])[0]; return n ? n[0].toUpperCase() + n.slice(1) : code }
+const langDisplay = (code) => {
+  const names = i18n.KEYS.languages[code] || []
+  const native = names[names.length - 1]
+  return native ? native[0].toUpperCase() + native.slice(1) : code
+}
 async function chooseLang(o, ask) {
-  const known = catalogLangs()
+  const bundled = scaffoldLangs()
   let lang = o.lang
   if (!lang && ask) {
     console.log('\n[4/5] Project document language:')
-    known.forEach((id, i) => console.log(`  ${i + 1}. ${langName(id)}${id === 'en' ? ' (default)' : ' — the agent translates the scaffold after install'}`))
-    console.log('  or type another language code (fr, de, ...): the agent translates the scaffold, hook messages stay English')
+    bundled.forEach((id, i) => console.log(`  ${i + 1}. ${langName(id)}${id === 'en' ? ' (default)' : ' (bundled scaffold)'}`))
+    console.log('  or type another language code (fr, de, ...): installs English scaffold, agent translates after install')
     const a = (await ask('Number or code [1]: ')).trim()
-    lang = !a ? 'en' : (known[Number(a) - 1] || a)
+    lang = !a ? 'en' : (bundled[Number(a) - 1] || a)
   }
   lang = String(lang || 'en').toLowerCase()
-  if (!/^[a-z]{2,3}$/.test(lang)) { console.error(`Language not supported: ${lang}. Use a language code such as ${known.join(', ')}, fr, de`); process.exit(2) }
+  if (!/^[a-z]{2,3}$/.test(lang)) { console.error(`Language not supported: ${lang}. Use a language code such as ${bundled.join(', ')}, fr, de`); process.exit(2) }
   return lang
 }
 
-// Project language: a field in PROJECT.md and, for non-English, a "translation pending" marker — the agent translates, not the installer.
+// Project language: a field in PROJECT.md and, for non-bundled languages, a "translation pending" marker — the agent translates, not the installer.
 function applyLanguage(root, lang) {
   const f = projectFile(root, 'PROJECT.md')
   let t = fs.readFileSync(f, 'utf8')
-  t = t.replace(/(\*\*Project language\*\*[^\n]*?\)\*?:\s*)English\./, `$1${langName(lang)}.`)
+  t = t.replace(/(\*\*.*<!--\s*k:language\s*-->[^\n]*?\)\*?:\s*)[^\n.]+/, `$1${langDisplay(lang)}`)
   fs.writeFileSync(f, t)
-  if (lang === 'en') return null
+  if (lang === 'en' || fs.existsSync(path.join(SCAFFOLD, lang))) return null
   const files = []
   for (const rel of walk(path.join(root, 'project'), { symlinks: true })) {
     if (/\.md$/.test(rel) && !rel.startsWith('brief' + path.sep + 'answers')) files.push('project/' + rel.split(path.sep).join('/'))
@@ -705,7 +727,7 @@ function printVerify(root) {
 function install(root, choice) {
   const existingTemplate = readProjectTemplate(root)
   const protectedPaths = protectedTemplatePaths(root, existingTemplate)
-  const core = installCore(root, protectedPaths)
+  const core = installCore(root, protectedPaths, choice.lang)
   const report = []
   report.push(adoptStep(root, choice.adopt))
   report.push(`core: AGENTS.md, .forma/manual/, .forma/board/, .forma/skills/, .forma/dashboard/ synced; .forma/living/ — missing files added; board .devtool/features/ — ${core.boardState}; project/ — ${core.projectState}`)
@@ -713,7 +735,10 @@ function install(root, choice) {
   installTemplateStep({ root, template: choice.template, existingTemplate }, core, report)
   if (core.projectCreated) {
     const n = applyLanguage(root, choice.lang)
-    report.push(n === null ? 'document language: English' : `document language: ${langName(choice.lang)} — translation awaits the agent: ${n} files (.forma/translation-pending.json; step in SKILL.md "Scaffold translation")${catalogLangs().includes(choice.lang) ? '' : `; no message catalog for "${choice.lang}": hook messages stay English (add core/i18n/messages/${choice.lang}.json)`}`)
+    const isBundled = choice.lang === 'en' || fs.existsSync(path.join(SCAFFOLD, choice.lang))
+    report.push(isBundled
+      ? (choice.lang === 'en' ? 'document language: English' : `document language: ${langName(choice.lang)} (bundled scaffold)`)
+      : `document language: ${langName(choice.lang)} — translation awaits the agent: ${n} files (.forma/translation-pending.json; step in SKILL.md "Scaffold translation")${catalogLangs().includes(choice.lang) ? '' : `; no message catalog for "${choice.lang}": hook messages stay English (add core/i18n/messages/${choice.lang}.json)`}`)
   } else if (choice.lang !== 'en') report.push('language: project/ already existed — not translated (language is chosen on first install only)')
   writeManifest(root, { engines: choice.engines, lang: choice.lang, template: choice.template === 'none' ? (existingTemplate || 'none') : choice.template, projectCreated: core.projectCreated })
   return { report, boardLines: board(choice.boardMode) }

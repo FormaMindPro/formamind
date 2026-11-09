@@ -32,12 +32,23 @@ for (const lang of ['en', 'ru']) {
     const m = JSON.parse(read(dir, '.forma/install-manifest.json'));
     assert.equal(m.lang, lang);
     assert.ok(Object.keys(m.files).length > 100 && Object.keys(m.skeleton).length > 20);
-    assert.match(read(dir, 'project/config/PROJECT.md'), new RegExp(`\\*\\*Project language\\*\\*[^\\n]*: ${lang === 'ru' ? 'Russian' : 'English'}\\.`));
-    assert.equal(fs.existsSync(path.join(dir, '.forma/translation-pending.json')), lang === 'ru');
+    assert.match(read(dir, 'project/config/PROJECT.md'), lang === 'ru'
+      ? /<!-- k:language -->[^\n]*\u0420\u0443\u0441\u0441\u043A\u0438\u0439/
+      : /<!-- k:language -->[^\n]*English/);
+    assert.equal(fs.existsSync(path.join(dir, '.forma/translation-pending.json')), false);
     const v = verify(dir);
     assert.equal(v.status, 0, v.out);
   });
 }
+
+test('the unbundled language install: installs English scaffold and schedules translation marker', () => {
+  const { dir, r } = install('de');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(fs.existsSync(path.join(dir, '.forma/translation-pending.json')), true);
+  const m = JSON.parse(read(dir, '.forma/translation-pending.json'));
+  assert.equal(m.to, 'de');
+  assert.ok(m.files.length >= 30);
+});
 
 test('the skeleton translation: the heading text changes - the check green; a lost heading - red with the address', () => {
   const { dir } = install('ru');

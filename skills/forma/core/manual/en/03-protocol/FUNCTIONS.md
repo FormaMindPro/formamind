@@ -48,3 +48,44 @@ The primary performance gain stems not from sequential megabyte streaming, but f
 1. **Graceful degradation:** if the virtual disk is unmounted or unreachable, the process does not terminate, falling back automatically to `os.tmpdir()` with a user notification.
 2. **Clean boundary:** volatile memory hosts only ephemeral, regenerable data — repository trees, git history, and secrets are strictly excluded.
 3. **Antivirus hygiene:** the RAM disk path should be placed in realtime scanning exclusion lists with periodic scheduled background scans.
+
+### Interactive On-Demand Provisioning (vdisk-setup)
+
+The `vdisk-setup` core skill activates on a Just-In-Time (JIT) basis whenever a node (`Run`, `Kit`, or `Intent` itself) faces disk-intensive operations:
+- Test suite execution (`npm test`, `test-runner.cjs`).
+- Assembly and refinement of web page mockups, HTML/CSS/JS generation, and build bundles.
+- Batch script drafts and operations handling thousands of small files.
+
+If the disk is unmounted, the agent neither fails nor degrades silently; instead, it presents an interactive decision request with clear benefit rationale:
+
+```mermaid
+flowchart TD
+    Start["Disk-intensive task (Run / Kit / Intent)"] --> Check{"Disk mounted?<br/>(R:\\forma-tmp)"}
+    Check -- "Yes" --> Exec["Execute on RAM disk<br/>(isolated subdirectory)"]
+    Check -- "No" --> Prompt["Interactive prompt to human<br/>(rationale: 2x–8x speed + SSD protection)"]
+    Prompt --> Decision{"Human decision"}
+    Decision -- "Yes (mount)" --> Mount["setup-ramdisk.ps1<br/>(OSFMount / ImDisk + ACLs + Defender)"]
+    Mount --> Exec
+    Decision -- "No (skip)" --> Degrade["Graceful fallback to os.tmpdir()<br/>(physical storage)"]
+    Degrade --> Work["Execution continues smoothly"]
+```
+
+## 2. Initial Project Onboarding Wizard (project-setup)
+
+Initial setup of a fresh project in the Forma protocol is automated via the `project-setup` conversational core skill. It resolves the startup blocking gate (`AGENTS.md` §3 "STOP START"), populating required configuration in `project/config/PROJECT.md` without requiring manual file edits.
+
+```mermaid
+flowchart LR
+    S1["1. RAM disk<br/>(vdisk-setup)"] --> S2["2. Thresholds<br/>(volume=25, attempts=3)"]
+    S2 --> S3["3. Plumb<br/>(jev / 80-40-0.75-3/4)"]
+    S3 --> S4["4. Localization<br/>(ru/en or translation)"]
+    S4 --> S5["5. Gate cleared<br/>(proceed to brief)"]
+```
+
+### Five Steps of Initial Setup
+
+1. **Virtual RAM Disk (`vdisk-setup`):** Checks `R:\forma-tmp` availability and offers to provision the disk, ensuring all subsequent tests and builds run in high-speed RAM from day one.
+2. **Protocol Thresholds:** Sets canonical baseline values — 25 cards per cycle (`volume`) and at most 3 attempts per task (`attempts`). Token spend and elapsed time remain metrics and are never capped in advance.
+3. **Plumb Decision Model:** Configures the decision model (recommended external `typesafe/jev-1.14` via OpenRouter Decisions API or in-family fallback `haiku`/`gemini-flash`), calibrates thresholds (leader ≥ 80%, margin ≥ 40%, noul ≥ 0.75, clarity ≥ 3/4, 100 calls per cycle), and verifies `.env` secret availability safely (prohibition 15).
+4. **Localization (i18n):** Checks the project document language. If a non-bundled language is chosen (beyond built-in `ru` and `en`), creates `.forma/translation-pending.json` and launches scaffold translation.
+5. **Start Gate Clearance:** Runs `check-ready.cjs`, confirms the removal of "STOP START", and hands off cleanly to the goal briefing interview (`grilling` / `forma-grill-with-ui`).

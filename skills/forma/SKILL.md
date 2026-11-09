@@ -20,9 +20,9 @@ Do not copy files by hand - that is the job of this same plugin's installer `bin
 3. **Run at the project root:** `node <path-to-installer>/bin/forma.cjs init --engines <engines> --template <template|none> --board <auto|skip> --lang <code> [--adopt|--no-adopt]`. All four flags given - the installer asks nothing. **First installation only, when the root already has foreign folders and files** (not the protocol root): ask the human whether to move them into `project/source/` (step 0b), and pass the answer with the flag `--adopt` or `--no-adopt`; without the flag in a terminal the installer asks itself, without a terminal - it will not touch them and will name what it found in the report.
 4. **Show the human the installer's report as is:** what was synchronized, whether `project/` was touched, the Kanban Markdown lines (`✓ ok` / `✓ installed` / the command for a manual install), the installation integrity line (`verify-install`). The report not `✓` - take it apart and report (step 8b).
 
-## Skeleton translation (only `--lang` not `en`, first installation only)
+## Skeleton translation (only for unbundled languages, first installation only)
 
-The installer does not translate: it lays the English skeleton, writes into `project/config/PROJECT.md` "Project language" = the language's name (`Russian`, `fr`…) and creates `.forma/translation-pending.json` (`from`, `to`, a closed list `files`). The translation is the agent's work, once:
+The installer checks if a bundled scaffold package exists in `templates/_scaffold/<code>` (currently `en` and `ru`). For bundled languages, the pre-translated skeleton is laid directly upon installation and no translation is needed. For unbundled languages (such as `fr`, `de`), the installer lays the English skeleton, records the language name in `project/config/PROJECT.md`, and creates `.forma/translation-pending.json` (`from`, `to`, a closed list `files`). The translation is the agent's work, once:
 
 1. No `.forma/translation-pending.json` - no translation needed, no step.
 2. Open a card (`node .forma/board/new-card.cjs`), kind `tooling`, epic `protocol`; the executor - `run-text`; in the card - the `files` list from the file, as a closed enumeration.

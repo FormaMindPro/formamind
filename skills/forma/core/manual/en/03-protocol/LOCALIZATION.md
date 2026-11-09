@@ -41,3 +41,18 @@ The core is English: zone headings, card kind, Kit unit keys, history verbs and 
 - no Cyrillic in `web/` outside comments and `i18n-keep` lines.
 
 The test `.forma/dashboard/locale-parity.test.cjs` proves the check turns red on each kind of breakage and stays green on clean code.
+
+## Project scaffold localization at install
+
+During installation (`forma init`), the core checks for bundled reference scaffold packages under `templates/_scaffold/<code>` (currently `en` and `ru`).
+
+- **Bundled language (`en`, `ru`):** the pre-translated reference scaffold of the chosen language is installed immediately. No `.forma/translation-pending.json` marker is created, and the project is ready without model calls.
+- **Custom / unbundled language (`de`, `fr`, `es`, etc.):** the installer lays the canonical English scaffold `templates/_scaffold/en/`, records the target language in `PROJECT.md`, and creates `.forma/translation-pending.json`. The agent translates the skeleton following the "Skeleton translation" procedure in the `forma` skill.
+- **Scaling to new languages:** once a verified translation for a new language is created, its files can be bundled into the protocol repository under `templates/_scaffold/<code>/`.
+
+## Scaffold parity checks and tests (scaffold-parity)
+
+All bundled scaffold packages are subject to strict structural parity:
+- The `test/scaffold-parity.test.cjs` test validates that the file tree of `en` and each localized scaffold package match 1:1;
+- For every markdown document, heading counts and levels (`#` and `##`, via `skeletonOf`) and machine anchor sequences (`<!-- k:... -->`) must be identical.
+
