@@ -13,7 +13,8 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { gitOut } = require('./lib/git.cjs');
 const i18n = require('../skills/forma/core/i18n/index.cjs');
-const tr = (code, params) => i18n.message(code, params, 'ru');
+// The console log speaks English (the engine's log rule); the ru/en dictionaries keep both canonical texts.
+const tr = (code, params) => i18n.message(code, params, 'en');
 
 const DIRS = 'board|dashboard|living|manual|protocol|skills|templates';
 // Carry-over corruption: a `.forma/...` path amid a foreign path or word, a double root, a possessive or keyed form.
@@ -110,9 +111,8 @@ function versionStop(dir) {
 }
 
 /* The changelog is an integral part of publishing: a version with no tag yet must have its
- * CHANGELOG.md section (## [X.Y.Z]) - the release notes are built from it. The console log speaks
- * English (the engine's log rule); the gate skips honestly when the tags are not available. */
-const en = (code, params) => i18n.message(code, params, 'en');
+ * CHANGELOG.md section (## [X.Y.Z]) - the release notes are built from it. The gate skips
+ * honestly when the tags are not available. */
 function changelogGate(dir) {
   let version = null;
   try { version = JSON.parse(fs.readFileSync(path.join(dir, '.claude-plugin', 'plugin.json'), 'utf8')).version; } catch {}
@@ -125,13 +125,13 @@ function changelogGate(dir) {
     const text = fs.readFileSync(path.join(dir, 'CHANGELOG.md'), 'utf8');
     hasSection = text.split(/\r?\n/).some((l) => l.trim() === `## [${version}]` || l.startsWith(`## [${version}] `));
   } catch {}
-  if (!hasSection) console.error(en('rel.changelog_missing', { version }));
+  if (!hasSection) console.error(tr('rel.changelog_missing', { version }));
   return { ok: hasSection, version, released };
 }
 
 function changelogStop(dir) {
   const gate = changelogGate(dir);
-  if (gate.ok) { console.log(en('rel.changelog_ok', { version: gate.version })); return; }
+  if (gate.ok) { console.log(tr('rel.changelog_ok', { version: gate.version })); return; }
   process.exit(1);
 }
 
