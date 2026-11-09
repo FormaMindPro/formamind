@@ -1,7 +1,9 @@
-// Схема движка: данные для блок-схемы. Блоки — из манифеста (schema-manifest.cjs), состав — реальные файлы на диске,
-// связи (читает, пишет, вызывает, регистрирует, порождает) — из settings.json/hooks.json и текста файлов.
-// Ничего не рисуется вручную: что не нашлось в файлах — попадает в gaps, а не выдумывается. Модель не вызывается.
-// Описание файла берётся из structure.cjs (describe) — без копии. Формат результата — в конце файла (SCHEMA_SHAPE).
+// The engine's schema: data for the block diagram. The blocks - from the manifest (schema-manifest.cjs), the
+// composition - real files on disk, the links (reads, writes, calls, registers, spawns) - from
+// settings.json/hooks.json and the files' text.
+// Nothing is drawn by hand: what was not found in the files lands in gaps, not invented. No model is called.
+// A file's description is taken from structure.cjs (describe) - without a copy. The result's format - at the
+// file's end (SCHEMA_SHAPE).
 'use strict';
 
 const fs = require('fs');
@@ -15,7 +17,7 @@ const TOKEN = /[A-Za-z0-9_$.{}\-/]*[A-Za-z0-9_\-]\.(?:cjs|js|mjs|sh|py|md|json|t
 const WRITE_FN = /(writeFileSync|appendFileSync|writeFile\b|appendFile\b|mkdirSync|renameSync|copyFileSync|writeJson|>>|\s>\s)/;
 const CALL_CTX = /(require\s*\(|\bnode\s|\bbash\s|\bsh\s|spawn|exec|fork\s*\(|import\s*\()/;
 const SPAWN_CTX = /(spawn|fork\s*\(|detached)/;
-const AGENT_CTX = /(subagent_type|\bAgent\b|spawn|invok|порожд|вызыва)/i;
+const AGENT_CTX = /(subagent_type|\bAgent\b|spawn|invok|\u043f\u043e\u0440\u043e\u0436\u0434|\u0432\u044b\u0437\u044b\u0432\u0430)/i;
 const NODE_FILE = /^\.claude\/agents\/(run\/)?[^/]+\.md$/;
 const MAX_BYTES = 400 * 1024;
 
@@ -56,7 +58,7 @@ function createResolver(files) {
   const set = new Set(files);
   const byBase = new Map();
   for (const f of files) { const b = path.posix.basename(f); (byBase.get(b) || byBase.set(b, []).get(b)).push(f); }
-  // несколько кандидатов: тот же движок, что у источника; иначе основной (.claude), иначе .forma
+  // several candidates: the same engine as the source's; else the main one (.claude), else .forma
   const pick = (c, from) => {
     if (c.length === 1) return c[0];
     const top = (x) => x.split('/')[0];
@@ -95,7 +97,7 @@ function blockOf(rel) {
   return r ? { block: r.block, does: r.does || null } : { block: null, does: null };
 }
 
-/** Связи settings.json/hooks.json: регистрирует каждый скрипт из команд хуков. */
+/** The settings.json/hooks.json links: registers every script from the hooks' commands. */
 function registerLinks(rel, text, resolve, out) {
   let j; try { j = JSON.parse(text); } catch { return; }
   const walk = (v, ev) => {
@@ -116,7 +118,7 @@ function registerLinks(rel, text, resolve, out) {
 function textLinks(rel, text, resolve, agentNames, out, unresolved) {
   if (!text) return;
   const isCode = CODE.test(rel), isMd = /\.md$/.test(rel);
-  // path.join('a','b') и ['a','b'] -> a/b
+  // path.join('a','b') and ['a','b'] -> a/b
   const flat = text.replace(/['"`]\s*,\s*['"`]/g, '/');
   const lines = flat.split(/\r?\n/);
   lines.forEach((line, i) => {
@@ -143,14 +145,14 @@ function textLinks(rel, text, resolve, agentNames, out, unresolved) {
       } else type = 'reads';
       if (type) out.push({ from: rel, to: r.file, type, evidence: line.trim().slice(0, 140) });
     }
-    // области вне состава (.devtool/features, .claude/.ledger, ...)
+    // the areas outside the composition (.devtool/features, .claude/.ledger, ...)
     for (const a of M.AREAS) {
       if (line.includes(a.prefix)) {
         const type = isCode ? (writes ? 'writes' : 'reads') : 'reads';
         out.push({ from: rel, to: 'area:' + a.prefix, area: a, type, evidence: line.trim().slice(0, 140) });
       }
     }
-    // порождение узла по имени: `plumb-haiku`, `run-script` в строке про вызов агента
+    // spawning a node by name: `plumb-haiku`, `run-script` in a line about an agent invocation
     if (isMd && AGENT_CTX.test(line)) {
       for (const [name, file] of agentNames) {
         if (file !== rel && new RegExp('`' + name.replace(/[-]/g, '\\-') + '`').test(line)) out.push({ from: rel, to: file, type: 'spawns', evidence: line.trim().slice(0, 140) });
@@ -198,13 +200,13 @@ function buildSchema(root) {
     fileBlock.set(f, block);
     const entry = ENTRY_RES.find((e) => e.re.test(f)) || null;
     let does = null;
-    try { does = describe(path.join(root, f)); } catch { /* нет описания */ }
+    try { does = describe(path.join(root, f)); } catch { /* no description */ }
     if (!does && /\.json$/.test(f)) does = jsonKeys(texts[f]);
     return { path: f, block, does: does || ruleDoes, doesSource: does ? 'file' : ruleDoes ? 'manifest' : null,
       kind: CODE.test(f) ? 'script' : /\.md$/.test(f) ? 'doc' : /\.json$/.test(f) ? 'data' : 'other',
       entry: entry ? { ru: entry.ru, en: entry.en } : null };
   });
-  // связи: уникальные по (from,to,type)
+  // the links: unique by (from,to,type)
   const seen = new Map();
   for (const l of raw) {
     const key = l.from + '>' + l.to + '>' + l.type;
@@ -256,6 +258,6 @@ if (require.main === module) {
 /* SCHEMA_SHAPE
 { linkTypes:[{key,ru,en}], blocks:[{key,ru,en,descRu,descEn,files:[path]}],
   files:[{path,block,does,doesSource,kind,entry,callers:[{path,type}],readBy:[path],caller,callerKind}],
-  links:[{from,to,type,fromBlock,toBlock,evidence}]  (to — путь файла или 'area:<prefix>'),
+  links:[{from,to,type,fromBlock,toBlock,evidence}]  (to - a file's path or 'area:<prefix>'),
   blockLinks:[{from,to,type,count}], unsorted:[path], gaps:{noDoes,noCaller,unresolvedRefs,unresolvedRefsTotal},
   engineMap:{tokens,resolved:[{lang,token,file}],unresolved:[{lang,token}]} } */

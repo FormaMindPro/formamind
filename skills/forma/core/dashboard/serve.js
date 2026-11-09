@@ -1,18 +1,18 @@
 #!/usr/bin/env node
-// Локальный сервер дашборда — статика + живой пересчёт data.json + SSE-пуш в браузер.
-// Без внешних зависимостей: только встроенные http/fs. file:// не отдаёт index.html
-// подтянуть data.json (CORS), поэтому нужен хоть какой-то HTTP-сервер, пусть и локальный.
+// Local dashboard server - static files + a live data.json rebuild + an SSE push into the browser.
+// No external dependencies: only the built-in http/fs. file:// does not serve index.html with
+// data.json pulled in (CORS), so some HTTP server is needed, even a local one.
 //
-// Запуск: node .forma/dashboard/serve.js  →  обычно http://localhost:5050/, порт динамический —
-// см. «Выбор порта» ниже (у каждого проекта свой дашборд, 5050 не гарантирован свободным).
+// Run: node .forma/dashboard/serve.js  ->  usually http://localhost:5050/, the port is dynamic -
+// see "Port choice" below (every project has its own dashboard, 5050 is not guaranteed free).
 //
-// Реального времени добивается так: fs.watch следит за .devtool/features/ рекурсивно;
-// любое изменение карточки (правка узлом, перенос в done/, новая карточка) с задержкой
-// в 300 мс (чтобы не пересчитывать по три раза за один Write-тулкол) пересобирает срез
-// в памяти и рассылает событие всем открытым вкладкам через Server-Sent Events —
-// браузер сам обновляет данные, без F5 и без ручного `node generate.js`.
+// The real-time effect works so: fs.watch watches .devtool/features/ recursively; any card change
+// (an edit by a node, a move into done/, a new card) with a 300 ms delay (so as not to rebuild three
+// times per one Write tool call) rebuilds the snapshot in memory and sends the event to every open
+// tab through Server-Sent Events - the browser refreshes the data itself, without F5 and without
+// a manual `node generate.js`.
 //
-// Маршруты — таблица ROUTES ниже: «метод + путь → функция». Всё, чего в ней нет, отдаётся как статика.
+// The routes are the ROUTES table below: "method + path -> function". Whatever is absent from it is served as static files.
 
 const http = require('http');
 const fs = require('fs');
@@ -21,6 +21,9 @@ const { execFileSync, spawn } = require('child_process');
 const { writeJsonAtomic } = require('./lib/fs.cjs');
 const i18n = require('./lib/i18n.cjs');
 const { DEFAULT_PORT } = require('./port.cjs');
+// Canonical ru strings of the console output live in the core dictionary; the language is fixed.
+const { message: coreMessage } = require('../i18n/index.cjs');
+const ruMsg = (key, params) => coreMessage(key, params, 'ru');
 
 const ROOT = __dirname;
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
@@ -28,15 +31,15 @@ const FEATURES_DIR = path.join(PROJECT_ROOT, '.devtool', 'features');
 const GRAPHIFY_LOG = path.join(__dirname, 'graphify.log');
 const BRIEF_DIR = path.join(PROJECT_ROOT, 'project', 'brief');
 const ANSWERS_FILE = path.join(BRIEF_DIR, 'answers.jsonl');
-// Материалы брифа: сюда переезжает всё, что человек приложил в интервью.
+// The brief's materials: everything the human attached in the interview lands here.
 const MATERIALS_DIR = path.join(BRIEF_DIR, 'materials');
 const GRILL_SERVER = path.join(PROJECT_ROOT, '.forma/skills', 'forma-grill-with-ui', 'server.mjs');
 const CACHE_DIR = path.join(__dirname, '.cache');
 const DATA_CACHE_FILE = path.join(CACHE_DIR, 'data.json');
 const SERVER_FILE = path.join(CACHE_DIR, 'server.json');
 const DEBOUNCE_MS = 300;
-const GRILL_WAIT_MS = 8000;              // сколько ждать, пока страница интервью поднимется
-const MAX_ANSWER_BYTES = 256 * 1024;     // ответ человека, не файл
+const GRILL_WAIT_MS = 8000;              // how long to wait for the interview page to come up
+const MAX_ANSWER_BYTES = 256 * 1024;     // a human answer, not a file
 
 fs.mkdirSync(CACHE_DIR, { recursive: true });
 
@@ -49,11 +52,11 @@ const MIME = {
   '.svg': 'image/svg+xml',
 };
 
-// ---------- перечитываемые модули ----------
+// ---------- re-readable modules ----------
 //
-// Сборщик данных и всё, что он читает (.forma/dashboard/generate.js, data/, lib/), а также модуль сессий интервью
-// живут в объекте `live`: правка любого из них доходит до работающего сервера сама, см. watchModules.
-// Обращаться к ним надо через `live.<имя>` в момент вызова, не сохраняя ссылку на модуль в константе.
+// The data builder and everything it reads (.forma/dashboard/generate.js, data/, lib/), plus the interview
+// sessions module live in the `live` object: an edit of any of them reaches the running server by itself,
+// see watchModules. Address them through `live.<name>` at the call moment, not kept in a constant.
 function loadLive() {
   return {
     buildData: require('./generate.js').buildData,
@@ -69,23 +72,23 @@ const sseClients = new Set();
 function rebuild(reason) {
   try {
     latestData = live.buildData(PROJECT_ROOT);
-    // Держим кэш на диске синхронным — совместимость с ручным чтением/сборкой.
+    // The disk cache is kept in sync - compatibility with a manual read/build.
     fs.writeFileSync(DATA_CACHE_FILE, JSON.stringify(latestData, null, 2), 'utf8');
-    console.log(`[${new Date().toLocaleTimeString('ru-RU')}] пересобрано (${reason}): карточек ${latestData.totals.cardCount}, токенов по движкам ${JSON.stringify(latestData.totals.tokensByEngine)}`);
+    console.log(ruMsg('serve.rebuilt', { time: new Date().toLocaleTimeString('ru-RU'), reason, cards: latestData.totals.cardCount, tokens: JSON.stringify(latestData.totals.tokensByEngine) }));
     try { live.graphifyTrigger.check(); } catch (err) { console.error('graphify-trigger:', err.message); }
     for (const res of sseClients) {
       res.write(`data: ${JSON.stringify(latestData)}\n\n`);
     }
   } catch (err) {
-    console.error('Ошибка пересборки:', err.message);
+    console.error(ruMsg('serve.rebuild_failed'), err.message);
   }
 }
 
-// ---------- сессии интервью ----------
+// ---------- interview sessions ----------
 
-// Распечатывает завершённую сессию: новый вопрос значит, что разговор продолжается.
-// Запись прошлого захода не теряется — она уходит в список завершённых кругов, и по
-// нему потом видно, что этот разговор уже один раз сдавался.
+// Reopens a finished session: a new question means the conversation continues.
+// The record of the previous round is not lost - it goes into the list of finished rounds, from which
+// one can later see that this conversation has already been submitted once.
 function reopen(state) {
   if (state.finished) {
     state.finishedRounds = [...(state.finishedRounds || []), state.finished];
@@ -94,11 +97,11 @@ function reopen(state) {
   state.agent = { ...(state.agent || {}), status: 'waiting', since: new Date().toISOString() };
 }
 
-// Ищет узел в дереве картины и попутно запоминает, к какой позиции он относится.
-// Позиция написана не на каждом узле, а на предках — берём ближайшую сверху.
+// Finds a node in the picture's tree and along the way remembers which position it belongs to.
+// The position is written not on every node but on the ancestors - the nearest one above is taken.
 function findNode(node, id, position) {
   if (!node) return null;
-  const mine = /(?:позиция|position)\s*(\d)/.exec(String(node.from || '') + ' ' + String(node.tag || ''));
+  const mine = /(?:\u043f\u043e\u0437\u0438\u0446\u0438\u044f|position)\s*(\d)/.exec(String(node.from || '') + ' ' + String(node.tag || ''));
   const pos = mine ? Number(mine[1]) : position;
   if (node.id === id) return { node, position: pos || 1 };
   for (const c of node.children || []) {
@@ -108,12 +111,12 @@ function findNode(node, id, position) {
   return null;
 }
 
-// Вопрос из узла: его же слова в кавычках и просьба раскрыть. Ни одного слова о том,
-// что этот узел, по-моему, значит, — иначе человек будет соглашаться с моим чтением
-// вместо того, чтобы рассказывать своё (`project/brief/picture.md`).
-// `n` — сколько раскруток в этой сессии уже было: имя выходит коротким и по порядку.
-// Узел записан отдельным полем, а не втиснут в имя: имя видно в узкой колонке списка,
-// и набивать его содержимым значит ломать список ради того, что там всё равно не прочесть.
+// The question out of a node: the node's own words in quotes and a request to expand. Not a single word
+// about what this node, in my reading, means - otherwise the human would agree with my reading instead
+// of telling their own (`project/brief/picture.md`).
+// `n` - how many expansions this session already had: the name comes out short and in order.
+// The node is written in a separate field, not squeezed into the name: the name is seen in a narrow
+// list column, and stuffing content into it breaks the list for something unreadable there anyway.
 const expandQuestion = (node, n) => ({
   id: 'x-' + (n + 1),
   node: node.id,
@@ -121,12 +124,12 @@ const expandQuestion = (node, n) => ({
   text: interviewCopy().grow.text.replace('{label}', node.label),
 });
 
-// Заход, которым возобновляют закрытую позицию: один открытый вопрос и ничего больше.
+// The round with which a closed position is resumed: one open question and nothing more.
 //
-// Подсказывать здесь нечего. Что человек хочет добавить, знает только он; список
-// готовых тем был бы моим замыслом, поданным ему на одобрение, — ровно то, чего
-// избегает первый заход (`project/brief/picture.md`).
-// Тексты для человека — на языке проекта (`data/interview-spec.cjs`, «Project language» в PROJECT.md).
+// There is nothing to suggest here. What the human wants to add, only they know; a list
+// of ready-made topics would be my design served to them for approval - exactly what
+// the first round avoids (`project/brief/picture.md`).
+// The texts for the human are in the project's language (`data/interview-spec.cjs`, "Project language" in PROJECT.md).
 const interviewCopy = () => {
   const { projectFile, readIfExists } = require('./lib/fs.cjs');
   const { langOf, localize } = require('./data/interview-spec.cjs');
@@ -138,10 +141,10 @@ const resumeQuestions = (position) => [{
   ...interviewCopy().resume,
 }];
 
-// Вопросы, которыми засевается новый заход позиции: ровно те, что записаны в `OPENING_ROUND`
-// и названы человеком годными. Это перенос готового текста, а не авторство, —
-// иначе дашборд писал бы `state.json`, который по договору скилла принадлежит
-// агенту, и разговор вёл бы не тот, кто за него отвечает.
+// The questions a new round of a position is seeded with: exactly those written in `OPENING_ROUND`
+// and named fit by the human. This is carrying over a ready text, not authorship - otherwise
+// the dashboard would write `state.json`, which by the skill's contract belongs to the agent,
+// and the conversation would be led by someone other than the one answerable for it.
 const openingQuestions = (position) => {
   const interview = latestData.interview;
   const hit = interview && (interview.positions || []).find((p) => p.n === position);
@@ -151,17 +154,17 @@ const openingQuestions = (position) => {
 const readState = (session) => JSON.parse(fs.readFileSync(path.join(session, 'state.json'), 'utf8'));
 const writeState = (session, state) => fs.writeFileSync(path.join(session, 'state.json'), JSON.stringify(state, null, 2), 'utf8');
 
-// Первый заход открытый: `options` нет намеренно. Варианты придумывает агент,
-// и опрос с готовыми вариантами записал бы в бриф его замысел, одобренный
-// человеком, вместо замысла человека (`project/brief/picture.md`).
+// The first round is open: `options` are absent on purpose. The agent invents the variants,
+// and a poll with ready variants would write the agent's design, approved by the human,
+// into the brief instead of the human's design (`project/brief/picture.md`).
 function seedQuestions(session, questions) {
   const state = readState(session);
   const { seed } = interviewCopy();
   state.note = seed.note;
   state.questions = questions.map((q, i) => ({
     id: q.id, round: 1, deps: [],
-    // Имя для бокового списка страницы: «Вопрос 1» там ничего не говорит,
-    // а по списку человек выбирает, к чему вернуться.
+    // The name for the page's side list: "Question 1" says nothing there,
+    // and by the list the human chooses what to return to.
     title: q.title || seed.question.replace('{n}', i + 1), body: q.text,
     options: [], status: 'open', durable: false, updated: false,
   }));
@@ -169,8 +172,8 @@ function seedQuestions(session, questions) {
   writeState(session, state);
 }
 
-// Новая папка сессии от скилла; заход дописывается в карту позиции — прошлые остаются в списке:
-// по ним считается, что уже спрошено.
+// A new session folder from the skill; the round is appended into the position's map - the past ones
+// stay in the list: they count as what has already been asked.
 function createGrillSession(position, questions) {
   const out = execFileSync(process.execPath, [
     GRILL_SERVER, 'new',
@@ -186,8 +189,8 @@ function createGrillSession(position, questions) {
   return session;
 }
 
-// Сервер страницы — отдельный процесс и переживает этот. Если он уже жив,
-// второй не поднимаем: две страницы одной сессии разошлись бы.
+// The page's server is a separate process and outlives this one. If it is already alive,
+// a second one is not raised: two pages of one session would drift apart.
 function startGrillServer(session) {
   if (live.sessions.serverOf(session).alive) return;
   const child = spawn(process.execPath, [GRILL_SERVER, 'serve', '--session', session],
@@ -195,9 +198,9 @@ function startGrillServer(session) {
   child.unref();
 }
 
-// Поднимает (или находит) сессию интервью для позиции и возвращает её папку.
-// `resume` — позиция закрыта, и прошлый разговор дописывать нельзя: он записан и
-// сдан. Возобновление всегда заводит новый заход, а старая сессия остаётся как есть.
+// Raises (or finds) the interview session for a position and returns its folder.
+// `resume` - the position is closed, and the past conversation must not be appended to: it is recorded
+// and submitted. A resume always starts a new round, the old session stays as it is.
 function ensureGrillSession(position, questions, resume) {
   const { readSessions, currentSession } = live.sessions;
   let session = resume ? null : currentSession(readSessions(PROJECT_ROOT)[String(position)]);
@@ -221,22 +224,22 @@ function grillUrl(session, deadlineMs) {
   });
 }
 
-// ---------- перенос ответов из сессий в бриф ----------
+// ---------- carrying the answers from the sessions into the brief ----------
 //
-// Страница интервью пишет свои отправки в `events.jsonl` сессии. Оттуда сказанное
-// переносится в `project/brief/answers.jsonl` — дословно и внутри брифа, потому что
-// запись разговора принадлежит проекту, а не папке сессии скилла, которую однажды
-// подчистят.
+// The interview page writes its submissions into the session's `events.jsonl`. From there what was
+// said is carried into `project/brief/answers.jsonl` - verbatim and inside the brief, because the
+// record of the conversation belongs to the project, not to the skill's session folder, which will
+// one day be cleaned up.
 //
-// Картину этот перенос не трогает: `picture.json` — синтез `Intent`, и собрать её
-// автоматически из сырого ответа значило бы выдать услышанное за понятое.
-// Докуда перенесено — на диске, а не в памяти процесса: отметка в памяти
-// обнулялась при перезапуске, и каждый запуск дописывал в бриф все прежние
-// ответы заново. `sessions.json` для этого и годится — он машинный и вне git.
-const watchedSessions = new Set();   // за какими сессиями уже следим в этом процессе
+// The picture is not touched by this carrying: `picture.json` is a synthesis by `Intent`, and
+// assembling it automatically from the raw answer would mean passing the heard off as the understood.
+// How far it has been carried lives on disk, not in the process's memory: an in-memory mark reset
+// on restart, and every launch appended all the past answers into the brief anew. `sessions.json`
+// is fit exactly for this - it is machine-owned and outside git.
+const watchedSessions = new Set();   // which sessions this process already watches
 
-// Переносит один файл в brief/materials и возвращает путь от корня проекта.
-// Тёзка не затирается: два разных «бриф.md» из разных сессий — обычное дело.
+// Carries one file into brief/materials and returns the path from the project root.
+// A namesake is not overwritten: two same-named files from different sessions are a common thing.
 function absorbUpload(session, name) {
   const from = path.join(session, 'uploads', name);
   if (!fs.existsSync(from)) return null;
@@ -247,32 +250,32 @@ function absorbUpload(session, name) {
   let out = name;
   let i = 1;
   while (fs.existsSync(path.join(dir, out))) {
-    // Тот же файл, уже перенесённый, переносить второй раз незачем.
+    // The same file, already carried, has no need to be carried a second time.
     if (fs.statSync(path.join(dir, out)).size === fs.statSync(from).size) break;
     out = `${stem}-${++i}${ext}`;
   }
   const to = path.join(dir, out);
   if (!fs.existsSync(to)) fs.copyFileSync(from, to);
-  console.log(`[интервью] приложен файл: ${out}`);
+  console.log(ruMsg('serve.upload_absorbed', { file: out }));
   return path.relative(PROJECT_ROOT, to).split(path.sep).join('/');
 }
 
-// Записи для answers.jsonl из одного события страницы.
+// Records for answers.jsonl out of one page event.
 function recordsOf(ev, session, position) {
   const at = ev.at || new Date().toISOString();
   const actions = ev.actions || [];
   const records = [];
 
-  // Берём только ответы. Треды, defer, reopen и visualize — разговор про
-  // разговор; в дословную запись они не идут, иначе бриф перестанет быть
-  // записью сказанного о предмете.
+  // Only the answers are taken. Threads, defer, reopen and visualize are a conversation about
+  // the conversation; they do not go into the verbatim record, otherwise the brief stops being
+  // a record of what was said about the subject.
   const answers = actions
     .filter((a) => a.type === 'answer')
     .map((a) => ({ id: String(a.q || ''), text: String(a.text || '').trim() }))
     .filter((a) => a.id && a.text);
   if (answers.length) records.push({ at, position, answers });
 
-  // Приложенные файлы. Их не пересказывают словами — их переносят и называют.
+  // Attached files. They are not retold in words - they are carried and named.
   for (const a of actions.filter((x) => x.type === 'upload' && x.file)) {
     const moved = absorbUpload(session, a.file);
     if (!moved) continue;
@@ -294,9 +297,9 @@ function appendAnswerRecords(records, position) {
   try {
     fs.mkdirSync(BRIEF_DIR, { recursive: true });
     fs.appendFileSync(ANSWERS_FILE, records.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf8');
-    console.log(`[интервью] позиция ${position}: перенесено ответов ${records.reduce((n, r) => n + r.answers.length, 0)}`);
+    console.log(ruMsg('serve.answers_absorbed', { position, n: records.reduce((n, r) => n + r.answers.length, 0) }));
   } catch (err) {
-    console.error('Перенос ответов не удался:', err.message);
+    console.error(ruMsg('serve.answers_failed'), err.message);
   }
 }
 
@@ -311,7 +314,7 @@ function absorbSessionEvents(session, position) {
     const t = line.trim();
     if (!t) continue;
     let ev;
-    try { ev = JSON.parse(t); } catch { continue; }   // оборванная строка — пропускаем
+    try { ev = JSON.parse(t); } catch { continue; }   // a torn line - skipped
     const seq = Number(ev.seq) || 0;
     if (seq <= seen) continue;
     maxSeq = Math.max(maxSeq, seq);
@@ -323,23 +326,23 @@ function absorbSessionEvents(session, position) {
 }
 
 function watchSessionEvents(session, position) {
-  if (watchedSessions.has(session)) return;   // уже следим
+  if (watchedSessions.has(session)) return;   // already watching
   watchedSessions.add(session);
-  absorbSessionEvents(session, position);     // догоняем то, что уже отправлено
+  absorbSessionEvents(session, position);     // catch up with what has already been sent
   try {
     fs.watch(session, (eventType, filename) => {
       if (filename && path.basename(filename) !== 'events.jsonl') return;
       absorbSessionEvents(session, position);
     });
-    console.log(`Слежение включено: сессия интервью позиции ${position}`);
+    console.log(ruMsg('serve.watch_session_on', { position }));
   } catch (err) {
-    console.log(`Слежение за сессией интервью недоступно (${err.message}).`);
+    console.log(ruMsg('serve.watch_session_off', { reason: err.message }));
   }
 }
 
-// Сессии, заведённые в прошлый запуск, подхватываются: человек мог ответить,
-// пока сервер дашборда был выключен, и эти ответы не должны пропасть.
-// Следим за всеми заходами позиции — ответить он мог в любом из них.
+// Sessions started in the past run are picked up: the human may have answered while the dashboard
+// server was off, and those answers must not be lost. Every round of the position is watched -
+// the answer could have been given in any of them.
 function resumeSessionWatchers() {
   for (const { position, dirs } of live.sessions.positionSessions(PROJECT_ROOT)) {
     for (const session of dirs) {
@@ -348,7 +351,7 @@ function resumeSessionWatchers() {
   }
 }
 
-// ---------- слежение: пересборка по изменениям на диске ----------
+// ---------- watching: rebuild on disk changes ----------
 
 let debounceTimer = null;
 function scheduleRebuild(reason) {
@@ -356,12 +359,12 @@ function scheduleRebuild(reason) {
   debounceTimer = setTimeout(() => rebuild(reason), DEBOUNCE_MS);
 }
 
-// Правка сборщика или любого модуля дашборда доходит до работающего сервера сама.
+// An edit of the builder or of any dashboard module reaches the running server by itself.
 //
-// Перезапуск руками — не решение: он требует помнить, что правка вообще была, и
-// расплачивается тем, что доска на секунду пропадает. Здесь модули каталога дашборда
-// (кроме самого сервера) выбрасываются из кэша и читаются заново, а если новая правка
-// сломана — прежние остаются в силе и об этом сказано вслух, вместо того чтобы уронить сервер.
+// A manual restart is not the answer: it requires remembering that an edit happened at all, and pays
+// with the board disappearing for a second. Here the dashboard directory's modules (the server itself
+// excepted) are dropped from the cache and read anew, and if the new edit is broken - the previous
+// ones stay in force and this is said out loud, instead of felling the server.
 const isReloadable = (file) => file.startsWith(ROOT + path.sep) && file !== __filename;
 
 function reloadModules() {
@@ -374,7 +377,7 @@ function reloadModules() {
   try {
     live = loadLive();
   } catch (err) {
-    for (const [file, mod] of dropped) require.cache[file] = mod;   // сломанная правка не должна останавливать доску
+    for (const [file, mod] of dropped) require.cache[file] = mod;   // a broken edit must not stop the board
     throw err;
   }
 }
@@ -385,15 +388,15 @@ function scheduleReload(filename) {
   reloadTimer = setTimeout(() => {
     try {
       reloadModules();
-      rebuild(`${filename} перечитан`);
+      rebuild(ruMsg('serve.reload_reason', { file: filename }));
     } catch (err) {
-      console.error(`${filename} не перечитан (остаётся прежний):`, err.message);
+      console.error(ruMsg('serve.reload_kept_old', { file: filename, reason: err.message }));
     }
   }, DEBOUNCE_MS);
 }
 
-// Каталоги смотрятся без рекурсии, по расширению: `.cache/data.json` сервер пишет сам, и рекурсивное
-// слежение зациклило бы пересборку на собственной записи.
+// The directories are watched without recursion, by extension: the server writes `.cache/data.json`
+// itself, and recursive watching would loop the rebuild on its own writing.
 function watchModules() {
   const dirs = [ROOT, path.join(ROOT, 'data'), path.join(ROOT, 'lib')];
   try {
@@ -402,63 +405,63 @@ function watchModules() {
         if (filename && /\.c?js$/.test(filename)) scheduleReload(filename);
       });
     }
-    console.log(`Слежение включено: ${path.relative(PROJECT_ROOT, ROOT)}/ (сборщик, data/, lib/)`);
+    console.log(ruMsg('serve.watch_modules_on', { dir: path.relative(PROJECT_ROOT, ROOT) + '/' }));
   } catch (err) {
-    console.log(`Слежение за сборщиком недоступно (${err.message}) — правки модулей потребуют перезапуска.`);
+    console.log(ruMsg('serve.watch_modules_off', { reason: err.message }));
   }
 }
 
 function watchFeatures() {
   if (!fs.existsSync(FEATURES_DIR)) {
-    console.log(`Внимание: ${path.relative(PROJECT_ROOT, FEATURES_DIR)} не найден — слежение за карточками не запущено.`);
+    console.log(ruMsg('serve.features_missing', { dir: path.relative(PROJECT_ROOT, FEATURES_DIR) }));
     return;
   }
   try {
-    // recursive:true поддержан на Windows и macOS; на Linux fs.watch не рекурсивен —
-    // на этой платформе живое обновление придёт с задержкой до следующего ручного
-    // запуска, но сервер и ручной `node generate.js` продолжают работать как раньше.
+    // recursive:true is supported on Windows and macOS; on Linux fs.watch is not recursive - on that
+    // platform the live update arrives with a delay, by the next manual run, but the server and a
+    // manual `node generate.js` keep working as before.
     fs.watch(FEATURES_DIR, { recursive: true }, (eventType, filename) => {
       if (filename && !filename.endsWith('.md')) return;
       scheduleRebuild(filename || eventType);
     });
-    console.log(`Слежение включено: ${path.relative(PROJECT_ROOT, FEATURES_DIR)}`);
+    console.log(ruMsg('serve.watch_on', { dir: path.relative(PROJECT_ROOT, FEATURES_DIR) }));
   } catch (err) {
-    console.log(`Слежение недоступно на этой платформе (${err.message}) — данные обновляются только при перезапуске сервера или ручном \`node .forma/dashboard/generate.js\`.`);
+    console.log(ruMsg('serve.watch_platform_off', { reason: err.message }));
   }
 }
 
 function watchPicture() {
-  // Следим за каталогом, а не за файлом: картины может ещё не быть (интервью не
-  // начато), а fs.watch по несуществующему пути бросает — и слежение не встало бы
-  // именно в тот момент, ради которого оно заводилось.
+  // The directory is watched, not the file: the picture may not exist yet (the interview not
+  // started), and fs.watch throws on a nonexistent path - the watching would not come up exactly
+  // at the moment it was started for.
   if (!fs.existsSync(BRIEF_DIR)) return;
   try {
     fs.watch(BRIEF_DIR, (eventType, filename) => {
       const name = filename && path.basename(filename);
-      // Три слоя, за которыми есть смысл следить: разобранное, дословное и связное.
+      // Three layers worth watching: the parsed, the verbatim and the coherent.
       const WATCHED = ['picture.json', 'answers.jsonl', 'idea.md'];
       if (name && !WATCHED.includes(name)) return;
       scheduleRebuild(name || 'brief');
     });
-    console.log(`Слежение включено: ${path.relative(PROJECT_ROOT, BRIEF_DIR)} (картина, ответы и идея)`);
+    console.log(ruMsg('serve.watch_brief_on', { dir: path.relative(PROJECT_ROOT, BRIEF_DIR) }));
   } catch (err) {
-    console.log(`Слежение за картиной интервью недоступно (${err.message}).`);
+    console.log(ruMsg('serve.watch_brief_off', { reason: err.message }));
   }
 }
 
 function watchGraphifyLog() {
   if (!fs.existsSync(GRAPHIFY_LOG)) return;
   try {
-    // Файл, не каталог: watch(ROOT) ловил бы и собственную запись data.json сервером
-    // в этот же каталог — цикл пересборок без внешней причины.
+    // A file, not a directory: watch(ROOT) would also catch the server's own writing of data.json
+    // into the same directory - a rebuild loop with no external cause.
     fs.watch(GRAPHIFY_LOG, () => scheduleRebuild('graphify.log'));
-    console.log(`Слежение включено: ${path.relative(PROJECT_ROOT, GRAPHIFY_LOG)}`);
+    console.log(ruMsg('serve.watch_on', { dir: path.relative(PROJECT_ROOT, GRAPHIFY_LOG) }));
   } catch (err) {
-    console.log(`Слежение за graphify.log недоступно (${err.message}).`);
+    console.log(ruMsg('serve.watch_log_off', { reason: err.message }));
   }
 }
 
-// ---------- маршруты ----------
+// ---------- routes ----------
 
 const queryOf = (req) => new URL(req.url, 'http://x').searchParams;
 
@@ -467,8 +470,8 @@ function sendJson(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
-// Ждёт, пока страница сессии поднимется, и отвечает её адресом. `o.extra` — что добавить к ответу,
-// `o.watchPosition` — позиция, за сессией которой начать следить, `o.failMessage` — своя фраза вместо ошибки ожидания.
+// Waits for the session page to come up and answers with its address. `o.extra` - what to add to the response,
+// `o.watchPosition` - the position whose session to start watching, `o.failMessage` - an own phrase instead of the wait error.
 function replyGrillUrl(res, session, o = {}) {
   grillUrl(session, GRILL_WAIT_MS).then((url) => {
     if (o.watchPosition !== undefined) watchSessionEvents(session, o.watchPosition);
@@ -492,20 +495,20 @@ function handleData(req, res) {
   res.end(JSON.stringify(latestData, null, 2));
 }
 
-// Сколько раскруток уже есть в текущем заходе позиции.
+// How many expansions the position's current round already has.
 function countExpanded(position) {
   try {
     const { readSessions, currentSession } = live.sessions;
     const cur = currentSession(readSessions(PROJECT_ROOT)[String(position)]);
     return cur ? (readState(cur).questions || []).filter((x) => /^x-/.test(x.id)).length : 0;
   } catch {
-    return 0;   // нет сессии или state.json не разобрался — раскруток не было
+    return 0;   // no session or state.json did not parse - there were no expansions
   }
 }
 
-// Куда лечь вопросу раскрутки. Идёт живой разговор по позиции — вопрос уходит в него:
-// один канал, одна вкладка (`existing` — тот же узел уже спрошен и ещё не отвечен, дублировать нечего).
-// Живого нет — заводится новый заход.
+// Where the expansion question lands. A live conversation on the position is going - the question goes
+// into it: one channel, one tab (`existing` - the same node already asked and not yet answered, nothing
+// to duplicate). No live one - a new round is started.
 function attachExpandQuestion(hit, q) {
   const { readSessions, currentSession, serverOf } = live.sessions;
   const session = currentSession(readSessions(PROJECT_ROOT)[String(hit.position)]);
@@ -520,15 +523,15 @@ function attachExpandQuestion(hit, q) {
     id: q.id, round, deps: [], title: q.title, body: q.text, node: q.node,
     options: [], status: 'open', durable: false, updated: false,
   });
-  state.note = 'Раскрутка узла дерева: «' + hit.node.label + '».';
+  state.note = ruMsg('serve.expand_note', { label: hit.node.label });
   reopen(state);
   writeState(session, state);
   return { session };
 }
 
-// Раскрутка узла дерева картины. Дашборд открывает страницу интервью вкладкой; формы внутри
-// дашборда нет намеренно: два места ввода под одни и те же вопросы — это и есть та усталость
-// от разных окошек, ради которой всё сведено в один привычный формат.
+// Growing a node of the picture's tree. The dashboard opens the interview page in a tab; there is no
+// form inside the dashboard on purpose: two input places for the same questions is that very tiredness
+// of different windows, for the sake of which everything is brought into one familiar format.
 function handleExpand(req, res) {
   const nodeId = queryOf(req).get('node');
   const hit = findNode((latestData.interview || {}).tree, nodeId, 1);
@@ -549,7 +552,7 @@ function handleExpand(req, res) {
   replyGrillUrl(res, target.session, { extra: { position }, watchPosition: position });
 }
 
-// Кнопка позиции: отдаёт адрес страницы интервью — дашборд открывает её вкладкой.
+// The position's button: serves the interview page's address - the dashboard opens it in a tab.
 function handleOpen(req, res) {
   const params = queryOf(req);
   const position = Number(params.get('position'));
@@ -565,7 +568,7 @@ function handleOpen(req, res) {
   replyGrillUrl(res, session, { watchPosition: position });
 }
 
-// Тело ответа человека → `{ position, answers }` или `{ error }`.
+// The human answer's body -> `{ position, answers }` or `{ error }`.
 function parseAnswerBody(body) {
   let position, answers;
   try {
@@ -579,10 +582,10 @@ function parseAnswerBody(body) {
   return { position, answers };
 }
 
-// Пустые ответы отбрасываются здесь, а не на экране: человек мог ответить
-// на один вопрос из трёх, и это нормально — но записывать пустоту как
-// ответ нельзя, её потом не отличить от «сказал, но невнятно».
-// Элемент, не похожий на объект (`null`, число, строка), — не ответ: пропускается, а не роняет процесс.
+// Empty answers are dropped here, not on the screen: the human may have answered one question of
+// three, and that is normal - but an emptiness must not be recorded as an answer, it could not be
+// told from "said, but unclear" later. An element unlike an object (`null`, a number, a string) is
+// not an answer: it is skipped, not felling the process.
 const cleanAnswers = (answers) => answers
   .filter((a) => a && typeof a === 'object')
   .map((a) => ({ id: String(a.id || ''), text: String(a.text || '').trim() }))
@@ -604,10 +607,10 @@ function saveAnswers(res, body) {
   }
 }
 
-// Ответы человека принимаются дословно и **дописываются**, не переписывают
-// прежние: сказанное однажды остаётся как сказано. Картину (`picture.json`)
-// этот путь не трогает вовсе — картина синтез `Intent`, и писать её отсюда
-// значило бы выдать сырой ответ за понятый.
+// The human's answers are taken verbatim and **appended**, they do not rewrite the past ones: what
+// was said once stays as it was said. The picture (`picture.json`) is not touched by this path at
+// all - the picture is a synthesis by `Intent`, and writing it from here would mean passing the raw
+// answer off as the understood one.
 function handleAnswer(req, res) {
   let body = '';
   req.on('data', (chunk) => {
@@ -617,16 +620,16 @@ function handleAnswer(req, res) {
   req.on('end', () => saveAnswers(res, body));
 }
 
-// Остальное — файлы. Графы живут в .forma/living/graphs/ (динамическое — отдельно от кода дашборда), адрес /graphs/ прежний.
+// The rest - files. The graphs live in .forma/living/graphs/ (the dynamic - apart from the dashboard code), the /graphs/ address is the old one.
 function handleStatic(req, res, urlPath) {
   const base = urlPath.startsWith('/graphs/') ? path.join(PROJECT_ROOT, '.forma/living') : ROOT;
   const filePath = path.join(base, urlPath === '/' ? 'index.html' : urlPath);
   if (!filePath.startsWith(base)) { res.writeHead(403); res.end('forbidden'); return; }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); res.end('not found: ' + urlPath); return; }
-    // Доска живая, и её страница не кэшируется никогда. Без этого браузер вправе
-    // показывать вчерашнюю копию сколько ему угодно: сервер уже пересобрал данные,
-    // отдал свежий HTML, а человек смотрит на старое и отличить это от поломки не может.
+    // The board is live, and its page is never cached. Without this the browser is free to show
+    // yesterday's copy as long as it likes: the server has already rebuilt the data and served
+    // fresh HTML, while the human looks at the old and cannot tell it from a breakdown.
     res.writeHead(200, {
       'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream',
       'Cache-Control': 'no-store, must-revalidate',
@@ -635,11 +638,11 @@ function handleStatic(req, res, urlPath) {
   });
 }
 
-// Языки интерфейса: по файлу на язык в locales/ (web/js/i18n.js).
+// The interface languages: one file per language in locales/ (web/js/i18n.js).
 function handleLocales(req, res) { sendJson(res, 200, { default: i18n.FALLBACK, locales: i18n.listLocales() }); }
 
-// Таблица маршрутов: метод + путь → функция `(req, res)`. Нет строки — `handleStatic`.
-// ANY — маршрут, который не смотрел на метод и до таблицы; так и оставлен, чтобы разбор запроса не менял поведения.
+// The routes table: method + path -> a `(req, res)` function. No row - `handleStatic`.
+// ANY - a route that never looked at the method, even before the table; left so on purpose, so that request parsing does not change behavior.
 const ANY = '*';
 const ROUTES = [
   { method: ANY, path: '/events', handle: handleEvents },
@@ -652,8 +655,8 @@ const ROUTES = [
 
 const findRoute = (method, urlPath) => ROUTES.find((r) => r.path === urlPath && (r.method === ANY || r.method === method));
 
-// Битая %-последовательность (`/%E0%A4%A`) и нулевой байт (`/%00`, его не принимает fs) в пути — ошибка клиента:
-// 400, а не исключение в обработчике.
+// A broken %-sequence (`/%E0%A4%A`) and a null byte (`/%00`, fs does not take it) in the path - a client error:
+// 400, not an exception in the handler.
 function decodePath(rawUrl) {
   try {
     const decoded = decodeURIComponent(rawUrl.split('?')[0]);
@@ -669,26 +672,26 @@ function handleRequest(req, res) {
   else handleStatic(req, res, urlPath);
 }
 
-// ---------- запуск ----------
+// ---------- startup ----------
 
-// Выбор порта: сперва порт прошлого запуска (.forma/dashboard/.cache/server.json), при занятости (EADDRINUSE) —
-// свободный эфемерный порт от ОС, реальный порт пишется в файл и печатается в консоль. Чтение запомненного
-// порта — общий модуль сессий интервью, тот же, что у сервера страницы интервью.
-// attempt=0 — «слушай на эфемерном, какой даст ОС» (node/libuv трактуют явный 0 именно так,
-// не как «порт не указан»). Пока attempt не 0 и слушатель ещё не встал — EADDRINUSE переключает
-// на эфемерный один раз и не более (второй провал того же рода — уже не «порт занят», настоящая
-// ошибка сети, падаем как раньше).
+// Port choice: first the past run's port (.forma/dashboard/.cache/server.json), on business (EADDRINUSE) -
+// a free ephemeral port from the OS; the real port is written into the file and printed to the console.
+// Reading the remembered port - the shared interview sessions module, the same one the interview page's
+// server uses. attempt=0 - "listen on the ephemeral port, whichever the OS gives" (node/libuv read an
+// explicit 0 exactly so, not as "the port is unset"). While attempt is not 0 and the listener has not
+// come up - EADDRINUSE switches to the ephemeral once and no more (a second failure of the same kind is
+// no longer "the port is busy", it is a real network error - we fall as before).
 const srv = http.createServer(handleRequest);
 let attempt = live.sessions.rememberedPort(SERVER_FILE) || DEFAULT_PORT;
 
 function onServerError(err) {
   if (!srv.listening && attempt !== 0 && err.code === 'EADDRINUSE') {
-    console.log(`Порт ${attempt} занят — пробую свободный эфемерный порт от ОС...`);
+    console.log(ruMsg('serve.port_busy', { port: attempt }));
     attempt = 0;
     srv.listen(0);
     return;
   }
-  console.error('Ошибка сервера:', err.message);
+  console.error(ruMsg('serve.server_error'), err.message);
   process.exit(1);
 }
 
@@ -696,8 +699,8 @@ function onListening() {
   const { port } = srv.address();
   const url = `http://localhost:${port}/`;
   writeJsonAtomic(SERVER_FILE, { url, port, pid: process.pid, started: new Date().toISOString() });
-  console.log(`Дашборд: ${url}`);
-  console.log(`Собрано при старте: карточек ${latestData.totals.cardCount}, токенов по движкам ${JSON.stringify(latestData.totals.tokensByEngine)}`);
+  console.log(ruMsg('serve.started', { url }));
+  console.log(ruMsg('serve.built_at_start', { cards: latestData.totals.cardCount, tokens: JSON.stringify(latestData.totals.tokensByEngine) }));
   watchFeatures();
   watchGraphifyLog();
   watchPicture();

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * Плитки движков в сводке «Экономики»: место (цвет), шкала, нет данных — не ноль.
+ * The engine tiles in the "Economy" summary: the place (the color), the scale, no data - not zero.
  *   node .forma/dashboard/tiles.test.cjs
  */
 const assert = require('node:assert/strict');
@@ -13,7 +13,7 @@ const m = (v) => ({ v, n: v == null ? 0 : 9, m: 9, low: false });
 const eng = (out, sec, tok, usd, retry, closed = 3) => ({ outPerCallSec: m(out), secPerClosed: m(sec), tokensPerClosed: m(tok),
   usdPerClosed: m(usd), retryShare: m(retry), tokensTotal: m(null), secTotal: m(null), usdTotal: m(null), closedCards: closed });
 
-it('место: больше — лучше для скорости, меньше — лучше для цены; один движок и равные — нейтрально', () => {
+it('the place: higher is better for the speed, lower is better for the price; one engine and equal ones - neutral', () => {
   assert.equal(tilePlace([10, 5, 1], 10, true), 'good');
   assert.equal(tilePlace([10, 5, 1], 5, true), 'mid');
   assert.equal(tilePlace([10, 5, 1], 1, true), 'bad');
@@ -25,7 +25,7 @@ it('место: больше — лучше для скорости, меньш�
   assert.equal(tilePlace([7, 3], null, true), null);
 });
 
-it('шкала: максимум среди движков — полная дуга; нет значения — null, не ноль', () => {
+it('the scale: the maximum across the engines - the full arc; no value - null, not zero', () => {
   assert.equal(tileFrac([40, 20, null], 40), 1);
   assert.equal(tileFrac([40, 20, null], 20), 0.5);
   assert.equal(tileFrac([40, 20, null], null), null);
@@ -33,7 +33,7 @@ it('шкала: максимум среди движков — полная ду
   assert.equal(tileFrac([1000, 1], 1), 0.04);
 });
 
-it('модель: плиток столько, сколько движков; места по колонкам; пустой движок помечен empty', () => {
+it('the model: as many tiles as engines; the places by the columns; an empty engine is marked empty', () => {
   const sm = { tags: ['a', 'b', 'c'], engines: { a: eng(40, 100, 5000, 0.1, 0.1), b: eng(20, 300, 9000, 0.4, 0.5), c: eng(null, null, null, null, null, 0) },
     total: eng(30, 200, 7000, 0.2, 0.3) };
   const mod = tileModel(sm);
@@ -49,7 +49,7 @@ it('модель: плиток столько, сколько движков; м
   assert.ok(mod.total);
 });
 
-it('один движок: дуга нейтральная и полная', () => {
+it('one engine: the arc is neutral and full', () => {
   const t1 = tileModel({ tags: ['x'], engines: { x: eng(12, 10, 10, 1, 0) }, total: null }).tiles[0];
   assert.deepEqual([t1.out.place, t1.out.frac, t1.bars.tok.place], ['neutral', 1, 'neutral']);
 });

@@ -1,19 +1,19 @@
 'use strict';
 
 /**
- * Командная строка: поиск флагов и разбор аргументов. Часть общей библиотеки ядра (`.forma/dashboard/lib/`).
- * Три способа читать одни и те же `argv` — по тому, что скрипту надо от значения; выбор — у вызывающего.
+ * The command line: flag search and argument parsing. Part of the core's shared library (`.forma/dashboard/lib/`).
+ * Three ways to read the same `argv` - by what the script needs from the value; the choice is the caller's.
  */
 
 /**
- * Поиск по `argv` (без `node` и пути скрипта или с ними — индексы не важны).
- *   flag('dry')      — флаг есть
- *   arg('kind', d)   — значение после `--kind`; следующего нет или оно само флаг — `d`
- *   value('n', d)    — сырое следующее слово после `--n` (флаг последний — `undefined`, не `d`); флага нет — `d`
- *   values('over')   — все значения повторяемого флага, сырые
- *   eq('only', d)    — значение в форме `--only=x`
- *   positional()     — слова, не начинающиеся с `--`
- *   die(prefix)      — печатает `<prefix>: <сообщение>` в stderr и завершает процесс кодом 2
+ * Search over `argv` (without `node` and the script's path or with them - the indices do not matter).
+ *   flag('dry')      - the flag is there
+ *   arg('kind', d)   - the value after `--kind`; no next one or the next is itself a flag - `d`
+ *   value('n', d)    - the raw next word after `--n` (the flag last - `undefined`, not `d`); no flag - `d`
+ *   values('over')   - all values of a repeatable flag, raw
+ *   eq('only', d)    - the value in the `--only=x` form
+ *   positional()     - the words not starting with `--`
+ *   die(prefix)      - prints `<prefix>: <message>` to stderr and ends the process with code 2
  */
 function makeCli(argv = process.argv.slice(2)) {
   const name = (n) => '--' + n;
@@ -40,10 +40,10 @@ function makeCli(argv = process.argv.slice(2)) {
 }
 
 /**
- * Все `--имя` разом в объект. Повтор — побеждает последний.
- *   greedy: false (по умолчанию) — флаг без значения (следующего нет или оно флаг) получает `true`
- *     и не проглатывает соседний аргумент;
- *   greedy: true — следующее слово всегда значение флага (даже `--x`); последний флаг без значения — `undefined`.
+ * All `--name`s at once into an object. A repeat - the last one wins.
+ *   greedy: false (the default) - a flag without a value (no next word or the next is a flag) gets `true`
+ *     and does not swallow the neighboring argument;
+ *   greedy: true - the next word is always the flag's value (even `--x`); a last flag without a value - `undefined`.
  */
 function parseOptions(argv, { greedy = false } = {}) {
   const out = {};
@@ -59,10 +59,10 @@ function parseOptions(argv, { greedy = false } = {}) {
 }
 
 /**
- * Разбор по списку известных флагов: `{ '--prompt': 'prompt', '--max-tokens': ['maxTokens', (v) => parseInt(v, 10)] }`.
- * Известный флаг берёт следующее слово как есть; незнакомое слово пропускается на один шаг — значение
- * незнакомого флага само разбирается как слово (так читал прежний разбор внешней модели).
- * Возвращает `target`, дополненный найденным.
+ * Parsing by a list of known flags: `{ '--prompt': 'prompt', '--max-tokens': ['maxTokens', (v) => parseInt(v, 10)] }`.
+ * A known flag takes the next word as is; an unknown word is skipped for one step - the unknown flag's
+ * value is itself parsed as a word (that is how the external model's former parsing read).
+ * Returns `target`, completed with what was found.
  */
 function parseKnown(argv, spec, target = {}) {
   for (let i = 0; i < argv.length; i++) {
@@ -76,8 +76,8 @@ function parseKnown(argv, spec, target = {}) {
 }
 
 /**
- * Слова вида `--ключ=значение` и `--ключ значение` в объект; `booleans` — флаги без значения; остальное — `rest`.
- * Ключ и значение — строки; `--ключ` последним словом даёт `undefined`.
+ * The words of the `--key=value` and `--key value` forms into an object; `booleans` - flags without a value;
+ * the rest - `rest`. The key and the value are strings; `--key` as the last word gives `undefined`.
  */
 function parseLong(argv, booleans = []) {
   const opts = {};

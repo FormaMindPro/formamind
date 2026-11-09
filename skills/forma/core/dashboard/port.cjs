@@ -1,7 +1,7 @@
 'use strict';
-// Порт дашборда по умолчанию — одно место. serve.js начинает поиск свободного порта с него,
-// ensure-running.js откатывается на него без server.json, хук старта сессии берёт его для ссылки.
-// Модуль без побочных эффектов: require не запускает сервер.
+// The dashboard's default port - one place. serve.js starts the free-port search from it,
+// ensure-running.js falls back to it without server.json, the session-start hook takes it for a link.
+// A module without side effects: require does not start a server.
 const DEFAULT_PORT = 5050;
 
 module.exports = { DEFAULT_PORT };

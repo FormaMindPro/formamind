@@ -1,21 +1,24 @@
 #!/usr/bin/env node
-// Счётчик накопления для авто-триггера graphify — читает graphify.config.json,
-// смотрит, сколько новых событий набежало с последнего запуска /graphify
-// (по последней строке .forma/dashboard/graphify.log), и при превышении порога
-// помечает граф как «пора пересобрать» (.forma/dashboard/.cache/graphify-pending.json).
+// The accumulation counter for the graphify auto-trigger - reads graphify.config.json,
+// watches how many new events have piled up since the last /graphify run
+// (by the last line of .forma/dashboard/graphify.log), and past the threshold
+// marks the graph as "due for a rebuild" (.forma/dashboard/.cache/graphify-pending.json).
 //
-// Запуск: node .forma/dashboard/graphify-trigger.cjs   (обычно — из watch.js, тем же порядком,
-// что и watchFeatures()/watchGraphifyLog() в serve.js; можно и вручную).
+// Run: node .forma/dashboard/graphify-trigger.cjs   (usually from watch.js, in the same order
+// as watchFeatures()/watchGraphifyLog() in serve.js; by hand works too).
 
 const fs = require('fs');
 const path = require('path');
 const { walk } = require('./lib/fs.cjs');
 const engines = require('./lib/engines.cjs');
+// Canonical ru strings of this module's own console output live in the core dictionary; the language is fixed.
+const { message: coreMessage } = require('../i18n/index.cjs');
+const ruMsg = (key, params) => coreMessage(key, params, 'ru');
 
 const ROOT = __dirname;
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
-// Только закрытые карточки (done/), не вся доска — живая доска (backlog/todo/in-progress/review)
-// меняется на каждом шаге круга, это другой, гораздо более дорогой и волатильный корпус
+// Only the closed cards (done/), not the whole board - a live board (backlog/todo/in-progress/review)
+// changes at every step of the cycle; that is a different, far more expensive and volatile corpus
 //.
 const FEATURES_DIR = path.join(PROJECT_ROOT, '.devtool', 'features', 'done');
 const CONFIG_FILE = path.join(ROOT, 'graphify.config.json');
@@ -26,11 +29,11 @@ const PENDING_FILE = path.join(CACHE_DIR, 'graphify-pending.json');
 function loadConfig() {
   if (!fs.existsSync(CONFIG_FILE)) return null;
   try { return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); }
-  catch (err) { console.error(`graphify-trigger: битый ${path.relative(PROJECT_ROOT, CONFIG_FILE)} (${err.message})`); return null; }
+  catch (err) { console.error(ruMsg('graphify_trigger.bad_config', { file: path.relative(PROJECT_ROOT, CONFIG_FILE), reason: err.message })); return null; }
 }
 
-// Последняя строка graphify.log — формат `AGENTS.md`: "ГГГГ-ММ-ДД ЧЧ:ММ | mode=... | ...".
-// Если лога ещё нет — считаем точкой отсчёта эпоху (0), то есть все существующие карточки в зачёт.
+// graphify.log's last line - the `AGENTS.md` format: "YYYY-MM-DD HH:MM | mode=... | ...".
+// No log yet - the epoch (0) counts as the reference point, that is, all existing cards count in.
 function lastRunAt() {
   if (!fs.existsSync(LOG_FILE)) return 0;
   const lines = fs.readFileSync(LOG_FILE, 'utf8').split('\n').map(l => l.trim()).filter(Boolean).filter(l => !l.startsWith('#'));
@@ -40,8 +43,8 @@ function lastRunAt() {
   return new Date(`${m[1]}T${m[2]}:00`).getTime();
 }
 
-// Считает markdown-файлы закрытых карточек (done/) с mtime новее lastRun — приближение
-// к «новых событий N»: и закрытие карточки, и новая строка History трогают mtime файла.
+// Counts the markdown files of closed cards (done/) with an mtime newer than lastRun - an approximation
+// of "N new events": both a card's closing and a new History line touch the file's mtime.
 function countAccumulatedEvents(sinceMs) {
   if (!fs.existsSync(FEATURES_DIR)) return 0;
   return walk(FEATURES_DIR, { ext: '.md', symlinks: true, abs: true })
@@ -73,12 +76,12 @@ function check() {
 
   if (count < threshold) { clearPending(); return; }
 
-  // Графы механические; хук только помечает «пора пересобрать».
+  // The graphs are mechanical; the hook only marks "due for a rebuild".
   writePending('threshold-reached-awaiting-manual-run', count, threshold);
-  console.log(`graphify-trigger: накоплено ${count} событий (порог ${threshold}) — граф помечен как «пора пересобрать» (${path.relative(PROJECT_ROOT, PENDING_FILE)}), запустите node .claude/scripts/build-kit-graphs.cjs.`);
+  console.log(ruMsg('graphify_trigger.pending_marked', { count, threshold, file: path.relative(PROJECT_ROOT, PENDING_FILE) }));
 }
 
 module.exports = { check };
 
-// Вызван напрямую (`node .forma/dashboard/graphify-trigger.cjs`), не через require() из serve.js.
+// Run directly (`node .forma/dashboard/graphify-trigger.cjs`), not through require() from serve.js.
 if (require.main === module) check();

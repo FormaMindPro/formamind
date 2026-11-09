@@ -1,6 +1,6 @@
 'use strict';
-// Сверка схемы движка с ENGINE-MAP (ru и en): каждое названное имя есть на диске и лежит ровно в одном блоке,
-// каждый файл движка описан блоком; новый неописанный файл или имя без файла — красный результат с адресом.
+// The engine schema vs ENGINE-MAP cross-check (ru and en): every name it names exists on disk and sits in exactly one block,
+// every engine file is described by a block; a new undescribed file or a name without a file - a red result with an address.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -11,11 +11,11 @@ const { buildSchema } = require('./schema.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const LIVE = { skip: !(fs.existsSync(path.join(ROOT, 'AGENTS.md')) && fs.existsSync(path.join(ROOT, '.claude/settings.json'))) && 'not a project root' };
 
-// Имена, которые ENGINE-MAP называет, а в шаблоне движка файла нет: их создаёт проект, а не протокол.
-// Список закрытый; имя из него, которое появилось на диске, тоже красное (убрать из списка).
+// The names ENGINE-MAP names while the engine template has no file for them: the project creates those, not the protocol.
+// The list is closed; a name from it that appears on disk is red too (remove it from the list).
 const PROJECT_MADE = new Set(['project/extensions/', 'credentials.md', 'VARS/credentials.md']);
 
-// Чистая сверка: схема -> список проблем, у каждой адрес.
+// The clean cross-check: the schema -> the list of problems, each with an address.
 function reconcile(schema, allowed) {
   const problems = [];
   const owners = new Map();

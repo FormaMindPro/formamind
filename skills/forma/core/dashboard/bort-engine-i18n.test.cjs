@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * Вкладки «Борт» и «Движок» на двух языках: все ключи t('…') из bort.js и engine.js есть в en и ru,
- * отрисовка не оставляет сырых ключей, а на en — кириллицы (данные в тесте английские).
+ * The "Board" and "Engine" tabs in two languages: all the t('…') keys from bort.js and engine.js exist in en and ru;
+ * the render leaves no raw keys behind, and no cyrillic on en (the data in the test is english).
  *   node .forma/dashboard/bort-engine-i18n.test.cjs
  */
 const assert = require('node:assert/strict');
@@ -14,24 +14,24 @@ const core = require('./web/js/i18n.js');
 
 let passed = 0;
 const it = (name, fn) => { fn(); passed += 1; console.log('ok  ' + name); };
-// Даты образцов собираются, а не пишутся: в чистой зоне нет календарных дат (запрет 16).
+// The sample dates are assembled, not written: a clean zone has no calendar dates (prohibition 16).
 const D = (n) => ['2020', '01', '0' + n].join('-');
 const js = (f) => fs.readFileSync(path.join(__dirname, 'web/js', f), 'utf8');
 const dicts = { en: i18n.readDict('en'), ru: i18n.readDict('ru') };
 const FILES = ['bort.js', 'engine.js'];
 
 for (const f of FILES) {
-  it(`каждый ключ t('…') и cnt('…') в ${f} есть в en и ru`, () => {
+  it(`every key t('…') and cnt('…') in ${f} exists in en and ru`, () => {
     const keys = new Set();
     for (const m of js(f).matchAll(/\b(?:t|cnt)\('([\w.-]+)'[,)]/g)) keys.add(m[1]);
-    assert.ok(keys.size > 40, 'ключей найдено мало: ' + keys.size);
+    assert.ok(keys.size > 40, 'too few keys found: ' + keys.size);
     assert.deepEqual([...keys].filter((k) => !(k in dicts.en && k in dicts.ru)), []);
   });
-  it(`в ${f} нет кириллицы вне комментариев и строк-источников`, () => {
+  it(`${f} has no cyrillic outside comments and source strings`, () => {
     const code = js(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-      .replace(/'«[^'»]+»'/g, "''"); // имена секций PROJECT.md — данные на языке проекта
-    const hit = code.match(/.{0,30}[А-Яа-яЁё]+.{0,20}/);
-    assert.equal(hit, null, 'кириллица в коде: ' + (hit && hit[0]));
+      .replace(/'«[^'»]+»'/g, "''"); // PROJECT.md section names - data in the project's language
+    const hit = code.match(/.{0,30}[\u0410-\u044f\u0401\u0451]+.{0,20}/);
+    assert.equal(hit, null, 'cyrillic in the code: ' + (hit && hit[0]));
   });
 }
 
@@ -72,21 +72,21 @@ const engine = { present: true, check: { ran: true, ok: false, exitCode: 1, reas
   routes: { source: 'ROUTES.md', routes: [{ code: 'route-0', name: 'n', chain: 'c', risks: [{ label: 'l', text: 'x' }], where: 'w' }], overlays: [{ code: 'over-1', name: 'o', changes: 'z', risks: [], where: [] }] } };
 
 for (const [lang, cyr] of [['en', false], ['ru', true]]) {
-  it(`отрисовка на ${lang}: нет сырых ключей${cyr ? '' : ' и кириллицы'}`, () => {
+  it(`render on ${lang}: no raw keys${cyr ? '' : ' and no cyrillic'}`, () => {
     const x = load(lang);
     const html = [x.bortNodesHtml(bort), x.bortSessionHtml(bort), x.floorChartHtml(bort.floor), x.floorChartHtml(null), x.floorChartHtml({ unavailable: '' }),
       bort.nodes.map((n, i) => x.bortStripHtml(n, i)).join(''), x.bortSummaryHtml(bort), x.bortSessionBlockHtml(bort),
       x.bortNodesHtml({ source: false }), x.bortNodesHtml({ source: true, log: { alive: false }, nodes: [] }),
       x.bortNodesHtml({ source: true, log: { alive: true, usable: false }, nodes: [] }),
       x.projectSettingsHtml(project), x.projectSettingsHtml(null), x.engineSettingsHtml(engine), x.engineSettingsHtml(null)].join('\n');
-    assert.ok(html.length > 5000, 'не отрисовалось');
-    assert.ok(!/\b(?:bort|eng)\.[a-z]+\.?[a-z]/.test(html), 'сырой ключ: ' + (html.match(/\b(?:bort|eng)\.[\w.-]+/) || [''])[0]);
-    assert.ok(!/\{\w+\}/.test(html), 'неподставленная переменная: ' + (html.match(/\{\w+\}/) || [''])[0]);
+    assert.ok(html.length > 5000, 'did not render');
+    assert.ok(!/\b(?:bort|eng)\.[a-z]+\.?[a-z]/.test(html), 'raw key: ' + (html.match(/\b(?:bort|eng)\.[\w.-]+/) || [''])[0]);
+    assert.ok(!/\{\w+\}/.test(html), 'unsubstituted variable: ' + (html.match(/\{\w+\}/) || [''])[0]);
     if (!cyr) {
-      // «Эпики проекта» и другие имена секций — источники на языке проекта, это данные, а не интерфейс
+      // "Project epics" and other section names - sources in the project's language: data, not interface
       const clean = html.replace(/<span class="set-src">[^<]*<\/span>/g, '');
-      assert.ok(!/[А-Яа-яЁё]/.test(clean), 'кириллица на en: ' + (clean.match(/.{20}[А-Яа-яЁё]+.{10}/) || [''])[0]);
-    } else assert.ok(/Нагрузка по ролям/.test(html) && /Пол окна/.test(html));
+      assert.ok(!/[\u0410-\u044f\u0401\u0451]/.test(clean), 'cyrillic on en: ' + (clean.match(/.{20}[\u0410-\u044f\u0401\u0451]+.{10}/) || [''])[0]);
+    } else assert.ok(/\u041d\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u043f\u043e \u0440\u043e\u043b\u044f\u043c/.test(html) && /\u041f\u043e\u043b \u043e\u043a\u043d\u0430/.test(html));
   });
 }
 

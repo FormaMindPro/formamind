@@ -1,5 +1,5 @@
 'use strict';
-// Сборщик схемы движка: манифест, один блок на файл, «неразобранное», связи из реальных файлов.
+// The engine schema builder: the manifest, one block per file, the "unmapped" bucket, the links from real files.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -10,7 +10,7 @@ const M = require('./schema-manifest.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const real = buildSchema(ROOT);
-// тесты по живому движку идут только в проекте; в исходнике протокола (другая раскладка) их нет
+// tests against a live engine run only in a project; the protocol source (a different layout) has none
 const LIVE = { skip: !(fs.existsSync(path.join(ROOT, 'AGENTS.md')) && fs.existsSync(path.join(ROOT, '.claude/settings.json'))) && 'not a project root' };
 
 function tmpProject(files) {

@@ -1,11 +1,11 @@
-// Данные вкладки «Схема»: buildSchema (schema.cjs) + тип каждого файла и счётчики состава по блокам.
-// Тип выводится по пути и виду файла, списков файлов здесь нет.
+// The "Schema" tab's data: buildSchema (schema.cjs) + each file's type and the composition counters by blocks.
+// The type is derived from the path and the file's kind; no file lists here.
 'use strict';
 const { buildSchema } = require('./schema.cjs');
 
 const TYPES = ['scripts', 'rules', 'hooks', 'knowledge', 'graphs', 'structural'];
 
-/** Тип файла: хуки и графы по пути, затем скрипт/правило/знание, остальное структурное. */
+/** A file's type: hooks and graphs by the path, then script/rule/knowledge, the rest structural. */
 function typeOf(f) {
   const p = f.path;
   if (/(^|\/)hooks(\/|\.json$)|(^|\/)settings\.json$|(^|\/)permission-levels\.json$/.test(p)) return 'hooks';

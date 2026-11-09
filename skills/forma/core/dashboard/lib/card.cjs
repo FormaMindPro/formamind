@@ -1,21 +1,21 @@
 'use strict';
 
 /**
- * Карточка доски (AGENTS.md §6–7): где лежат файлы, frontmatter, заголовок, метки, зоны на двух языках.
- * Часть общей библиотеки ядра (`.forma/dashboard/lib/`). Здесь читается только форма карточки — что значат поля,
- * решают вызывающие.
+ * A board card (AGENTS.md §6-7): where the files live, the frontmatter, the heading, the labels, the zones in
+ * two languages. Part of the core's shared library (`.forma/dashboard/lib/`). Only the card's shape is read
+ * here - what the fields mean is decided by the callers.
  */
 
 const fs = require('fs');
 const path = require('path');
 const i18n = require('../../i18n/index.cjs');
 
-/** Каталог доски: живые карточки; закрытые — в `done/` внутри него. */
+/** The board's directory: live cards; the closed ones - in `done/` inside it. */
 const boardDir = (root) => path.join(root, '.devtool', 'features');
 
 /**
- * Файлы карточек: сначала доска, потом `done/`; в каждом каталоге — порядок `readdir`. Нет каталога — пропущен.
- * `test` — RegExp или `(имя) => bool` по имени файла; по умолчанию — `.md`. Возвращает абсолютные пути.
+ * The cards' files: the board first, then `done/`; in each directory - the `readdir` order. No directory -
+ * skipped. `test` - a RegExp or a `(name) => bool` over the file's name; the default is `.md`. Returns absolute paths.
  */
 function cardFiles(root, test = (name) => name.endsWith('.md')) {
   const ok = test instanceof RegExp ? (name) => test.test(name) : test;
@@ -30,16 +30,16 @@ function cardFiles(root, test = (name) => name.endsWith('.md')) {
 
 // ---- frontmatter --------------------------------------------------------------------------------
 
-/** Блок между `---` в начале файла: единственная копия регулярки. */
+/** The block between the `---` at the file's start: the single copy of the regex. */
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---/;
 
-/** Содержимое блока frontmatter или `null`. */
+/** The frontmatter block's content or `null`. */
 function frontmatterBlock(text) {
   const m = FRONTMATTER_RE.exec(text);
   return m ? m[1] : null;
 }
 
-/** `{ block, rest }`: блок и тело после закрывающих `---` (и одного перевода строки). Нет блока — `block: null`, `rest` — весь текст. */
+/** `{ block, rest }`: the block and the body after the closing `---` (and one line break). No block - `block: null`, `rest` is the whole text. */
 function splitFrontmatter(text) {
   const m = FRONTMATTER_RE.exec(text);
   if (!m) return { block: null, rest: text };
@@ -47,8 +47,8 @@ function splitFrontmatter(text) {
 }
 
 /**
- * Поля карточки с типами: `null` — `null`, `"…"` — строка, `[…]` — массив строк, прочее — сырая строка.
- * Ключ — латиница (`[a-zA-Z]+`). Нет блока — `{}`.
+ * The card's fields with types: `null` - `null`, `"..."` - a string, `[...]` - an array of strings, else -
+ * the raw string. The key is latin (`[a-zA-Z]+`). No block - `{}`.
  */
 function parseFrontmatter(text) {
   const block = frontmatterBlock(text);
@@ -70,7 +70,7 @@ function parseFrontmatter(text) {
   return fm;
 }
 
-/** Поля как JSON: значение — `JSON.parse`, не разобралось — сырая строка. Ключ — всё до первого `:`. Нет блока — `{}`. */
+/** The fields as JSON: the value - `JSON.parse`, unparsed - the raw string. The key - everything before the first `:`. No block - `{}`. */
 function parseFrontmatterJson(text) {
   const block = frontmatterBlock(text);
   const fm = {};
@@ -86,8 +86,8 @@ function parseFrontmatterJson(text) {
 }
 
 /**
- * Плоские строки frontmatter (роли, скиллы): `[поля, тело]`. Значения — строки без крайних кавычек;
- * ключ — `\w+`; разбор по `\n`, `\r` вычищает вызывающий.
+ * The flat frontmatter lines (roles, skills): `[fields, body]`. The values - strings without edge quotes;
+ * the key - `\w+`; the parsing is by `\n`, the caller cleans `\r`.
  */
 function parseFlatFrontmatter(text) {
   const { block, rest } = splitFrontmatter(text);
@@ -96,7 +96,7 @@ function parseFlatFrontmatter(text) {
   return [o, rest];
 }
 
-/** Значение поля по всему тексту (не только по блоку): без кавычек, `null` — `null`; поля нет — `null`. */
+/** A field's value over the whole text (not only the block): without quotes, `null` - `null`; no field - `null`. */
 function field(text, key) {
   const m = text.match(new RegExp('^' + key + ':\\s*(.*)$', 'm'));
   if (!m) return null;
@@ -104,39 +104,39 @@ function field(text, key) {
   return v === 'null' ? null : v;
 }
 
-/** Метки карточки — по всему тексту, `labels: [...]` в одну строку. */
+/** The card's labels - over the whole text, a one-line `labels: [...]`. */
 function labelsOf(text) {
   const m = text.match(/^labels:\s*\[([^\]]*)\]/m);
   return m ? m[1].split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean) : [];
 }
 
-/** День создания (`created`) — `ГГГГ-ММ-ДД` или пустая строка. */
+/** The creation day (`created`) - `YYYY-MM-DD` or an empty string. */
 function createdDay(text) {
   return (text.match(/^created:\s*"?(\d{4}-\d{2}-\d{2})/m) || [])[1] || '';
 }
 
-/** Заголовок карточки — первая строка `# …`; нет — `null`. */
+/** The card's heading - the first `# ...` line; none - `null`. */
 function cardTitle(text) {
   const m = text.match(/^#\s+(.+)$/m);
   return m ? m[1].trim() : null;
 }
 
-// ---- зоны ---------------------------------------------------------------------------------------
+// ---- zones --------------------------------------------------------------------------------------
 
-/** Ключи четырёх зон карточки (AGENTS.md §6): заголовок ищется по якорю `<!-- k:zone.X -->`, иначе по словарю i18n. */
+/** The keys of the card's four zones (AGENTS.md §6): the heading is found by the `<!-- k:zone.X -->` anchor, else by the i18n dictionary. */
 const ZONES = ['task', 'kit', 'history', 'result'];
 
-/** Заголовок зоны для новой карточки — всегда английский (Task, Kit, History, Result): ключ ядра не зависит от языка проекта. Лишние аргументы (язык, якорь) приняты для совместимости и не влияют. */
+/** A zone's heading for a new card is always English (Task, Kit, History, Result): the core's key does not depend on the project's language. Extra arguments (a language, an anchor) are accepted for compatibility and have no effect. */
 const zoneHeading = (key) => i18n.labelsOf('zone.' + key)[0];
 
-/** Заголовок зоны так, как он написан в этой карточке (английский, русский, с якорем): без крайних `## `; нет зоны — `null`. */
+/** A zone's heading as written in this card (English, Russian, with an anchor): without the edge `## `; no zone - `null`. */
 const zoneHeadingIn = (text, key) => {
   const re = i18n.headingRe('zone.' + key, '');
   const l = String(text).split('\n').map((x) => x.replace(/\r$/, '')).find((x) => re.test(x));
   return l ? l.replace(/^##[ \t]+/, '') : null;
 };
 
-/** Тело зоны, без крайних пробелов; зоны нет — пустая строка. */
+/** A zone's body, without edge spaces; no zone - an empty string. */
 function zone(text, key) {
   const head = i18n.headingRe('zone.' + key, 'm');
   const lines = String(text).split(/\r?\n/);
@@ -147,10 +147,10 @@ function zone(text, key) {
   return lines.slice(i + 1, end).join('\n').trim();
 }
 
-/** Строка-заголовок зоны «История» целиком (для построчного поиска). */
+/** The whole heading line of the "History" zone (for line-by-line search). */
 const HISTORY_HEADING_RE = i18n.headingRe('zone.history', '');
 
-/** Текст карточки без зоны истории — строки расхода дописываются в закрытые карточки и не должны менять хэш. */
+/** The card's text without the history zone - spend lines are appended into closed cards and must not change the hash. */
 function withoutHistory(text) {
   const lines = String(text).split('\n');
   const i = lines.findIndex((l) => HISTORY_HEADING_RE.test(l.replace(/\r$/, '')));

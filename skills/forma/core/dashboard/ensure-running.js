@@ -1,28 +1,31 @@
 #!/usr/bin/env node
-// Разовая проверка: жив ли дашборд ЭТОГО проекта. Если нет — поднимает супервизор
-// (watch.js, который дальше сам следит за serve.js и перезапускает его при падении)
-// полностью в фоне, detached — переживает завершение этого процесса и завершение
-// сессии, которая его вызвала.
+// A one-shot check: is THIS project's dashboard alive. If not - it raises the supervisor
+// (watch.js, which then watches serve.js itself and restarts it on a fall)
+// entirely in the background, detached - it outlives this process's exit and the exit
+// of the session that called it.
 //
-// Порт дашборда динамический (serve.js: запомненный порт → при занятости эфемерный
-// от ОС, `kit.md`-задача «динамический порт для дашборда»), поэтому живость проверяем
-// не по захардкоженной константе, а по факту из .forma/dashboard/.cache/server.json — том же
-// файле, который serve.js сам пишет при собственном listening ({url, port, pid, started}).
-// Решающий факт — не только порт, но и pid: серверный файл может протухнуть (процесс
-// с прошлого запуска уже не существует), а порт из него — указывать в никуда или,
-// хуже, на чужой процесс, который случайно там что-то слушает. Живой pid + ответ
-// HTTP на записанном порту — только тогда доверяем файлу; иначе дашборд этого проекта
-// считается не живым и запускается свой (порт выберет serve.js).
+// The dashboard's port is dynamic (serve.js: the remembered port -> on business an ephemeral
+// one from the OS, the `kit.md` task "a dynamic port for the dashboard"), so liveness is checked
+// not by a hardcoded constant but by the fact in .forma/dashboard/.cache/server.json - the same
+// file serve.js itself writes on its own listening ({url, port, pid, started}).
+// The deciding fact is not only the port but also the pid: the server file may have gone stale
+// (the past run's process no longer exists), and its port may point nowhere or, worse, at a
+// foreign process that happens to listen there. A live pid + an HTTP answer on the recorded port -
+// only then is the file trusted; otherwise this project's dashboard counts as not alive and its own
+// is started (serve.js will choose the port).
 //
-// Безопасно вызывать повторно (идемпотентно): если дашборд уже жив — ничего
-// не делает и не плодит вторых серверов. Вызывается из хука SessionStart
-// (хук старта сессии в каталоге адаптера) и может вызываться вручную:
+// Safe to call repeatedly (idempotent): if the dashboard is already alive - it does nothing and
+// breeds no second servers. Called from the SessionStart hook (the session-start hook in the
+// adapter directory) and can be called by hand:
 //   node .forma/dashboard/ensure-running.js
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+// Canonical ru strings of the console output live in the core dictionary; the language is fixed.
+const { message: coreMessage } = require('../i18n/index.cjs');
+const ruMsg = (key, params) => coreMessage(key, params, 'ru');
 
 const { DEFAULT_PORT } = require('./port.cjs');
 const TIMEOUT_MS = 800;
@@ -31,9 +34,9 @@ const CACHE_DIR = path.join(__dirname, '.cache');
 const LOG_FILE = path.join(CACHE_DIR, 'watch.log');
 const SERVER_FILE = path.join(CACHE_DIR, 'server.json');
 
-// process.kill(pid, 0) не шлёт сигнал — стандартный способ узнать, существует ли процесс,
-// без побочных эффектов. ESRCH — процесса нет (протухший файл); EPERM — процесс есть,
-// но нет прав слать ему сигналы (тоже «жив», просто не наш пользователь/привилегии).
+// process.kill(pid, 0) sends no signal - the standard way to learn whether the process exists,
+// without side effects. ESRCH - there is no process (a stale file); EPERM - the process exists,
+// but there is no right to signal it (also "alive", just not our user/privileges).
 function pidAlive(pid) {
   try { process.kill(pid, 0); return true; }
   catch (err) { return err.code === 'EPERM'; }
@@ -47,7 +50,7 @@ function readServerFile() {
     if (!Number.isInteger(port) || port <= 0 || !Number.isInteger(pid) || pid <= 0) return null;
     return { port, pid };
   } catch {
-    return null; // файла нет, или он битый/недописан (гонка с записью serve.js) — не решающий факт
+    return null; // the file is absent, or broken/unfinished (a race with serve.js's writing) - not a deciding fact
   }
 }
 
@@ -62,27 +65,27 @@ function httpAlive(port) {
   });
 }
 
-// Возвращает { alive, port } — port это тот, на котором реально (или по старому
-// умолчанию) проверялась живость, чтобы дальше можно было честно про него написать.
+// Returns { alive, port } - port is the one liveness was really checked on (or by the old default),
+// so that it can be written about honestly further on.
 async function checkAlive() {
   const info = readServerFile();
   if (info && pidAlive(info.pid)) {
     return { alive: await httpAlive(info.port), port: info.port };
   }
-  // Нет файла, он битый, или записанный pid уже не существует (протухший, от
-  // прошлого запуска): дашборд этого проекта не жив. Дефолтный порт 5050 не проверяем —
-  // там может отвечать дашборд другого проекта, и принять его за свой значит не поднять свой.
+  // No file, it is broken, or the recorded pid no longer exists (stale, from the past run):
+  // this project's dashboard is not alive. The default port 5050 is not checked - another
+  // project's dashboard may answer there, and taking it for one's own means not raising one's own.
   return { alive: false, port: DEFAULT_PORT };
 }
 
 async function main() {
   const { alive, port } = await checkAlive();
   if (alive) {
-    console.log(`Дашборд уже работает: http://localhost:${port}/`);
+    console.log(ruMsg('ensure.already_running', { port }));
     return;
   }
 
-  console.log('Дашборд не отвечает — запускаю супервизор в фоне...');
+  console.log(ruMsg('ensure.not_responding'));
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   const out = fs.openSync(LOG_FILE, 'a');
   const child = spawn(process.execPath, [WATCH_PATH], {
@@ -91,10 +94,10 @@ async function main() {
     windowsHide: true,
   });
   child.unref();
-  console.log(`Супервизор поднят (pid ${child.pid}); лог — ${path.relative(process.cwd(), LOG_FILE)}`);
-  // Порт нового запуска решает уже сам serve.js (тот же динамический выбор) — не всегда
-  // 5050, если он занят. Точный адрес — .forma/dashboard/.cache/server.json через пару секунд.
-  console.log(`Через пару секунд: обычно http://localhost:${DEFAULT_PORT}/ — точный адрес смотрите в .forma/dashboard/.cache/server.json, если порт был занят.`);
+  console.log(ruMsg('ensure.supervisor_up', { pid: child.pid, log: path.relative(process.cwd(), LOG_FILE) }));
+  // The new run's port is decided by serve.js itself (the same dynamic choice) - not always 5050,
+  // if it is busy. The exact address - .forma/dashboard/.cache/server.json in a couple of seconds.
+  console.log(ruMsg('ensure.eta', { port: DEFAULT_PORT }));
 }
 
 main();

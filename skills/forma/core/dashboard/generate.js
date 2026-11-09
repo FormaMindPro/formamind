@@ -1,20 +1,23 @@
 #!/usr/bin/env node
-// Пересобирает срез по эпикам/карточкам/расходу из .devtool/features/**/*.md.
-// Не хранилище — кэш: карточки остаются единственной правдой (AGENTS.md §3, «Расход считается по факту»).
-// .forma/dashboard/ — не часть .devtool/ (та принадлежит расширению Kanban Markdown, .devtool/features/);
-// это отдельный инструмент арсенала в корне проекта, просто читающий .devtool/features/.
-// Экспортирует buildData() для serve.js (живой пересчёт без записи файла) и работает как CLI:
-// Запуск: node .forma/dashboard/generate.js  →  .forma/dashboard/.cache/data.json
+// Rebuilds the snapshot of epics/cards/spend out of .devtool/features/**/*.md.
+// Not a store - a cache: the cards remain the single truth (AGENTS.md §3, "Spend is counted by fact").
+// .forma/dashboard/ is not part of .devtool/ (that belongs to the Kanban Markdown extension, .devtool/features/);
+// this is a separate arsenal tool in the project root that simply reads .devtool/features/.
+// Exports buildData() for serve.js (a live rebuild without writing the file) and works as a CLI:
+// Run: node .forma/dashboard/generate.js  ->  .forma/dashboard/.cache/data.json
 //
-// Здесь только компоновка: каждая вкладка читается своим модулем из `data/`
-// (карточки и заходы, расход, graphify, подагенты, интервью, настройки, маршруты, доска).
-// Всё, что знает только движок, ядро берёт у адаптера через `lib/engines.cjs`; нет адаптера или поля —
-// в данных `unknown`, остальные величины не страдают.
+// Only the assembly lives here: every tab is read by its own module from `data/`
+// (cards and attempts, spend, graphify, subagents, the interview, settings, routes, the board).
+// Whatever only the engine knows, the core takes from the adapter through `lib/engines.cjs`; no adapter
+// or field - the datum is `unknown`, the other quantities suffer nothing.
 
 const fs = require('fs');
 const path = require('path');
+// Canonical ru strings of the console output live in the core dictionary; the language is fixed.
+const { message: coreMessage } = require('../i18n/index.cjs');
+const ruMsg = (key, params) => coreMessage(key, params, 'ru');
 
-// Сервер горячо перезагружает только этот файл, поэтому модули `data/` при каждой загрузке читаются заново.
+// The server hot-reloads only this file, so the `data/` modules are read anew on every load.
 const DATA_DIR = path.join(__dirname, 'data') + path.sep;
 for (const key of Object.keys(require.cache)) {
   if (key.startsWith(DATA_DIR)) delete require.cache[key];
@@ -34,13 +37,13 @@ const { readProjectSettings, readEngineSettings } = require('./data/settings.cjs
 const { buildBoard } = require('./data/board.cjs');
 const { buildDocs } = require('./data/docs.cjs');
 
-/** Дерево структуры перечитывается каждый раз: сервер горячо перезагружает только `generate.js`. */
+/** The structure tree is re-read every time: the server hot-reloads only `generate.js`. */
 function readStructure(projectRoot) {
   delete require.cache[require.resolve('./structure.cjs')];
   return require('./structure.cjs').buildStructure(projectRoot);
 }
 
-/** Схема движка перечитывается каждый раз (как структура). */
+/** The engine schema is re-read every time (like the structure). */
 function readSchema(projectRoot) {
   for (const m of ['./schema-manifest.cjs', './schema.cjs', './schema-view.cjs']) delete require.cache[require.resolve(m)];
   return require('./schema-view.cjs').buildSchemaView(projectRoot);
@@ -55,7 +58,7 @@ function buildData(projectRoot) {
     generatedAt: new Date().toISOString(),
     totals,
     byNode,
-    // Разрез по меткам маршрутов — по тегу движка, в economy.engines[тег].byRoute.
+    // The cut by route labels - by the engine tag, in economy.engines[tag].byRoute.
     economy,
     sessionEconomy: readSessionEconomy(projectRoot),
     dialog: readDialog(projectRoot),
@@ -78,16 +81,16 @@ function buildData(projectRoot) {
 
 module.exports = { buildData };
 
-/** CLI: собрать данные и записать в кэш `.forma/dashboard/.cache/data.json`. */
+/** CLI: build the data and write it into the `.forma/dashboard/.cache/data.json` cache. */
 function main() {
   const root = path.resolve(__dirname, '..', '..');
   const outFile = path.join(__dirname, '.cache', 'data.json');
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   const data = buildData(root);
   fs.writeFileSync(outFile, JSON.stringify(data, null, 2), 'utf8');
-  console.log(`Собрано карточек: ${data.totals.cardCount}, эпиков: ${data.totals.epicCount}, токенов по движкам: ${JSON.stringify(data.totals.tokensByEngine)}, заходов с записью: ${data.totals.attemptCount}`);
+  console.log(ruMsg('generate.built', { cards: data.totals.cardCount, epics: data.totals.epicCount, tokens: JSON.stringify(data.totals.tokensByEngine), attempts: data.totals.attemptCount }));
   console.log(`→ ${path.relative(root, outFile)}`);
 }
 
-// Запущен напрямую (не require из serve.js) — собрать и записать в кэш.
+// Run directly (not require from serve.js) - build and write into the cache.
 if (require.main === module) main();

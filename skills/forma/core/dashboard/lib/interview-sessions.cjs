@@ -1,16 +1,17 @@
 'use strict';
 
 /**
- * Сессии интервью к брифу: карта «позиция → заходы», живость сервера страницы, порт прошлого запуска.
- * Одна копия на троих: `serve.js` (поднимает и опрашивает сессии), `data/interview-files.cjs` (показывает их на вкладке)
- * и `server.mjs` скилла `forma-grill-with-ui` (порт и живость своего сервера). Часть общей библиотеки ядра (`.forma/dashboard/lib/`).
+ * The brief's interview sessions: the "position -> rounds" map, the page server's liveness, the past run's port.
+ * One copy for three: `serve.js` (raises and polls the sessions), `data/interview-files.cjs` (shows them on the tab)
+ * and the `forma-grill-with-ui` skill's `server.mjs` (its own server's port and liveness). Part of the core's shared library (`.forma/dashboard/lib/`).
  *
- * Карта лежит в `project/brief/sessions.json`, а не в кэше дашборда: сессия принадлежит разговору с человеком,
- * а не экрану, и переживает снос кэша. Значение позиции — список папок заходов, последний — текущий; строка —
- * старая форма записи. Служебный ключ `__absorbed` (докуда перенесены события каждой сессии) позицией не является.
+ * The map lives in `project/brief/sessions.json`, not in the dashboard's cache: a session belongs to the conversation
+ * with the human, not to a screen, and outlives the cache's demolition. A position's value is the list of round
+ * folders, the last one current; a string - the old record form. The service key `__absorbed` (how far each
+ * session's events have been carried) is not a position.
  *
- * Без зависимостей, кроме встроенных модулей и `./fs.cjs`. `server.mjs` — ESM и подключает модуль по пути через
- * `createRequire`, поэтому здесь остаётся CommonJS.
+ * No dependencies besides the built-in modules and `./fs.cjs`. `server.mjs` is ESM and connects the module by path
+ * through `createRequire`, so this stays CommonJS.
  */
 
 const fs = require('fs');
@@ -21,29 +22,29 @@ const ABSORBED_KEY = '__absorbed';
 
 const sessionsFile = (projectRoot) => path.join(projectRoot, 'project', 'brief', 'sessions.json');
 
-/** Карта сессий; файла нет или он битый — `{}`: интервью ещё не открывали. */
+/** The sessions' map; no file or a broken one - `{}`: the interview has not been opened yet. */
 const readSessions = (projectRoot) => readJson(sessionsFile(projectRoot), {});
 
-/** Запись карты целиком; каталог брифа создаётся, если его нет. */
+/** Writing the map whole; the brief's directory is created when absent. */
 function writeSessions(projectRoot, all) {
   const file = sessionsFile(projectRoot);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(all, null, 2), 'utf8');
 }
 
-/** Заходы позиции по порядку; последний — текущий. Строка — старая форма записи. */
+/** A position's rounds in order; the last one current. A string - the old record form. */
 const sessionList = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 
 const currentSession = (v) => sessionList(v).slice(-1)[0] || null;
 
-/** Позиции карты с их заходами; служебный ключ пропущен. `[{ position, dirs }]`. */
+/** The map's positions with their rounds; the service key skipped. `[{ position, dirs }]`. */
 function positionSessions(projectRoot) {
   return Object.entries(readSessions(projectRoot))
     .filter(([pos]) => pos !== ABSORBED_KEY)
     .map(([pos, raw]) => ({ position: Number(pos), dirs: sessionList(raw) }));
 }
 
-/** Номер последнего перенесённого события сессии; ничего не переносили — 0. */
+/** The number of the session's last carried event; nothing carried - 0. */
 const readAbsorbedSeq = (projectRoot, session) => Number((readSessions(projectRoot)[ABSORBED_KEY] || {})[session]) || 0;
 
 function writeAbsorbedSeq(projectRoot, session, seq) {
@@ -53,16 +54,16 @@ function writeAbsorbedSeq(projectRoot, session, seq) {
   writeSessions(projectRoot, all);
 }
 
-/** Жив ли процесс. Без pid — нет: `process.kill(0, 0)` означал бы группу процессов, а не этот сервер. */
+/** Whether the process is alive. Without a pid - no: `process.kill(0, 0)` would mean a process group, not this server. */
 function alive(pid) {
   if (!pid) return false;
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
 
 /**
- * Адрес и живость сервера страницы сессии — по её `server.json`. Живость — по pid, а не по наличию файла:
- * файл остаётся на диске и после того, как процесс умер, и доверять ему значило бы показывать адрес, по которому никого нет.
- * Сервер ни разу не поднимался — `{ url: null, alive: false }`.
+ * The session page server's address and liveness - by its `server.json`. Liveness - by the pid, not by the file's
+ * presence: the file stays on disk after the process died, and trusting it would mean showing an address nobody is at.
+ * The server never came up - `{ url: null, alive: false }`.
  */
 function serverOf(dir) {
   const srv = readJson(path.join(dir, 'server.json'), null);
@@ -71,8 +72,8 @@ function serverOf(dir) {
 }
 
 /**
- * Порт прошлого запуска — из `server.json` `{ port, pid, started }`. Нет файла или валидного числа — 0
- * (сигнал «нет запомненного»: вызывающий подставит свой порт по умолчанию или эфемерный).
+ * The past run's port - from `server.json` `{ port, pid, started }`. No file or no valid number - 0
+ * (the "nothing remembered" signal: the caller will substitute its own default port or an ephemeral one).
  */
 function rememberedPort(serverFile) {
   const p = Number((readJson(serverFile, null) || {}).port);

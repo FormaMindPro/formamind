@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// Вкладка «Схема»: данные для отрисовки берутся из schema.cjs, счётчики сходятся с составом, вёрстка без списков.
+// The "Schema" tab: the render data comes from schema.cjs, the counters match the composition, the layout has no lists.
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');

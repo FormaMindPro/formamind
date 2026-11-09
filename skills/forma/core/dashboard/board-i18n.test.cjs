@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * Вкладка «Канбан» на двух языках: все ключи есть в en и ru, отрисовка карточки, плашек, маршрута и ожидания
- * не оставляет сырых ключей, а на en — кириллицы (данные карточки в тесте английские).
+ * The "Kanban" tab in two languages: all the keys exist in en and ru; the render of the card, the plates, the
+ * route and the expectation leaves no raw keys behind, and no cyrillic on en (the card data in the test is english).
  *   node .forma/dashboard/board-i18n.test.cjs
  */
 const assert = require('node:assert/strict');
@@ -14,12 +14,12 @@ const core = require('./web/js/i18n.js');
 
 let passed = 0;
 const it = (name, fn) => { fn(); passed += 1; console.log('ok  ' + name); };
-// Даты образцов собираются, а не пишутся: в чистой зоне нет календарных дат (запрет 16).
+// The sample dates are assembled, not written: a clean zone has no calendar dates (prohibition 16).
 const D = (n) => ['2020', '01', '0' + n].join('-');
 const js = (f) => fs.readFileSync(path.join(__dirname, 'web/js', f), 'utf8');
 const dicts = { en: i18n.readDict('en'), ru: i18n.readDict('ru') };
 
-it('каждый ключ t(\'…\') в board.js и common.js есть в en и ru', () => {
+it('every key t(\'…\') in board.js and common.js exists in en and ru', () => {
   const keys = new Set();
   for (const f of ['board.js', 'common.js']) for (const m of js(f).matchAll(/\bt\('([\w.-]+)'[,)]/g)) keys.add(m[1]);
   const prefixes = ['board.col.', 'board.rt.', 'board.step.', 'board.unit.', 'board.g.', 'board.s.', 'board.rdy.'];
@@ -27,7 +27,7 @@ it('каждый ключ t(\'…\') в board.js и common.js есть в en и 
   assert.deepEqual(lost, []);
 });
 
-it('маршруты, статусы и единицы снаряжения: словари полные', () => {
+it('routes, statuses and kit units: the dictionaries are complete', () => {
   const need = [];
   for (let i = 0; i < 9; i++) need.push('board.rt.route' + i);
   for (const s of ['backlog', 'todo', 'in-progress', 'review', 'done']) need.push('board.col.' + s, 'board.status.' + s);
@@ -61,13 +61,13 @@ const card = {
 const B = { DATA: { goals: {}, thresholds: { volume: 5 }, cards: [card] }, S: { q: '' }, byCode: { 'card-x1': card }, dependents: { 'card-x1': ['card-x2'] } };
 
 for (const [lang, cyr] of [['en', false], ['ru', true]]) {
-  it(`отрисовка карточки на ${lang}: нет сырых ключей${cyr ? '' : ' и кириллицы'}`, () => {
+  it(`card render on ${lang}: no raw keys${cyr ? '' : ' and no cyrillic'}`, () => {
     const x = load(lang);
     const out = [x.bdCardHtml(B, card), x.bdPips(B, card), x.bdRouteHtml(card), JSON.stringify(x.bdWaiting(B, card)),
       JSON.stringify(x.boardRoutes()), JSON.stringify(x.BOARD_T.stage), x.bdFmtTok(1500000), x.bdFmtSec(4000), x.bdGoalName(B, '')].join('\n');
-    assert.ok(!/\bboard\.[a-z]/.test(out), 'сырой ключ: ' + (out.match(/\bboard\.[\w.-]+/) || [''])[0]);
-    if (!cyr) assert.ok(!/[А-Яа-яЁё]/.test(out), 'кириллица на en: ' + (out.match(/.{20}[А-Яа-яЁё]+.{10}/) || [''])[0]);
-    else assert.ok(/маршрут/.test(out));
+    assert.ok(!/\bboard\.[a-z]/.test(out), 'raw key: ' + (out.match(/\bboard\.[\w.-]+/) || [''])[0]);
+    if (!cyr) assert.ok(!/[\u0410-\u044f\u0401\u0451]/.test(out), 'cyrillic on en: ' + (out.match(/.{20}[\u0410-\u044f\u0401\u0451]+.{10}/) || [''])[0]);
+    else assert.ok(/\u043c\u0430\u0440\u0448\u0440\u0443\u0442/.test(out));
   });
 }
 

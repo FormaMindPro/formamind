@@ -1,11 +1,12 @@
 'use strict';
 
 /**
- * Общая часть адаптеров для вкладки «Форма»: чтение ролей узлов и каталога ролей Run в виде
+ * The adapters' shared part for the "Forma" tab: reading the nodes' roles and the Run roles' catalog as
  * `{ name, file, model, tier, effort, skills, connectors, toolCount }`.
- * Форматов два: markdown с фронтматтером (Claude, Gemini) и toml (Codex). Какой читать — решает адаптер движка;
- * ядро (`.forma/dashboard/data/forma.cjs`) видит только готовый срез из поля `formaRoles` адаптера (шапка `engines.cjs`).
- * Только показ: опись не хранится, это срез тех же файлов.
+ * Two formats: markdown with a frontmatter (Claude, Gemini) and toml (Codex). Which to read is the engine
+ * adapter's decision; the core (`.forma/dashboard/data/forma.cjs`) sees only the ready snapshot from the
+ * adapter's `formaRoles` field (the `engines.cjs` header).
+ * Display only: the inventory is not stored, this is a snapshot of the same files.
  */
 
 const fs = require('fs');
@@ -13,20 +14,20 @@ const path = require('path');
 const { readJson } = require('./fs.cjs');
 const { parseFrontmatter } = require('./card.cjs');
 
-const NODE_ORDER = ['Intent', 'Spec', 'Kit', 'Core']; // Run — отдельно, каталог ролей
+const NODE_ORDER = ['Intent', 'Spec', 'Kit', 'Core']; // Run - separately, the roles' catalog
 
-/** Инструменты фронтматтера, запятая внутри Bash(...)/mcp-скобок не режет список. */
+/** The frontmatter's tools; a comma inside Bash(...)/mcp brackets does not cut the list. */
 function splitTools(raw) {
   return String(raw || '').split(/,\s*(?![^()]*\))/).map((s) => s.trim()).filter(Boolean);
 }
 
-/** Список скиллов: пусто/`none` → `[]`. */
+/** The skills' list: empty/`none` -> `[]`. */
 function splitSkills(raw) {
   const skills = String(raw || '').trim();
   return !skills || skills.toLowerCase() === 'none' ? [] : skills.split(/,\s*/).filter(Boolean);
 }
 
-/** Коннекторы MCP среди инструментов: `mcp__<server>__<ability>` → имя сервера. */
+/** The MCP connectors among the tools: `mcp__<server>__<ability>` -> the server's name. */
 function mcpServerNames(tools) {
   const names = new Set();
   for (const t of tools) {
@@ -36,7 +37,7 @@ function mcpServerNames(tools) {
   return [...names];
 }
 
-/** Минимальный разбор toml: строковые и числовые значения верхнего уровня и имена таблиц `[a.b]`. */
+/** A minimal toml parse: top-level string and number values and the `[a.b]` table names. */
 function parseToml(text) {
   const top = {};
   const tables = [];
@@ -50,7 +51,7 @@ function parseToml(text) {
     const kv = line.match(/^([A-Za-z0-9_-]+)\s*=\s*(.*)$/);
     if (!kv) continue;
     let [, key, val] = kv;
-    if (val.startsWith('"""')) { // многострочная строка: пропускаем до закрывающей
+    if (val.startsWith('"""')) { // a multiline string: skip to the closing one
       if (!(val.length >= 6 && val.endsWith('"""'))) while (++i < lines.length && !lines[i].includes('"""'));
       if (inTop) top[key] = '';
       continue;
@@ -62,7 +63,7 @@ function parseToml(text) {
   return { top, tables };
 }
 
-/** Имена серверов MCP из файлов `{ file, level }`: ключи `mcpServers` (json) или таблицы `[mcp_servers.<имя>]` (toml). */
+/** The MCP servers' names from `{ file, level }` files: the `mcpServers` keys (json) or the `[mcp_servers.<name>]` tables (toml). */
 function configuredServers(files) {
   const byName = new Map();
   for (const { file, level } of files) {
@@ -80,14 +81,14 @@ function configuredServers(files) {
   return byName;
 }
 
-/** Карточка коннектора: `{ name, level }` — level null, если сервер не нашёлся ни в одном файле. */
+/** A connector's row: `{ name, level }` - level null when the server was found in no file. */
 function connectorRows(tools, configured) {
   return mcpServerNames(tools).sort().map((name) => ({ name, level: configured.get(name) || null }));
 }
 
 const rel = (root, file) => path.relative(root, file).split(path.sep).join('/');
 
-/** Роль из markdown с фронтматтером; `skillsKey` — ключ со скиллами (`uses` у узлов, `.forma/skills` у ролей Run). */
+/** A role from markdown with a frontmatter; `skillsKey` - the skills' key (`uses` for the nodes, `.forma/skills` for the Run roles). */
 function mdRoleRow(root, file, { name, skillsKey, configured }) {
   const fm = parseFrontmatter(fs.readFileSync(file, 'utf8'));
   const tools = splitTools(fm.tools);
@@ -103,7 +104,7 @@ function mdRoleRow(root, file, { name, skillsKey, configured }) {
   };
 }
 
-/** Роль из toml движка Codex: модель, effort — `model_reasoning_effort`. Скиллов и инструментов в файле нет. */
+/** A role from the Codex engine's toml: the model, effort - `model_reasoning_effort`. No skills or tools in the file. */
 function tomlRoleRow(root, file, name) {
   const { top } = parseToml(fs.readFileSync(file, 'utf8'));
   return {
@@ -119,8 +120,8 @@ function tomlRoleRow(root, file, name) {
 }
 
 /**
- * Срез по каталогу markdown-ролей: узлы `<rolesDir>/<узел>.md`, роли Run `<rolesDir>/run/*.md`.
- * `mcpFiles` — `[{ file, level }]`. Результат — форма поля `formaRoles`.
+ * A snapshot over a markdown roles' directory: the nodes `<rolesDir>/<node>.md`, the Run roles `<rolesDir>/run/*.md`.
+ * `mcpFiles` - `[{ file, level }]`. The result is the shape of the `formaRoles` field.
  */
 function readMdCatalog(root, { title, rolesDir, mcpFiles }) {
   const dir = path.join(root, ...rolesDir.split('/'));
@@ -140,8 +141,8 @@ function readMdCatalog(root, { title, rolesDir, mcpFiles }) {
 }
 
 /**
- * Срез по каталогу toml-ролей (Codex): пять узлов и `run` — файлы `<agentsDir>/<узел>.toml`.
- * Каталога ролей Run у движка нет — одна карточка `run` и явная пометка в `runNote`.
+ * A snapshot over a toml roles' directory (Codex): the five nodes and `run` - the files `<agentsDir>/<node>.toml`.
+ * The engine has no Run roles' catalog - a single `run` row and an explicit mark in `runNote`.
  */
 function readTomlCatalog(root, { title, agentsDir }) {
   const dir = path.join(root, ...agentsDir.split('/'));

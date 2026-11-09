@@ -1,78 +1,82 @@
 'use strict';
 
 /**
- * Граница ядро — адаптер движка. Ядро не знает ни имени движка, ни каталога его адаптера:
- * оно спрашивает у адаптеров то, что знает только движок, и живёт без ответа.
+ * The core - engine adapter boundary. The core knows neither the engine's name nor its adapter's directory:
+ * it asks the adapters for what only the engine knows and lives without an answer.
  *
- * Поиск: `loadAdapters(root)` перебирает каталоги корня проекта, чьё имя начинается с точки,
- * и подключает `<каталог>/forma-adapter.cjs`, если он есть. Модуль не найден или бросил при
- * загрузке — адаптера нет, это не падение. Порядок — по имени каталога.
+ * Search: `loadAdapters(root)` goes over the project root's directories whose name starts with a dot
+ * and connects `<dir>/forma-adapter.cjs` if it is there. The module not found or thrown at load -
+ * there is no adapter, that is not a fall. The order is by the directory's name.
  *
- * Форма адаптера — объект с необязательными полями. Пути — от корня проекта, через `/`.
- * Нет поля или нет адаптера — ядро кладёт в данные `unknown` (строкой) либо пустой список
- * там, где UI ждёт список; ноль и `null` на место числа не идут.
+ * The adapter's shape is an object with optional fields. Paths - from the project root, through `/`.
+ * No field or no adapter - the core puts `unknown` (as a string) into the datum, or an empty list
+ * where the UI waits for a list; a zero and `null` do not go into a number's place.
  *
- *   поле                   что это                                         при отсутствии
- *   engine                 тег движка, строка ('claude-code')              'unknown'
- *   instructionWeight()    вес закона и роли на шаг вызова: { common,      блок веса не строится,
- *                          byNode: { Узел: { perStep } } }                 в данных 'unknown'
- *   stepsFromCacheRead(cacheRead, perStep) — число шагов по кэш-чтению     'unknown'
- *   toolUsage              разбор журнала инструментов: { source,          ярус узлов «Борта» без
- *                          readDeclared(dirAbs), readLog(fileAbs),         источника (source: null)
+ *   field                  what it is                                      when absent
+ *   engine                 the engine's tag, a string ('claude-code')      'unknown'
+ *   instructionWeight()    the weight of the law and the role per call step: { common,   no weight block is
+ *                          byNode: { Node: { perStep } } }                 built, 'unknown' in the datum
+ *   stepsFromCacheRead(cacheRead, perStep) - the step count by cache read  'unknown'
+ *   toolUsage              the tool journal's parsing: { source,           the tier of "Board" nodes without
+ *                          readDeclared(dirAbs), readLog(fileAbs),         a source (source: null)
  *                          baseName(decl) }
- *   parseUsage(step)       шаг стенограммы → { tokens_in, tokens_out,      расход стенограммы — null
+ *   parseUsage(step)       a transcript step -> { tokens_in, tokens_out,   the transcript's spend - null
  *                          cache_read, cache_write }
- *   transcriptsDir(root)   каталог стенограмм проекта, абсолютный | null   стенограмм нет
- *   mainSessions(root)     журналы основной сессии: [{ id, file }] —        основной журнал движка
- *                          без субагентских; раскладка знает адаптер        не читается
- *   mainStepOf(line, prev) запись журнала основной сессии → нормализованный шаг
- *                          { ts, key, usage, toolCalls, human, model }      (та же группа)
- *   rolesDir               каталог ролей узлов                             роли не читаются
- *   onDemandRolesDir       каталог ролей «по случаю»                       не читаются
- *   engineRulesFile        файл §8 — правила движка                        текст пустой
- *   skillsDir              каталог скиллов проекта                         'unknown' вместо числа
- *   templateSkills         имена умений, что поставляет шаблон (список)    признак умений «—»
- *   syncScript             скрипт сверки движков; вызывается с --check     сверка не запускается
- *   usageRefresh           [{ script, args, cache }] — скрипты, что         кэши расхода не
- *                          обновляют кэш расхода диалога в .forma/dashboard/.cache обновляются ядром
- *   mcpConfigs(root)       [{ rel, file, level }] — файлы MCP-серверов     серверов нет, список пуст
- *   engineSettings(root)   { present, env, hooks, nodes, skills, mcp,      present: false, пустые списки
- *                          check } — вкладка «Движок»
- *   formaRoles(root)       { title, nodes[], runRoles[], runNote, rolesMissing,  вкладки движка нет
- *                          plugins? } — срез ролей для вкладки «Форма»;
- *                          по вкладке на каждый адаптер с этим полем
- *   structure              { key, title, note, roots, notes } — группа     группы в «Структуре» нет
- *                          дерева «Структура»; notes — подписи каталогов
- *   id                     имя движка для `check <engine>`, строка         имя каталога без точки
- *   spendTag               метка движка в строке расхода §3 после тире     значение `engine`
- *   sources                { rolesDir, onDemandRolesDir, runRolesDir,      значения по соглашению
- *                          scriptsDir, skillsDir, testsDir (строки),       от каталога адаптера
- *                          packageManifest (строка), mcpConfigs (список) } (`sourcesOf`)
- *   capabilities           { subagents, sendMessage, hooks, mcp } —        режим «деградированный»
- *                          булевы; subagents: true даёт режим «полный»     (`modeOf`)
- *   nodeModels             { Узел: { model, effort } } для пяти узлов      таблицы нет
- *   writeZones             список путей, куда движок пишет: своя папка и   пишет только в свою папку
- *                          карточки (.devtool/features)                    (проверка `check`)
+ *   transcriptsDir(root)   the project's transcripts directory, absolute | null  no transcripts
+ *   mainSessions(root)     the main session's journals: [{ id, file }] -    the engine's main journal
+ *                          without subagent ones; the layout knows the adapter  is not read
+ *   mainStepOf(line, prev) a main session journal entry -> a normalized step
+ *                          { ts, key, usage, toolCalls, human, model }      (the same group)
+ *   rolesDir               the nodes' roles directory                      the roles are not read
+ *   onDemandRolesDir       the "on occasion" roles' directory              not read
+ *   engineRulesFile        the §8 file - the engine's rules                the text is empty
+ *   skillsDir              the project's skills directory                  'unknown' instead of a number
+ *   templateSkills         the names of skills the template supplies (a list)  the skills mark "-"
+ *   syncScript             the engines' sync script; called with --check   the sync is not run
+ *   usageRefresh           [{ script, args, cache }] - scripts that         the spend caches are not
+ *                          refresh the dialog spend cache in .forma/dashboard/.cache  refreshed by the core
+ *   mcpConfigs(root)       [{ rel, file, level }] - MCP server files       no servers, an empty list
+ *   engineSettings(root)   { present, env, hooks, nodes, skills, mcp,      present: false, empty lists
+ *                          check } - the "Engine" tab
+ *   formaRoles(root)       { title, nodes[], runRoles[], runNote, rolesMissing,  no engine tab
+ *                          plugins? } - the roles snapshot for the "Forma" tab;
+ *                          a tab per each adapter carrying the field
+ *   structure              { key, title, note, roots, notes } - a group     no group in "Structure"
+ *                          of the "Structure" tree; notes - the directories' captions
+ *   id                     the engine's name for `check <engine>`, a string  the directory's name without the dot
+ *   spendTag               the engine's label in the §3 spend line after the dash  the `engine` value
+ *   sources                { rolesDir, onDemandRolesDir, runRolesDir,      values by convention
+ *                          scriptsDir, skillsDir, testsDir (strings),      from the adapter's directory
+ *                          packageManifest (a string), mcpConfigs (a list) } (`sourcesOf`)
+ *   capabilities           { subagents, sendMessage, hooks, mcp } -        the "degraded" mode
+ *                          booleans; subagents: true gives the "full" mode  (`modeOf`)
+ *   nodeModels             { Node: { model, effort } } for the five nodes  no table
+ *   writeZones             the list of paths the engine writes to: its own folder  writes only into its own folder
+ *                          and the cards (.devtool/features)               (the `check` check)
  *
- * Полей несколько адаптеров: одиночные берутся у первого, кто их объявил; списки склеиваются.
+ * Several adapters carry fields: single ones are taken from the first who declared them; lists are glued.
  */
 
 const fs = require('fs');
 const path = require('path');
+// Canonical ru strings (the check items, the mode labels) live in the core dictionary; the language is fixed.
+const { message: coreMessage } = require('../../i18n/index.cjs');
+const ruMsg = (key, params) => coreMessage(key, params, 'ru');
 
 const ADAPTER_FILE = 'forma-adapter.cjs';
 const UNKNOWN = 'unknown';
 
 /**
- * Поля чтения стенограмм, которые движок объявляет, только если его платформа их даёт:
- * раскладка и формат журналов принадлежат движку, ядро на каждое поле имеет запасной путь
- * (без findSubagent/stepOf — раскладка `message.usage`; без mainSessions/mainStepOf — основной
- * журнал движка просто не читается). Строгая проверка «объявлена вся форма» (тесты адаптеров)
- * эту группу пропускает — требовать её у всех равноценно требованию одинаковых хостов.
+ * The transcript-reading fields an engine declares only when its platform provides them:
+ * the layout and format of the journals belong to the engine, and the core has a fallback path for
+ * every field (without findSubagent/stepOf - the `message.usage` layout; without mainSessions/
+ * mainStepOf - the engine's main journal is simply not read). The strict "the whole shape is
+ * declared" check (the adapters' tests) skips this group - demanding it from all would equal
+ * demanding identical hosts.
  */
 const TRANSCRIPT_FIELDS = ['findSubagent', 'stepOf', 'mainSessions', 'mainStepOf'];
 
-/** Тип каждого поля формы; проверяет `validateAdapter`. */
+/** The type of every shape field; `validateAdapter` checks it. */
 const SHAPE = {
   engine: 'string',
   instructionWeight: 'function',
@@ -103,7 +107,7 @@ const SHAPE = {
   writeZones: 'array',
 };
 
-/** Поля `sources` и тип каждого. */
+/** The `sources` fields and each one's type. */
 const SOURCE_FIELDS = {
   rolesDir: 'string',
   onDemandRolesDir: 'string',
@@ -114,62 +118,64 @@ const SOURCE_FIELDS = {
   packageManifest: 'string',
   mcpConfigs: 'array',
 };
-/** Возможности движка: каждая — булево. */
+/** The engine's capabilities: each one a boolean. */
 const CAPABILITY_FIELDS = ['subagents', 'sendMessage', 'hooks', 'mcp'];
-/** Пять узлов таблицы `nodeModels`. */
+/** The five nodes of the `nodeModels` table. */
 const NODES = ['Intent', 'Spec', 'Kit', 'Run', 'Core'];
-const MODE_FULL = 'полный';
-const MODE_DEGRADED = 'деградированный';
-/** Карточки — вторая разрешённая зона записи, кроме собственной папки движка. */
+// The mode labels are canonical ru strings of the dictionary; the byte-exact values are pinned by tests.
+const MODE_FULL = ruMsg('engines.mode_full');
+const MODE_DEGRADED = ruMsg('engines.mode_degraded');
+/** The cards - the second permitted write zone, besides the engine's own folder. */
 const CARDS_ZONE = '.devtool/features';
 
 const typeOf = (v) => (Array.isArray(v) ? 'array' : typeof v);
 
-/** Что не так с адаптером: пустой список — форма соблюдена. Поле, которого нет, не ошибка. */
+/** What is wrong with the adapter: an empty list - the shape is held. An absent field is not an error. */
 function validateAdapter(adapter) {
-  if (!adapter || typeof adapter !== 'object') return ['адаптер — не объект'];
+  if (!adapter || typeof adapter !== 'object') return [ruMsg('engines.not_object')];
   const problems = [];
   for (const [field, type] of Object.entries(SHAPE)) {
     if (adapter[field] == null) continue;
-    if (typeOf(adapter[field]) !== type) problems.push(`${field}: ждали ${type}, пришло ${typeOf(adapter[field])}`);
+    if (typeOf(adapter[field]) !== type) problems.push(ruMsg('engines.field_type', { field, want: type, got: typeOf(adapter[field]) }));
   }
   for (const field of Object.keys(adapter)) {
-    if (field !== 'dir' && !(field in SHAPE)) problems.push(`${field}: поля нет в объявленной форме`);
+    if (field !== 'dir' && !(field in SHAPE)) problems.push(ruMsg('engines.field_unknown', { field }));
   }
   const { sources, capabilities, nodeModels, writeZones } = adapter;
   if (typeOf(sources) === 'object') {
     for (const [k, v] of Object.entries(sources)) {
-      if (!(k in SOURCE_FIELDS)) problems.push(`sources.${k}: поля нет в объявленной форме`);
-      else if (typeOf(v) !== SOURCE_FIELDS[k]) problems.push(`sources.${k}: ждали ${SOURCE_FIELDS[k]}, пришло ${typeOf(v)}`);
-      else if (k === 'mcpConfigs' && v.some((x) => typeof x !== 'string')) problems.push('sources.mcpConfigs: ждали список строк');
+      if (!(k in SOURCE_FIELDS)) problems.push(ruMsg('engines.sources_field_unknown', { key: k }));
+      else if (typeOf(v) !== SOURCE_FIELDS[k]) problems.push(ruMsg('engines.sources_field_type', { key: k, want: SOURCE_FIELDS[k], got: typeOf(v) }));
+      else if (k === 'mcpConfigs' && v.some((x) => typeof x !== 'string')) problems.push(ruMsg('engines.sources_mcp_strings'));
     }
   }
   if (typeOf(capabilities) === 'object') {
     for (const [k, v] of Object.entries(capabilities)) {
-      if (!CAPABILITY_FIELDS.includes(k)) problems.push(`capabilities.${k}: поля нет в объявленной форме`);
-      else if (typeof v !== 'boolean') problems.push(`capabilities.${k}: ждали boolean, пришло ${typeOf(v)}`);
+      if (!CAPABILITY_FIELDS.includes(k)) problems.push(ruMsg('engines.cap_field_unknown', { key: k }));
+      else if (typeof v !== 'boolean') problems.push(ruMsg('engines.cap_field_type', { key: k, got: typeOf(v) }));
     }
   }
   if (typeOf(nodeModels) === 'object') {
     for (const [node, row] of Object.entries(nodeModels)) {
-      if (!NODES.includes(node)) problems.push(`nodeModels.${node}: узла нет среди пяти`);
-      else if (typeOf(row) !== 'object' || typeof row.model !== 'string' || typeof row.effort !== 'string') problems.push(`nodeModels.${node}: ждали { model, effort } строками`);
+      if (!NODES.includes(node)) problems.push(ruMsg('engines.node_unknown', { node }));
+      else if (typeOf(row) !== 'object' || typeof row.model !== 'string' || typeof row.effort !== 'string') problems.push(ruMsg('engines.node_shape', { node }));
     }
   }
-  if (Array.isArray(writeZones) && writeZones.some((x) => typeof x !== 'string')) problems.push('writeZones: ждали список строк');
+  if (Array.isArray(writeZones) && writeZones.some((x) => typeof x !== 'string')) problems.push(ruMsg('engines.writezones_strings'));
   return problems;
 }
 
-/** Имя движка: `id` или имя каталога адаптера без точки. */
+/** The engine's name: the `id` or the adapter directory's name without the dot. */
 function idOf(adapter) {
   if (adapter && typeof adapter.id === 'string' && adapter.id) return adapter.id;
   return adapter && adapter.dir ? String(adapter.dir).replace(/^\./, '') : UNKNOWN;
 }
 
 /**
- * Источники адаптера: объявленные в `sources` как есть; адаптер без `sources` — значения по соглашению
- * от его каталога (`<каталог>/agents`, `/agents/on-demand`, `/agents/run`, `/scripts`, `/skills`, `/tests`);
- * `packageManifest` по соглашению — `null`, `mcpConfigs` — пустой список. Объявленное соглашением не затирается.
+ * The adapter's sources: the ones declared in `sources` as they are; an adapter without `sources` -
+ * the values by convention from its directory (`<dir>/agents`, `/agents/on-demand`, `/agents/run`,
+ * `/scripts`, `/skills`, `/tests`); `packageManifest` by convention - `null`, `mcpConfigs` - an empty
+ * list. What is declared is not overwritten by the convention.
  */
 function sourcesOf(adapter) {
   const dir = adapter && adapter.dir ? String(adapter.dir) : '.' + idOf(adapter);
@@ -187,7 +193,7 @@ function sourcesOf(adapter) {
   return declared ? { ...byConvention, ...declared } : byConvention;
 }
 
-/** Режим движка (AGENTS.md §2): «полный», если объявлен вызов субагентов, иначе «деградированный». */
+/** The engine's mode (AGENTS.md §2): "full" when the calling of subagents is declared, otherwise "degraded". */
 function modeOf(adapter) {
   const c = adapter && adapter.capabilities;
   return c && typeof c === 'object' && c.subagents === true ? MODE_FULL : MODE_DEGRADED;
@@ -196,8 +202,9 @@ function modeOf(adapter) {
 const under = (rel, dir) => rel === dir || rel.startsWith(dir + '/');
 
 /**
- * Папка пакета движка по `sources.packageManifest`: каталог манифеста; если манифест лежит в служебной папке
- * с точкой в имени (метаданные плагина), пакетом считается её родитель. Без манифеста — `null`. Имён движков нет.
+ * The engine package folder by `sources.packageManifest`: the manifest's directory; when the manifest
+ * sits in a service folder with a dot in the name (a plugin's metadata), its parent counts as the package.
+ * Without a manifest - `null`. No engine names.
  */
 function packageZone(adapter) {
   const m = adapter && adapter.sources && adapter.sources.packageManifest;
@@ -208,78 +215,79 @@ function packageZone(adapter) {
 }
 
 /**
- * Пункты контракта для адаптера: `[{ item, ok, detail }]`. Читает диск только для существования объявленных источников.
- * Движок пишет только в свою папку и карточки; Kit создаёт роли в rolesDir движка, который их исполняет.
+ * The contract items for an adapter: `[{ item, ok, detail }]`. It reads the disk only for the existence
+ * of the declared sources. An engine writes only into its own folder and the cards; Kit creates the roles
+ * in the rolesDir of the engine that executes them.
  */
 function checkAdapter(adapter, root) {
   const out = [];
   const add = (item, ok, detail = '') => out.push({ item, ok: Boolean(ok), detail });
   const shape = validateAdapter(adapter);
-  add('форма адаптера соблюдена', shape.length === 0, shape.join('; '));
-  add('метка расхода (spendTag или engine)', typeof (adapter.spendTag || adapter.engine) === 'string', 'ни spendTag, ни engine не объявлены');
+  add(ruMsg('engines.item_shape_ok'), shape.length === 0, shape.join('; '));
+  add(ruMsg('engines.item_spend_tag'), typeof (adapter.spendTag || adapter.engine) === 'string', ruMsg('engines.spend_tag_missing'));
   const src = sourcesOf(adapter);
-  add('sources объявлены', adapter.sources != null, 'поле sources не объявлено, действует соглашение');
+  add(ruMsg('engines.item_sources'), adapter.sources != null, ruMsg('engines.sources_missing'));
   for (const k of ['rolesDir', 'onDemandRolesDir', 'runRolesDir', 'scriptsDir', 'skillsDir', 'testsDir', 'packageManifest']) {
     if (adapter.sources == null || adapter.sources[k] == null) continue;
-    add(`sources.${k} существует`, fs.existsSync(resolveRel(root, src[k])), src[k]);
+    add(ruMsg('engines.item_source_exists', { key: k }), fs.existsSync(resolveRel(root, src[k])), src[k]);
   }
   const cap = adapter.capabilities;
   const capOk = cap && typeof cap === 'object' && CAPABILITY_FIELDS.every((k) => typeof cap[k] === 'boolean');
-  add('capabilities объявлены (subagents, sendMessage, hooks, mcp)', capOk, 'нужны четыре булевых поля');
-  add(`режим движка: ${modeOf(adapter)}`, true);
+  add(ruMsg('engines.item_capabilities'), capOk, ruMsg('engines.cap_needed'));
+  add(ruMsg('engines.item_mode', { mode: modeOf(adapter) }), true);
   const nm = adapter.nodeModels;
-  add('nodeModels: пять узлов с моделью и усилием', nm && typeof nm === 'object' && NODES.every((n) => nm[n] && nm[n].model && nm[n].effort),
-    'нужны Intent, Spec, Kit, Run, Core');
+  add(ruMsg('engines.item_nodemodels'), nm && typeof nm === 'object' && NODES.every((n) => nm[n] && nm[n].model && nm[n].effort),
+    ruMsg('engines.nodes_needed'));
   const zones = adapter.writeZones;
   const own = adapter.dir ? String(adapter.dir) : null;
   const pkg = packageZone(adapter);
   const zonesOk = Array.isArray(zones) && zones.length > 0
     && zones.every((z) => (own && under(z, own)) || under(z, CARDS_ZONE) || (pkg && under(z, pkg)));
-  add('writeZones: только своя папка, карточки и папка пакета', zonesOk,
-    `разрешены ${own || 'папка движка'}, ${CARDS_ZONE}${pkg ? ' и ' + pkg : ''}`);
-  add('rolesDir внутри зоны записи движка', own != null && under(src.rolesDir, own), `${src.rolesDir} вне ${own}`);
-  // Проба разбора: шаг с выходными токенами в частых именах поля, плоский и под usage; ждём tokens_out = 7.
+  add(ruMsg('engines.item_writezones'), zonesOk,
+    ruMsg('engines.writezones_allowed', { own: own || ruMsg('engines.own_folder_fallback'), cards: CARDS_ZONE, pkg: pkg ? ruMsg('engines.and') + pkg : '' }));
+  add(ruMsg('engines.item_roles_in_zone'), own != null && under(src.rolesDir, own), ruMsg('engines.roles_outside', { rolesDir: src.rolesDir, own }));
+  // A parse probe: a step with output tokens under common field names, flat and under usage; we wait for tokens_out = 7.
   const flat = { tokens_out: 7, output_tokens: 7, outputTokens: 7, completion_tokens: 7, candidatesTokenCount: 7 };
   const reads = (step) => { try { const r = adapter.parseUsage(step); return Boolean(r) && typeof r === 'object' && r.tokens_out === 7; } catch { return false; } };
-  add('parseUsage отдаёт tokens_out', typeof adapter.parseUsage === 'function' && (reads(flat) || reads({ usage: flat })), 'шаг с 7 выходными токенами не дал tokens_out = 7');
+  add(ruMsg('engines.item_parseusage'), typeof adapter.parseUsage === 'function' && (reads(flat) || reads({ usage: flat })), ruMsg('engines.parseusage_failed'));
   return out;
 }
 
-/** Адаптеры проекта: `[{ ...поля, dir }]`, `dir` — имя каталога адаптера в корне. */
+/** The project's adapters: `[{ ...fields, dir }]`, `dir` - the adapter directory's name in the root. */
 function loadAdapters(root) {
   let entries = [];
-  try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { return []; } // корня нет — адаптеров нет
+  try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { return []; } // no root - no adapters
   const dirs = entries.filter((e) => e.isDirectory() && e.name.startsWith('.')).map((e) => e.name).sort();
   const found = [];
   for (const dir of dirs) {
     const file = path.join(root, dir, ADAPTER_FILE);
     if (!fs.existsSync(file)) continue;
     let mod;
-    try { mod = require(file); } catch { continue; } // упал при загрузке — адаптера нет, ядро идёт дальше
+    try { mod = require(file); } catch { continue; } // fell at load - no adapter, the core moves on
     if (mod && typeof mod === 'object') found.push({ ...mod, dir });
   }
   return found;
 }
 
-/** Значение поля у первого адаптера, который его объявил; иначе `null`. */
+/** The field's value at the first adapter that declared it; otherwise `null`. */
 function first(root, field) {
   for (const a of loadAdapters(root)) if (a[field] != null) return a[field];
   return null;
 }
 
-/** Значения поля-списка у всех адаптеров, склеенные. */
+/** The values of a list field at all adapters, glued. */
 function all(root, field) {
   return loadAdapters(root).flatMap((a) => (Array.isArray(a[field]) ? a[field] : []));
 }
 
-/** Результаты функции-поля всех адаптеров (`fn(root)` → список), склеенные. */
+/** The results of a function field at all adapters (`fn(root)` -> a list), glued. */
 function collect(root, field) {
   return loadAdapters(root).flatMap((a) => (typeof a[field] === 'function' ? a[field](root) : []));
 }
 
 /**
- * Метки движков в строке расхода: `spendTag`, `engine` и `id` каждого адаптера (строка может нести любую из них).
- * Нет ни одного адаптера — пустой список (метку судить не по чему).
+ * The engines' labels in the spend line: the `spendTag`, `engine` and `id` of each adapter (the line may carry
+ * any of them). Not a single adapter - an empty list (nothing to judge the label by).
  */
 function spendTags(root) {
   const tags = new Set();
@@ -290,9 +298,10 @@ function spendTags(root) {
 }
 
 /**
- * Движки проекта по адаптерам: `[{ tag, aliases }]`. `tag` — основная метка (`spendTag`, иначе `engine`), `aliases` — все
- * метки, под которыми движок может стоять в строке расхода (`spendTag`, `engine`, `id`). Вкладка и колонка расхода
- * строятся от этого списка: появилась папка движка с адаптером — движок в списке, удалена — нет.
+ * The project's engines by the adapters: `[{ tag, aliases }]`. `tag` - the main label (`spendTag`, else
+ * `engine`), `aliases` - all the labels under which the engine may stand in a spend line (`spendTag`,
+ * `engine`, `id`). The tab and the spend column are built from this list: an engine folder with an adapter
+ * appeared - the engine is in the list; removed - it is not.
  */
 function engineTags(root) {
   return loadAdapters(root).map((a) => {
@@ -302,7 +311,7 @@ function engineTags(root) {
   });
 }
 
-/** Функция тег -> основная метка движка: алиасы одного адаптера (`spendTag`, `engine`, `id`) сводятся к `tag`; чужой тег — как есть. */
+/** A function tag -> the engine's main label: one adapter's aliases (`spendTag`, `engine`, `id`) reduce to `tag`; a foreign tag stays as is. */
 function canonicalTag(root) {
   const map = new Map();
   for (const { tag, aliases } of engineTags(root)) for (const x of aliases) if (!map.has(x)) map.set(x, tag);
@@ -310,10 +319,11 @@ function canonicalTag(root) {
 }
 
 /**
- * Каталоги стенограмм всех адаптеров: `[{ tag, dir, parseUsage, findSubagent, stepOf }]`, `tag` — метка движка
- * (`spendTag` или `engine`). `findSubagent(agentId, root)` — стенограмма захода субагента по id (раскладка движка
- * знает адаптер, не ядро); `stepOf(line)` — `usage`, `requestId` и время из шага стенограммы, `null` — шага без
- * расхода. Адаптер без `transcriptsDir`, бросивший или не нашедший каталог — пропускается.
+ * The transcripts directories of all adapters: `[{ tag, dir, parseUsage, findSubagent, stepOf }]`, `tag` -
+ * the engine's label (`spendTag` or `engine`). `findSubagent(agentId, root)` - a subagent attempt's transcript
+ * by id (the engine layout knows the adapter, not the core); `stepOf(line)` - the `usage`, `requestId` and
+ * time out of a transcript step, `null` for a step without spend. An adapter without `transcriptsDir`, one
+ * that threw or found no directory - is skipped.
  */
 function transcriptDirs(root) {
   const out = [];
@@ -334,10 +344,10 @@ function transcriptDirs(root) {
 }
 
 /**
- * Журналы основной сессии всех адаптеров: `[{ tag, id, file, stepOf, parseUsage }]` — по записи на файл.
- * Адаптер объявляет `mainSessions(root)` (какие файлы — его раскладка, субагентские не входят) и
- * `mainStepOf(line, prev)` (нормализованный шаг); без обоих движок основного журнала не даёт — пропуск.
- * `parseUsage` берётся тот же, что для стенограмм; каталогов движок не называет — только файлы.
+ * The main session journals of all adapters: `[{ tag, id, file, stepOf, parseUsage }]` - one entry per file.
+ * An adapter declares `mainSessions(root)` (which files is its layout's business, subagent ones not included)
+ * and `mainStepOf(line, prev)` (a normalized step); without both the engine gives no main journal - skipped.
+ * The same `parseUsage` is taken as for transcripts; the engine names no directories - only files.
  */
 function mainSessions(root) {
   const out = [];
@@ -359,17 +369,17 @@ function mainSessions(root) {
   return out;
 }
 
-/** Таблица узел -> { model, effort } каждого адаптера: `[{ tag, dir, rolesDir, nodeModels }]` (адаптеры без таблицы пропускаются). */
+/** Each adapter's node -> { model, effort } table: `[{ tag, dir, rolesDir, nodeModels }]` (adapters without a table are skipped). */
 function nodeModelTables(root) {
   return loadAdapters(root)
     .filter((a) => a.nodeModels && typeof a.nodeModels === 'object')
     .map((a) => ({ tag: a.spendTag || a.engine || idOf(a), dir: a.dir, rolesDir: typeof a.rolesDir === 'string' ? a.rolesDir : null, nodeModels: a.nodeModels }));
 }
 
-/** Абсолютный путь по пути от корня проекта, записанному через `/`. */
+/** An absolute path out of a path from the project root written through `/`. */
 const resolveRel = (root, rel) => path.join(root, ...rel.split('/'));
 
-/** Абсолютный путь поля-пути первого адаптера или `null`. */
+/** The absolute path of the first adapter's path field, or `null`. */
 function firstPath(root, field) {
   const rel = first(root, field);
   return rel ? resolveRel(root, rel) : null;
@@ -381,8 +391,8 @@ module.exports = {
 };
 
 /**
- * `node engines.cjs check <engine> [--root <dir>]` — печатает пункты контракта: `✓` пройден, `✗` не пройден.
- * Код выхода: 0 — все пройдены, 1 — есть непройденный, 2 — нет движка или неверный вызов. Ничего не пишет.
+ * `node engines.cjs check <engine> [--root <dir>]` - prints the contract items: `✓` passed, `✗` failed.
+ * Exit code: 0 - all passed, 1 - there is a failed one, 2 - no engine or a wrong call. Writes nothing else.
  */
 if (require.main === module) {
   const argv = process.argv.slice(2);
