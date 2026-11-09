@@ -1083,6 +1083,7 @@
   "rel.why_card_count": "a project card count in the message",
   "rel.stop_traces": "STOP: project traces in the protocol - only clean code in the clone (prohibition 16):",
   "rel.commit_hit": "  commit \"{message}\" [{rule}: {why}]",
+  "rel.versions_mismatch": "STOP: the release versions disagree - plugin.json ({plugin}), package.json ({pkg}), package-lock.json ({lock}) must be equal (fail-closed):",
   "rel.no_traces": "✓ no project traces",
   "rel.stop_corruption": "STOP: {n} carry-over corruptions in the release:",
   "rel.no_corruption": "✓ no carry-over corruptions",

@@ -1082,6 +1082,7 @@
   "rel.why_card_count": "число карточек проекта в сообщении",
   "rel.stop_traces": "СТОП: в протоколе следы проекта — в клоне только чистый код (запрет 16):",
   "rel.commit_hit": "  коммит «{message}» [{rule}: {why}]",
+  "rel.versions_mismatch": "СТОП: версии релиза расходятся — plugin.json ({plugin}), package.json ({pkg}), package-lock.json ({lock}) должны совпадать (fail-closed):",
   "rel.no_traces": "✓ следов проекта нет",
   "rel.stop_corruption": "СТОП: в выпуске следы порчи переезда ({n}):",
   "rel.no_corruption": "✓ следов порчи переезда нет",

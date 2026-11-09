@@ -10,7 +10,6 @@ const i18n = require('../../i18n/index.cjs');
 const msg = (key, params) => i18n.message(key, params, 'ru');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
-const PROTO = path.join(ROOT, '.forma', 'protocol');
 
 const MARK = {
   run: 'A push is finished by the remote\'s verdict',
@@ -23,30 +22,42 @@ function read(p) {
   try { return fs.readFileSync(p, 'utf8'); } catch { return null; }
 }
 
-function runGate() {
+/** The engine mirrors of the project `root`: the root-level zones carrying `agents/run.md`. */
+function findMirrors(root) {
+  return fs.readdirSync(root, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && e.name.startsWith('.') && read(path.join(root, e.name, 'agents', 'run.md')) !== null)
+    .map((e) => e.name);
+}
+
+/** The gate's findings without the process exit: { facts, problems, zones, hasProtocol, adaptersWithRun }.
+ *  The registry wrapper (`law-push-verify-rule.cjs`) calls it; the CLI (`runGate`) prints and exits.
+ *  The template half (the protocol source at `<root>/.forma/protocol`) is judged only when the source
+ *  is in place - a project without the clone does not carry that half of the subject, and the wrapper
+ *  skips it; the CLI keeps its strict form (`strictProtocol` names the absence a problem). */
+function collect({ root, strictProtocol = false } = {}) {
+  root = root || ROOT;
   const problems = [];
   const facts = [];
+  const adaptersDir = path.join(root, '.forma', 'protocol', 'skills', 'forma', 'adapters');
 
   // 1. Project mirrors: every root-level engine zone with agents/run.md carries the markers.
-  const zones = fs.readdirSync(ROOT, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && e.name.startsWith('.') && read(path.join(ROOT, e.name, 'agents', 'run.md')) !== null)
-    .map((e) => e.name);
+  const zones = findMirrors(root);
   facts.push(msg('board.push-verify-rule.mirrors', { zones: zones.join(', ') || msg('board.push-verify-rule.none') }));
   if (zones.length === 0) problems.push(msg('board.push-verify-rule.no_mirrors'));
   for (const z of zones) {
-    const run = read(path.join(ROOT, z, 'agents', 'run.md'));
-    const kit = read(path.join(ROOT, z, 'agents', 'kit.md'));
-    const intent = read(path.join(ROOT, z, 'agents', 'intent.md'));
+    const run = read(path.join(root, z, 'agents', 'run.md'));
+    const kit = read(path.join(root, z, 'agents', 'kit.md'));
+    const intent = read(path.join(root, z, 'agents', 'intent.md'));
     if (!run || !run.includes(MARK.run) || !run.includes(CONCEPT)) problems.push(msg('board.push-verify-rule.no_marker', { f: z + '/agents/run.md' }));
     if (!kit || !kit.includes(MARK.kit) || !kit.includes(CONCEPT)) problems.push(msg('board.push-verify-rule.no_marker', { f: z + '/agents/kit.md' }));
     if (!intent || !intent.includes(MARK.intent)) problems.push(msg('board.push-verify-rule.no_report', { f: z + '/agents/intent.md' }));
   }
 
   // 2. Template source: every adapter role file (any nesting) carries the markers; at least 3 adapters with run.md.
-  const adaptersDir = path.join(PROTO, 'skills', 'forma', 'adapters');
+  const hasProtocol = fs.existsSync(adaptersDir);
   let adaptersWithRun = 0;
-  if (!fs.existsSync(adaptersDir)) {
-    problems.push(msg('board.push-verify-rule.no_adapters_dir'));
+  if (!hasProtocol) {
+    if (strictProtocol) problems.push(msg('board.push-verify-rule.no_adapters_dir'));
   } else {
     const roleFiles = [];
     (function walk(dir) {
@@ -58,7 +69,7 @@ function runGate() {
     })(adaptersDir);
     const adapters = new Set(roleFiles.map((f) => path.relative(adaptersDir, f).split(path.sep)[0]));
     for (const f of roleFiles) {
-      const rel = path.relative(PROTO, f);
+      const rel = path.relative(path.join(root, '.forma', 'protocol'), f);
       const name = path.basename(f);
       const src = read(f);
       if (name === 'run.md') {
@@ -77,8 +88,8 @@ function runGate() {
   // command surface has no place in the law text.
   const tracePatterns = [/[A-Za-z]:\\/, /OSFMount|ImDisk/i, /forma-ramdisk/i, /gh run|GITHUB_TOKEN|github\.com|gitlab/i];
   const traceTargets = [];
-  for (const z of zones) ['run.md', 'kit.md', 'intent.md'].forEach((n) => traceTargets.push(path.join(ROOT, z, 'agents', n)));
-  if (fs.existsSync(adaptersDir)) {
+  for (const z of zones) ['run.md', 'kit.md', 'intent.md'].forEach((n) => traceTargets.push(path.join(root, z, 'agents', n)));
+  if (hasProtocol) {
     (function walk(dir) {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, e.name);
@@ -91,10 +102,15 @@ function runGate() {
     const src = read(f);
     if (!src) continue;
     for (const re of tracePatterns) {
-      if (re.test(src)) problems.push(msg('board.push-verify-rule.machine_trace', { f: path.relative(ROOT, f), re }));
+      if (re.test(src)) problems.push(msg('board.push-verify-rule.machine_trace', { f: path.relative(root, f), re }));
     }
   }
 
+  return { facts, problems, zones, hasProtocol, adaptersWithRun };
+}
+
+function runGate() {
+  const { facts, problems } = collect({ strictProtocol: true });
   console.log(facts.join('\n'));
   if (problems.length) {
     console.log(msg('board.push-verify-rule.problems') + problems.map((p) => '  - ' + p).join('\n'));
@@ -104,6 +120,6 @@ function runGate() {
   process.exit(0);
 }
 
-module.exports = { runGate };
+module.exports = { runGate, collect, findMirrors };
 
 if (require.main === module) runGate();

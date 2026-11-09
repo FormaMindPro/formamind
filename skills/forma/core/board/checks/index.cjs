@@ -25,4 +25,7 @@ module.exports = [
   require('./route-regression.cjs'),
   require('./check-ready.cjs'),
   require('./check-english-code.cjs'),
+  require('./law-thresholds-declared.cjs'),
+  require('./law-external-exits.cjs'),
+  require('./law-push-verify-rule.cjs'),
 ];
