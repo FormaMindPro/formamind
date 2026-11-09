@@ -1,7 +1,5 @@
 {
-  "allowList": [
-    "skill-scripts"
-  ],
+  "allowList": [],
   "zones": {
     "board-core": {
       "prefixes": [

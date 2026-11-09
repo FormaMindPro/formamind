@@ -2,25 +2,25 @@
 'use strict';
 
 /**
- * Пилотный счётчик заходов/токенов/денег по историям карточек.
- * Источник данных — строго формат раздела 3 AGENTS.md (ключевая часть — английская
- * при любом языке проекта):
- *   `Node`, YYYY-MM-DD: attempt, N tokens (R cache-read), T s, `<id>` — <что сделано>
- *   `Node`, YYYY-MM-DD: attempt, N tokens, T s, $X.XXXXXX (provider/model) — <что сделано>
- * Русская форма старых строк («заход, N токенов…») читается через toEnglish() (spend-line.cjs).
- * Денежный сегмент опционален — только для заходов через внешнюю модель, не Agent tool.
- * Читает готовые факты, ничего не оценивает и не угадывает.
+ * Pilot counter of attempts/tokens/money over the cards' histories.
+ * The data source is strictly the format of AGENTS.md section 3 (the key part is English
+ * whatever the project's language):
+ *   `Node`, YYYY-MM-DD: attempt, N tokens (R cache-read), T s, `<id>` — <what was done>
+ *   `Node`, YYYY-MM-DD: attempt, N tokens, T s, $X.XXXXXX (provider/model) — <what was done>
+ * The old lines' Russian form ("attempt, N tokens…") is read through toEnglish() (spend-line.cjs).
+ * The money segment is optional - only for attempts through an external model, not the Agent tool.
+ * Reads ready facts, evaluates nothing and guesses nothing.
  *
- * Использование:
- * Ядро: живёт в .forma/dashboard/ рядом с economy.cjs; адаптер движка может держать у себя тонкую ссылку на этот модуль.
- *   node tally.cjs <файл-или-каталог> [ещё файл-или-каталог ...]
- *   node tally.cjs <номер-карточки> [...]              → «NNN», «card-NNN» или «N»: живая доска, затем done/
- *   node tally.cjs --report [<файл-или-каталог> ...]   → знаменатель, глазами
- *   node tally.cjs --routes [--json] [<файл-или-каталог> ...] → разрез по route-N/over-N/seg-N/wave-N
+ * Usage:
+ * Core: lives in .forma/dashboard/ next to economy.cjs; an engine adapter may keep a thin reference to this module.
+ *   node tally.cjs <file-or-dir> [more file-or-dir ...]
+ *   node tally.cjs <card-number> [...]              → "NNN", "card-NNN" or "N": the live board, then done/
+ *   node tally.cjs --report [<file-or-dir> ...]     → the denominator, for the eyes
+ *   node tally.cjs --routes [--json] [<file-or-dir> ...] → the cut by route-N/over-N/seg-N/wave-N
  *
- * Каталог обходится рекурсивно, берутся только *.md.
- * Вывод — JSON в stdout, ключи английские: byNode и total, плюс unparsed — строки,
- * которые похожи на запись захода, но не распознались (для ручной проверки формата).
+ * The catalog is walked recursively, only *.md are taken.
+ * The output is JSON on stdout, English keys: byNode and total, plus unparsed - lines
+ * that look like an attempt record but were not recognized (for a manual format check).
  */
 
 const fs = require('fs');
@@ -31,27 +31,32 @@ const { frontmatterBlock } = require('./lib/card.cjs');
 const engines = require('./lib/engines.cjs');
 const { toEnglish, SPEND_SOURCE, CLAIM_RE, CACHE_UNKNOWN_RE, TOKENS_UNKNOWN_RE, ID_UNKNOWN_RE, toInt, outTokens, dedupKey } = require('./spend-line.cjs');
 
-// Три вещи, на которых этот разбор ломался или сломался бы:
-//   1. Разряды числа пишут через пробел («52 339 tokens») — простое \d+ такую строку не берёт.
-//   2. Кэш-чтение (AGENTS.md §3) стоит в скобках сразу после токенов.
-//   3. Секунды обязательными быть не могут: в записанных строках они есть не везде,
-//      а требовать их значит молча терять заход целиком вместо одного поля.
-// Группы — spend-line.cjs; здесь добавлены только привязка к `^-` и описание после тире.
+// Canonical ru strings of this module's own CLI output live in the core dictionary; the language is fixed.
+const { message: coreMessage } = require('../i18n/index.cjs');
+const ruMsg = (key, params) => coreMessage(key, params, 'ru');
+
+// Three things on which this parsing broke or would break:
+//   1. Number digits are written with spaces ("52 339 tokens") - a plain \d+ does not take such a string.
+//   2. The cache-read (AGENTS.md §3) stands in parentheses right after the tokens.
+//   3. Seconds cannot be mandatory: not every recorded line has them,
+//      and demanding them would silently lose the whole attempt instead of one field.
+// The groups are spend-line.cjs's; only the `^-` anchor and the description after the dash are added here.
 const LINE_RE = new RegExp('^-\\s*' + SPEND_SOURCE + '—\\s*(.*)$', 'i');
 
-// Внешний сервис считает в своей единице (Magnific — credits, другой — минуты).
-// Имён сервисов разбор не знает: берёт любое «N <unit> (<service>/<operation>)».
-// Отличает сервис от времени форма, а не слово: у сервиса есть скобка с косой чертой.
-const SERVICE_RE = /(\d[\d\s  ]*)\s*([A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё.]*)\s*\(([^)\/]+)\/([^)]+)\)/g;
+// An external service counts in its own unit (Magnific - credits, another - minutes).
+// The parsing does not know service names: it takes any "N <unit> (<service>/<operation>)".
+// What tells a service from time is the form, not the word: a service has the parenthesis with a slash.
+const SERVICE_RE = /(\d[\d\s\u00a0\u202f]*)\s*([A-Za-z\u0410-\u044f\u0401\u0451][A-Za-z\u0410-\u044f\u0401\u0451.]*)\s*\(([^)\/]+)\/([^)]+)\)/g;
 
-// Строки, похожие на запись захода (есть «attempt,» и дата), но не подошедшие под LINE_RE —
-// повод проверить формат руками, а не молча потерять данные. Форма «attempt N,» (номер захода вместо токенов) — тоже подозрительна.
+// Lines that look like an attempt record (there is "attempt," and a date) but did not match LINE_RE -
+// a reason to check the format by hand, not to lose the data silently. The "attempt N," form (the attempt
+// number instead of tokens) is suspicious too.
 const SUSPECT_RE = new RegExp('`[^`]+`,\\s*' + CLAIM_RE.source.replace('attempt,', 'attempt\\s*\\d*,'));
 
-/** Карточка демонстрационного круга (метка `demo`): в расход и статистику доски не входит. */
+/** A card of a demonstration cycle (the `demo` label): not counted in the spend and the board's statistics. */
 const isDemoCard = (file) => /^labels:\s*\[[^\]]*["']demo["']/m.test(fs.readFileSync(file, 'utf8'));
 
-// Каталог обходится без демо-карточек; карточка, названная явно, считается — так читается итог самого демо.
+// The catalog is walked without demo cards; an explicitly named card is counted - that is how the demo's own total is read.
 function collectFiles(targets) {
   const files = [];
   for (const target of targets) {
@@ -66,13 +71,13 @@ function tally(targets, canon) {
   return tallyFiles(collectFiles(targets), new Set(), undefined, canon);
 }
 
-/** Ключ движка строки: тег после тире; нет тега — undefined (в разрезе — `untagged`, economy.byEngine). */
+/** The line's engine key: the tag after the dash; no tag - undefined (in the cut - `untagged`, economy.byEngine). */
 const engineKey = (line) => { const m = /—\s*([a-z][a-z0-9-]*):/.exec(line); return m ? m[1] : undefined; };
 
-/** Ключ с приведением алиасов тега к основной метке движка (`canon` — функция тег -> тег; без неё ключ как в строке). */
+/** The key with the tag's aliases reduced to the engine's main label (`canon` - a tag -> tag function; without it the key is as in the line). */
 const canonKey = (line, canon) => { const k = engineKey(line); return k !== undefined && canon ? canon(k) : k; };
 
-//** «N <unit> (<service>/<operation>)» из хвоста строки: расход внешних сервисов. */
+//** "N <unit> (<service>/<operation>)" from the line's tail: external services' spend. */
 function serviceUnits(tail) {
   const ext = [];
   SERVICE_RE.lastIndex = 0;
@@ -81,11 +86,11 @@ function serviceUnits(tail) {
   return ext;
 }
 
-/** id вызова в конце хвоста строки; `id unknown` или его отсутствие — false/null. */
+/** The call id at the end of the line's tail; `id unknown` or its absence - false/null. */
 const callIdMatch = (line, tail) => !ID_UNKNOWN_RE.test(line) && /`([^`\s]+)`\s*$/.exec(tail || '');
 
-// Строка → канонические переменные (.forma/manual/en/03-protocol/ECONOMY.md); счёт — economy.cjs.
-// null — маркер `unknown` (отдельно), undefined — поле не записано.
+// A line → the canonical variables (.forma/manual/en/03-protocol/ECONOMY.md); the counting - economy.cjs.
+// null - the `unknown` marker (kept apart), undefined - the field not recorded.
 function attemptRecord(m, line, idMatch, canon) {
   const [, node, , tokensStr, cacheStr, secondsStr, turnsStr, costStr, , tail] = m;
   return {
@@ -93,7 +98,7 @@ function attemptRecord(m, line, idMatch, canon) {
     engine: canonKey(line, canon),
     tokens: TOKENS_UNKNOWN_RE.test(line) ? null : toInt(tokensStr),
     cache_read: cacheStr != null ? toInt(cacheStr) : (CACHE_UNKNOWN_RE.test(line) ? null : undefined),
-    tokens_out: outTokens(line), // null — «out unknown» и старые строки без сегмента
+    tokens_out: outTokens(line), // null - "out unknown" and old lines without the segment
     duration_s: secondsStr == null ? undefined : (secondsStr === 'unknown' ? null : toInt(secondsStr)),
     turns: turnsStr == null ? undefined : toInt(turnsStr),
     call_id: ID_UNKNOWN_RE.test(line) ? null : (idMatch ? idMatch[1] : undefined),
@@ -102,15 +107,15 @@ function attemptRecord(m, line, idMatch, canon) {
   };
 }
 
-// Что сделать со строкой: { unparsed } — назвать; { dup } — id уже учтён; { rec } — записать; {} — пропустить.
+// What to do with a line: { unparsed } - name it; { dup } - the id is already counted; { rec } - record; {} - skip.
 function readLine(raw, file, engine, seenIds, canon) {
   const line = toEnglish(raw.trim());
   const m = LINE_RE.exec(line);
   if (!m) return SUSPECT_RE.test(line) ? { unparsed: line } : {};
-  // Совпадение с формой ещё не значит число: строка вроде «attempt, tokens не
-  // записано» когда-то проходила разбор и уносила весь итог в NaN. Вторая,
-  // независимая от строгости формы защита: нечисло в сумму не попадает НИКОГДА,
-  // а строка уходит в unparsed — то есть называется файлом и текстом.
+  // A match with the form is not yet a number: a line like "attempt, tokens not
+  // recorded" once passed the parsing and carried the whole total into NaN. The second,
+  // form-strictness-independent guard: a non-number never enters the sum,
+  // and the line goes to unparsed - that is, is named by file and text.
   if (!TOKENS_UNKNOWN_RE.test(line) && !Number.isFinite(toInt(m[3]))) return { unparsed: line };
   if (engine && (canonKey(line, canon) || 'untagged') !== engine) return {};
   const idMatch = callIdMatch(line, m[9]);
@@ -123,9 +128,9 @@ function readLine(raw, file, engine, seenIds, canon) {
 }
 
 function newTallyState() {
-  // Карточки, где заход записан хоть кем-то. Отдельно от `files` по узлам: сумма
-  // по узлам считает одну карточку столько раз, сколько узлов в ней отметилось,
-  // и покрытие вышло бы завышенным.
+  // Cards where an attempt was recorded by anyone. Apart from `files` per node: a sum
+  // by nodes counts one card as many times as there were nodes in it,
+  // and the coverage would come out inflated.
   return { byNode: {}, records: [], engineFiles: {}, unparsed: [], filesWithAttempt: new Set() };
 }
 
@@ -144,7 +149,7 @@ function absorb(st, file, res) {
   st.filesWithAttempt.add(name);
 }
 
-/** Разрез по узлам и общий итог; услуги внешних сервисов сливаются по всем узлам. */
+/** The cut by nodes and the total; external services' units are merged across all nodes. */
 function summarizeNodes(byNode) {
   const services = {};
   for (const v of Object.values(byNode)) for (const [k, x] of Object.entries(v.services)) services[k] = (services[k] || 0) + x;
@@ -181,8 +186,8 @@ function summarizeNodes(byNode) {
   return { nodesOut, total };
 }
 
-// По движкам — economy.byEngine. Токены ключей между собой не складываются;
-// `unknown` — отдельным числом по каждому полю.
+// By engines - economy.byEngine. The keys' tokens are not added together;
+// `unknown` - a separate number per each field.
 function summarizeEngines(records, engineFiles) {
   const byEngine = {};
   for (const [k, v] of Object.entries(economy.byEngine(records))) {
@@ -196,13 +201,13 @@ function summarizeEngines(records, engineFiles) {
   return byEngine;
 }
 
-// seenIds передаётся снаружи, чтобы разрез по маршрутам (byRoute) схлопывал общий id
-// так же, как сквозной счёт: один вызов — один раз на весь корпус.
-// engine — необязательный фильтр по ключу движка (`untagged` — строки без тега):
-// разрез одного движка, чтобы токены разных движков не сошлись в одну сумму.
-// Один вызов, обслуживший несколько карточек, записан в каждой той же строкой
-// (AGENTS.md §3, id вызова). Считается один раз — по id.
-// Строки без id (`id unknown`, заход без отдельного вызова) не схлопываются.
+// seenIds is passed from outside so that the cut by routes (byRoute) collapses a shared id
+// the same way as the through count: one call - once over the whole corpus.
+// engine - an optional filter by the engine key (`untagged` - lines without a tag):
+// the cut of one engine, so that different engines' tokens do not meet in one sum.
+// One call that served several cards is recorded in each by the same line
+// (AGENTS.md §3, the call id). Counted once - by id.
+// Lines without an id (`id unknown`, an attempt without a separate call) are not collapsed.
 function tallyFiles(files, seenIds, engine, canon) {
   const st = newTallyState();
   for (const file of files) {
@@ -223,17 +228,17 @@ function tallyFiles(files, seenIds, engine, canon) {
   };
 }
 
-// ─────────────────────────── разрез по маршрутам ───────────────────────────
-// Метки маршрутов — AGENTS.md §6 и .forma/manual/en/03-protocol/ROUTES.md §3: route-0…route-8,
-// over-1…over-4 (надстройки, считаются своей таблицей: у карточки их может быть
-// несколько), seg-N и wave-N (срезы route-8). Старая `route-intent-run` = `route-2`.
-// Доля подготовки — расход Spec + Kit к расходу карточек маршрута; на route-4 Kit —
-// исполнитель, там подготовка — только Spec. Возвраты — заходы исполнителя (Run;
-// на route-4 — Kit) сверх первого на карточке: tally их отдельно не считал.
-// Карточка без метки маршрута — строка «без маршрута».
+// ─────────────────────────── the cut by routes ───────────────────────────
+// Route labels - AGENTS.md §6 and .forma/manual/en/03-protocol/ROUTES.md §3: route-0…route-8,
+// over-1…over-4 (overlays, counted by their own table: a card may carry several
+// of them), seg-N and wave-N (slices of route-8). The old `route-intent-run` = `route-2`.
+// The preparation share - the spend of Spec + Kit against the spend of the route's cards; on route-4 Kit is
+// the executor, there the preparation is Spec only. Returns - the executor's attempts (Run;
+// on route-4 - Kit) beyond the first one on the card: tally did not count them separately.
+// A card without a route label - the "no route" row.
 
 const ROUTE_ALIAS = { 'route-intent-run': 'route-2' };
-const NO_ROUTE = 'без маршрута';
+const NO_ROUTE = ruMsg('tally.routes.no_route');
 
 function readLabels(text) {
   const fm = frontmatterBlock(text);
@@ -295,38 +300,38 @@ function byRoute(targets, engine, canon) {
 
 function routeReport(targets) {
   const t = byRoute(targets);
-  const L = ['Расход по маршрутам (метки route-N / over-N / seg-N / wave-N)', '='.repeat(64)];
-  const head = 'метка'.padEnd(14) + 'карт.'.padStart(6) + 'заход.'.padStart(7) + 'токены'.padStart(12) +
-    'cache-read'.padStart(12) + 'сек'.padStart(8) + 'обороты'.padStart(8) + 'возвр.'.padStart(7) + '  подготовка';
-  for (const [name, title] of [['route', 'Маршруты'], ['over', 'Надстройки'], ['seg', 'Сегменты'], ['wave', 'Волны']]) {
+  const L = [ruMsg('tally.routes.title'), '='.repeat(64)];
+  const head = ruMsg('tally.routes.th_label').padEnd(14) + ruMsg('tally.routes.th_cards').padStart(6) + ruMsg('tally.routes.th_attempts').padStart(7) + ruMsg('tally.routes.th_tokens').padStart(12) +
+    'cache-read'.padStart(12) + ruMsg('tally.routes.th_seconds').padStart(8) + ruMsg('tally.routes.th_turns').padStart(8) + ruMsg('tally.routes.th_returns').padStart(7) + ruMsg('tally.routes.th_prep');
+  for (const [name, title] of [['route', ruMsg('tally.routes.section_route')], ['over', ruMsg('tally.routes.section_over')], ['seg', ruMsg('tally.routes.section_seg')], ['wave', ruMsg('tally.routes.section_wave')]]) {
     if (!t[name].length) continue;
     L.push('', title, head);
     for (const r of t[name]) {
       const unk = [];
-      if (r.tokensUnknown) unk.push(`токены unknown: ${r.tokensUnknown}`);
+      if (r.tokensUnknown) unk.push(ruMsg('tally.routes.unknown_tokens', { n: r.tokensUnknown }));
       if (r.cacheUnknown) unk.push(`cache-read unknown: ${r.cacheUnknown}`);
-      if (r.secondsUnknown) unk.push(`сек unknown: ${r.secondsUnknown}`);
+      if (r.secondsUnknown) unk.push(ruMsg('tally.routes.unknown_seconds', { n: r.secondsUnknown }));
       const turnsStr = r.turns > 0 ? String(r.turns) : '—';
       L.push(r.key.padEnd(14) + String(r.cards).padStart(6) + String(r.attempts).padStart(7) +
         groups(r.tokens).padStart(12) + groups(r.cacheRead).padStart(12) + groups(r.seconds).padStart(8) +
         turnsStr.padStart(8) + String(r.returns).padStart(7) + '  ' + (r.prepShare == null ? NOT_RECORDED : `${r.prepShare}% (${r.prepNodes})`) +
-        (unk.length ? `\n${' '.repeat(14)}${unk.join('; ')} — отдельно, не нулём` : ''));
+        (unk.length ? `\n${' '.repeat(14)}${unk.join('; ')} ${ruMsg('tally.routes.unknown_suffix')}` : ''));
     }
   }
-  L.push('', 'route-4: Kit — исполнитель, подготовкой считается только Spec.');
-  L.push('Возвраты — заходы исполнителя (Run; на route-4 — Kit) сверх первого на карточке.');
+  L.push('', ruMsg('tally.routes.foot_prep'));
+  L.push(ruMsg('tally.routes.foot_returns'));
   return L.join('\n');
 }
 
-// ─────────────────────────── знаменатель ───────────────────────────
-// Мера полезной работы — ЗАКРЫТАЯ КАРТОЧКА, не сожжённый токен. Соотношение
-// «перечитывание / токены» падает и от того, что задача просто стала длиннее.
-// ПРАВИЛО ЭТОГО ОТЧЁТА: рядом с каждой величиной стоит её покрытие,
-// а величина с нулевым покрытием не считается вовсе — печатается «не записано».
-// Ноль и «не записано» уже один раз выглядели одинаково.
+// ─────────────────────────── the denominator ───────────────────────────
+// The measure of useful work - a CLOSED CARD, not a burnt token. The ratio
+// "re-reading / tokens" falls also because the task simply became longer.
+// THE RULE OF THIS REPORT: next to each quantity stands its coverage,
+// and a quantity with zero coverage is not counted at all - "not recorded" is printed.
+// Zero and "not recorded" already looked identical once.
 
 const FEATURES_DIR = path.resolve(__dirname, '..', '..', '.devtool', 'features');
-const NOT_RECORDED = 'не записано';
+const NOT_RECORDED = ruMsg('tally.report.not_recorded');
 
 function countClosedCards() {
   const dir = path.join(FEATURES_DIR, 'done');
@@ -335,10 +340,10 @@ function countClosedCards() {
   } catch { return 0; }
 }
 
-/** Пробелы разрядов — чтобы длинное число читалось глазами, а не пересчитывалось. */
+/** Digit-group spaces - so a long number is read by the eyes, not recomputed. */
 const groups = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
-/** Числительное подписи: 1 токен / 2 токена / 5 токенов. */
+/** The caption's numeral: 1 token / 2 tokens / 5 tokens. */
 function plural(n, one, few, many) {
   const a = Math.abs(n) % 100;
   const b = a % 10;
@@ -347,68 +352,74 @@ function plural(n, one, few, many) {
   if (b >= 2 && b <= 4) return few;
   return many;
 }
-const tokenWord = (n) => plural(n, 'токен', 'токена', 'токенов');
+const tokenWord = (n) => plural(n, ruMsg('tally.words.token_one'), ruMsg('tally.words.token_few'), ruMsg('tally.words.token_many'));
+const wordAttempts = (n) => plural(n, ruMsg('tally.words.attempt_one'), ruMsg('tally.words.attempt_few'), ruMsg('tally.words.attempt_many'));
+const fileWord = (n) => plural(n, ruMsg('tally.words.file_one'), ruMsg('tally.words.file_few'), ruMsg('tally.words.file_many'));
 
 /**
- * Одна строка отчёта. Единственное место, где решается «число или "не записано"»:
- * решает ПОКРЫТИЕ, а не значение. cover = { done, all } — заходов с величиной из всех.
+ * One report line. The only place where "a number or 'not recorded'" is decided:
+ * the COVERAGE decides, not the value. cover = { done, all } - attempts with the quantity, of all.
  */
 function metricLine(label, cover, compute, unit) {
   const head = label.padEnd(34);
   const pad = ' '.repeat(34);
   if (!cover.done) {
-    return `${head}${NOT_RECORDED}\n${pad}покрытие: ни одного захода из ${groups(cover.all)} — величина не считалась`;
+    return `${head}${NOT_RECORDED}\n${pad}${ruMsg('tally.report.metric_cover_none', { all: groups(cover.all) })}`;
   }
   const share = Math.round((cover.done / cover.all) * 100);
-  return `${head}${compute()} ${unit}\n${pad}покрытие: ${groups(cover.done)} из ${groups(cover.all)} (${share}%)`;
+  return `${head}${compute()} ${unit}\n${pad}${ruMsg('tally.report.metric_cover', { done: groups(cover.done), all: groups(cover.all), share })}`;
 }
 
-const wordAttempts = (n) => plural(n, 'заход', 'захода', 'заходов');
-
-/** Шапка: корпус, «токены не вернул движок» и состояние кэш-чтения. */
+/** The header: the corpus, "tokens not returned by the engine" and the cache-read state. */
 function corpusLines(c) {
-  const L = ['Знаменатель: инструктаж против закрытой работы', '='.repeat(64)];
-  L.push(`Корпус: ${groups(c.filesProcessed)} ${plural(c.filesProcessed, 'файл', 'файла', 'файлов')}, ` +
-    `${groups(c.attempts)} ${wordAttempts(c.attempts)}, ` +
-    `${groups(c.allTokens)} ${tokenWord(c.allTokens)}, закрытых карточек: ${groups(c.closed)}.`);
-  if (c.tokensUnknown) L.push(`Токены не вернул движок: ${groups(c.tokensUnknown)} ${wordAttempts(c.tokensUnknown)}; они не приравнены к нулю.`);
+  const L = [ruMsg('tally.report.title'), '='.repeat(64)];
+  L.push(ruMsg('tally.report.corpus', {
+    files: groups(c.filesProcessed), files_word: fileWord(c.filesProcessed),
+    attempts: groups(c.attempts), attempts_word: wordAttempts(c.attempts),
+    tokens: groups(c.allTokens), tokens_word: tokenWord(c.allTokens),
+    closed: groups(c.closed),
+  }));
+  if (c.tokensUnknown) L.push(ruMsg('tally.report.tokens_unknown', { n: groups(c.tokensUnknown), word: wordAttempts(c.tokensUnknown) }));
 
-  /* ДВА СОСТОЯНИЯ РАЗОМ — норма корпуса, а не поломка отчёта.
-     R восстанавливается из стенограммы захода, а у ранних заходов её нет. */
+  /* TWO STATES AT ONCE - the corpus's norm, not a report failure.
+     R is restored from the attempt's transcript, and early attempts have none. */
   const withoutCache = c.attempts - c.withCache;
   if (c.withCache && withoutCache) {
-    L.push(`Кэш-чтение есть у ${groups(c.withCache)} ${plural(c.withCache, 'захода', 'заходов', 'заходов')} из ${groups(c.attempts)}; ` +
-      `у остальных ${groups(withoutCache)} — стенограмма не найдена.`);
-    L.push('Это штатно: R берётся из стенограммы захода, а стенограммы живут при сессии —');
-    L.push('«не записано» ниже — правда о корпусе, а не сбой счёта.');
+    L.push(ruMsg('tally.report.cache_present', {
+      count: groups(c.withCache),
+      count_word: plural(c.withCache, ruMsg('tally.words.attempt_gen_one'), ruMsg('tally.words.attempt_gen_few'), ruMsg('tally.words.attempt_gen_many')),
+      attempts: groups(c.attempts),
+      rest: groups(withoutCache),
+    }));
+    L.push(ruMsg('tally.report.cache_note1'));
+    L.push(ruMsg('tally.report.cache_note2'));
   } else if (!c.withCache && c.attempts) {
-    L.push(`Кэш-чтение не записано ни у одного из ${groups(c.attempts)} заходов — величины, ` +
-      'которые на нём стоят, не считаются вовсе.');
+    L.push(ruMsg('tally.report.cache_none', { attempts: groups(c.attempts) }));
   }
   L.push('');
   return L;
 }
 
-// 2. Заходов на закрытую карточку. Печатается ОБРАТНОЙ дробью, когда заходов меньше
-// карточек: ведущий ноль читается глазами как «почти ничего».
+// 2. Attempts per closed card. Printed as the INVERSE fraction when there are fewer attempts
+// than cards: the leading zero reads to the eyes as "almost nothing".
 function attemptsPerCardLines(c) {
-  const label = 'заходов на закрытую карточку'.padEnd(34);
+  const label = ruMsg('tally.report.apc_label').padEnd(34);
   const pad = ' '.repeat(34);
   if (!c.closed || !c.cardsWithAttempt) {
-    return [`${label}${NOT_RECORDED}`, `${pad}покрытие: ни одной закрытой карточки с записанным заходом`];
+    return [`${label}${NOT_RECORDED}`, `${pad}${ruMsg('tally.report.apc_cover_none')}`];
   }
   const value = c.attempts >= c.closed
-    ? `${(c.attempts / c.closed).toFixed(1)} захода на карточку`
-    : `1 заход на ${(c.closed / c.attempts).toFixed(1)} закрытых карточки`;
+    ? ruMsg('tally.report.apc_value_direct', { v: (c.attempts / c.closed).toFixed(1) })
+    : ruMsg('tally.report.apc_value_inverse', { v: (c.closed / c.attempts).toFixed(1) });
   return [
     `${label}${value}`,
-    `${pad}покрытие: заход записан в ${groups(c.cardsWithAttempt)} карточках из ${groups(c.closed)} закрытых`,
-    `${pad}(${groups(c.attempts)} заходов всего; у остальных карточек расход не записан вовсе,`,
-    `${pad}поэтому величина — нижняя граница, а не средняя цена карточки)`,
+    `${pad}${ruMsg('tally.report.apc_cover', { cards: groups(c.cardsWithAttempt), closed: groups(c.closed) })}`,
+    `${pad}${ruMsg('tally.report.apc_bound1', { attempts: groups(c.attempts) })}`,
+    `${pad}${ruMsg('tally.report.apc_bound2')}`,
   ];
 }
 
-// 4. Шагов на заход — R, делённое на вес одного шага узла.
+// 4. Steps per attempt - R divided by one node-step's weight.
 function stepsPerAttempt(byNode, weights) {
   const parts = [];
   for (const [node, v] of Object.entries(byNode)) {
@@ -420,56 +431,53 @@ function stepsPerAttempt(byNode, weights) {
   return parts.length ? parts.join(', ') : NOT_RECORDED;
 }
 
-/** Четыре величины отчёта, каждая с покрытием. */
+/** The report's four quantities, each with its coverage. */
 function metricLines(c, byNode, weights) {
   const cover = { done: c.withCache, all: c.attempts };
   const pad = ' '.repeat(34);
   const L = [];
-  // 1. Перечитывание на закрытую карточку — покрытие по заходам с записанным R.
-  L.push(metricLine('перечитывание на закрытую карточку', cover,
-    () => groups(Math.round(c.cacheRead / Math.max(1, c.closed))), 'токенов'), '');
+  // 1. Re-reads per closed card - coverage over attempts with a recorded R.
+  L.push(metricLine(ruMsg('tally.report.metric_reread_label'), cover,
+    () => groups(Math.round(c.cacheRead / Math.max(1, c.closed))), ruMsg('tally.report.metric_reread_unit')), '');
   L.push(...attemptsPerCardLines(c), '');
-  // 3. Доля перечитывания в окне — делится на токены ТЕХ ЖЕ заходов, у которых записан R.
-  // Устав — ~4% от R, остальное — заново отправляемая беседа.
-  L.push(metricLine('доля перечитывания в окне', cover,
+  // 3. The re-read share in the window - divided by the tokens of THE SAME attempts that have R recorded.
+  // The charter - ~4% of R, the rest is the conversation sent again.
+  L.push(metricLine(ruMsg('tally.report.metric_share_label'), cover,
     () => Math.round((c.cacheRead / Math.max(1, c.tokensWithCache)) * 100) + '%', ''));
-  L.push(`${pad}(R против токенов тех же заходов; устав — лишь ~4% этой доли,`);
-  L.push(`${pad}остальное — заново отправляемая беседа, см. пол ниже)`, '');
-  L.push(metricLine('шагов на заход', cover, () => stepsPerAttempt(byNode, weights), 'шагов (оценка)'), '');
+  L.push(`${pad}${ruMsg('tally.report.share_note1')}`);
+  L.push(`${pad}${ruMsg('tally.report.share_note2')}`, '');
+  L.push(metricLine(ruMsg('tally.report.metric_steps_label'), cover, () => stepsPerAttempt(byNode, weights), ruMsg('tally.report.metric_steps_unit')), '');
   return L;
 }
 
-// ПОЛ. Самый быстрый способ уронить долю инструктажа — выкинуть AGENTS.md.
-// Поэтому пол называется всегда, даже когда сама доля ещё не считается.
+// THE FLOOR. The fastest way to drop the instruction share - throw AGENTS.md out.
+// So the floor is named always, even when the share itself is not yet computed.
 function floorLines(weights) {
-  const L = ['-'.repeat(64), 'Пол — ниже него не опускаются, не урезав закон:'];
+  const L = ['-'.repeat(64), ruMsg('tally.report.floor_title')];
   if (weights) {
     const w = weights();
     for (const [node, v] of Object.entries(w.byNode)) {
-      L.push(`  ${node.padEnd(8)} ${groups(v.perStep)} ${tokenWord(v.perStep)} — это «вес шага × 1», один шаг с законом и ролью.`);
+      L.push(ruMsg('tally.report.floor_node', { node: node.padEnd(8), tokens: groups(v.perStep), word: tokenWord(v.perStep) }));
     }
-    L.push(`  Из них общая часть (${w.common.files.map((f) => f.file).join(' + ')}): ${groups(w.common.tokens)} ${tokenWord(w.common.tokens)}.`);
-    L.push('  Оценка, не измерение (см. instruction-weight.cjs): настоящий вес шага больше.');
+    L.push(ruMsg('tally.report.floor_common', { files: w.common.files.map((f) => f.file).join(' + '), tokens: groups(w.common.tokens), word: tokenWord(w.common.tokens) }));
+    L.push(ruMsg('tally.report.floor_estimate'));
   } else {
-    L.push('  instruction-weight.cjs недоступен — пол не назван, и это не ноль.');
+    L.push(ruMsg('tally.report.floor_unavailable'));
   }
-  L.push('  Инструктаж и есть пятнадцать запретов. Падение доли НИЖЕ пола читается как');
-  L.push('  поломка закона, а не как успех оптимизации.', '');
-  L.push('Приближение, которое нельзя забыть: дата закрытия карточки нигде не');
-  L.push('записывается, поэтому «на закрытую карточку» считается по корпусу целиком,');
-  L.push('а окно — по датам заходов. Чинится отдельной карточкой, не этим счётчиком.');
+  L.push(ruMsg('tally.report.floor_law'), '');
+  L.push(ruMsg('tally.report.approximation'));
   return L;
 }
 
 function unparsedLines(unparsed) {
   if (!unparsed.length) return [];
-  return ['', `Похожи на заход, но не разобрались — проверить руками: ${unparsed.length}.`,
+  return ['', ruMsg('tally.report.unparsed_header', { n: unparsed.length }),
     ...unparsed.slice(0, 5).map((s) => `  ${s.file}${s.lineNo ? ':' + s.lineNo : ''}: ${s.line}`)];
 }
 
 function report(targets) {
   const { byNode, total, filesProcessed, cardsWithAttempt, unparsed } = tally(targets);
-  // Вес инструкций — дело адаптера движка; нет адаптера — пол назовём как недоступный.
+  // The instruction weight is the engine adapter's business; no adapter - the floor is named as unavailable.
   const weights = engines.first(path.resolve(__dirname, '..', '..'), 'instructionWeight');
   const sum = (key) => Object.values(byNode).reduce((s, v) => s + v[key], 0);
   const c = {
@@ -480,7 +488,7 @@ function report(targets) {
   return [...corpusLines(c), ...metricLines(c, byNode, weights), ...floorLines(weights), ...unparsedLines(unparsed)].join('\n');
 }
 
-/** Ссылка на карточку («NNN», «card-NNN», «N») в путь её файла: живая доска, затем done/. */
+/** A card reference ("NNN", "card-NNN", "N") into its file's path: the live board, then done/. */
 function resolveCardRef(arg) {
   if (fs.existsSync(arg)) return arg;
   const m = /^(?:card-)?(\d{1,4})$/.exec(arg);
@@ -508,24 +516,24 @@ function main() {
     const rest = argv.filter((a) => a !== '--report');
     const targets = rest.length ? rest : [FEATURES_DIR];
     const missing = targets.filter((a) => !fs.existsSync(a));
-    if (missing.length) { console.error('Не найдено: ' + missing.join(', ')); process.exit(1); }
+    if (missing.length) { console.error(ruMsg('tally.cli.not_found') + missing.join(', ')); process.exit(1); }
     process.stdout.write(report(targets) + '\n');
     return;
   }
   const args = argv;
   if (args.length === 0) {
-    console.error('Использование: node tally.cjs <файл-или-каталог> [...]');
+    console.error(ruMsg('tally.cli.usage'));
     process.exit(1);
   }
   const targets = args.map(resolveCardRef);
   const ambiguous = targets.filter((t) => t && t.ambiguous);
   if (ambiguous.length) {
-    console.error('Неоднозначно: ' + ambiguous.flatMap((t) => t.ambiguous).join(', '));
+    console.error(ruMsg('tally.cli.ambiguous') + ambiguous.flatMap((t) => t.ambiguous).join(', '));
     process.exit(1);
   }
   const missing = targets.filter((a) => !fs.existsSync(a));
   if (missing.length) {
-    console.error('Не найдено: ' + missing.join(', '));
+    console.error(ruMsg('tally.cli.not_found') + missing.join(', '));
     process.exit(1);
   }
   const result = tally(targets);
