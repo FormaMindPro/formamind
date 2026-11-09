@@ -90,6 +90,24 @@ function stopTraces(fileHits, msgHits) {
   process.exit(1);
 }
 
+/** The release versions agree: .claude-plugin/plugin.json = package.json = package-lock.json (the top
+ *  level and the packages[''] entry). A release that bumps only one of the three must not ship - the
+ *  disagreement stops the release, fail-closed. */
+function versionStop(dir) {
+  const file = path.join(dir, 'package-lock.json');
+  let lock = null;
+  try { lock = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
+  const versions = {
+    plugin: (() => { try { return JSON.parse(fs.readFileSync(path.join(dir, '.claude-plugin', 'plugin.json'), 'utf8')).version; } catch { return null; } })(),
+    package: (() => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version; } catch { return null; } })(),
+    lock: lock ? lock.version : null,
+    lockRoot: lock && lock.packages && lock.packages[''] ? lock.packages[''].version : null,
+  };
+  if (versions.plugin && versions.plugin === versions.package && versions.package === versions.lock && (versions.lockRoot === null || versions.lockRoot === versions.package)) return;
+  console.error(tr('rel.versions_mismatch', { plugin: versions.plugin, pkg: versions.package, lock: versions.lock }));
+  process.exit(1);
+}
+
 function main() {
   const dir = path.join(__dirname, '..');
   const argv = process.argv.slice(2);
@@ -110,6 +128,7 @@ function main() {
   const traces = scanTraces(dir);
   if (traces.length) stopTraces(traces, []);
   console.log(tr('rel.no_traces'));
+  versionStop(dir);
   const bad = scanCorruption(dir);
   if (bad.length) {
     console.error(tr('rel.stop_corruption', { n: bad.length }));
