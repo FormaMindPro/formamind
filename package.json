@@ -18,6 +18,7 @@
   "files": [
     "bin/",
     "scripts/initialize-project-git.cjs",
+    "scripts/setup-ramdisk.ps1",
     "scripts/uninstall.cjs",
     "scripts/layout/",
     "skills/",
