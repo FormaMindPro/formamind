@@ -1,19 +1,19 @@
-// Снимок buildData на фикстуре: сборка в отдельном процессе с изолированным HOME,
-// затем нормализация всего, что зависит от машины и времени.
+// The buildData snapshot on the fixture: the build in a separate process with an isolated HOME,
+// then a normalization of everything that depends on the machine and time.
 const path = require('node:path');
 const { runNode } = require('./fixture.cjs');
 
-// Ключи, чьё значение — время сборки или возраст файла; заменяются маркером.
+// Keys whose value is the build time or the file age; replaced with a marker.
 const VOLATILE_KEYS = new Set(['generatedAt', 'generated', 'ageHours', 'mtime']);
-// Ветки, которые читают стенограммы и настройки машины (~/.claude, ~/.claude.json, ~/.codex) —
-// исключаются целиком, чтобы снимок не зависел от хоста.
+// The branches that read the transcripts and the machine settings (~/.claude, ~/.claude.json, ~/.codex) -
+// excluded as a whole, so the snapshot does not depend on the host.
 const EXCLUDED_BRANCHES = ['dialog', 'sessionEconomy', 'settings.engine', 'bort'];
 
 function buildDataRaw(fx) {
   const gen = path.join(fx.root, '.forma', 'dashboard', 'generate.js');
   const code = `process.stdout.write(JSON.stringify(require(${JSON.stringify(gen)}).buildData(${JSON.stringify(fx.root)})))`;
   const r = runNode(fx, ['-e', code]);
-  if (r.status !== 0) throw new Error('buildData упал:\n' + r.stderr);
+  if (r.status !== 0) throw new Error('buildData fell:\n' + r.stderr);
   return JSON.parse(r.stdout);
 }
 

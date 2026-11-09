@@ -1,4 +1,4 @@
-// scripts/template-push.cjs: публикация обезличенных файлов проекта в шаблон проекта.
+// scripts/template-push.cjs: publishing the project's de-personalized files into the project template.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -29,16 +29,16 @@ const run = (root, ...args) => spawnSync(process.execPath, [SCRIPT, '--template'
 });
 const tplFile = (root, p) => path.join(root, '.forma/protocol/templates/tpl', p);
 
-test('dry-run ничего не пишет', () => {
+test('a dry-run writes nothing', () => {
   const root = fixture();
   const r = run(root, '--add', '.claude/scripts/shot.cjs');
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /новый\s+\.claude\/scripts\/shot\.cjs/);
+  assert.match(r.stdout, new RegExp('\u043d\u043e\u0432\u044b\u0439\\s+\\.claude\\/scripts\\/shot\\.cjs'));
   assert.equal(fs.existsSync(tplFile(root, 'skills/tpl/template/scripts/shot.cjs')), false);
   assert.equal(JSON.parse(fs.readFileSync(tplFile(root, '.claude-plugin/plugin.json'), 'utf8')).version, '0.0.1');
 });
 
-test('--apply: обезличивание, версия, CHANGELOG и «Состав»', () => {
+test('--apply: the de-personalization, the version, CHANGELOG and the inventory', () => {
   const root = fixture();
   const r = run(root, '--add', '.claude/scripts/shot.cjs', '--add', '.claude/agents/run/run-x.md', '--mcp', 'wp=site', '--note', 'First publish.', '--apply');
   assert.equal(r.status, 0, r.stderr);
@@ -60,16 +60,16 @@ test('--apply: обезличивание, версия, CHANGELOG и «Сост
   assert.match(readme, /<!-- inventory:end -->\ntail/);
 });
 
-test('повтор без изменений не поднимает версию', () => {
+test('a repeat without changes does not raise the version', () => {
   const root = fixture();
   run(root, '--add', '.claude/scripts/shot.cjs', '--apply');
   const r = run(root, '--add', '.claude/scripts/shot.cjs', '--apply');
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /Записывать нечего/);
+  assert.match(r.stdout, new RegExp('\u0417\u0430\u043f\u0438\u0441\u044b\u0432\u0430\u0442\u044c \u043d\u0435\u0447\u0435\u0433\u043e'));
   assert.equal(JSON.parse(fs.readFileSync(tplFile(root, '.claude-plugin/plugin.json'), 'utf8')).version, '0.0.2');
 });
 
-test('след проекта — отказ, ничего не записано', () => {
+test('a project trace - a refusal, nothing written', () => {
   const root = fixture();
   write(path.join(root, '.claude/scripts/bad.cjs'), '// mail ' + 'dev' + '@' + 'corp.test\n');
   const r = run(root, '--add', '.claude/scripts/shot.cjs', '--add', '.claude/scripts/bad.cjs', '--apply');
@@ -78,7 +78,7 @@ test('след проекта — отказ, ничего не записано
   assert.equal(fs.existsSync(tplFile(root, 'skills/tpl/template/scripts/shot.cjs')), false);
 });
 
-test('продуктовые зоны и пути вне зон отклоняются', () => {
+test('product zones and paths outside the zones are rejected', () => {
   const root = fixture();
   assert.equal(run(root, '--add', 'project/config/SITE.md').status, 1);
   assert.equal(run(root, '--add', '.claude/hooks/x.sh').status, 1);

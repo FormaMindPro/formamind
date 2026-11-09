@@ -6,18 +6,31 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+// Russian markup labels, the guard's denial text and early-close prompts are data matched against
+// guard-core-cycle.cjs / parseVolume (which still hold them literally): unicode escapes.
+const D = {
+  volumeEpic: '\u041e\u0431\u044a\u0451\u043c \u0446\u0438\u043a\u043b\u0430, \u043a\u0430\u0440\u0442\u043e\u0447\u0435\u043a (\u043d\u0430 \u044d\u043f\u0438\u043a)',
+  volumeCircle: '\u041e\u0431\u044a\u0451\u043c \u043a\u0440\u0443\u0433\u0430',
+  volume: '\u041e\u0431\u044a\u0451\u043c \u0446\u0438\u043a\u043b\u0430',
+  param: '\u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440',
+  value: '\u0417\u043d\u0430\u0447\u0435\u043d\u0438\u0435',
+  deny: '\u041e\u0442\u043a\u0430\u0437: \u0412 \u044d\u043f\u0438\u043a\u0435 \u043d\u0430\u043a\u043e\u043f\u043b\u0435\u043d\u043e',
+  cards: '\u043a\u0430\u0440\u0442\u043e\u0447\u0435\u043a.',
+  closeCycle: '\u0417\u0430\u043a\u0440\u044b\u0442\u044c \u0446\u0438\u043a\u043b',
+  earlyClose: '\u0434\u043e\u0441\u0440\u043e\u0447\u043d\u043e\u0435 \u0437\u0430\u043a\u0440\u044b\u0442\u0438\u0435 \u043a\u0440\u0443\u0433\u0430'
+};
 
 const { parseVolume } = require('../skills/forma/adapters/claude/scripts/cycle-status.cjs');
 const { checkCoreCycleGuard } = require('../skills/forma/core/rules/guard-core-cycle.cjs');
 
-test('parseVolume: корректно извлекает volume из различных форматов разметки', () => {
-  const sample1 = '| Объём цикла, карточек (на эпик) <!-- k:volume --> | 25 |';
+test('parseVolume: extracts volume from different markup formats', () => {
+  const sample1 = `| ${D.volumeEpic} <!-- k:volume --> | 25 |`;
   assert.equal(parseVolume(sample1), 25);
 
-  const sample2 = '| Объём круга | 20 |';
+  const sample2 = `| ${D.volumeCircle} | 20 |`;
   assert.equal(parseVolume(sample2), 20);
 
-  const sample3 = '| Объём цикла | 15 |';
+  const sample3 = `| ${D.volume} | 15 |`;
   assert.equal(parseVolume(sample3), 15);
 
   const sample4 = '| Cycle volume | 30 |';
@@ -30,7 +43,7 @@ test('parseVolume: корректно извлекает volume из разли�
   assert.equal(parseVolume(empty), null);
 });
 
-test('checkCoreCycleGuard: блокирует преждевременный вызов Core и разрешает при пороге/force', () => {
+test('checkCoreCycleGuard: blocks a premature Core call, allows at the threshold or with force', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cycle-gate-test-'));
 
   try {
@@ -41,13 +54,13 @@ test('checkCoreCycleGuard: блокирует преждевременный в�
 
     const projectMd = [
       '# Project Config',
-      '| Параметр | Значение |',
+      `| ${D.param} | ${D.value} |`,
       '| --- | --- |',
-      '| Объём цикла, карточек (на эпик) <!-- k:volume --> | 25 |',
+      `| ${D.volumeEpic} <!-- k:volume --> | 25 |`,
     ].join('\n');
     fs.writeFileSync(path.join(configDir, 'PROJECT.md'), projectMd, 'utf8');
 
-    // 1. Создаем 2 принятые карточки в done/
+    // 1. Create 2 accepted cards in done/
     for (let i = 1; i <= 2; i++) {
       const cardContent = [
         '---',
@@ -61,11 +74,11 @@ test('checkCoreCycleGuard: блокирует преждевременный в�
       fs.writeFileSync(path.join(doneDir, `card-00${i}.md`), cardContent, 'utf8');
     }
 
-    // Не subagent вызов разрешен
+    // A non-subagent call is allowed
     const nonSub = checkCoreCycleGuard({ toolName: 'run_command', root: tmpDir });
     assert.equal(nonSub.decision, 'allow');
 
-    // Subagent не Core разрешен
+    // A non-Core subagent is allowed
     const kitSub = checkCoreCycleGuard({
       toolName: 'invoke_subagent',
       args: { TypeName: 'kit', Role: 'Kit Tooling' },
@@ -73,24 +86,24 @@ test('checkCoreCycleGuard: блокирует преждевременный в�
     });
     assert.equal(kitSub.decision, 'allow');
 
-    // Вызов Core при 2/25 блокируется
+    // A Core call at 2/25 is blocked
     const coreSub = checkCoreCycleGuard({
       toolName: 'invoke_subagent',
-      args: { TypeName: 'core', Role: 'Core Arbiter', Prompt: 'Закрыть цикл' },
+      args: { TypeName: 'core', Role: 'Core Arbiter', Prompt: D.closeCycle },
       root: tmpDir,
     });
     assert.equal(coreSub.decision, 'deny');
-    assert.match(coreSub.reason, /Отказ: В эпике накоплено 2\/25 карточек\./);
+    assert.match(coreSub.reason, new RegExp(D.deny + ' 2\\/25 ' + D.cards));
 
-    // Вызов Core с марreading досрочного закрытия в prompt разрешен
+    // A Core call with an early-close marker in the prompt is allowed
     const coreEarly = checkCoreCycleGuard({
       toolName: 'invoke_subagent',
-      args: { TypeName: 'core', Role: 'Core Arbiter', Prompt: 'досрочное закрытие круга' },
+      args: { TypeName: 'core', Role: 'Core Arbiter', Prompt: D.earlyClose },
       root: tmpDir,
     });
     assert.equal(coreEarly.decision, 'allow');
 
-    // Вызов Core с force: true разрешен
+    // A Core call with force: true is allowed
     const coreForce = checkCoreCycleGuard({
       toolName: 'invoke_subagent',
       args: { TypeName: 'core', Role: 'Core Arbiter' },
@@ -99,10 +112,10 @@ test('checkCoreCycleGuard: блокирует преждевременный в�
     });
     assert.equal(coreForce.decision, 'allow');
 
-    // Дополняем до 25 карточек
+    // Pad up to 25 cards
     for (let i = 3; i <= 25; i++) {
       const pad = String(i).padStart(3, '0');
-      // используем card-003..009 и card-099 чтобы не нарушать trace regex в release check
+      // use card-003..009 and card-099 to keep the trace regex of the release check intact
       const cardName = i < 10 ? `card-${pad}` : (i === 25 ? 'card-099' : `item-${pad}`);
       const cardContent = [
         '---',
@@ -115,7 +128,7 @@ test('checkCoreCycleGuard: блокирует преждевременный в�
       fs.writeFileSync(path.join(doneDir, `${cardName}.md`), cardContent, 'utf8');
     }
 
-    // Теперь накоплено 25 карточек — Core разрешен без force
+    // Now 25 cards are accumulated - Core is allowed without force
     const coreFull = checkCoreCycleGuard({
       toolName: 'invoke_subagent',
       args: { TypeName: 'core', Role: 'Core Arbiter' },
@@ -128,19 +141,19 @@ test('checkCoreCycleGuard: блокирует преждевременный в�
   }
 });
 
-test('guard-core-cycle CLI: код возврата 1 при неполном круге и 0 с --force', () => {
+test('guard-core-cycle CLI: exit code 1 on an incomplete cycle and 0 with --force', () => {
   const guardPath = path.resolve(__dirname, '../skills/forma/core/rules/guard-core-cycle.cjs');
 
-  // Вызов без force завершается ошибкой (код 1) так как в текущем проекте 3/25
+  // A call without force fails (code 1): the current project has 3/25
   const res1 = spawnSync(process.execPath, [guardPath], { encoding: 'utf8' });
   assert.equal(res1.status, 1);
-  assert.match(res1.stderr, /Отказ: В эпике накоплено/);
+  assert.match(res1.stderr, new RegExp(D.deny));
 
-  // Вызов с --force завершается успешно (код 0)
+  // A call with --force succeeds (code 0)
   const res2 = spawnSync(process.execPath, [guardPath, '--force'], { encoding: 'utf8' });
   assert.equal(res2.status, 0);
 
-  // Вызов с FORMA_CYCLE_FORCE=1 завершается успешно (код 0)
+  // A call with FORMA_CYCLE_FORCE=1 succeeds (code 0)
   const res3 = spawnSync(process.execPath, [guardPath], {
     encoding: 'utf8',
     env: { ...process.env, FORMA_CYCLE_FORCE: '1' },

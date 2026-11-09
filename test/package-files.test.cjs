@@ -1,4 +1,4 @@
-// Всё, что bin/forma.cjs подключает из scripts/, входит в "files" пакета: иначе npx github:… не найдёт модуль.
+// Everything bin/forma.cjs requires from scripts/ is part of the package "files": otherwise npx github:... will not find the module.
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -8,12 +8,12 @@ const root = path.resolve(__dirname, '..')
 const files = require('../package.json').files
 const covered = (rel) => files.some((f) => (f.endsWith('/') ? rel.startsWith(f) : rel === f))
 
-test('скрипты, которые подключает bin/forma.cjs, входят в "files" пакета', () => {
+test('the scripts bin/forma.cjs requires are part of the package "files"', () => {
   const src = fs.readFileSync(path.join(root, 'bin', 'forma.cjs'), 'utf8')
   const used = [...src.matchAll(/require\('\.\.\/(scripts\/[^']+)'\)/g)].map((m) => m[1])
   assert.ok(used.length > 0)
   for (const rel of used) {
-    assert.ok(fs.existsSync(path.join(root, rel)), rel + ' существует')
-    assert.ok(covered(rel), rel + ' не входит в "files" package.json')
+    assert.ok(fs.existsSync(path.join(root, rel)), rel + ' exists')
+    assert.ok(covered(rel), rel + ' is not part of the package.json "files"')
   }
 })

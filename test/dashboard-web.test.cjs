@@ -1,6 +1,6 @@
-// Каркас дашборда: index.html — только разметка, стили и скрипты лежат в dashboard/web/ и отдаются статикой.
-// Страховка рефакторинга: вернули встроенный <style>/<script>, разрослась страница, потерялся файл или
-// сервер отдал стиль не тем типом — тест падает. Установка (forma init) берётся из фикстуры: она ставится им же.
+// The dashboard frame: index.html - markup only, the styles and scripts live in dashboard/web/ and are served as statics.
+// A refactoring safety net: an inlined <style>/<script> back, a grown page, a lost file or the server serving a style
+// with the wrong type - the test falls. The install (forma init) is taken from the fixture: it is installed by it.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -21,7 +21,7 @@ const dash = (...p) => path.join(fx.root, '.forma', 'dashboard', ...p);
 test.before(async () => {
   fx = makeFixture();
   html = fs.readFileSync(dash('index.html'), 'utf8');
-  // Только свои файлы: внешние (CDN, шрифты) начинаются со схемы.
+  // Only own files: external ones (CDN, fonts) start with a scheme.
   assets = [...html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)="([^":]+)"/g)].map((m) => m[1]);
   server = await startServer(fx);
 });
@@ -31,32 +31,32 @@ test.after(async () => {
   if (fx) fx.cleanup();
 });
 
-test('index.html — только каркас: до 200 строк, без встроенных стилей и скриптов', () => {
-  assert.ok(html.split('\n').length <= MAX_INDEX_LINES, `строк: ${html.split('\n').length}`);
-  assert.ok(!/<style[\s>]/i.test(html), 'встроенный <style>');
+test('index.html - the frame only: up to 200 lines, no inlined styles or scripts', () => {
+  assert.ok(html.split('\n').length <= MAX_INDEX_LINES, `lines: ${html.split('\n').length}`);
+  assert.ok(!/<style[\s>]/i.test(html), 'an inlined <style>');
   for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
-    assert.match(m[1], /\bsrc=/, 'встроенный <script> без src: ' + m[2].trim().slice(0, 60));
-    assert.equal(m[2].trim(), '', 'у <script src> есть тело');
+    assert.match(m[1], /\bsrc=/, 'an inlined <script> without src: ' + m[2].trim().slice(0, 60));
+    assert.equal(m[2].trim(), '', 'a <script src> has a body');
   }
 });
 
-test('установка кладёт все файлы, на которые ссылается index.html, и ни одного лишнего в web/', () => {
+test('the install lays every file index.html references, and no extra one in web/', () => {
   assert.ok(assets.some((a) => a.endsWith('.css')) && assets.some((a) => a.endsWith('.js')), assets.join(', '));
-  for (const a of assets) assert.ok(fs.existsSync(dash(a)), 'нет файла ' + a);
+  for (const a of assets) assert.ok(fs.existsSync(dash(a)), 'no file ' + a);
   const onDisk = [];
   const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : onDisk.push(path.relative(dash(), path.join(d, e.name)).replace(/\\/g, '/'))));
   walk(dash('web'));
-  assert.deepEqual(onDisk.sort(), [...assets].sort(), 'файлы web/ и ссылки index.html расходятся');
+  assert.deepEqual(onDisk.sort(), [...assets].sort(), 'the web/ files and the index.html references diverge');
 });
 
-test('скрипты разбираются как классические (без модулей) и идут в порядке: i18n первым, common вторым, app последним', () => {
+test('the scripts parse as classic (no modules) and run in order: i18n first, common second, app last', () => {
   const js = assets.filter((a) => a.endsWith('.js'));
   assert.deepEqual(js.slice(0, 2).map((a) => path.basename(a)), ['i18n.js', 'common.js']);
   assert.equal(path.basename(js[js.length - 1]), 'app.js');
   for (const a of js) assert.doesNotThrow(() => new vm.Script(fs.readFileSync(dash(a), 'utf8'), { filename: a }), a);
 });
 
-test('сервер отдаёт стили и скрипты статикой с верным типом и без кэша', async () => {
+test('the server serves the styles and scripts as statics with the right type and no cache', async () => {
   for (const a of assets) {
     const r = await request(server.port, 'GET', '/' + a);
     assert.equal(r.status, 200, a);
@@ -66,7 +66,7 @@ test('сервер отдаёт стили и скрипты статикой с
   }
 });
 
-test('сервер отдаёт список языков и словари en и ru', async () => {
+test('the server serves the language list and the en and ru catalogs', async () => {
   const r = await request(server.port, 'GET', '/locales.json');
   assert.equal(r.status, 200);
   const j = JSON.parse(r.body);

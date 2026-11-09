@@ -1,5 +1,5 @@
-// engine-to-protocol.cjs: --apply <файл> --add <тот же файл> переносит новый файл; без --add — отказ;
-// --add вне MAP / слой 4 / не из списка новых — отказ до любой записи.
+// engine-to-protocol.cjs: --apply <file> --add <the same file> carries the new file over; without --add - a refusal;
+// an --add outside the MAP / layer 4 / not from the new list - a refusal before any write.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -28,7 +28,7 @@ function fixture() {
 const run = (dir, ...a) => spawnSync(process.execPath, [SCRIPT, ...a], { cwd: dir, encoding: 'utf8' });
 const dst = (dir) => path.join(dir, ...DST);
 
-test('--apply F --add F записывает новый файл в шаблон', () => {
+test('--apply F --add F writes the new file into the template', () => {
   const dir = fixture();
   try {
     const r = run(dir, '--apply', NEW, '--add', NEW);
@@ -37,29 +37,29 @@ test('--apply F --add F записывает новый файл в шаблон
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('--apply F без --add отказывает «новый файл: переносится по --add», ничего не записано', () => {
+test('--apply F without --add refuses with the new-file message, nothing written', () => {
   const dir = fixture();
   try {
     const r = run(dir, '--apply', NEW);
     assert.equal(r.status, 1);
-    assert.match(r.stderr, /новый файл: переносится по --add/);
+    assert.match(r.stderr, new RegExp('\u043d\u043e\u0432\u044b\u0439 \u0444\u0430\u0439\u043b: \u043f\u0435\u0440\u0435\u043d\u043e\u0441\u0438\u0442\u0441\u044f \u043f\u043e --add'));
     assert.equal(fs.existsSync(dst(dir)), false);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('--add для файла вне MAP, слоя 4 или не из списка новых отказывает до записи', () => {
+test('--add for a file outside the MAP, layer 4 or not from the new list refuses before any write', () => {
   for (const bad of ['outside/map.txt', '.claude/scripts/own-layer.cjs', 'project/config/X.md', '.claude/scripts/known.cjs']) {
     const dir = fixture();
     try {
       const r = run(dir, '--apply', NEW, '--add', NEW, '--add', bad);
       assert.equal(r.status, 1, bad + ': ' + r.stderr);
-      assert.match(r.stderr, /--add (отказан|не из списка новых)/, bad);
+      assert.match(r.stderr, new RegExp('--add (\u043e\u0442\u043a\u0430\u0437\u0430\u043d|\u043d\u0435 \u0438\u0437 \u0441\u043f\u0438\u0441\u043a\u0430 \u043d\u043e\u0432\u044b\u0445)'), bad);
       assert.equal(fs.existsSync(dst(dir)), false, bad);
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   }
 });
 
-test('профиль run-protocol-* из project/extensions/ — инструмент движка: попадает в «новые», прочие копии расширений нет', () => {
+test('a run-protocol-* profile from project/extensions/ is an engine tool: it lands in the new ones, other extension copies do not', () => {
   const dir = fixture();
   try {
     const put = (rel, text) => { const f = path.join(dir, ...rel.split('/')); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
@@ -70,7 +70,7 @@ test('профиль run-protocol-* из project/extensions/ — инструм�
       put('project/extensions/template/claude/agents/run/' + n, 't\n');
     }
     const r = run(dir);
-    assert.equal(r.status, 3, r.stderr);   // неразложенный новый файл — стоп с вопросом, как для любого нового
+    assert.equal(r.status, 3, r.stderr);   // an unplaced new file - a stop with a question, as for any new one
     assert.match(r.stderr, /run-protocol-x\.md/);
     assert.doesNotMatch(r.stderr + r.stdout, /run-other\.md/);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }

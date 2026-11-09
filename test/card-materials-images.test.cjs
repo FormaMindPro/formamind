@@ -1,4 +1,4 @@
-// Материалы карточек: изображение вне assets/ — находка при любом весе; внутри assets/ и work/ — нет.
+// Card materials: an image outside assets/ is a finding at any weight; inside assets/ and work/ - not.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -23,7 +23,8 @@ test('image next to card files is reported at any weight', () => {
   put(root, 'card-001/shot.png');
   put(root, 'card-001/note.md');
   const out = check.run({ root });
-  assert.equal(out.filter((p) => /shot\.png: изображение .* вне assets\//.test(p)).length, 1);
+  // board.card-materials.image_outside: the finding names the image and "outside assets/" - matched by fragments.
+  assert.equal(out.filter((p) => p.includes('shot.png') && p.includes('\u0432\u043d\u0435 assets/')).length, 1);
 });
 
 test('images inside assets/ and work/ are not reported', () => {

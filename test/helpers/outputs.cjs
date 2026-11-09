@@ -1,5 +1,5 @@
-// Выводы движка на фикстуре, приведённые к виду, не зависящему от машины:
-// пути корня и HOME — маркерами, дата создания карточки — маркером, переводы строк — LF.
+// The engine outputs on the fixture, reduced to a machine-independent form:
+// the root and HOME paths by markers, the card creation date by a marker, the line endings - LF.
 const { runNode } = require('./fixture.cjs');
 const { snapshot } = require('./snapshot.cjs');
 
@@ -18,14 +18,17 @@ function run(fx, args) {
   return { status: r.status, out: clean((r.stdout || '') + (r.stderr || ''), fx) };
 }
 
-const NEW_CARD_ARGS = ['.forma/board/new-card.cjs', '--kind', 'protocol', '--title', 'Проба сетки', '--route', '4', '--dry'];
+// The card title stays Russian on purpose: new-card transliterates it into the card slug
+// (card-004-proba-setki.md), which behavior.test.cjs pins. Data, not code: unicode escapes.
+const TITLE = '\u041f\u0440\u043e\u0431\u0430 \u0441\u0435\u0442\u043a\u0438';
+const NEW_CARD_ARGS = ['.forma/board/new-card.cjs', '--kind', 'protocol', '--title', TITLE, '--route', '4', '--dry'];
 
 function newCardDry(fx) {
   const r = run(fx, NEW_CARD_ARGS);
   return { status: r.status, out: slash(r.out).replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/g, '<now>') };
 }
 
-// Всё, что сравнивается «до/после» рефакторинга: имя → текст.
+// Everything compared "before/after" a refactoring: name -> text.
 function collect(fx) {
   const board = run(fx, ['.forma/board/check-board.cjs']);
   const sync = run(fx, ['.claude/scripts/sync-engines.cjs', '--check']);

@@ -971,7 +971,7 @@
   "mcap.ledger_line": "the engine's calls log: ",
   "mcap.ledger_line_tail": " — the platform calls' records, the identifiers from the hook's payload",
   "mcap.subagentstop_note": "the package's SubagentStop hook writes the call's identifier and duration; the spend numbers are taken from the runtime's session transcript (the platform counts them step by step there); no transcript — unknown remains, not zero",
-  "mcap.honesty_note": "The probe writes only what is provable from the environment. A field that cannot be proven is marked `available: null` with a reason; a field proven absent — `false`. `true` is set only where a proof is named.",
+  "mcap.honesty_note": "The probe writes only what is provable from the environment. A field that cannot be proven is marked `available: null` with a reason; a field proven absent - `false`. `true` is set only where a proof is named.",
   "mcap.written": "written: ",
   "gpa.default_description": "A node of the Forma protocol: ",
   "gpa.delegate.spec": "Call when the task must be sliced into cards: one card is one qualification.",

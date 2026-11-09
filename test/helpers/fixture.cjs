@@ -1,5 +1,5 @@
-// Учебный проект-фикстура: чистая установка протокола (bin/forma.cjs init) во временный каталог
-// + синтетические карточки из test/fixture/overlay/. Никаких следов реального проекта.
+// The training project fixture: a clean protocol install (bin/forma.cjs init) into a temp directory
+// + the synthetic cards from test/fixture/overlay/. No traces of a real project.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -16,7 +16,7 @@ function copyTree(src, dst) {
   }
 }
 
-// Изолированный HOME: сборка не видит ~/.claude и ~/.claude.json машины.
+// An isolated HOME: the build does not see the machine ~/.claude and ~/.claude.json.
 function isolatedEnv(home) {
   return { ...process.env, HOME: home, USERPROFILE: home, HOMEDRIVE: '', HOMEPATH: '' };
 }
@@ -30,7 +30,7 @@ function makeFixture() {
   const r = spawnSync(process.execPath, [path.join(PKG, 'bin', 'forma.cjs'), 'init', '--dir', root,
     '--engines', 'claude', '--template', 'none', '--board', 'skip', '--yes'],
   { encoding: 'utf8', env: isolatedEnv(home) });
-  if (r.status !== 0) throw new Error('forma init упал:\n' + r.stdout + r.stderr);
+  if (r.status !== 0) throw new Error('forma init fell:\n' + r.stdout + r.stderr);
   copyTree(OVERLAY, root);
   return { base, root, home, env: isolatedEnv(home), cleanup: () => {
     try { fs.rmSync(base, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch {}

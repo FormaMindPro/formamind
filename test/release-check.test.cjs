@@ -1,4 +1,4 @@
-// check-release.cjs: сканер порчи переезда ловит образцы и не трогает честные пути; клон протокола чист.
+// check-release.cjs: the move-damage scanner catches the samples and leaves honest paths alone; the protocol clone is clean.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -6,8 +6,18 @@ const os = require('node:os');
 const path = require('node:path');
 const { gitRun } = require('../scripts/lib/git.cjs');
 const { scanCorruption, RULES } = require('../scripts/check-release.cjs');
+// Trace-pattern data the scanner must catch (the ru card label, the attempt and criterion words)
+// and the language-finding input: byte-identical from ASCII source through unicode escapes.
+const TR = {
+  see: '\u0441\u043c.',
+  card: '\u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0430 ',
+  attempt: '\u043f\u043e\u043f\u044b\u0442\u043a\u0430 ',
+  crit: '\u043a\u0440\u0438\u0442\u0435\u0440\u0438\u0439 ',
+  cleanMsg: '\u0427\u0438\u0441\u0442\u043e\u0435 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435',
+};
 
-const R = '.' + 'forma/'; // не литерал целиком — чтобы сканер не краснел на собственном тесте
+
+const R = '.' + 'forma/'; // not a whole literal - so the scanner does not blush on its own test
 
 function repoWith(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-check-'));
@@ -17,46 +27,46 @@ function repoWith(files) {
   return dir;
 }
 
-test('сканер ловит три вида порчи', () => {
+test('the scanner catches the three kinds of damage', () => {
   const dir = repoWith({
-    'a.md': `см. github.com/mattpocock/${R}skills\n`,
-    'b.md': `путь ${R}protocol/${R}skills/forma/\n`,
-    'c.md': `ключ \`${R}skills:\` и ${R}dashboard's\n`,
+    'a.md': `${TR.see} github.com/mattpocock/${R}skills\n`,
+    'b.md': `the path ${R}protocol/${R}skills/forma/\n`,
+    'c.md': `the key \`${R}skills:\` and ${R}dashboard's\n`,
     'd.md': `site pages/${R}templates/blocks\n`,
   });
   assert.deepEqual([...new Set(scanCorruption(dir).map((x) => x.file))].sort(), ['a.md', 'b.md', 'c.md', 'd.md']);
 });
 
-test('сканер не трогает честные пути', () => {
+test('the scanner leaves honest paths alone', () => {
   const dir = repoWith({ 'ok.md': `\`${R}skills/forma/SKILL.md\`, \`${R}manual/\`, ../${R}board/x, node ${R}board/new-card.cjs\n` });
   assert.deepEqual(scanCorruption(dir), []);
 });
 
-test('в сам клон протокола порча не просочилась', () => {
+test('no damage has leaked into the protocol clone itself', () => {
   const bad = scanCorruption(path.join(__dirname, '..'));
   assert.deepEqual(bad.map((b) => `${b.file}:${b.line} ${b.rule}`), []);
 });
 
-test('правил порчи не меньше трёх', () => {
+test('there are at least three damage rules', () => {
   assert.ok(RULES.length >= 3);
 });
 
 const { scanTraces, scanMessages } = require('../scripts/check-release.cjs');
 
-test('следы проекта в файлах: код и номер карточки, попытка, критерий, дата, имя сайта', () => {
+test('project traces in files: the card code and number, an attempt, a criterion, a date, the site name', () => {
   const dir = repoWith({
     'a.cjs': '// ' + 'card-' + '123\n',
-    'b.md': 'см. ' + 'Карточка ' + '45\n',
-    'c.cjs': '// ' + 'попытка ' + '2\n',
-    'd.md': '' + 'критерий ' + '3\n',
-    'e.md': 'обновлено 20' + '31-01-05\n',
-    'f.md': 'сайт iamforma' + '.pro\n',
+    'b.md': TR.see + ' ' + TR.card + '45\n',
+    'c.cjs': '// ' + TR.attempt + '2\n',
+    'd.md': '' + TR.crit + '3\n',
+    'e.md': 'updated 20' + '31-01-05\n',
+    'f.md': 'the site iamforma' + '.pro\n',
     'g.cjs': '// ' + 'goal-' + '12\n',
   });
   assert.deepEqual([...new Set(scanTraces(dir).map((x) => x.file))].sort(), ['a.cjs', 'b.md', 'c.cjs', 'd.md', 'e.md', 'f.md', 'g.cjs']);
 });
 
-test('заглушки card-001…009, card-099, goal-00 и даты в test/ — не след', () => {
+test('the card-001...009, card-099, goal-00 stubs and dates in test/ are not a trace', () => {
   const dir = repoWith({
     'a.md': 'card-001-x, card-099, goal-00, goal-01\n',
     'test/t.cjs': "// created: '20" + "31-01-05'\n",
@@ -64,21 +74,21 @@ test('заглушки card-001…009, card-099, goal-00 и даты в test/ �
   assert.deepEqual(scanTraces(dir), []);
 });
 
-test('следы проекта в сообщениях коммитов; дата в сообщении допустима', () => {
+test('project traces in commit messages; a date in a message is allowed', () => {
   assert.equal(scanMessages(['Card ' + '134: grid', 'card-' + '197: set', 'v1 — 20' + '31-01-05', 'Clean message']).length, 2);
 });
 
 test('commit messages in Cyrillic are a language finding', () => {
-  const bad = scanMessages(['Clean message', 'Чистое сообщение']);
+  const bad = scanMessages(['Clean message', TR.cleanMsg]);
   assert.deepEqual(bad.map((b) => b.rule), ['language']);
 });
 
-test('в сам клон протокола следы проекта не просочились', () => {
+test('no project traces have leaked into the protocol clone itself', () => {
   const bad = scanTraces(path.join(__dirname, '..'));
   assert.deepEqual(bad.map((b) => `${b.file}:${b.line} ${b.rule}`), []);
 });
 
-test('следы проекта: домен, коннектор сайта и число карточек в сообщении', () => {
+test('project traces: the domain, the site connector and the card count in a message', () => {
   const dir = repoWith({
     'a.md': 'on formacraft.studio the site\n',
     'b.md': 'use `mcp__novamira-example-site__execute` here\n',

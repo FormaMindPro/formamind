@@ -1,5 +1,5 @@
-// Целостность установки: установщик пишет опись, `verify-install` сверяет её с диском.
-// Чистая установка (en и ru) — зелёная; каждое нарушение называется по адресу, с ожидаемым и найденным.
+// The install integrity: the installer writes the manifest, `verify-install` checks it against the disk.
+// A clean install (en and ru) - green; every violation is named by address, with the expected and the found.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -25,7 +25,7 @@ const write = (dir, rel, t) => fs.writeFileSync(path.join(dir, rel), t);
 test.after(() => { for (const d of tmps) fs.rmSync(d, { recursive: true, force: true }); });
 
 for (const lang of ['en', 'ru']) {
-  test(`установка --lang ${lang}: опись записана, сверка зелёная`, () => {
+  test(`the --lang ${lang} install: the manifest written, the check green`, () => {
     const { dir, r } = install(lang);
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /install is intact/);
@@ -39,9 +39,9 @@ for (const lang of ['en', 'ru']) {
   });
 }
 
-test('перевод каркаса: текст заголовков меняется — сверка зелёная; потерян заголовок — красная с адресом', () => {
+test('the skeleton translation: the heading text changes - the check green; a lost heading - red with the address', () => {
   const { dir } = install('ru');
-  write(dir, 'project/ops/VALUE.md', read(dir, 'project/ops/VALUE.md').replace(/^# .*/m, '# Ценность').replace(/^## .*/gm, '## Раздел'));
+  write(dir, 'project/ops/VALUE.md', read(dir, 'project/ops/VALUE.md').replace(/^# .*/m, '# Value').replace(/^## .*/gm, '## Section'));
   const ok = verify(dir);
   assert.equal(ok.status, 0, ok.out);
   write(dir, 'project/ops/VALUE.md', read(dir, 'project/ops/VALUE.md').replace(/^## .*/gm, ''));
@@ -50,26 +50,26 @@ test('перевод каркаса: текст заголовков меняе�
   assert.match(v.out, /project\/ops\/VALUE\.md — «##» headings — expected: ≥ \d+ — found: 0/);
 });
 
-test('красное называет адрес, ожидаемое и найденное', async (t) => {
+test('the red names the address, the expected and the found', async (t) => {
   const { dir: base } = install('en');
-  // каждый случай — на своей копии чистой установки; правка получает её корень
+  // every case - on its own copy of the clean install; the edit receives its root
   const cases = [
-    ['удалён хук', (d) => fs.rmSync(path.join(d, '.claude/hooks/intent-start.sh')),
+    ['a hook removed', (d) => fs.rmSync(path.join(d, '.claude/hooks/intent-start.sh')),
       /\.claude\/hooks\/intent-start\.sh — expected: installer file — found: file missing/],
-    ['хук выпал из settings.json', (d) => {
+    ['the hook dropped out of settings.json', (d) => {
       const s = JSON.parse(read(d, '.claude/settings.json'));
       for (const g of s.hooks.SessionStart) g.hooks = g.hooks.filter((h) => !/check-ready/.test(h.command));
       write(d, '.claude/settings.json', JSON.stringify(s));
     }, /hooks\.SessionStart\[startup\] — expected: command «bash \.claude\/hooks\/check-ready\.sh»/],
-    ['файл установщика изменён', (d) => write(d, '.forma/board/new-card.cjs', read(d, '.forma/board/new-card.cjs') + '\n// x\n'),
+    ['an installer file changed', (d) => write(d, '.forma/board/new-card.cjs', read(d, '.forma/board/new-card.cjs') + '\n// x\n'),
       /\.forma\/board\/new-card\.cjs — expected: sha256 \w+… — found: sha256 \w+… \(file changed after install\)/],
-    ['синтаксис .cjs', (d) => write(d, '.forma/board/check-board.cjs', '(((\n'),
+    ['the .cjs syntax', (d) => write(d, '.forma/board/check-board.cjs', '(((\n'),
       /check-board\.cjs — expected: parses as CommonJS — found: /],
-    ['корневой CLAUDE.md', (d) => write(d, 'CLAUDE.md', 'x\n'),
+    ['a root CLAUDE.md', (d) => write(d, 'CLAUDE.md', 'x\n'),
       /CLAUDE\.md — expected: no root CLAUDE\.md/],
-    ['плейсхолдер в tools:', (d) => write(d, '.claude/agents/spec.md', read(d, '.claude/agents/spec.md').replace(/^tools:.*/m, 'tools: Read, mcp__<srv>__*')),
+    ['a placeholder in tools:', (d) => write(d, '.claude/agents/spec.md', read(d, '.claude/agents/spec.md').replace(/^tools:.*/m, 'tools: Read, mcp__<srv>__*')),
       /spec\.md — tools: — expected: tool names without placeholders — found: mcp__<srv>__\*/],
-    ['опись удалена', (d) => fs.rmSync(path.join(d, '.forma/install-manifest.json')),
+    ['the manifest removed', (d) => fs.rmSync(path.join(d, '.forma/install-manifest.json')),
       /install-manifest\.json — expected: install manifest — found: file missing/],
   ];
   for (const [name, apply, expect] of cases) {
@@ -84,9 +84,9 @@ test('красное называет адрес, ожидаемое и найд
   }
 });
 
-test('повторная установка на живой проект: сверка зелёная, скелет не пересчитан', () => {
+test('a reinstall on a live project: the check green, the skeleton not recalculated', () => {
   const { dir } = install('en');
-  write(dir, 'project/ops/ROADMAP.md', read(dir, 'project/ops/ROADMAP.md') + '\n## Человек дописал раздел\n');
+  write(dir, 'project/ops/ROADMAP.md', read(dir, 'project/ops/ROADMAP.md') + '\n## A human added a section\n');
   const again = install('en', dir).r;
   assert.equal(again.status, 0, again.stdout + again.stderr);
   const v = verify(dir);

@@ -1,5 +1,5 @@
-// Порча файлов фикстуры с откатом: каждая правка запоминает исходное состояние файла
-// (содержимое или «файла не было») и каталоги, созданные по пути; restore() возвращает всё как было.
+// Fixture file damage with a rollback: every edit remembers the file original state (the contents or
+// "the file was absent") and the directories created along the path; restore() returns everything as it was.
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -25,7 +25,7 @@ function mutator(root) {
     fs.mkdirSync(path.dirname(abs(rel)), { recursive: true });
     fs.writeFileSync(abs(rel), text);
   }
-  // Правка текста в LF; переводы строк файла (CRLF после checkout на Windows) возвращаются как были.
+  // The text is edited in LF; the file line endings (CRLF after a checkout on Windows) are returned as they were.
   function edit(rel, fn) {
     const raw = read(rel);
     const crlf = raw.includes(CRLF);

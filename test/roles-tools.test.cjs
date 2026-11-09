@@ -1,7 +1,7 @@
 'use strict';
-// Роль, которая в тексте велит запускать скрипт доски, должна иметь его в списке `tools:`: иначе в живом вызове
-// подагента команда отклоняется, а роль молча откатывается на ручную правку карточки. Замер в основной сессии
-// (где разрешено всё) такую дыру не видит — её ловит только сверка текста роли со списком.
+// A role whose text tells one to run a board script must have it in its `tools:` list: otherwise in a live subagent
+// call the command is rejected and the role silently falls back to hand-editing the card. A measurement in the main
+// session (where everything is allowed) does not see such a hole - only checking the role text against the list catches it.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -24,21 +24,21 @@ const allows = (tools, script) => tools.includes(`Bash(node .forma/board/${scrip
 for (const engine of ENGINES) {
   const dir = path.join(AGENTS, engine, 'agents');
   for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('.md'))) {
-    test(`${engine}/${name}: скрипты доски из текста роли разрешены в tools`, () => {
+    test(`${engine}/${name}: the board scripts from the role text are allowed in tools`, () => {
       const r = role(path.join(dir, name));
-      if (!r || r.tools == null || !/\bBash\b/.test(r.tools)) return; // роль без списка или без Bash — не наш случай: Bash ей не даётся совсем
+      if (!r || r.tools == null || !/\bBash\b/.test(r.tools)) return; // a role without a list or without Bash - not our case: Bash is not given to it at all
       const used = SCRIPTS.filter((s) => new RegExp(`node \\.forma/board/${s}\\.cjs\\b`).test(r.body));
       const missing = used.filter((s) => !allows(r.tools, s));
-      assert.deepEqual(missing, [], `${engine}/${name}: в тексте есть вызов, которого нет в tools: ${missing.join(', ')}`);
+      assert.deepEqual(missing, [], `${engine}/${name}: the text has a call missing from tools: ${missing.join(', ')}`);
     });
   }
 }
 
-test('Spec создаёт карточки скриптом, Run и Core передают их card-move (а не правят файл)', () => {
+test('Spec creates cards with the script, Run and Core hand them over with card-move (not by editing the file)', () => {
   for (const engine of ENGINES) {
     const g = (n) => role(path.join(AGENTS, engine, 'agents', n + '.md'));
-    assert.ok(allows(g('spec').tools, 'new-card'), engine + '/spec: нет new-card');
-    assert.ok(allows(g('run').tools, 'card-move'), engine + '/run: нет card-move');
-    assert.ok(allows(g('core').tools, 'card-move'), engine + '/core: нет card-move');
+    assert.ok(allows(g('spec').tools, 'new-card'), engine + '/spec: no new-card');
+    assert.ok(allows(g('run').tools, 'card-move'), engine + '/run: no card-move');
+    assert.ok(allows(g('core').tools, 'card-move'), engine + '/core: no card-move');
   }
 });

@@ -80,9 +80,9 @@ for (const [mode, envPath] of modes) {
   test(`unlock-delete ${mode}: the code phrase lets exactly one deletion through`, { skip: winSkip }, () => {
     const root = project();
     const del = { tool_input: { command: 'rm -rf .claude' } };
-    run('unlock-delete.sh', root, { prompt: 'Подключи сенсорику' }, envPath);
-    assert.equal(run('guard-delete.sh', root, del, envPath).status, 2, '"Подключи" does not unlock');
-    run('unlock-delete.sh', root, { prompt: 'ок, отключи сенсорику' }, envPath);
+    run('unlock-delete.sh', root, { prompt: '\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0438 \u0441\u0435\u043d\u0441\u043e\u0440\u0438\u043a\u0443' }, envPath);
+    assert.equal(run('guard-delete.sh', root, del, envPath).status, 2, '\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0438 does not unlock');
+    run('unlock-delete.sh', root, { prompt: '\u043e\u043a, \u043e\u0442\u043a\u043b\u044e\u0447\u0438 \u0441\u0435\u043d\u0441\u043e\u0440\u0438\u043a\u0443' }, envPath);
     assert.equal(run('guard-delete.sh', root, del, envPath).status, 0, 'first deletion after the phrase passes');
     assert.equal(run('guard-delete.sh', root, del, envPath).status, 2, 'the permission does not linger');
   });

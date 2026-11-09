@@ -1,6 +1,5 @@
 {
   "allowList": [
-    "tests-fixtures",
     "skill-scripts"
   ],
   "zones": {

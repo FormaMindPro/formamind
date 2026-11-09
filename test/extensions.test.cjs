@@ -1,4 +1,4 @@
-// project/extensions/: наработки проекта переживают uninstall и переустановку; копии в каталогах движка вторичны.
+// project/extensions/: the project's own work survives uninstall and reinstall; the copies in the engine directories are secondary.
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -16,7 +16,7 @@ const read = (...s) => fs.readFileSync(p(...s), 'utf8')
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }))
 
-test('установка создаёт project/extensions/ с README и кладёт скрипт синхронизации в .forma/', () => {
+test('the install creates project/extensions/ with a README and lays the sync script into .forma/', () => {
   const r = init()
   assert.equal(r.status, 0, r.stdout + r.stderr)
   assert.ok(fs.existsSync(p('project', 'extensions', 'README.md')))
@@ -26,7 +26,7 @@ test('установка создаёт project/extensions/ с README и кла�
   assert.match(read('.claude', 'settings.json'), /sync-extensions\.sh/)
 })
 
-test('sync копирует файл проекта, помечает перекрытие файла движка, check видит правку копии', () => {
+test('sync copies the project file, marks the engine file overlap, check sees a copy edit', () => {
   fs.mkdirSync(p('project', 'extensions', 'claude', 'agents', 'run'), { recursive: true })
   fs.writeFileSync(p('project', 'extensions', 'claude', 'agents', 'run', 'run-seo.md'), '# mine\n')
   fs.writeFileSync(p('project', 'extensions', 'claude', 'agents', 'run', 'run-text.md'), '# override\n')
@@ -44,28 +44,28 @@ test('sync копирует файл проекта, помечает перек
   assert.match(c.stdout, /edited by hand: \.claude\/agents\/run\/run-seo\.md/)
   const s = ext('sync')
   assert.equal(s.status, 1)
-  assert.match(read('.claude', 'agents', 'run', 'run-seo.md'), /hand edit/) // правка не затёрта молча
+  assert.match(read('.claude', 'agents', 'run', 'run-seo.md'), /hand edit/) // the edit was not silently overwritten
 })
 
-test('uninstall: dry-run перечисляет чужие файлы, --yes переносит их в extensions/ до удаления движка', () => {
+test('uninstall: a dry-run lists the foreign files, --yes moves them into extensions/ before the engine removal', () => {
   fs.mkdirSync(p('.claude', 'scripts'), { recursive: true })
   fs.writeFileSync(p('.claude', 'scripts', 'my-tool.cjs'), 'x\n')
   const d = forma('uninstall')
   assert.match(d.stdout, /\.claude\/scripts\/my-tool\.cjs -> project\/extensions\/claude\/scripts\/my-tool\.cjs/)
   assert.match(d.stdout, /run-seo\.md\.edited/)
-  assert.doesNotMatch(d.stdout, /run-text\.md ->/) // копия, не правка
-  assert.ok(!fs.existsSync(p('project', 'extensions', 'claude', 'scripts', 'my-tool.cjs')), 'dry-run ничего не переносит')
+  assert.doesNotMatch(d.stdout, /run-text\.md ->/) // a copy, not an edit
+  assert.ok(!fs.existsSync(p('project', 'extensions', 'claude', 'scripts', 'my-tool.cjs')), 'the dry-run moves nothing')
 
   const r = forma('uninstall', '--yes')
   assert.equal(r.status, 0, r.stdout + r.stderr)
   assert.ok(!fs.existsSync(p('.claude')))
   assert.equal(read('project', 'extensions', 'claude', 'scripts', 'my-tool.cjs'), 'x\n')
   assert.match(read('project', 'extensions', 'claude', 'agents', 'run', 'run-seo.md.edited'), /hand edit/)
-  assert.equal(read('project', 'extensions', 'claude', 'agents', 'run', 'run-seo.md'), '# mine\n') // источник не тронут
+  assert.equal(read('project', 'extensions', 'claude', 'agents', 'run', 'run-seo.md'), '# mine\n') // the source untouched
   assert.doesNotMatch(read('.gitignore'), /Forma: extension copies/)
 })
 
-test('переустановка возвращает наработки в каталог движка без ручных действий', () => {
+test('a reinstall returns the work into the engine directory with no manual steps', () => {
   fs.rmSync(p('project', 'extensions', 'claude', 'agents', 'run', 'run-seo.md.edited'))
   const r = init()
   assert.equal(r.status, 0, r.stdout + r.stderr)
@@ -77,14 +77,14 @@ test('переустановка возвращает наработки в ка
   assert.equal(read('project', 'extensions', 'claude', 'agents', 'run', 'run-seo.md'), '# mine\n')
 })
 
-test('удалён источник — удалена и нетронутая копия', () => {
+test('the source removed - the untouched copy removed too', () => {
   fs.rmSync(p('project', 'extensions', 'claude', 'agents', 'run', 'run-seo.md'))
   const r = ext('sync')
   assert.match(r.stdout, /removed: \.claude\/agents\/run\/run-seo\.md/)
   assert.ok(!fs.existsSync(p('.claude', 'agents', 'run', 'run-seo.md')))
 })
 
-test('template/ копируется, затем custom/ перекрывает; check без дрейфа', () => {
+test('template/ is copied, then custom/ overrides; check without drift', () => {
   for (const layer of ['template', 'custom']) fs.mkdirSync(p('project', 'extensions', layer, 'claude', 'agents', 'run'), { recursive: true })
   const run = (layer, name, text) => fs.writeFileSync(p('project', 'extensions', layer, 'claude', 'agents', 'run', name), text)
   run('template', 'run-a.md', '# template a\n')

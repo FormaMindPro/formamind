@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 'use strict'
-// Живой эталонный прогон протокола: замер «до/после» при облегчении стартового контекста.
-// Не часть `npm test` (нужен claude и сеть, стоит денег): запуск вручную.
+// A live reference run of the protocol: a "before/after" measurement while slimming the start context.
+// Not part of `npm test` (needs claude and the network, costs money): run by hand.
 //
 //   node test/eval-start-context.cjs [--model sonnet] [--effort low] [--scenario all|gate|card] [--out report.json] [--keep]
 //
-// Каждый сценарий идёт в свежей установке (bin/forma.cjs init) во временной папке и в живой сессии `claude -p`.
-//   gate — задача «описать README»: цикл не открыт (AGENTS.md §3), карточек быть не должно.          [показатель]
-//          Базовая линия красная: Sonnet/low создаёт карточку вопреки гейту (3 прогона из 3). Следим за динамикой.
-//   handoff — карточка уже в backlog: провести её Intent → Kit → Run → проверка (три передачи).        [обязательно]
-//          Это единственный сценарий, где работает `card-move.cjs`: сценарии gate/card передач не делают.
-//   card — задача «карточка интервью»: ровно одна карточка, `check-board` без ошибок.                   [обязательно]
-//          Показатель (не блокирует): в карточке нет шаблонных заглушек `<…>` — агент заполнил поля.
-// Кроме проверок печатаются размеры стартового контекста (КБ файлов) и цена прогона: ходы, токены, $.
-// Сравнивать «до» и «после» только при одинаковых --model и --effort. Код выхода 1 — провалена обязательная проверка.
+// Every scenario runs in a fresh install (bin/forma.cjs init) in a temp directory and in a live `claude -p` session.
+//   gate - the task "describe the README": no cycle open (AGENTS.md §3), there must be no cards.        [indicator]
+//          The baseline is red: Sonnet/low creates a card despite the gate (3 runs of 3). Watching the trend.
+//   handoff - the card is already in backlog: walk it Intent -> Kit -> Run -> the check (three handoffs). [required]
+//          This is the only scenario where `card-move.cjs` works: the gate/card scenarios make no handoffs.
+//   card - the task "an interview card": exactly one card, `check-board` without errors.                  [required]
+//          An indicator (does not block): the card has no template placeholders `<...>` - the agent filled the fields.
+// Besides the checks, the start context sizes (file KB) and the run price are printed: turns, tokens, $.
+// Compare "before" and "after" only at the same --model and --effort. Exit code 1 - a required check failed.
 
 const fs = require('node:fs')
 const os = require('node:os')
@@ -22,10 +22,10 @@ const { spawnSync } = require('node:child_process')
 
 const ROOT = path.resolve(__dirname, '..')
 const TIMEOUT_MS = 290000
-// Одинаковые разрешения во всех прогонах: без них `claude -p` блокирует Bash и результаты не сравнимы.
+// The same permissions in every run: without them `claude -p` blocks Bash and the results are not comparable.
 const ALLOWED = ['Bash(node:*)', 'Bash(ls:*)', 'Bash(cat:*)']
-// Правки файлов разрешены (acceptEdits): иначе агент не сможет заполнить карточку и показатель про заглушки бессмыслен.
-// Файлы, которые попадают в контекст основной сессии при старте (AGENTS.md и правила — нативно, роль — хук).
+// File edits are allowed (acceptEdits): otherwise the agent cannot fill the card and the placeholder indicator is meaningless.
+// The files that enter the main session context at start (AGENTS.md and the rules - natively, the role - a hook).
 const START_FILES = [
   'AGENTS.md',
   '.claude/rules/claude-8.md',
@@ -33,8 +33,9 @@ const START_FILES = [
   '.claude/agents/on-demand/intent-session-start.md',
 ]
 
-// Стартовый гейт (AGENTS.md §3) честно держит агента: пока цели-образы черновик, а пороги пусты, цикл не открывают и передачу
-// агент отказывается делать. Для замера передач гейт выполняется заранее — как у человека, прошедшего интервью.
+// The start gate (AGENTS.md §3) honestly holds the agent: while the goal images are a draft and the thresholds are empty,
+// no cycle is opened and the agent refuses the handoff. For the handoff measurement the gate is passed in advance - like a
+// human who has been through the interview.
 function openGate(dir) {
   for (const c of ['resources', 'results']) {
     const f = path.join(dir, 'project', 'goals', `goal-${c}`, 'GOAL.md')
@@ -48,7 +49,7 @@ function openGate(dir) {
   if (/START STOP/.test(gate.stdout || '')) throw new Error(`gate still closed:\n${gate.stdout}`)
 }
 
-// Сценарий handoff: карточка создаётся заранее тем же скриптом, что и в рабочем проекте, — агент её только передаёт.
+// The handoff scenario: the card is created in advance by the same script as in a working project - the agent only hands it over.
 function seedCard(dir) {
   const r = sh('node', [path.join(dir, '.forma/board/new-card.cjs'), '--kind', 'analytics', '--title', 'Eval handoff card',
     '--delivers', 'a short note', '--criterion', 'the note exists', '--budget', '2 attempts', '--next', 'Intent',

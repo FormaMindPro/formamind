@@ -1,4 +1,4 @@
-// Gemini (бета) ставится установщиком; Codex и MiniMax спят (core/engines.json) — не ставится, явный запрос отклоняется.
+// Gemini (beta) is installed by the installer; Codex and MiniMax sleep (core/engines.json) - not installed, an explicit request is rejected.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -12,20 +12,20 @@ const init = (engines) => spawnSync(process.execPath, [FORMA, 'init', '--dir', d
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-test('claude,gemini: адаптер Gemini установлен, Codex не ставится, сверка целостна', () => {
+test('claude,gemini: the Gemini adapter installed, Codex not installed, the sync intact', () => {
   const r = init('claude,gemini');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   for (const f of [
     '.forma/engines.json',
     '.agents/rules/gemini-8.md', '.agents/forma-adapter.cjs', '.agents/plugins/forma/plugin.json', '.agents/plugins/forma/agents/kit.md', '.agents/plugins/forma/mcp_config.json',
   ]) assert.ok(fs.existsSync(path.join(dir, f)), f);
-  assert.ok(!fs.existsSync(path.join(dir, '.codex')), 'Codex спит — .codex/ не ставится');
+  assert.ok(!fs.existsSync(path.join(dir, '.codex')), 'Codex sleeps - .codex/ is not installed');
   assert.match(r.stdout, /Gemini \(Antigravity\)/);
   assert.doesNotMatch(r.stdout, /Codex/);
   assert.match(r.stdout, /install is intact/);
 });
 
-test('повторный запуск не затирает mcp_config.json проекта', () => {
+test('a second run does not overwrite the project mcp_config.json', () => {
   const mcp = path.join(dir, '.agents', 'plugins', 'forma', 'mcp_config.json');
   fs.writeFileSync(mcp, '{"mcpServers":{"site":{}}}');
   const r = init('claude,gemini');
@@ -33,7 +33,7 @@ test('повторный запуск не затирает mcp_config.json пр
   assert.match(fs.readFileSync(mcp, 'utf8'), /"site"/);
 });
 
-test('--engines codex: спящий движок отклоняется кодом 2, ничего не ставится', () => {
+test('--engines codex: a dormant engine is rejected with code 2, nothing is installed', () => {
   const d2 = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-engines2-'));
   try {
     const r = spawnSync(process.execPath, [FORMA, 'init', '--dir', d2, '--engines', 'codex', '--board', 'skip', '--yes'], { encoding: 'utf8' });
@@ -43,7 +43,7 @@ test('--engines codex: спящий движок отклоняется кодо
   } finally { fs.rmSync(d2, { recursive: true, force: true }); }
 });
 
-test('--engines minimax: спящий движок отклоняется кодом 2, ничего не ставится', () => {
+test('--engines minimax: a dormant engine is rejected with code 2, nothing is installed', () => {
   const d2 = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-engines3-'));
   try {
     const r = spawnSync(process.execPath, [FORMA, 'init', '--dir', d2, '--engines', 'minimax', '--board', 'skip', '--yes'], { encoding: 'utf8' });
@@ -54,14 +54,14 @@ test('--engines minimax: спящий движок отклоняется код
   } finally { fs.rmSync(d2, { recursive: true, force: true }); }
 });
 
-test('справка --engines не предлагает minimax как выбор', () => {
+test('the --engines help does not offer minimax as a choice', () => {
   const r = spawnSync(process.execPath, [FORMA, 'init', '--help'], { encoding: 'utf8' });
   const line = r.stdout.split(String.fromCharCode(10)).find((l) => l.includes('--engines'));
   assert.match(line, /minimax are dormant/);
   assert.ok(!line.includes('claude[,minimax'));
 });
 
-test('установка по умолчанию: ни .minimax/, ни miniapps/minimax-engine/', () => {
+test('the default install: neither .minimax/ nor miniapps/minimax-engine/', () => {
   const d3 = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-engines4-'));
   try {
     const r = spawnSync(process.execPath, [FORMA, 'init', '--dir', d3, '--board', 'skip', '--yes'], { encoding: 'utf8' });
@@ -72,18 +72,18 @@ test('установка по умолчанию: ни .minimax/, ни miniapps/
   } finally { fs.rmSync(d3, { recursive: true, force: true }); }
 });
 
-test('claude,zcode: адаптер ZCode установлен, .state не едет, зеркало скиллов на месте, адаптер цел на свежей машине', () => {
+test('claude,zcode: the ZCode adapter installed, .state not shipped, the skill mirror in place, the adapter intact on a fresh machine', () => {
   const r = init('claude,zcode');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   for (const f of [
     '.zcode/rules/zcode-8.md', '.zcode/forma-adapter.cjs', '.zcode/scripts/gen-roles.cjs',
     '.zcode/tests/test-zcode-adapter.cjs', '.zcode/agents/intent.md', '.agents/skills/grilling',
   ]) assert.ok(fs.existsSync(path.join(dir, f)), f);
-  assert.ok(!fs.existsSync(path.join(dir, '.zcode', '.state')), 'машинное состояние .state/ не едет в чужой проект');
+  assert.ok(!fs.existsSync(path.join(dir, '.zcode', '.state')), 'the .state/ machine state is not shipped into someone else\'s project');
   assert.match(r.stdout, /ZCode: .*— installed/);
   assert.match(r.stdout, /gen-roles: role mirror rebuilt/);
-  // Регресс красного v0.0.5: конформность адаптера целиком на свежей установке. ZCODE_HOME
-  // подменяется на пустой rollout — проверка не зависит от того, стоит ли ZCode на этой машине.
+  // The v0.0.5 red regression: the adapter conformance entirely on a fresh install. ZCODE_HOME
+  // is swapped to an empty rollout - the check does not depend on whether ZCode sits on this machine.
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'zcode-home-'));
   fs.mkdirSync(path.join(home, 'cli', 'rollout'), { recursive: true });
   try {
@@ -93,14 +93,14 @@ test('claude,zcode: адаптер ZCode установлен, .state не ед�
   } finally { fs.rmSync(home, { recursive: true, force: true }); }
 });
 
-test('--engines zcode: claude ставится ядром автоматически, скиллы на месте', () => {
+test('--engines zcode: claude is installed by the core automatically, the skills in place', () => {
   const d4 = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-engines5-'));
   try {
     const r = spawnSync(process.execPath, [FORMA, 'init', '--dir', d4, '--engines', 'zcode', '--board', 'skip', '--yes'], { encoding: 'utf8' });
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.ok(fs.existsSync(path.join(d4, '.zcode', 'forma-adapter.cjs')), '.zcode/ не поставлен');
-    assert.ok(fs.existsSync(path.join(d4, '.claude', 'rules')), 'claude не поставлен ядром');
-    assert.ok(fs.existsSync(path.join(d4, '.agents', 'skills')), 'общее зеркало скиллов не поставлено');
-    assert.ok(!fs.existsSync(path.join(d4, '.zcode', '.state')), 'машинное состояние не едет');
+    assert.ok(fs.existsSync(path.join(d4, '.zcode', 'forma-adapter.cjs')), '.zcode/ was not installed');
+    assert.ok(fs.existsSync(path.join(d4, '.claude', 'rules')), 'claude was not installed by the core');
+    assert.ok(fs.existsSync(path.join(d4, '.agents', 'skills')), 'the shared skill mirror was not installed');
+    assert.ok(!fs.existsSync(path.join(d4, '.zcode', '.state')), 'the machine state is not shipped');
   } finally { fs.rmSync(d4, { recursive: true, force: true }); }
 });
