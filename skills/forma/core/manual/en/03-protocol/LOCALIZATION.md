@@ -56,3 +56,25 @@ All bundled scaffold packages are subject to strict structural parity:
 - The `test/scaffold-parity.test.cjs` test validates that the file tree of `en` and each localized scaffold package match 1:1;
 - For every markdown document, heading counts and levels (`#` and `##`, via `skeletonOf`) and machine anchor sequences (`<!-- k:... -->`) must be identical.
 
+## Scaffold synchronization utility (scaffold-sync)
+
+To prevent drift between the canonical English scaffold and localized packages (`templates/_scaffold/<lang>`), the protocol includes `scripts/scaffold-sync.cjs`:
+
+```bash
+# Verify parity across all bundled language packages
+node scripts/scaffold-sync.cjs --check
+
+# Check a specific language package
+node scripts/scaffold-sync.cjs --lang ru
+
+# Output machine-readable JSON status
+node scripts/scaffold-sync.cjs --json
+```
+
+The tool inspects:
+1. Missing or unexpected extraneous files;
+2. Machine anchor additions, removals, or renames (`<!-- k:... -->`);
+3. Heading hierarchy mismatches (`#` through `####`);
+4. Key structure parity in JSON templates (`resources.rules.json`).
+
+
