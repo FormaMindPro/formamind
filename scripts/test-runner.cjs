@@ -156,6 +156,15 @@ function main() {
     env: process.env,
   });
 
+  // Reaping any orphaned test processes left behind in the temp directory
+  if (process.platform === 'win32' && tmpInfo && tmpInfo.path) {
+    try {
+      const normTmp = path.normalize(tmpInfo.path).replace(/\\/g, '\\\\');
+      const reapCmd = `Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object { $_.CommandLine -like '*${normTmp}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`;
+      spawnSync('powershell', ['-NoProfile', '-Command', reapCmd], { stdio: 'ignore', timeout: 5000 });
+    } catch {}
+  }
+
   process.exit(res.status ?? (res.error ? 1 : 0));
 }
 

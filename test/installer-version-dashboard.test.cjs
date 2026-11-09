@@ -21,44 +21,75 @@ const manifestFile = (dir) => path.join(dir, '.forma', 'install-manifest.json');
 
 test('version line: installed, refreshed, updated', () => {
   const dir = tmp('forma-v-'), home = tmp('forma-h-');
-  let r = install(dir, home);
-  assert.equal(r.status, 0, r.out);
-  assert.match(r.out, new RegExp(`✓ Forma ${VERSION.replace(/\./g, '\\.')} installed\\.`));
-  r = install(dir, home);
-  assert.match(r.out, new RegExp(`Forma ${VERSION.replace(/\./g, '\\.')} — already this version`));
-  const m = JSON.parse(fs.readFileSync(manifestFile(dir), 'utf8'));
-  m.version = '0.0.0';
-  fs.writeFileSync(manifestFile(dir), JSON.stringify(m));
-  r = install(dir, home);
-  assert.match(r.out, new RegExp(`Forma updated: 0\\.0\\.0 → ${VERSION.replace(/\./g, '\\.')}\\.`));
-  assert.equal(JSON.parse(fs.readFileSync(manifestFile(dir), 'utf8')).version, VERSION);
+  try {
+    let r = install(dir, home);
+    assert.equal(r.status, 0, r.out);
+    assert.match(r.out, new RegExp(`✓ Forma ${VERSION.replace(/\./g, '\\.')} installed\\.`));
+    r = install(dir, home);
+    assert.match(r.out, new RegExp(`Forma ${VERSION.replace(/\./g, '\\.')} — already this version`));
+    const m = JSON.parse(fs.readFileSync(manifestFile(dir), 'utf8'));
+    m.version = '0.0.0';
+    fs.writeFileSync(manifestFile(dir), JSON.stringify(m));
+    r = install(dir, home);
+    assert.match(r.out, new RegExp(`Forma updated: 0\\.0\\.0 → ${VERSION.replace(/\./g, '\\.')}\\.`));
+    assert.equal(JSON.parse(fs.readFileSync(manifestFile(dir), 'utf8')).version, VERSION);
+  } finally {
+    try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }); } catch {}
+    try { fs.rmSync(home, { recursive: true, force: true, maxRetries: 5 }); } catch {}
+  }
 });
 
 test('dashboard: without a terminal the installer prints the start command and does not start it', () => {
   const dir = tmp('forma-d-'), home = tmp('forma-h-');
-  const r = install(dir, home);
-  assert.match(r.out, /Dashboard: node \.forma\/dashboard\/ensure-running\.js/);
-  assert.equal(fs.existsSync(path.join(dir, '.forma', 'dashboard', '.cache', 'server.json')), false);
-  const no = install(dir, home, ['--no-dashboard']);
-  assert.match(no.out, /Dashboard: node \.forma\/dashboard\/ensure-running\.js/);
+  try {
+    const r = install(dir, home);
+    assert.match(r.out, /Dashboard: node \.forma\/dashboard\/ensure-running\.js/);
+    assert.equal(fs.existsSync(path.join(dir, '.forma', 'dashboard', '.cache', 'server.json')), false);
+    const no = install(dir, home, ['--no-dashboard']);
+    assert.match(no.out, /Dashboard: node \.forma\/dashboard\/ensure-running\.js/);
+  } finally {
+    try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }); } catch {}
+    try { fs.rmSync(home, { recursive: true, force: true, maxRetries: 5 }); } catch {}
+  }
 });
 
 test('dashboard: --dashboard starts it and prints its address', async () => {
   const dir = tmp('forma-d-'), home = tmp('forma-h-');
   const cache = path.join(dir, '.forma', 'dashboard', '.cache', 'server.json');
+  const supCache = path.join(dir, '.forma', 'dashboard', '.cache', 'supervisor.json');
   let info = null;
   try {
     const r = install(dir, home, ['--dashboard']);
     assert.equal(r.status, 0, r.out);
-    info = JSON.parse(fs.readFileSync(cache, 'utf8'));
+    for (let i = 0; i < 60; i++) {
+      if (fs.existsSync(cache)) {
+        try { info = JSON.parse(fs.readFileSync(cache, 'utf8')); if (info && info.url) break; } catch {}
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+    }
+    assert.ok(info && info.url, 'server.json must be written: ' + r.out);
     assert.ok(r.out.includes(`Dashboard: ${info.url}`), r.out);
     const res = await fetch(info.url);
     assert.equal(res.status, 200);
   } finally {
+    try {
+      const sup = JSON.parse(fs.readFileSync(supCache, 'utf8'));
+      if (sup && sup.pid) { try { process.kill(sup.pid); } catch { /* already gone */ } }
+    } catch { /* no supervisor file */ }
     if (info && info.pid) { try { process.kill(info.pid); } catch { /* already gone */ } }
-    try { // the supervisor would restart the server: stop it too
-      const ps = spawnSync('pkill', ['-f', path.join(dir, '.forma', 'dashboard')]);
-      void ps;
-    } catch { /* no pkill */ }
+    if (process.platform === 'win32') {
+      try {
+        const normDir = path.normalize(dir).replace(/\\/g, '\\\\');
+        const script = `Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object { $_.CommandLine -like '*${normDir}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`;
+        spawnSync('powershell', ['-NoProfile', '-Command', script], { stdio: 'ignore', timeout: 5000 });
+      } catch {}
+    } else {
+      try {
+        const ps = spawnSync('pkill', ['-f', path.join(dir, '.forma', 'dashboard')]);
+        void ps;
+      } catch { /* no pkill */ }
+    }
+    try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }); } catch {}
+    try { fs.rmSync(home, { recursive: true, force: true, maxRetries: 5 }); } catch {}
   }
 });

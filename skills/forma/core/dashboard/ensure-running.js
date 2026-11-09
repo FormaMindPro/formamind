@@ -33,6 +33,7 @@ const WATCH_PATH = path.join(__dirname, 'watch.js');
 const CACHE_DIR = path.join(__dirname, '.cache');
 const LOG_FILE = path.join(CACHE_DIR, 'watch.log');
 const SERVER_FILE = path.join(CACHE_DIR, 'server.json');
+const SUPERVISOR_FILE = path.join(CACHE_DIR, 'supervisor.json');
 
 // process.kill(pid, 0) sends no signal - the standard way to learn whether the process exists,
 // without side effects. ESRCH - there is no process (a stale file); EPERM - the process exists,
@@ -40,6 +41,17 @@ const SERVER_FILE = path.join(CACHE_DIR, 'server.json');
 function pidAlive(pid) {
   try { process.kill(pid, 0); return true; }
   catch (err) { return err.code === 'EPERM'; }
+}
+
+function readSupervisorFile() {
+  try {
+    const info = JSON.parse(fs.readFileSync(SUPERVISOR_FILE, 'utf8'));
+    const pid = Number(info.pid);
+    if (Number.isInteger(pid) && pid > 0) return { pid };
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function readServerFile() {
@@ -82,6 +94,12 @@ async function main() {
   const { alive, port } = await checkAlive();
   if (alive) {
     console.log(ruMsg('ensure.already_running', { port }));
+    return;
+  }
+
+  const sup = readSupervisorFile();
+  if (sup && pidAlive(sup.pid)) {
+    console.log(ruMsg('ensure.supervisor_up', { pid: sup.pid, log: path.relative(process.cwd(), LOG_FILE) }));
     return;
   }
 

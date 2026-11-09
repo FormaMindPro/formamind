@@ -697,10 +697,10 @@ function startDashboard(root) {
   const script = path.join(root, '.forma', 'dashboard', 'ensure-running.js')
   if (!fs.existsSync(script)) return null
   spawnSync(process.execPath, [script], { cwd: root, stdio: 'ignore', timeout: 15000 })
-  for (let i = 0; i < 60; i++) { // up to ~6 s for the server to write its address
+  for (let i = 0; i < 150; i++) { // up to ~15 s for the server to write its address
     const url = dashboardUrl(root)
     if (url) return url
-    spawnSync(process.execPath, ['-e', 'setTimeout(() => {}, 100)'], { stdio: 'ignore' })
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100)
   }
   return null
 }
