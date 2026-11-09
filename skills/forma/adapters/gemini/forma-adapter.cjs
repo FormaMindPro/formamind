@@ -15,7 +15,11 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
-const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
+const i18n = require([
+  path.resolve(__dirname, '../.forma/i18n/index.cjs'),
+  path.resolve(__dirname, '../../.forma/i18n/index.cjs'),
+  path.resolve(__dirname, '../../core/i18n/index.cjs'),
+].find((p) => fs.existsSync(p)));
 const msg = (code, params) => i18n.message(code, params, 'ru');
 
 function resolveModule(candidates) {
