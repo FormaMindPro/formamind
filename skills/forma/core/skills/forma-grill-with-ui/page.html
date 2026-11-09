@@ -27,6 +27,7 @@
   header h1 { font-family: var(--serif); font-weight: 500; font-size: 20px; margin: 0; }
   header .path { color: var(--ink-3); font-size: 13px; }
   header .status { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); } header .status .spin { color: var(--stage); }
+  header .lang { font: inherit; font-size: 13px; color: var(--ink-2); background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 4px 6px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
   .dot.working { background: var(--stage); animation: pulse 1.2s ease-in-out infinite; }
   .dot.gone { background: var(--ink-3); }
@@ -63,7 +64,7 @@
   .item .mark { font-size: 11px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 4px; }
   .item .mark svg { width: 12px; height: 12px; }
   .mark.answered { color: var(--ok); } .mark.open, .mark.reopened { color: var(--accent); } .mark.staged { color: var(--stage); font-weight: 600; } .mark.pending { color: var(--stage); }
-  .item.updated .t::after { content: "обновлено"; font-size: 10px; color: var(--stage); margin-left: 6px; letter-spacing: .06em; text-transform: uppercase; }
+  .item.updated .t::after { content: attr(data-upd); font-size: 10px; color: var(--stage); margin-left: 6px; letter-spacing: .06em; text-transform: uppercase; }
   nav .empty { padding: 20px; font-size: 13px; color: var(--ink-3); }
 
   /* Visualize view: the list and card columns give way to the visual; the right panel becomes its feedback. */
@@ -175,151 +176,459 @@
 <header>
   <h1 id="topic">grill</h1>
   <span class="path" id="doc-path"></span>
-  <button id="terms-toggle" type="button">Термины</button>
+  <button id="terms-toggle" type="button" data-i18n="terms"></button>
   <div id="terms"></div>
-  <button id="visualize" type="button" hidden>Визуализация</button>
-  <span class="status"><span class="dot" id="agent-dot"></span><span id="agent-status">подключение…</span></span>
+  <button id="visualize" type="button" hidden data-i18n="visualize"></button>
+  <span class="status"><span class="dot" id="agent-dot"></span><span id="agent-status" data-i18n="connecting"></span></span>
+  <select id="lang" class="lang" aria-label="Language"></select>
   <div id="progress"></div>
 </header>
-<nav id="nav"><div class="empty">Подключение…</div></nav>
+<nav id="nav"><div class="empty" data-i18n="connectingNav"></div></nav>
 <main id="main"></main>
-<section id="visual"><div id="visual-strip"></div><div id="visual-wait" hidden><span class="spin"></span>Рисуем первую версию…</div><iframe id="visual-frame" title="Визуал" sandbox="allow-scripts"></iframe></section>
+<section id="visual"><div id="visual-strip"></div><div id="visual-wait" hidden><span class="spin"></span><span data-i18n="drawingFirst"></span></div><iframe id="visual-frame" data-i18n-title="visualTitle" sandbox="allow-scripts"></iframe></section>
 <aside id="aside"></aside>
 <footer>
   <span class="staged-list" id="staged-list"></span>
   <span class="warn" id="send-why"></span>
-  <span class="hint">⌘↩ отправить</span>
+  <span class="hint" data-i18n="sendHint"></span>
   <span id="finish-area"></span>
-  <button class="primary" id="send" type="button" disabled>Отправить агенту</button>
+  <button class="primary" id="send" type="button" disabled data-i18n="sendToAgent"></button>
 </footer>
 <script>
 "use strict";
 
-// ---- translations (T) — единственная точка правки текста интерфейса; ----
-// код ниже обращается к T, а не хранит английские/русские строки инлайн — так
-// диффы апстрима остаются логическими правками, не текстовыми.
-const T = {
-  terms: "Термины",
-  termsWithCount: (n) => `Термины${n ? " · " + n : ""}`,
-  visualize: "Визуализация",
-  visualizeBack: "Вопросы",
-  wideOn: "Во всё окно",
-  wideOff: "Режим общения",
-  wideOnHint: "Развернуть визуал на всё окно — когда детали слишком мелкие (Esc — обратно)",
-  wideOffHint: "Вернуть колонку обратной связи",
-  visualLabel: (v) => `Визуал · v${v}`,
-  visualizing: "Визуализация…",
-  visualizeHint: "Нарисовать прототип или диаграмму текущего замысла",
-  connecting: "подключение…",
-  connectingNav: "Подключение…",
-  drawingFirst: "Рисуем первую версию…",
-  sendToAgent: "Отправить агенту",
-  sendNToAgent: (n) => `Отправить агенту (${n})`,
-  drawStuck: "Рисование идёт больше 10 минут; перегенерируйте, чтобы попробовать снова.",
-  serverGone: "сервер недоступен",
-  agentBusyWarn: (t) => `Агент работает уже ${t}; возможно, он не слушает.`,
-  sendWaitingWarn: (seq, ms) => `Отправка #${seq} ушла ${ms} назад, агент ещё не забрал её. Отвечать дальше можно — отправки разбираются по порядку.`,
-  sendFailed: "Отправка не удалась: ",
-  noServer: "нет связи с сервером",
-  finishedBanner: (doc, visual, at) => `Завершено · документ записан в ${doc}${visual ? ", визуал — в " + visual : ""}${at ? " в " + at : ""}.`,
-  serverGoneBanner: "Сервер недоступен. Возобновите грилл из терминала — вкладка переподключится сама.",
-  avoid: "Не использовать: ",
-  noTermsYet: "Пока нет терминов. Агент добавляет их сюда по мере того, как они устаканиваются.",
-  agentBusyTitle: "агент занят",
-  diagram: "Диаграмма",
-  prototype: "Прототип",
-  firstVersionOnWay: "первая версия уже в пути",
-  outOfDate: "Устарело · перегенерируйте, чтобы учесть последние решения",
-  regenerating: "перегенерация…",
-  regenerate: "Перегенерировать",
-  agentWorking: (t) => `Агент работает · ${t}`,
-  agentWaiting: (since, handled) => `Агент ждёт вас${since ? " · с " + since : ""}${handled ? " · обработано #" + handled : ""}`,
-  waitingFirstRound: "Ждём первый раунд…",
-  round: (r) => `Раунд ${r}`,
-  currentSuffix: " · текущий",
-  pickQuestion: "Выберите вопрос слева.",
-  noQuestionsYet: "Пока нет вопросов.",
-  crumbRound: (r) => `раунд ${r}`,
-  after: (list) => `после ${list}`,
-  root: "корень",
-  durable: "трудно обратимо",
-  recUpdated: "рекомендация обновлена",
-  deferred: "отложено",
-  reopened: "переоткрыто",
-  statusOpen: "открыт",
-  recommended: "Рекомендовано",
-  yourAnswer: "Ваш ответ",
-  yourAnswerSending: "Ваш ответ · ушло",
-  whyOption: (o) => `Почему ${o}.`,
-  suggested: "Предложено.",
-  stagedDefer: "В очереди: отложить этот вопрос",
-  stagedReopen: "В очереди: переоткрыть этот вопрос",
-  stagedAccept: (o) => `В очереди: принять ${o}`,
-  stagedOption: (o) => `В очереди: вариант ${o}`,
-  // Показываем текст целиком: обрезка прятала бы то, что человек уже надиктовал,
-  // и потерю части снова было бы не видно.
-  stagedText: (t) => `В очереди текст: «${t}»`,
-  stagedTextParts: (n) => ` · частей: ${n}`,
-  clear: "очистить",
-  bitDefer: "отложить",
-  bitReopen: "переоткрыть",
-  sentWaiting: (bits) => `Отправлено: ${bits} по этому вопросу — ушло, агент разбирает`,
-  placeholderChange: "Измените ответ или добавьте нюанс…",
-  placeholderFreeText: "Свободный ответ, если ни один вариант не подходит…",
-  placeholderYourAnswer: "Ваш ответ…",
-  stageText: "Отправить текст в очередь",
-  deferThis: "Отложить этот вопрос",
-  reopenThis: "Переоткрыть этот вопрос",
-  exploring: "Изучаем…",
-  exploreAgain: "Изучить ещё раз",
-  exploreDeeper: "Изучить глубже",
-  discussion: "Обсуждение",
-  message: (n) => `${n} ${ruPlural(n, ["сообщение", "сообщения", "сообщений"])}`,
-  who: (w) => (w === "agent" ? "агент" : "вы"),
-  sendingSuffix: "ушло",
-  stagedSuffix: "в очереди",
-  remove: "Удалить",
-  emptyThreadQuestion: "Пока ничего нет. Спросите что угодно об этом вопросе — агент ответит здесь при следующей отправке.",
-  threadPlaceholder: (id) => `Уточнить по ${id}…`,
-  addToDiscussion: "Добавить в обсуждение",
-  prosAndCons: (at) => `Плюсы и минусы${at ? " · " + at : ""}`,
-  pros: "Плюсы",
-  cons: "Минусы",
-  exploringWait: "Изучаем: агент составляет таблицу плюсов и минусов по этому вопросу.",
-  visualFeedback: "Обратная связь по визуалу",
-  emptyThreadVisual: "Пока ничего нет. Опишите, что не так или чего не хватает в визуале — агент перерисует его при следующей отправке. Если замечание противоречит уже отвеченному вопросу, этот вопрос будет переоткрыт для вас.",
-  feedbackPlaceholder: "Замечание по визуалу…",
-  addFeedback: "Добавить замечание",
-  optionArrow: (o) => `→ ${o}`,
-  optionArrowText: "→ текст",
-  msgCountShort: (n) => `+${n} сообщ.`,
-  visualMsgCountShort: (n) => `визуал +${n} сообщ.`,
-  sentSeqWaiting: (seq) => `Отправлено #${seq} — ушло. Агент разбирает, отвечать можно дальше.`,
-  finished: "завершено",
-  finishedFooter: "Этот грилл завершён.",
-  nothingStaged: "Ничего не в очереди. Выберите вариант или напишите в обсуждении.",
-  attachFile: "Приложить файл",
-  attaching: (name) => `Отправляю ${name}…`,
-  attached: (n) => `Приложено файлов: ${n}`,
-  attachFailed: (name, why) => `${name} не приложился: ${why}`,
-  attachFormats: "doc · xlsx · pdf · txt · md · изображение — до 10 МБ",
-  attachHint: "Уходит сразу и привязывается к этому вопросу. Нужное для интервью, а не архив: то, что короче показать, чем рассказать.",
-  attachTooBig: (name, mb) => `${name} — ${mb} МБ, это больше 10. Пришлите выжимку или страницу, а не весь файл.`,
-  finishSent: "Завершение ушло. Агент записывает документ — страница обновится сама.",
-  finishStale: (seq, ms) => `Завершение #${seq} ушло ${ms} назад, агент его ещё не забрал. Ничего не потеряно: оно записано на диск и будет обработано. Вкладку можно закрыть — ответы сохранены.`,
-  finishConfirm: "Завершить этот грилл? Всё, что в очереди, уйдёт вместе с этим; агент запишет документ и остановится.",
-  finish: "Завершить",
-  cancel: "Отмена",
-  finishReadyTitle: "Все вопросы закрыты. Завершение запишет документ.",
-  finishGrill: "Завершить грилл",
-  micStart: "Наговорить голосом",
-  micStop: "Остановить запись",
+// ---- i18n: словари и выбор языка — по образцу дашборда ----
+// Страница — один файл, а её сервер не отдаёт статику, поэтому словари едут внутри неё;
+// рядом лежат канонические locales/en.json и locales/ru.json с теми же данными — тест
+// сверяет встроенную копию с файлами и парность en/ru. Язык: сохранённый выбор
+// (localStorage "forma.lang", как в дашборде), иначе язык клиента; переключатель — select#lang.
+const DICTS = {
+  "en": {
+    "_meta.name": "English",
+    "terms": "Terms",
+    "termsWithCount": "Terms · {n}",
+    "visualize": "Visualize",
+    "visualizeBack": "Questions",
+    "wideOn": "Full window",
+    "wideOff": "Conversation mode",
+    "wideOnHint": "Expand the visual to the full window — when the details are too small (Esc to go back)",
+    "wideOffHint": "Bring back the feedback column",
+    "visualTitle": "Visual",
+    "visualLabel": "Visual · v{v}",
+    "visualizing": "Visualizing…",
+    "visualizeHint": "Draw a prototype or a diagram of the current intent",
+    "connecting": "connecting…",
+    "connectingNav": "Connecting…",
+    "drawingFirst": "Drawing the first version…",
+    "sendToAgent": "Send to agent",
+    "sendNToAgent": "Send to agent ({n})",
+    "sendHint": "⌘↩ send",
+    "drawStuck": "The draw has been running for over 10 minutes; regenerate to try again.",
+    "serverGone": "server unreachable",
+    "agentBusyWarn": "The agent has been working for {t}; it may not be listening.",
+    "sendWaitingWarn": "Send #{seq} went out {ms} ago, the agent has not picked it up yet. You can keep answering — sends are processed in order.",
+    "sendFailed": "Send failed: ",
+    "noServer": "no connection to the server",
+    "finishedBanner": "Finished · the document is written to {doc}{visual}{at}.",
+    "finishedVisual": ", the visual — to {visual}",
+    "finishedAt": " at {at}",
+    "serverGoneBanner": "The server is unreachable. Resume the grill from the terminal — the tab will reconnect on its own.",
+    "avoid": "Avoid: ",
+    "noTermsYet": "No terms yet. The agent adds them here as they settle.",
+    "agentBusyTitle": "agent busy",
+    "diagram": "Diagram",
+    "prototype": "Prototype",
+    "firstVersionOnWay": "the first version is already on its way",
+    "outOfDate": "Stale · regenerate to take the latest decisions into account",
+    "regenerating": "regenerating…",
+    "regenerate": "Regenerate",
+    "agentWorking": "Agent working · {t}",
+    "agentWaiting": "Agent waiting for you{since}{handled}",
+    "agentWaitingSince": " · since {since}",
+    "agentWaitingHandled": " · handled #{handled}",
+    "waitingFirstRound": "Waiting for the first round…",
+    "round": "Round {r}",
+    "currentSuffix": " · current",
+    "pickQuestion": "Pick a question on the left.",
+    "noQuestionsYet": "No questions yet.",
+    "crumbRound": "round {r}",
+    "after": "after {list}",
+    "root": "root",
+    "durable": "hard to reverse",
+    "recUpdated": "recommendation updated",
+    "updatedMark": "updated",
+    "deferred": "deferred",
+    "reopened": "reopened",
+    "statusOpen": "open",
+    "recommended": "Recommended",
+    "yourAnswer": "Your answer",
+    "yourAnswerSending": "Your answer · sent",
+    "whyOption": "Why {o}.",
+    "suggested": "Suggested.",
+    "stagedDefer": "Staged: defer this question",
+    "stagedReopen": "Staged: reopen this question",
+    "stagedAccept": "Staged: accept {o}",
+    "stagedOption": "Staged: option {o}",
+    "stagedText": "Staged text: “{t}”",
+    "stagedTextParts": " · parts: {n}",
+    "clear": "clear",
+    "bitDefer": "defer",
+    "bitReopen": "reopen",
+    "sentWaiting": "Sent: {bits} on this question — out, the agent is processing",
+    "placeholderChange": "Change the answer or add a nuance…",
+    "placeholderFreeText": "A free answer if none of the options fits…",
+    "placeholderYourAnswer": "Your answer…",
+    "stageText": "Stage the text",
+    "deferThis": "Defer this question",
+    "reopenThis": "Reopen this question",
+    "exploring": "Exploring…",
+    "exploreAgain": "Explore again",
+    "exploreDeeper": "Explore deeper",
+    "discussion": "Discussion",
+    "message": {
+      "one": "{n} message",
+      "other": "{n} messages"
+    },
+    "whoAgent": "agent",
+    "whoUser": "you",
+    "sendingSuffix": "sent",
+    "stagedSuffix": "staged",
+    "stagedN": "{n} queued",
+    "remove": "Remove",
+    "emptyThreadQuestion": "Nothing here yet. Ask anything about this question — the agent will answer here on the next send.",
+    "threadPlaceholder": "Clarify {id}…",
+    "addToDiscussion": "Add to the discussion",
+    "prosAndCons": "Pros and cons{at}",
+    "prosAndConsAt": " · {at}",
+    "pros": "Pros",
+    "cons": "Cons",
+    "exploringWait": "Exploring: the agent is building a pros-and-cons table for this question.",
+    "visualFeedback": "Visual feedback",
+    "emptyThreadVisual": "Nothing here yet. Describe what is wrong or missing in the visual — the agent will redraw it on the next send. If a remark contradicts an already answered question, that question will be reopened for you.",
+    "feedbackPlaceholder": "A remark on the visual…",
+    "addFeedback": "Add a remark",
+    "optionArrow": "→ {o}",
+    "optionArrowText": "→ text",
+    "msgCountShort": "+{n} msgs.",
+    "visualMsgCountShort": "visual +{n} msgs.",
+    "sentSeqWaiting": "Sent #{seq} — out. The agent is processing, you can keep answering.",
+    "finished": "finished",
+    "finishedFooter": "This grill is finished.",
+    "nothingStaged": "Nothing staged. Pick an option or write in the discussion.",
+    "attachFile": "Attach a file",
+    "attaching": "Sending {name}…",
+    "attached": "Files attached: {n}",
+    "attachFailed": "{name} failed to attach: {why}",
+    "attachFormats": "doc · xlsx · pdf · txt · md · image — up to 10 MB",
+    "attachHint": "It goes out right away and is bound to this question. Interview material, not an archive: what is shorter to show than to tell.",
+    "attachTooBig": "{name} is {mb} MB, over the limit of 10. Send a summary or a page, not the whole file.",
+    "finishSent": "The finish is out. The agent is writing the document — the page will update on its own.",
+    "finishStale": "Finish #{seq} went out {ms} ago, the agent has not picked it up yet. Nothing is lost: it is written to disk and will be processed. You can close the tab — the answers are saved.",
+    "finishConfirm": "Finish this grill? Everything staged will go out with it; the agent will write the document and stop.",
+    "finish": "Finish",
+    "cancel": "Cancel",
+    "finishReadyTitle": "All questions are closed. Finishing will write the document.",
+    "finishGrill": "Finish the grill",
+    "micStart": "Dictate by voice",
+    "micStop": "Stop recording",
+    "langLabel": "Language"
+  },
+  "ru": {
+    "_meta.name": "Русский",
+    "terms": "Термины",
+    "termsWithCount": "Термины · {n}",
+    "visualize": "Визуализация",
+    "visualizeBack": "Вопросы",
+    "wideOn": "Во всё окно",
+    "wideOff": "Режим общения",
+    "wideOnHint": "Развернуть визуал на всё окно — когда детали слишком мелкие (Esc — обратно)",
+    "wideOffHint": "Вернуть колонку обратной связи",
+    "visualTitle": "Визуал",
+    "visualLabel": "Визуал · v{v}",
+    "visualizing": "Визуализация…",
+    "visualizeHint": "Нарисовать прототип или диаграмму текущего замысла",
+    "connecting": "подключение…",
+    "connectingNav": "Подключение…",
+    "drawingFirst": "Рисуем первую версию…",
+    "sendToAgent": "Отправить агенту",
+    "sendNToAgent": "Отправить агенту ({n})",
+    "sendHint": "⌘↩ отправить",
+    "drawStuck": "Рисование идёт больше 10 минут; перегенерируйте, чтобы попробовать снова.",
+    "serverGone": "сервер недоступен",
+    "agentBusyWarn": "Агент работает уже {t}; возможно, он не слушает.",
+    "sendWaitingWarn": "Отправка #{seq} ушла {ms} назад, агент ещё не забрал её. Отвечать дальше можно — отправки разбираются по порядку.",
+    "sendFailed": "Отправка не удалась: ",
+    "noServer": "нет связи с сервером",
+    "finishedBanner": "Завершено · документ записан в {doc}{visual}{at}.",
+    "finishedVisual": ", визуал — в {visual}",
+    "finishedAt": " в {at}",
+    "serverGoneBanner": "Сервер недоступен. Возобновите грилл из терминала — вкладка переподключится сама.",
+    "avoid": "Не использовать: ",
+    "noTermsYet": "Пока нет терминов. Агент добавляет их сюда по мере того, как они устаканиваются.",
+    "agentBusyTitle": "агент занят",
+    "diagram": "Диаграмма",
+    "prototype": "Прототип",
+    "firstVersionOnWay": "первая версия уже в пути",
+    "outOfDate": "Устарело · перегенерируйте, чтобы учесть последние решения",
+    "regenerating": "перегенерация…",
+    "regenerate": "Перегенерировать",
+    "agentWorking": "Агент работает · {t}",
+    "agentWaiting": "Агент ждёт вас{since}{handled}",
+    "agentWaitingSince": " · с {since}",
+    "agentWaitingHandled": " · обработано #{handled}",
+    "waitingFirstRound": "Ждём первый раунд…",
+    "round": "Раунд {r}",
+    "currentSuffix": " · текущий",
+    "pickQuestion": "Выберите вопрос слева.",
+    "noQuestionsYet": "Пока нет вопросов.",
+    "crumbRound": "раунд {r}",
+    "after": "после {list}",
+    "root": "корень",
+    "durable": "трудно обратимо",
+    "recUpdated": "рекомендация обновлена",
+    "updatedMark": "обновлено",
+    "deferred": "отложено",
+    "reopened": "переоткрыто",
+    "statusOpen": "открыт",
+    "recommended": "Рекомендовано",
+    "yourAnswer": "Ваш ответ",
+    "yourAnswerSending": "Ваш ответ · ушло",
+    "whyOption": "Почему {o}.",
+    "suggested": "Предложено.",
+    "stagedDefer": "В очереди: отложить этот вопрос",
+    "stagedReopen": "В очереди: переоткрыть этот вопрос",
+    "stagedAccept": "В очереди: принять {o}",
+    "stagedOption": "В очереди: вариант {o}",
+    "stagedText": "В очереди текст: «{t}»",
+    "stagedTextParts": " · частей: {n}",
+    "clear": "очистить",
+    "bitDefer": "отложить",
+    "bitReopen": "переоткрыть",
+    "sentWaiting": "Отправлено: {bits} по этому вопросу — ушло, агент разбирает",
+    "placeholderChange": "Измените ответ или добавьте нюанс…",
+    "placeholderFreeText": "Свободный ответ, если ни один вариант не подходит…",
+    "placeholderYourAnswer": "Ваш ответ…",
+    "stageText": "Отправить текст в очередь",
+    "deferThis": "Отложить этот вопрос",
+    "reopenThis": "Переоткрыть этот вопрос",
+    "exploring": "Изучаем…",
+    "exploreAgain": "Изучить ещё раз",
+    "exploreDeeper": "Изучить глубже",
+    "discussion": "Обсуждение",
+    "message": {
+      "one": "{n} сообщение",
+      "few": "{n} сообщения",
+      "many": "{n} сообщений",
+      "other": "{n} сообщения"
+    },
+    "whoAgent": "агент",
+    "whoUser": "вы",
+    "sendingSuffix": "ушло",
+    "stagedSuffix": "в очереди",
+    "stagedN": "{n} в очереди",
+    "remove": "Удалить",
+    "emptyThreadQuestion": "Пока ничего нет. Спросите что угодно об этом вопросе — агент ответит здесь при следующей отправке.",
+    "threadPlaceholder": "Уточнить по {id}…",
+    "addToDiscussion": "Добавить в обсуждение",
+    "prosAndCons": "Плюсы и минусы{at}",
+    "prosAndConsAt": " · {at}",
+    "pros": "Плюсы",
+    "cons": "Минусы",
+    "exploringWait": "Изучаем: агент составляет таблицу плюсов и минусов по этому вопросу.",
+    "visualFeedback": "Обратная связь по визуалу",
+    "emptyThreadVisual": "Пока ничего нет. Опишите, что не так или чего не хватает в визуале — агент перерисует его при следующей отправке. Если замечание противоречит уже отвеченному вопросу, этот вопрос будет переоткрыт для вас.",
+    "feedbackPlaceholder": "Замечание по визуалу…",
+    "addFeedback": "Добавить замечание",
+    "optionArrow": "→ {o}",
+    "optionArrowText": "→ текст",
+    "msgCountShort": "+{n} сообщ.",
+    "visualMsgCountShort": "визуал +{n} сообщ.",
+    "sentSeqWaiting": "Отправлено #{seq} — ушло. Агент разбирает, отвечать можно дальше.",
+    "finished": "завершено",
+    "finishedFooter": "Этот грилл завершён.",
+    "nothingStaged": "Ничего не в очереди. Выберите вариант или напишите в обсуждении.",
+    "attachFile": "Приложить файл",
+    "attaching": "Отправляю {name}…",
+    "attached": "Приложено файлов: {n}",
+    "attachFailed": "{name} не приложился: {why}",
+    "attachFormats": "doc · xlsx · pdf · txt · md · изображение — до 10 МБ",
+    "attachHint": "Уходит сразу и привязывается к этому вопросу. Нужное для интервью, а не архив: то, что короче показать, чем рассказать.",
+    "attachTooBig": "{name} — {mb} МБ, это больше 10. Пришлите выжимку или страницу, а не весь файл.",
+    "finishSent": "Завершение ушло. Агент записывает документ — страница обновится сама.",
+    "finishStale": "Завершение #{seq} ушло {ms} назад, агент его ещё не забрал. Ничего не потеряно: оно записано на диск и будет обработано. Вкладку можно закрыть — ответы сохранены.",
+    "finishConfirm": "Завершить этот грилл? Всё, что в очереди, уйдёт вместе с этим; агент запишет документ и остановится.",
+    "finish": "Завершить",
+    "cancel": "Отмена",
+    "finishReadyTitle": "Все вопросы закрыты. Завершение запишет документ.",
+    "finishGrill": "Завершить грилл",
+    "micStart": "Наговорить голосом",
+    "micStop": "Остановить запись",
+    "langLabel": "Язык"
+  }
 };
-function ruPlural(n, forms) {
-  const n10 = n % 10, n100 = n % 100;
-  if (n10 === 1 && n100 !== 11) return forms[0];
-  if (n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return forms[1];
-  return forms[2];
+const FALLBACK = "en";
+function pickLang() {
+  try { const s = localStorage.getItem("forma.lang"); if (s && s in DICTS) return s; } catch {}
+  return (navigator.language || "").toLowerCase().startsWith("ru") ? "ru" : FALLBACK;
+}
+let LANG = pickLang();
+function tr(key, vars) {
+  const own = DICTS[LANG] || {}, fb = DICTS[FALLBACK] || {};
+  const entry = key in own ? own[key] : fb[key];
+  if (entry === undefined) return key;
+  let text = entry;
+  if (entry && typeof entry === "object") {
+    const form = new Intl.PluralRules(key in own ? LANG : FALLBACK).select(Number(vars && vars.n) || 0);
+    text = entry[form] !== undefined ? entry[form] : entry.other;
+  }
+  return String(text).replace(/\{(\w+)\}/g, (m, k) => (vars && vars[k] !== undefined ? vars[k] : m));
+}
+// Строки интерфейса: пересобираются при смене языка; render() читает только T — как раньше.
+let T = null;
+function rebuildT() {
+  T = {
+    terms: tr("terms"),
+    termsWithCount: (n) => (n ? tr("termsWithCount", { n }) : tr("terms")),
+    visualize: tr("visualize"),
+    visualizeBack: tr("visualizeBack"),
+    wideOn: tr("wideOn"),
+    wideOff: tr("wideOff"),
+    wideOnHint: tr("wideOnHint"),
+    wideOffHint: tr("wideOffHint"),
+    visualLabel: (v) => tr("visualLabel", { v }),
+    visualizing: tr("visualizing"),
+    visualizeHint: tr("visualizeHint"),
+    connecting: tr("connecting"),
+    connectingNav: tr("connectingNav"),
+    drawingFirst: tr("drawingFirst"),
+    sendToAgent: tr("sendToAgent"),
+    sendNToAgent: (n) => tr("sendNToAgent", { n }),
+    drawStuck: tr("drawStuck"),
+    serverGone: tr("serverGone"),
+    agentBusyWarn: (t) => tr("agentBusyWarn", { t }),
+    sendWaitingWarn: (seq, ms) => tr("sendWaitingWarn", { seq, ms }),
+    sendFailed: tr("sendFailed"),
+    noServer: tr("noServer"),
+    finishedBanner: (doc, visual, at) => tr("finishedBanner", { doc, visual: visual ? tr("finishedVisual", { visual }) : "", at: at ? tr("finishedAt", { at }) : "" }),
+    serverGoneBanner: tr("serverGoneBanner"),
+    avoid: tr("avoid"),
+    noTermsYet: tr("noTermsYet"),
+    agentBusyTitle: tr("agentBusyTitle"),
+    diagram: tr("diagram"),
+    prototype: tr("prototype"),
+    firstVersionOnWay: tr("firstVersionOnWay"),
+    outOfDate: tr("outOfDate"),
+    regenerating: tr("regenerating"),
+    regenerate: tr("regenerate"),
+    agentWorking: (t) => tr("agentWorking", { t }),
+    agentWaiting: (since, handled) => tr("agentWaiting", { since: since ? tr("agentWaitingSince", { since }) : "", handled: handled ? tr("agentWaitingHandled", { handled }) : "" }),
+    waitingFirstRound: tr("waitingFirstRound"),
+    round: (r) => tr("round", { r }),
+    currentSuffix: tr("currentSuffix"),
+    pickQuestion: tr("pickQuestion"),
+    noQuestionsYet: tr("noQuestionsYet"),
+    crumbRound: (r) => tr("crumbRound", { r }),
+    after: (list) => tr("after", { list }),
+    root: tr("root"),
+    durable: tr("durable"),
+    recUpdated: tr("recUpdated"),
+    deferred: tr("deferred"),
+    reopened: tr("reopened"),
+    statusOpen: tr("statusOpen"),
+    recommended: tr("recommended"),
+    yourAnswer: tr("yourAnswer"),
+    yourAnswerSending: tr("yourAnswerSending"),
+    whyOption: (o) => tr("whyOption", { o }),
+    suggested: tr("suggested"),
+    stagedDefer: tr("stagedDefer"),
+    stagedReopen: tr("stagedReopen"),
+    stagedAccept: (o) => tr("stagedAccept", { o }),
+    stagedOption: (o) => tr("stagedOption", { o }),
+    // Показываем текст целиком: обрезка прятала бы то, что человек уже надиктовал,
+    // и потерю части снова было бы не видно.
+    stagedText: (t) => tr("stagedText", { t }),
+    stagedTextParts: (n) => tr("stagedTextParts", { n }),
+    clear: tr("clear"),
+    bitDefer: tr("bitDefer"),
+    bitReopen: tr("bitReopen"),
+    sentWaiting: (bits) => tr("sentWaiting", { bits }),
+    placeholderChange: tr("placeholderChange"),
+    placeholderFreeText: tr("placeholderFreeText"),
+    placeholderYourAnswer: tr("placeholderYourAnswer"),
+    stageText: tr("stageText"),
+    deferThis: tr("deferThis"),
+    reopenThis: tr("reopenThis"),
+    exploring: tr("exploring"),
+    exploreAgain: tr("exploreAgain"),
+    exploreDeeper: tr("exploreDeeper"),
+    discussion: tr("discussion"),
+    message: (n) => tr("message", { n }),
+    who: (w) => (w === "agent" ? tr("whoAgent") : tr("whoUser")),
+    sendingSuffix: tr("sendingSuffix"),
+    stagedSuffix: tr("stagedSuffix"),
+    stagedN: (n) => tr("stagedN", { n }),
+    remove: tr("remove"),
+    emptyThreadQuestion: tr("emptyThreadQuestion"),
+    threadPlaceholder: (id) => tr("threadPlaceholder", { id }),
+    addToDiscussion: tr("addToDiscussion"),
+    prosAndCons: (at) => tr("prosAndCons", { at: at ? tr("prosAndConsAt", { at }) : "" }),
+    pros: tr("pros"),
+    cons: tr("cons"),
+    exploringWait: tr("exploringWait"),
+    visualFeedback: tr("visualFeedback"),
+    emptyThreadVisual: tr("emptyThreadVisual"),
+    feedbackPlaceholder: tr("feedbackPlaceholder"),
+    addFeedback: tr("addFeedback"),
+    optionArrow: (o) => tr("optionArrow", { o }),
+    optionArrowText: tr("optionArrowText"),
+    msgCountShort: (n) => tr("msgCountShort", { n }),
+    visualMsgCountShort: (n) => tr("visualMsgCountShort", { n }),
+    sentSeqWaiting: (seq) => tr("sentSeqWaiting", { seq }),
+    finished: tr("finished"),
+    finishedFooter: tr("finishedFooter"),
+    nothingStaged: tr("nothingStaged"),
+    attachFile: tr("attachFile"),
+    attaching: (name) => tr("attaching", { name }),
+    attached: (n) => tr("attached", { n }),
+    attachFailed: (name, why) => tr("attachFailed", { name, why }),
+    attachFormats: tr("attachFormats"),
+    attachHint: tr("attachHint"),
+    attachTooBig: (name, mb) => tr("attachTooBig", { name, mb }),
+    finishSent: tr("finishSent"),
+    finishStale: (seq, ms) => tr("finishStale", { seq, ms }),
+    finishConfirm: tr("finishConfirm"),
+    finish: tr("finish"),
+    cancel: tr("cancel"),
+    finishReadyTitle: tr("finishReadyTitle"),
+    finishGrill: tr("finishGrill"),
+    micStart: tr("micStart"),
+    micStop: tr("micStop"),
+    updatedMark: tr("updatedMark"),
+  };
+}
+rebuildT();
+// Разметка: узлы с data-i18n получают текст, с data-i18n-title — title; язык документа идёт за выбором.
+function applyI18n() {
+  document.querySelectorAll("[data-i18n]").forEach((n) => { n.textContent = tr(n.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-title]").forEach((n) => { n.title = tr(n.dataset.i18nTitle); });
+  document.documentElement.lang = LANG;
+}
+// Переключатель языка — как в дашборде: select#lang, имена языков из _meta.name словарей.
+function renderLang() {
+  const sel = $("lang");
+  if (!sel) return;
+  sel.innerHTML = Object.keys(DICTS).map((code) => `<option value="${code}"${code === LANG ? " selected" : ""}>${(DICTS[code] && DICTS[code]["_meta.name"]) || code}</option>`).join("");
+  sel.title = tr("langLabel");
+  sel.onchange = () => setLang(sel.value);
+}
+function setLang(code) {
+  if (!(code in DICTS) || code === LANG) return;
+  LANG = code;
+  try { localStorage.setItem("forma.lang", code); } catch {}
+  rebuildT();
+  applyI18n();
+  renderLang();
+  render();
 }
 
 const $ = (id) => document.getElementById(id);
@@ -400,7 +709,7 @@ function wireMic(btnId, textareaId, meterId, onCommit) {
   btn.onclick = () => {
     if (activeMic) { activeMic.recognition.stop(); return; }
     const rec = new SR();
-    rec.lang = "ru-RU"; rec.interimResults = false; rec.continuous = true;
+    rec.lang = LANG === "ru" ? "ru-RU" : "en-US"; rec.interimResults = false; rec.continuous = true;
     activeMic = { recognition: rec };
     btn.classList.add("recording"); btn.title = T.micStop;
     startMeter(meterId);
@@ -701,7 +1010,7 @@ function renderNav() {
       const mark = s ? `<span class="mark staged">${T.stagedSuffix}</span>`
         : pendingActions(q.id).some((a) => a.type !== "explore") ? `<span class="mark pending"><span class="ok-mark">&#10003;</span>${T.sendingSuffix}</span>`
         : `<span class="mark ${esc(q.status)}">${q.status === "answered" ? CHECK + (q.answer && q.answer.option ? esc(q.answer.option) : "") : statusLabel}</span>`;
-      el.innerHTML = `<span class="id" title="${esc(q.id)}">${esc(q.id).toUpperCase()}</span><span class="t">${esc(q.title)}</span>${mark}`;
+      el.innerHTML = `<span class="id" title="${esc(q.id)}">${esc(q.id).toUpperCase()}</span><span class="t" data-upd="${esc(T.updatedMark)}">${esc(q.title)}</span>${mark}`;
       el.onclick = () => { selected = q.id; render(); };
       nav.appendChild(el);
     }
@@ -834,7 +1143,7 @@ function renderFooter() {
   if (local.vfeedback.length) parts.push(T.visualMsgCountShort(local.vfeedback.length));
   const lp = lastPending();
   const sent = lp ? `<span class="sent"><span class="ok-mark">&#10003;</span>${T.sentSeqWaiting(lp.seq)}</span>` : "";
-  list.innerHTML = locked() ? T.finishedFooter : n ? `<b>${n} ${ruPlural(n, ["в очереди", "в очереди", "в очереди"])}</b> · ${parts.join(" · ")}${sent ? " · " + sent : ""}` : sent || T.nothingStaged;
+  list.innerHTML = locked() ? T.finishedFooter : n ? `<b>${T.stagedN(n)}</b> · ${parts.join(" · ")}${sent ? " · " + sent : ""}` : sent || T.nothingStaged;
   const fa = $("finish-area");
   if (locked()) fa.innerHTML = "";
   else if (isFinishing()) {
@@ -867,6 +1176,8 @@ $("visualize").onclick = () => { if (hasVisual()) { local.view = activeView() ==
 $("terms-toggle").onclick = () => $("terms").classList.toggle("show");
 document.addEventListener("click", (e) => { if (!e.target.closest("#terms") && !e.target.closest("#terms-toggle")) $("terms").classList.remove("show"); });
 document.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") send(); });
+applyI18n();
+renderLang();
 poll();
 </script>
 </body>
