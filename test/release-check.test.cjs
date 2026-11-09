@@ -111,7 +111,7 @@ test('a version without a tag needs its CHANGELOG section - the release does not
   const ready = repoWith({ '.claude-plugin/plugin.json': '{"version":"2.0.0"}', 'CHANGELOG.md': '## [2.0.0] - 20' + '31-01-05\n\n### Added\n\n- the change\n' });
   assert.equal(changelogGate(ready).ok, true);
   const released = repoWith({ '.claude-plugin/plugin.json': '{"version":"2.0.0"}', 'CHANGELOG.md': 'no section\n' });
-  gitRun(released, 'commit', '--allow-empty', '-m', 'fixture');
+  gitRun(released, '-c', 'user.email=g@test', '-c', 'user.name=g', 'commit', '--allow-empty', '-m', 'fixture');
   gitRun(released, 'tag', 'v2.0.0');
   assert.equal(changelogGate(released).ok, true);
 });
