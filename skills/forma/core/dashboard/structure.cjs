@@ -9,9 +9,9 @@ const fs = require('fs');
 const path = require('path');
 const { walk } = require('./lib/fs.cjs');
 const engines = require('./lib/engines.cjs');
-// Canonical ru strings of this module's own CLI output live in the core dictionary; the language is fixed.
+// Canonical English strings of this module's own CLI output live in the core dictionary; the log language is fixed.
 const { message: coreMessage } = require('../i18n/index.cjs');
-const ruMsg = (key, params) => coreMessage(key, params, 'ru');
+const logMsg = (key, params) => coreMessage(key, params, 'en');
 
 // The core groups; the adapters' groups (the `structure` field) stand between "Engine" and "Project".
 const CORE_GROUPS = [
@@ -204,6 +204,6 @@ module.exports = { buildStructure, describe };
 
 if (require.main === module) {
   const s = buildStructure(path.resolve(__dirname, '..', '..'));
-  for (const k of s.projectKinds) console.log(k.title + ": " + k.items.map(i => i.name + (i.mixed ? ruMsg('structure.mixed_marker') : "")).join(", "));
+  for (const k of s.projectKinds) console.log(k.title + ": " + k.items.map(i => i.name + (i.mixed ? logMsg('structure.mixed_marker') : "")).join(", "));
   for (const g of s.groups) console.log(g.title + ': ' + g.roots.map(r => r.name + (r.dir ? ` (${r.files})` : '')).join(', '));
 }

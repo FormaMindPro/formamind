@@ -21,9 +21,9 @@ const { execFileSync, spawn } = require('child_process');
 const { writeJsonAtomic } = require('./lib/fs.cjs');
 const i18n = require('./lib/i18n.cjs');
 const { DEFAULT_PORT } = require('./port.cjs');
-// Canonical ru strings of the console output live in the core dictionary; the language is fixed.
+// Canonical English strings of the console log live in the core dictionary; the log language is fixed.
 const { message: coreMessage } = require('../i18n/index.cjs');
-const ruMsg = (key, params) => coreMessage(key, params, 'ru');
+const logMsg = (key, params) => coreMessage(key, params, 'en');
 
 const ROOT = __dirname;
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
@@ -74,13 +74,13 @@ function rebuild(reason) {
     latestData = live.buildData(PROJECT_ROOT);
     // The disk cache is kept in sync - compatibility with a manual read/build.
     fs.writeFileSync(DATA_CACHE_FILE, JSON.stringify(latestData, null, 2), 'utf8');
-    console.log(ruMsg('serve.rebuilt', { time: new Date().toLocaleTimeString('ru-RU'), reason, cards: latestData.totals.cardCount, tokens: JSON.stringify(latestData.totals.tokensByEngine) }));
+    console.log(logMsg('serve.rebuilt', { time: new Date().toLocaleTimeString('en-GB'), reason, cards: latestData.totals.cardCount, tokens: JSON.stringify(latestData.totals.tokensByEngine) }));
     try { live.graphifyTrigger.check(); } catch (err) { console.error('graphify-trigger:', err.message); }
     for (const res of sseClients) {
       res.write(`data: ${JSON.stringify(latestData)}\n\n`);
     }
   } catch (err) {
-    console.error(ruMsg('serve.rebuild_failed'), err.message);
+    console.error(logMsg('serve.rebuild_failed'), err.message);
   }
 }
 
@@ -256,7 +256,7 @@ function absorbUpload(session, name) {
   }
   const to = path.join(dir, out);
   if (!fs.existsSync(to)) fs.copyFileSync(from, to);
-  console.log(ruMsg('serve.upload_absorbed', { file: out }));
+  console.log(logMsg('serve.upload_absorbed', { file: out }));
   return path.relative(PROJECT_ROOT, to).split(path.sep).join('/');
 }
 
@@ -297,9 +297,9 @@ function appendAnswerRecords(records, position) {
   try {
     fs.mkdirSync(BRIEF_DIR, { recursive: true });
     fs.appendFileSync(ANSWERS_FILE, records.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf8');
-    console.log(ruMsg('serve.answers_absorbed', { position, n: records.reduce((n, r) => n + r.answers.length, 0) }));
+    console.log(logMsg('serve.answers_absorbed', { position, n: records.reduce((n, r) => n + r.answers.length, 0) }));
   } catch (err) {
-    console.error(ruMsg('serve.answers_failed'), err.message);
+    console.error(logMsg('serve.answers_failed'), err.message);
   }
 }
 
@@ -334,9 +334,9 @@ function watchSessionEvents(session, position) {
       if (filename && path.basename(filename) !== 'events.jsonl') return;
       absorbSessionEvents(session, position);
     });
-    console.log(ruMsg('serve.watch_session_on', { position }));
+    console.log(logMsg('serve.watch_session_on', { position }));
   } catch (err) {
-    console.log(ruMsg('serve.watch_session_off', { reason: err.message }));
+    console.log(logMsg('serve.watch_session_off', { reason: err.message }));
   }
 }
 
@@ -388,9 +388,9 @@ function scheduleReload(filename) {
   reloadTimer = setTimeout(() => {
     try {
       reloadModules();
-      rebuild(ruMsg('serve.reload_reason', { file: filename }));
+      rebuild(logMsg('serve.reload_reason', { file: filename }));
     } catch (err) {
-      console.error(ruMsg('serve.reload_kept_old', { file: filename, reason: err.message }));
+      console.error(logMsg('serve.reload_kept_old', { file: filename, reason: err.message }));
     }
   }, DEBOUNCE_MS);
 }
@@ -405,15 +405,15 @@ function watchModules() {
         if (filename && /\.c?js$/.test(filename)) scheduleReload(filename);
       });
     }
-    console.log(ruMsg('serve.watch_modules_on', { dir: path.relative(PROJECT_ROOT, ROOT) + '/' }));
+    console.log(logMsg('serve.watch_modules_on', { dir: path.relative(PROJECT_ROOT, ROOT) + '/' }));
   } catch (err) {
-    console.log(ruMsg('serve.watch_modules_off', { reason: err.message }));
+    console.log(logMsg('serve.watch_modules_off', { reason: err.message }));
   }
 }
 
 function watchFeatures() {
   if (!fs.existsSync(FEATURES_DIR)) {
-    console.log(ruMsg('serve.features_missing', { dir: path.relative(PROJECT_ROOT, FEATURES_DIR) }));
+    console.log(logMsg('serve.features_missing', { dir: path.relative(PROJECT_ROOT, FEATURES_DIR) }));
     return;
   }
   try {
@@ -424,9 +424,9 @@ function watchFeatures() {
       if (filename && !filename.endsWith('.md')) return;
       scheduleRebuild(filename || eventType);
     });
-    console.log(ruMsg('serve.watch_on', { dir: path.relative(PROJECT_ROOT, FEATURES_DIR) }));
+    console.log(logMsg('serve.watch_on', { dir: path.relative(PROJECT_ROOT, FEATURES_DIR) }));
   } catch (err) {
-    console.log(ruMsg('serve.watch_platform_off', { reason: err.message }));
+    console.log(logMsg('serve.watch_platform_off', { reason: err.message }));
   }
 }
 
@@ -443,9 +443,9 @@ function watchPicture() {
       if (name && !WATCHED.includes(name)) return;
       scheduleRebuild(name || 'brief');
     });
-    console.log(ruMsg('serve.watch_brief_on', { dir: path.relative(PROJECT_ROOT, BRIEF_DIR) }));
+    console.log(logMsg('serve.watch_brief_on', { dir: path.relative(PROJECT_ROOT, BRIEF_DIR) }));
   } catch (err) {
-    console.log(ruMsg('serve.watch_brief_off', { reason: err.message }));
+    console.log(logMsg('serve.watch_brief_off', { reason: err.message }));
   }
 }
 
@@ -455,9 +455,9 @@ function watchGraphifyLog() {
     // A file, not a directory: watch(ROOT) would also catch the server's own writing of data.json
     // into the same directory - a rebuild loop with no external cause.
     fs.watch(GRAPHIFY_LOG, () => scheduleRebuild('graphify.log'));
-    console.log(ruMsg('serve.watch_on', { dir: path.relative(PROJECT_ROOT, GRAPHIFY_LOG) }));
+    console.log(logMsg('serve.watch_on', { dir: path.relative(PROJECT_ROOT, GRAPHIFY_LOG) }));
   } catch (err) {
-    console.log(ruMsg('serve.watch_log_off', { reason: err.message }));
+    console.log(logMsg('serve.watch_log_off', { reason: err.message }));
   }
 }
 
@@ -523,7 +523,7 @@ function attachExpandQuestion(hit, q) {
     id: q.id, round, deps: [], title: q.title, body: q.text, node: q.node,
     options: [], status: 'open', durable: false, updated: false,
   });
-  state.note = ruMsg('serve.expand_note', { label: hit.node.label });
+  state.note = logMsg('serve.expand_note', { label: hit.node.label });
   reopen(state);
   writeState(session, state);
   return { session };
@@ -686,12 +686,12 @@ let attempt = live.sessions.rememberedPort(SERVER_FILE) || DEFAULT_PORT;
 
 function onServerError(err) {
   if (!srv.listening && attempt !== 0 && err.code === 'EADDRINUSE') {
-    console.log(ruMsg('serve.port_busy', { port: attempt }));
+    console.log(logMsg('serve.port_busy', { port: attempt }));
     attempt = 0;
     srv.listen(0);
     return;
   }
-  console.error(ruMsg('serve.server_error'), err.message);
+  console.error(logMsg('serve.server_error'), err.message);
   process.exit(1);
 }
 
@@ -699,8 +699,8 @@ function onListening() {
   const { port } = srv.address();
   const url = `http://localhost:${port}/`;
   writeJsonAtomic(SERVER_FILE, { url, port, pid: process.pid, started: new Date().toISOString() });
-  console.log(ruMsg('serve.started', { url }));
-  console.log(ruMsg('serve.built_at_start', { cards: latestData.totals.cardCount, tokens: JSON.stringify(latestData.totals.tokensByEngine) }));
+  console.log(logMsg('serve.started', { url }));
+  console.log(logMsg('serve.built_at_start', { cards: latestData.totals.cardCount, tokens: JSON.stringify(latestData.totals.tokensByEngine) }));
   watchFeatures();
   watchGraphifyLog();
   watchPicture();

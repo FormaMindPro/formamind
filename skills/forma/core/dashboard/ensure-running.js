@@ -23,9 +23,9 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-// Canonical ru strings of the console output live in the core dictionary; the language is fixed.
+// Canonical English strings of the console log live in the core dictionary; the log language is fixed.
 const { message: coreMessage } = require('../i18n/index.cjs');
-const ruMsg = (key, params) => coreMessage(key, params, 'ru');
+const logMsg = (key, params) => coreMessage(key, params, 'en');
 
 const { DEFAULT_PORT } = require('./port.cjs');
 const TIMEOUT_MS = 800;
@@ -93,17 +93,17 @@ async function checkAlive() {
 async function main() {
   const { alive, port } = await checkAlive();
   if (alive) {
-    console.log(ruMsg('ensure.already_running', { port }));
+    console.log(logMsg('ensure.already_running', { port }));
     return;
   }
 
   const sup = readSupervisorFile();
   if (sup && pidAlive(sup.pid)) {
-    console.log(ruMsg('ensure.supervisor_up', { pid: sup.pid, log: path.relative(process.cwd(), LOG_FILE) }));
+    console.log(logMsg('ensure.supervisor_up', { pid: sup.pid, log: path.relative(process.cwd(), LOG_FILE) }));
     return;
   }
 
-  console.log(ruMsg('ensure.not_responding'));
+  console.log(logMsg('ensure.not_responding'));
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   const out = fs.openSync(LOG_FILE, 'a');
   const child = spawn(process.execPath, [WATCH_PATH], {
@@ -112,10 +112,10 @@ async function main() {
     windowsHide: true,
   });
   child.unref();
-  console.log(ruMsg('ensure.supervisor_up', { pid: child.pid, log: path.relative(process.cwd(), LOG_FILE) }));
+  console.log(logMsg('ensure.supervisor_up', { pid: child.pid, log: path.relative(process.cwd(), LOG_FILE) }));
   // The new run's port is decided by serve.js itself (the same dynamic choice) - not always 5050,
   // if it is busy. The exact address - .forma/dashboard/.cache/server.json in a couple of seconds.
-  console.log(ruMsg('ensure.eta', { port: DEFAULT_PORT }));
+  console.log(logMsg('ensure.eta', { port: DEFAULT_PORT }));
 }
 
 main();

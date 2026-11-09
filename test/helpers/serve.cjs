@@ -7,7 +7,7 @@ const http = require('node:http');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
-const READY_RE = /\u0414\u0430\u0448\u0431\u043e\u0440\u0434: http:\/\/localhost:(\d+)\//;
+const READY_RE = /Dashboard: http:\/\/localhost:(\d+)\//;
 const START_TIMEOUT_MS = 60000;
 
 function freePort() {

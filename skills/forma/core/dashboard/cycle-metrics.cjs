@@ -22,9 +22,9 @@ const fs = require('fs');
 const path = require('path');
 const { cardFiles } = require('./lib/card.cjs');
 const { toEnglish, SPEND_SOURCE } = require('./spend-line.cjs');
-// Canonical ru strings of this module's own CLI output live in the core dictionary; the language is fixed.
+// Canonical English strings of this module's own CLI output live in the core dictionary; the log language is fixed.
 const { message: coreMessage } = require('../i18n/index.cjs');
-const ruMsg = (key, params) => coreMessage(key, params, 'ru');
+const logMsg = (key, params) => coreMessage(key, params, 'en');
 
 const ATTEMPT_RE = () => new RegExp('^-\\s*' + SPEND_SOURCE + '—', 'i');
 const RETURN_RE = /:\s*task check\b[^—]*—?\s*(?:[^—]*\b)?(?:\u043d\u0435 \u043f\u0440\u043e\u0439\u0434\u0435\u043d|not passed)/i;
@@ -123,11 +123,11 @@ function main() {
     : cardFiles(root);
   const m = metrics(collect(files));
   if (asJson) { console.log(JSON.stringify(m, null, 2)); return; }
-  console.log(ruMsg('cycle_metrics.header'));
-  console.log(ruMsg('cycle_metrics.attempts', { average: m.attemptsPerTask.average, max: m.attemptsPerTask.max, with: m.cardsWithAttempts, total: m.cardsTotal }));
-  console.log(ruMsg('cycle_metrics.returns', { list: Object.keys(m.returnsByNode).map(n => n + ': ' + m.returnsByNode[n]).join(', ') || ruMsg('cycle_metrics.none'), n: m.routeLengthened }));
-  console.log(ruMsg('cycle_metrics.unknown_share', { v: m.unknownShare }));
-  console.log(ruMsg('cycle_metrics.metacycle_share', { v: m.metacycleShare }));
+  console.log(logMsg('cycle_metrics.header'));
+  console.log(logMsg('cycle_metrics.attempts', { average: m.attemptsPerTask.average, max: m.attemptsPerTask.max, with: m.cardsWithAttempts, total: m.cardsTotal }));
+  console.log(logMsg('cycle_metrics.returns', { list: Object.keys(m.returnsByNode).map(n => n + ': ' + m.returnsByNode[n]).join(', ') || logMsg('cycle_metrics.none'), n: m.routeLengthened }));
+  console.log(logMsg('cycle_metrics.unknown_share', { v: m.unknownShare }));
+  console.log(logMsg('cycle_metrics.metacycle_share', { v: m.metacycleShare }));
 }
 
 if (require.main === module) main();

@@ -31,9 +31,9 @@ const { frontmatterBlock } = require('./lib/card.cjs');
 const engines = require('./lib/engines.cjs');
 const { toEnglish, SPEND_SOURCE, CLAIM_RE, CACHE_UNKNOWN_RE, TOKENS_UNKNOWN_RE, ID_UNKNOWN_RE, toInt, outTokens, dedupKey } = require('./spend-line.cjs');
 
-// Canonical ru strings of this module's own CLI output live in the core dictionary; the language is fixed.
+// Canonical English strings of this module's own CLI output live in the core dictionary; the log language is fixed.
 const { message: coreMessage } = require('../i18n/index.cjs');
-const ruMsg = (key, params) => coreMessage(key, params, 'ru');
+const logMsg = (key, params) => coreMessage(key, params, 'en');
 
 // Three things on which this parsing broke or would break:
 //   1. Number digits are written with spaces ("52 339 tokens") - a plain \d+ does not take such a string.
@@ -238,7 +238,7 @@ function tallyFiles(files, seenIds, engine, canon) {
 // A card without a route label - the "no route" row.
 
 const ROUTE_ALIAS = { 'route-intent-run': 'route-2' };
-const NO_ROUTE = ruMsg('tally.routes.no_route');
+const NO_ROUTE = logMsg('tally.routes.no_route');
 
 function readLabels(text) {
   const fm = frontmatterBlock(text);
@@ -300,26 +300,26 @@ function byRoute(targets, engine, canon) {
 
 function routeReport(targets) {
   const t = byRoute(targets);
-  const L = [ruMsg('tally.routes.title'), '='.repeat(64)];
-  const head = ruMsg('tally.routes.th_label').padEnd(14) + ruMsg('tally.routes.th_cards').padStart(6) + ruMsg('tally.routes.th_attempts').padStart(7) + ruMsg('tally.routes.th_tokens').padStart(12) +
-    'cache-read'.padStart(12) + ruMsg('tally.routes.th_seconds').padStart(8) + ruMsg('tally.routes.th_turns').padStart(8) + ruMsg('tally.routes.th_returns').padStart(7) + ruMsg('tally.routes.th_prep');
-  for (const [name, title] of [['route', ruMsg('tally.routes.section_route')], ['over', ruMsg('tally.routes.section_over')], ['seg', ruMsg('tally.routes.section_seg')], ['wave', ruMsg('tally.routes.section_wave')]]) {
+  const L = [logMsg('tally.routes.title'), '='.repeat(64)];
+  const head = logMsg('tally.routes.th_label').padEnd(14) + logMsg('tally.routes.th_cards').padStart(6) + logMsg('tally.routes.th_attempts').padStart(7) + logMsg('tally.routes.th_tokens').padStart(12) +
+    'cache-read'.padStart(12) + logMsg('tally.routes.th_seconds').padStart(8) + logMsg('tally.routes.th_turns').padStart(8) + logMsg('tally.routes.th_returns').padStart(7) + logMsg('tally.routes.th_prep');
+  for (const [name, title] of [['route', logMsg('tally.routes.section_route')], ['over', logMsg('tally.routes.section_over')], ['seg', logMsg('tally.routes.section_seg')], ['wave', logMsg('tally.routes.section_wave')]]) {
     if (!t[name].length) continue;
     L.push('', title, head);
     for (const r of t[name]) {
       const unk = [];
-      if (r.tokensUnknown) unk.push(ruMsg('tally.routes.unknown_tokens', { n: r.tokensUnknown }));
+      if (r.tokensUnknown) unk.push(logMsg('tally.routes.unknown_tokens', { n: r.tokensUnknown }));
       if (r.cacheUnknown) unk.push(`cache-read unknown: ${r.cacheUnknown}`);
-      if (r.secondsUnknown) unk.push(ruMsg('tally.routes.unknown_seconds', { n: r.secondsUnknown }));
+      if (r.secondsUnknown) unk.push(logMsg('tally.routes.unknown_seconds', { n: r.secondsUnknown }));
       const turnsStr = r.turns > 0 ? String(r.turns) : '—';
       L.push(r.key.padEnd(14) + String(r.cards).padStart(6) + String(r.attempts).padStart(7) +
         groups(r.tokens).padStart(12) + groups(r.cacheRead).padStart(12) + groups(r.seconds).padStart(8) +
         turnsStr.padStart(8) + String(r.returns).padStart(7) + '  ' + (r.prepShare == null ? NOT_RECORDED : `${r.prepShare}% (${r.prepNodes})`) +
-        (unk.length ? `\n${' '.repeat(14)}${unk.join('; ')} ${ruMsg('tally.routes.unknown_suffix')}` : ''));
+        (unk.length ? `\n${' '.repeat(14)}${unk.join('; ')} ${logMsg('tally.routes.unknown_suffix')}` : ''));
     }
   }
-  L.push('', ruMsg('tally.routes.foot_prep'));
-  L.push(ruMsg('tally.routes.foot_returns'));
+  L.push('', logMsg('tally.routes.foot_prep'));
+  L.push(logMsg('tally.routes.foot_returns'));
   return L.join('\n');
 }
 
@@ -331,7 +331,7 @@ function routeReport(targets) {
 // Zero and "not recorded" already looked identical once.
 
 const FEATURES_DIR = path.resolve(__dirname, '..', '..', '.devtool', 'features');
-const NOT_RECORDED = ruMsg('tally.report.not_recorded');
+const NOT_RECORDED = logMsg('tally.report.not_recorded');
 
 function countClosedCards() {
   const dir = path.join(FEATURES_DIR, 'done');
@@ -352,9 +352,9 @@ function plural(n, one, few, many) {
   if (b >= 2 && b <= 4) return few;
   return many;
 }
-const tokenWord = (n) => plural(n, ruMsg('tally.words.token_one'), ruMsg('tally.words.token_few'), ruMsg('tally.words.token_many'));
-const wordAttempts = (n) => plural(n, ruMsg('tally.words.attempt_one'), ruMsg('tally.words.attempt_few'), ruMsg('tally.words.attempt_many'));
-const fileWord = (n) => plural(n, ruMsg('tally.words.file_one'), ruMsg('tally.words.file_few'), ruMsg('tally.words.file_many'));
+const tokenWord = (n) => plural(n, logMsg('tally.words.token_one'), logMsg('tally.words.token_few'), logMsg('tally.words.token_many'));
+const wordAttempts = (n) => plural(n, logMsg('tally.words.attempt_one'), logMsg('tally.words.attempt_few'), logMsg('tally.words.attempt_many'));
+const fileWord = (n) => plural(n, logMsg('tally.words.file_one'), logMsg('tally.words.file_few'), logMsg('tally.words.file_many'));
 
 /**
  * One report line. The only place where "a number or 'not recorded'" is decided:
@@ -364,37 +364,37 @@ function metricLine(label, cover, compute, unit) {
   const head = label.padEnd(34);
   const pad = ' '.repeat(34);
   if (!cover.done) {
-    return `${head}${NOT_RECORDED}\n${pad}${ruMsg('tally.report.metric_cover_none', { all: groups(cover.all) })}`;
+    return `${head}${NOT_RECORDED}\n${pad}${logMsg('tally.report.metric_cover_none', { all: groups(cover.all) })}`;
   }
   const share = Math.round((cover.done / cover.all) * 100);
-  return `${head}${compute()} ${unit}\n${pad}${ruMsg('tally.report.metric_cover', { done: groups(cover.done), all: groups(cover.all), share })}`;
+  return `${head}${compute()} ${unit}\n${pad}${logMsg('tally.report.metric_cover', { done: groups(cover.done), all: groups(cover.all), share })}`;
 }
 
 /** The header: the corpus, "tokens not returned by the engine" and the cache-read state. */
 function corpusLines(c) {
-  const L = [ruMsg('tally.report.title'), '='.repeat(64)];
-  L.push(ruMsg('tally.report.corpus', {
+  const L = [logMsg('tally.report.title'), '='.repeat(64)];
+  L.push(logMsg('tally.report.corpus', {
     files: groups(c.filesProcessed), files_word: fileWord(c.filesProcessed),
     attempts: groups(c.attempts), attempts_word: wordAttempts(c.attempts),
     tokens: groups(c.allTokens), tokens_word: tokenWord(c.allTokens),
     closed: groups(c.closed),
   }));
-  if (c.tokensUnknown) L.push(ruMsg('tally.report.tokens_unknown', { n: groups(c.tokensUnknown), word: wordAttempts(c.tokensUnknown) }));
+  if (c.tokensUnknown) L.push(logMsg('tally.report.tokens_unknown', { n: groups(c.tokensUnknown), word: wordAttempts(c.tokensUnknown) }));
 
   /* TWO STATES AT ONCE - the corpus's norm, not a report failure.
      R is restored from the attempt's transcript, and early attempts have none. */
   const withoutCache = c.attempts - c.withCache;
   if (c.withCache && withoutCache) {
-    L.push(ruMsg('tally.report.cache_present', {
+    L.push(logMsg('tally.report.cache_present', {
       count: groups(c.withCache),
-      count_word: plural(c.withCache, ruMsg('tally.words.attempt_gen_one'), ruMsg('tally.words.attempt_gen_few'), ruMsg('tally.words.attempt_gen_many')),
+      count_word: plural(c.withCache, logMsg('tally.words.attempt_gen_one'), logMsg('tally.words.attempt_gen_few'), logMsg('tally.words.attempt_gen_many')),
       attempts: groups(c.attempts),
       rest: groups(withoutCache),
     }));
-    L.push(ruMsg('tally.report.cache_note1'));
-    L.push(ruMsg('tally.report.cache_note2'));
+    L.push(logMsg('tally.report.cache_note1'));
+    L.push(logMsg('tally.report.cache_note2'));
   } else if (!c.withCache && c.attempts) {
-    L.push(ruMsg('tally.report.cache_none', { attempts: groups(c.attempts) }));
+    L.push(logMsg('tally.report.cache_none', { attempts: groups(c.attempts) }));
   }
   L.push('');
   return L;
@@ -403,19 +403,19 @@ function corpusLines(c) {
 // 2. Attempts per closed card. Printed as the INVERSE fraction when there are fewer attempts
 // than cards: the leading zero reads to the eyes as "almost nothing".
 function attemptsPerCardLines(c) {
-  const label = ruMsg('tally.report.apc_label').padEnd(34);
+  const label = logMsg('tally.report.apc_label').padEnd(34);
   const pad = ' '.repeat(34);
   if (!c.closed || !c.cardsWithAttempt) {
-    return [`${label}${NOT_RECORDED}`, `${pad}${ruMsg('tally.report.apc_cover_none')}`];
+    return [`${label}${NOT_RECORDED}`, `${pad}${logMsg('tally.report.apc_cover_none')}`];
   }
   const value = c.attempts >= c.closed
-    ? ruMsg('tally.report.apc_value_direct', { v: (c.attempts / c.closed).toFixed(1) })
-    : ruMsg('tally.report.apc_value_inverse', { v: (c.closed / c.attempts).toFixed(1) });
+    ? logMsg('tally.report.apc_value_direct', { v: (c.attempts / c.closed).toFixed(1) })
+    : logMsg('tally.report.apc_value_inverse', { v: (c.closed / c.attempts).toFixed(1) });
   return [
     `${label}${value}`,
-    `${pad}${ruMsg('tally.report.apc_cover', { cards: groups(c.cardsWithAttempt), closed: groups(c.closed) })}`,
-    `${pad}${ruMsg('tally.report.apc_bound1', { attempts: groups(c.attempts) })}`,
-    `${pad}${ruMsg('tally.report.apc_bound2')}`,
+    `${pad}${logMsg('tally.report.apc_cover', { cards: groups(c.cardsWithAttempt), closed: groups(c.closed) })}`,
+    `${pad}${logMsg('tally.report.apc_bound1', { attempts: groups(c.attempts) })}`,
+    `${pad}${logMsg('tally.report.apc_bound2')}`,
   ];
 }
 
@@ -437,41 +437,41 @@ function metricLines(c, byNode, weights) {
   const pad = ' '.repeat(34);
   const L = [];
   // 1. Re-reads per closed card - coverage over attempts with a recorded R.
-  L.push(metricLine(ruMsg('tally.report.metric_reread_label'), cover,
-    () => groups(Math.round(c.cacheRead / Math.max(1, c.closed))), ruMsg('tally.report.metric_reread_unit')), '');
+  L.push(metricLine(logMsg('tally.report.metric_reread_label'), cover,
+    () => groups(Math.round(c.cacheRead / Math.max(1, c.closed))), logMsg('tally.report.metric_reread_unit')), '');
   L.push(...attemptsPerCardLines(c), '');
   // 3. The re-read share in the window - divided by the tokens of THE SAME attempts that have R recorded.
   // The charter - ~4% of R, the rest is the conversation sent again.
-  L.push(metricLine(ruMsg('tally.report.metric_share_label'), cover,
+  L.push(metricLine(logMsg('tally.report.metric_share_label'), cover,
     () => Math.round((c.cacheRead / Math.max(1, c.tokensWithCache)) * 100) + '%', ''));
-  L.push(`${pad}${ruMsg('tally.report.share_note1')}`);
-  L.push(`${pad}${ruMsg('tally.report.share_note2')}`, '');
-  L.push(metricLine(ruMsg('tally.report.metric_steps_label'), cover, () => stepsPerAttempt(byNode, weights), ruMsg('tally.report.metric_steps_unit')), '');
+  L.push(`${pad}${logMsg('tally.report.share_note1')}`);
+  L.push(`${pad}${logMsg('tally.report.share_note2')}`, '');
+  L.push(metricLine(logMsg('tally.report.metric_steps_label'), cover, () => stepsPerAttempt(byNode, weights), logMsg('tally.report.metric_steps_unit')), '');
   return L;
 }
 
 // THE FLOOR. The fastest way to drop the instruction share - throw AGENTS.md out.
 // So the floor is named always, even when the share itself is not yet computed.
 function floorLines(weights) {
-  const L = ['-'.repeat(64), ruMsg('tally.report.floor_title')];
+  const L = ['-'.repeat(64), logMsg('tally.report.floor_title')];
   if (weights) {
     const w = weights();
     for (const [node, v] of Object.entries(w.byNode)) {
-      L.push(ruMsg('tally.report.floor_node', { node: node.padEnd(8), tokens: groups(v.perStep), word: tokenWord(v.perStep) }));
+      L.push(logMsg('tally.report.floor_node', { node: node.padEnd(8), tokens: groups(v.perStep), word: tokenWord(v.perStep) }));
     }
-    L.push(ruMsg('tally.report.floor_common', { files: w.common.files.map((f) => f.file).join(' + '), tokens: groups(w.common.tokens), word: tokenWord(w.common.tokens) }));
-    L.push(ruMsg('tally.report.floor_estimate'));
+    L.push(logMsg('tally.report.floor_common', { files: w.common.files.map((f) => f.file).join(' + '), tokens: groups(w.common.tokens), word: tokenWord(w.common.tokens) }));
+    L.push(logMsg('tally.report.floor_estimate'));
   } else {
-    L.push(ruMsg('tally.report.floor_unavailable'));
+    L.push(logMsg('tally.report.floor_unavailable'));
   }
-  L.push(ruMsg('tally.report.floor_law'), '');
-  L.push(ruMsg('tally.report.approximation'));
+  L.push(logMsg('tally.report.floor_law'), '');
+  L.push(logMsg('tally.report.approximation'));
   return L;
 }
 
 function unparsedLines(unparsed) {
   if (!unparsed.length) return [];
-  return ['', ruMsg('tally.report.unparsed_header', { n: unparsed.length }),
+  return ['', logMsg('tally.report.unparsed_header', { n: unparsed.length }),
     ...unparsed.slice(0, 5).map((s) => `  ${s.file}${s.lineNo ? ':' + s.lineNo : ''}: ${s.line}`)];
 }
 
@@ -516,24 +516,24 @@ function main() {
     const rest = argv.filter((a) => a !== '--report');
     const targets = rest.length ? rest : [FEATURES_DIR];
     const missing = targets.filter((a) => !fs.existsSync(a));
-    if (missing.length) { console.error(ruMsg('tally.cli.not_found') + missing.join(', ')); process.exit(1); }
+    if (missing.length) { console.error(logMsg('tally.cli.not_found') + missing.join(', ')); process.exit(1); }
     process.stdout.write(report(targets) + '\n');
     return;
   }
   const args = argv;
   if (args.length === 0) {
-    console.error(ruMsg('tally.cli.usage'));
+    console.error(logMsg('tally.cli.usage'));
     process.exit(1);
   }
   const targets = args.map(resolveCardRef);
   const ambiguous = targets.filter((t) => t && t.ambiguous);
   if (ambiguous.length) {
-    console.error(ruMsg('tally.cli.ambiguous') + ambiguous.flatMap((t) => t.ambiguous).join(', '));
+    console.error(logMsg('tally.cli.ambiguous') + ambiguous.flatMap((t) => t.ambiguous).join(', '));
     process.exit(1);
   }
   const missing = targets.filter((a) => !fs.existsSync(a));
   if (missing.length) {
-    console.error(ruMsg('tally.cli.not_found') + missing.join(', '));
+    console.error(logMsg('tally.cli.not_found') + missing.join(', '));
     process.exit(1);
   }
   const result = tally(targets);
