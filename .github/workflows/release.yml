@@ -1,12 +1,12 @@
 name: release
 
-# Срабатывает при каждом пуше в main. Смотрит версию в .claude-plugin/plugin.json;
-# если релиз с таким номером ещё не существует — создаёт git-тег и GitHub Release
-# с названием, равным ровно номеру версии. Тело релиза берётся из CHANGELOG.md —
-# секция под выпускаемую версию (заголовок "## [X.Y.Z]"); если секции нет, тело
-# остаётся пустым и релиз собирается из авто-заметок GitHub (список коммитов
-# с прошлого тега и ссылка Full Changelog). Авто-заметки включены всегда.
-# Ничего не публикует, если версия не изменилась с последнего релиза.
+# Срабатывает при каждом пуше в main, который меняет версию (.claude-plugin/plugin.json,
+# package.json) или CHANGELOG.md. Ченжлог — неотъемлемая часть публикации: если релиза с
+# таким номером ещё нет, а секции "## [X.Y.Z]" в CHANGELOG.md нет — шаг падает и релиз
+# не создаётся; допиши секцию и пушни — пуш CHANGELOG.md перезапускает публикацию.
+# Если секция есть — тело релиза берётся из неё, авто-заметки GitHub (список коммитов
+# с прошлого тега и ссылка Full Changelog) добавляются всегда.
+# Ничего не публикует, если релиз уже существует.
 
 on:
   push:
@@ -14,6 +14,7 @@ on:
     paths:
       - ".claude-plugin/plugin.json"
       - "package.json"
+      - "CHANGELOG.md"
 
 permissions:
   contents: write
@@ -47,34 +48,20 @@ jobs:
         id: notes
         run: |
           VERSION="${{ steps.v.outputs.version }}"
-          if [ -f CHANGELOG.md ] && awk -v ver="$VERSION" '
+          if ! awk -v ver="$VERSION" '
               index($0, "## [" ver "]") == 1 { insec=1; next }
               /^## / { insec=0 }
               insec { print }
-            ' CHANGELOG.md | grep -q .; then
-            awk -v ver="$VERSION" '
-              index($0, "## [" ver "]") == 1 { insec=1; next }
-              /^## / { insec=0 }
-              insec { print }
-            ' CHANGELOG.md > release_notes.md
-            echo "found=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "found=false" >> "$GITHUB_OUTPUT"
+            ' CHANGELOG.md 2>/dev/null > release_notes.md || ! grep -q . release_notes.md; then
+            echo "no CHANGELOG.md section (## [$VERSION]) for the pending release - the changelog is an integral part of publishing; add the section and push (a CHANGELOG.md push retriggers this run)" >&2
+            exit 1
           fi
 
       - name: Create release with changelog
-        if: steps.check.outputs.exists == 'false' && steps.notes.outputs.found == 'true'
+        if: steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.v.outputs.version }}
           name: ${{ steps.v.outputs.version }}
           generate_release_notes: true
           body_path: release_notes.md
-
-      - name: Create release with auto notes only
-        if: steps.check.outputs.exists == 'false' && steps.notes.outputs.found != 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.v.outputs.version }}
-          name: ${{ steps.v.outputs.version }}
-          generate_release_notes: true

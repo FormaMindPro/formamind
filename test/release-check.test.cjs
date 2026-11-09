@@ -51,7 +51,7 @@ test('there are at least three damage rules', () => {
   assert.ok(RULES.length >= 3);
 });
 
-const { scanTraces, scanMessages } = require('../scripts/check-release.cjs');
+const { scanTraces, scanMessages, changelogGate } = require('../scripts/check-release.cjs');
 
 test('project traces in files: the card code and number, an attempt, a criterion, a date, the site name', () => {
   const dir = repoWith({
@@ -103,4 +103,15 @@ test('project traces: the domain, the site connector and the card count in a mes
   });
   assert.deepEqual([...new Set(scanTraces(dir).map((x) => x.file))].sort(), ['a.md', 'b.md']);
   assert.deepEqual(scanMessages(['Core closed 11 cards', 'Add graph renderer']).map((x) => x.rule), ['card-count']);
+});
+
+test('a version without a tag needs its CHANGELOG section - the release does not ship without it', () => {
+  const pending = repoWith({ '.claude-plugin/plugin.json': '{"version":"2.0.0"}', 'CHANGELOG.md': '## [1.0.0] - 20' + '31-01-05\n' });
+  assert.equal(changelogGate(pending).ok, false);
+  const ready = repoWith({ '.claude-plugin/plugin.json': '{"version":"2.0.0"}', 'CHANGELOG.md': '## [2.0.0] - 20' + '31-01-05\n\n### Added\n\n- the change\n' });
+  assert.equal(changelogGate(ready).ok, true);
+  const released = repoWith({ '.claude-plugin/plugin.json': '{"version":"2.0.0"}', 'CHANGELOG.md': 'no section\n' });
+  gitRun(released, 'commit', '--allow-empty', '-m', 'fixture');
+  gitRun(released, 'tag', 'v2.0.0');
+  assert.equal(changelogGate(released).ok, true);
 });

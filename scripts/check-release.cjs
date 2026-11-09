@@ -109,6 +109,32 @@ function versionStop(dir) {
   process.exit(1);
 }
 
+/* The changelog is an integral part of publishing: a version with no tag yet must have its
+ * CHANGELOG.md section (## [X.Y.Z]) - the release notes are built from it. The console log speaks
+ * English (the engine's log rule); the gate skips honestly when the tags are not available. */
+const en = (code, params) => i18n.message(code, params, 'en');
+function changelogGate(dir) {
+  let version = null;
+  try { version = JSON.parse(fs.readFileSync(path.join(dir, '.claude-plugin', 'plugin.json'), 'utf8')).version; } catch {}
+  let released = null;
+  try { released = version ? gitOut(dir, 'tag', '-l', `v${version}`).trim() : null; } catch { released = null; }
+  if (!version) return { ok: true, version, released };
+  if (released) return { ok: true, version, released };
+  let hasSection = false;
+  try {
+    const text = fs.readFileSync(path.join(dir, 'CHANGELOG.md'), 'utf8');
+    hasSection = text.split(/\r?\n/).some((l) => l.trim() === `## [${version}]` || l.startsWith(`## [${version}] `));
+  } catch {}
+  if (!hasSection) console.error(en('rel.changelog_missing', { version }));
+  return { ok: hasSection, version, released };
+}
+
+function changelogStop(dir) {
+  const gate = changelogGate(dir);
+  if (gate.ok) { console.log(en('rel.changelog_ok', { version: gate.version })); return; }
+  process.exit(1);
+}
+
 function main() {
   const dir = path.join(__dirname, '..');
   const argv = process.argv.slice(2);
@@ -130,6 +156,7 @@ function main() {
   if (traces.length) stopTraces(traces, []);
   console.log(tr('rel.no_traces'));
   versionStop(dir);
+  changelogStop(dir);
   const bad = scanCorruption(dir);
   if (bad.length) {
     console.error(tr('rel.stop_corruption', { n: bad.length }));
@@ -154,4 +181,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { scanCorruption, RULES, scanTraces, scanMessages, TRACES, projectSiteNames };
+module.exports = { scanCorruption, RULES, scanTraces, scanMessages, TRACES, projectSiteNames, changelogGate };
