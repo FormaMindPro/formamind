@@ -420,11 +420,11 @@ function board(mode) {
     const list = runCli(cli, ['--list-extensions'])
     if (list.error || list.status !== 0) continue
     found++
-    if (list.stdout.toLowerCase().split(/\r?\n/).includes(EXT_ID.toLowerCase())) { lines.push(`${cli}: ✓ ok`); continue }
+    if (list.stdout.toLowerCase().split(/\r?\n/).includes(EXT_ID.toLowerCase())) { lines.push(`${cli}: ${verifyInstall.colorMark(true)} ok`); continue }
     const inst = runCli(cli, ['--install-extension', EXT_ID])
     const again = runCli(cli, ['--list-extensions'])
-    if (inst.status === 0 && again.stdout.toLowerCase().includes(EXT_ID.toLowerCase())) lines.push(`${cli}: ✓ installed`)
-    else lines.push(`${cli}: ✗ failed — run manually: ${cli} --install-extension ${EXT_ID}`)
+    if (inst.status === 0 && again.stdout.toLowerCase().includes(EXT_ID.toLowerCase())) lines.push(`${cli}: ${verifyInstall.colorMark(true)} installed`)
+    else lines.push(`${cli}: ${verifyInstall.colorMark(false)} failed — run manually: ${cli} --install-extension ${EXT_ID}`)
   }
   if (!found) lines.push(`No editor CLI found (${EDITOR_CLIS.join(', ')}). Install the extension yourself: code --install-extension ${EXT_ID} (or from the extensions marketplace: Kanban Markdown, LachyFS)`)
   return lines
@@ -710,9 +710,9 @@ function downgradeReason(root) {
 
 // The version line at the end of an install: first install, update (from -> to) or a refresh of the same version.
 function versionLine(before, now) {
-  if (!before) return `✓ Forma ${now} installed.`
-  if (before === now) return `✓ Forma ${now} — already this version, files refreshed.`
-  return `✓ Forma updated: ${before} → ${now}.`
+  if (!before) return `${verifyInstall.colorMark(true)} Forma ${now} installed.`
+  if (before === now) return `${verifyInstall.colorMark(true)} Forma ${now} — already this version, files refreshed.`
+  return `${verifyInstall.colorMark(true)} Forma updated: ${before} → ${now}.`
 }
 function installedVersion(root) {
   try { return verifyInstall.readManifest(root).version || null } catch { return null }

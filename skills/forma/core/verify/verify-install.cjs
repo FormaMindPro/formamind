@@ -167,6 +167,16 @@ function verify(root, { behavior = true } = {}) {
   return result;
 }
 
+// Console colors for the check marks; plain text everywhere else (pipes, tests, CI) — no ANSI codes.
+const MARK_OK = '✓';
+const MARK_FAIL = '✗';
+
+/** Check mark for console output: green ok / red fail, but only on an interactive terminal without NO_COLOR. */
+function colorMark(ok) {
+  if (!(process.stdout.isTTY && !process.env.NO_COLOR)) return ok ? MARK_OK : MARK_FAIL;
+  return `\x1b[${ok ? 32 : 31}m${ok ? MARK_OK : MARK_FAIL}\x1b[0m`;
+}
+
 /** Text form: OK or a list of "address — expected — found". */
 function format(result) {
   const lines = [];
@@ -177,7 +187,7 @@ function format(result) {
     for (const n of e.notes) lines.push(`  · ${e.id} (${tag}): ${n}`);
     for (const f of e.findings) lines.push(e.role === 'main' ? row(f) : row(f).replace('  — ', '  ! warning: '));
   }
-  const head = result.ok ? '✓ install is intact' : '✗ install is broken';
+  const head = `${colorMark(result.ok)} install is ${result.ok ? 'intact' : 'broken'}`;
   return head + (lines.length ? '\n' + lines.join('\n') : '');
 }
 
@@ -190,5 +200,5 @@ function main(argv) {
   process.exit(result.ok ? 0 : 1);
 }
 
-module.exports = { MANIFEST, sha256, skeletonOf, buildManifest, readManifest, verify, format, syntaxError };
+module.exports = { MANIFEST, sha256, skeletonOf, buildManifest, readManifest, verify, format, syntaxError, colorMark };
 if (require.main === module) main(process.argv.slice(2));
