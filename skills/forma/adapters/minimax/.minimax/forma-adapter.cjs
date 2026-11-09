@@ -149,7 +149,7 @@ module.exports = {
   engineRulesFile: '.minimax/rules/minimax-8.md',
   skillsDir: '.minimax/skills',
   // The skills the template supplies (the core's interview): by them the "Project" tab tells the core from a project.
-  templateSkills: ['forma-grill-with-ui', 'grilling'],
+  templateSkills: ['forma-grill-with-ui', 'grilling', 'project-setup', 'vdisk-setup'],
   syncScript: '.minimax/scripts/gen-roles.cjs',
 
   // The dialogue spend: the script writes .forma/dashboard/.cache/session-current.json.
