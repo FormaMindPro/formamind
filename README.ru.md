@@ -7,7 +7,7 @@
 <p align="center"><a href="README.md">English</a> · <b>Русский</b></p>
 
 <p align="center">
-<img alt="Версия 0.0.x" src="https://img.shields.io/badge/version-0.0.x-blue">
+<img alt="Версия" src="https://img.shields.io/github/v/release/FormaMindPro/formamind?sort=semver&label=%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F&color=blue">
 <img alt="Лицензия MIT" src="https://img.shields.io/badge/license-MIT-green">
 <img alt="Claude Code: готов" src="https://img.shields.io/badge/Claude%20Code-ready-brightgreen">
 <img alt="Gemini: готов" src="https://img.shields.io/badge/Gemini-ready-brightgreen">
