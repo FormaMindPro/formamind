@@ -3,6 +3,17 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.11] - 2026-11-09
+
+### Added
+
+- CHANGELOG.md (Keep a Changelog, sections 0.0.8-0.0.10 backfilled); release notes publish the changelog section of the released version, GitHub auto notes are always on
+
+### Changed
+
+- Installer: check marks tint on TTY only - green ok / red fail, plain text in pipes, tests and CI
+- release-check: a date in CHANGELOG.md is not a project trace - the version history is published by design (per-file exception + test)
+
 ## [0.0.10] - 2026-11-09
 
 ### Added
