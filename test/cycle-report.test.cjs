@@ -35,8 +35,10 @@ const num = (k) => String(900 + k);
 const DAY = () => new Date().toISOString().slice(0, 10);
 
 // The five-field line of the Task zone: green gate for the working cards, red for the failing one.
-const FIVE = (n) => `${n} · tooling | a synthetic summary script | check: node --eval process.exit(0) ; nothing else to decide | 2 | Intent checks by the gates`;
-const FIVE_RED = (n) => `${n} · protocol | a synthetic failing script | check: node --eval process.exit(2) ; nothing else to decide | 3 | Intent checks by the gates`;
+// The eval argument is quoted: unquoted parentheses are a syntax error under POSIX /bin/sh (dash),
+// while cmd.exe on Windows passes them - the quoting keeps the fixture portable across runners.
+const FIVE = (n) => `${n} · tooling | a synthetic summary script | check: node --eval "process.exit(0)" ; nothing else to decide | 2 | Intent checks by the gates`;
+const FIVE_RED = (n) => `${n} · protocol | a synthetic failing script | check: node --eval "process.exit(2)" ; nothing else to decide | 3 | Intent checks by the gates`;
 
 // A spend line (AGENTS.md §3 canon) and a stage line, as the nodes write them into History.
 function spend(node, tokens, opts = {}) {
@@ -133,15 +135,13 @@ test('five fields, the last stage line, the gate statuses and the verdict, per c
   const r = run(['--label', 'goal-t1', '--cards', [probe(3), probe(4)].join(',')]);
   assert.equal(r.status, 0, r.stderr);
   for (const [field, value] of [['kind', num(1) + ' · tooling'], ['delivers', 'a synthetic summary script'],
-    ['criterion', 'check: node --eval process.exit(0)'], ['budget', '2'], ['next', 'Intent checks by the gates']]) {
+    ['criterion', 'check: node --eval "process.exit(0)"'], ['budget', '2'], ['next', 'Intent checks by the gates']]) {
     assert.ok(r.stdout.includes(`| ${EN['board.cycle-report.field_' + field]} | ${value}`), `the ${field} row of the green-gate card`);
   }
   assert.ok(r.stdout.includes(EN['board.cycle-report.stage'] + ': `Run`') && r.stdout.includes('stage exec — second.'),
     'the last stage line is the latest one');
   assert.ok(!r.stdout.includes('— first.'), 'an earlier stage line is not shown');
-  assert.ok(r.stdout.includes(`gate-1: ${EN['board.cycle-report.gate_green']}`),
-    'the green gate of the green-gate card; the card section as rendered: ' +
-    r.stdout.slice(r.stdout.indexOf('## ' + probe(1)), r.stdout.indexOf('## ' + probe(3))));
+  assert.ok(r.stdout.includes(`gate-1: ${EN['board.cycle-report.gate_green']}`), 'the green gate of the green-gate card');
   assert.ok(r.stdout.includes(EN['board.cycle-report.ready']), 'the green verdict');
   assert.ok(r.stdout.includes(`gate-1: ${EN['board.cycle-report.gate_red']}`), 'the red gate of the red-gate card');
   assert.ok(r.stdout.includes(EN['board.cycle-report.not_ready']), 'the red verdict');
