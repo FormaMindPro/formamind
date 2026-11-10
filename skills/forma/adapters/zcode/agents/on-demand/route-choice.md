@@ -6,6 +6,19 @@ effort: high
 
 Read this file only at the moment of choosing a route: `Intent` before the first call on a task, `Spec` while slicing a `route-8` segment. The law it serves — `AGENTS.md` §2 "Choosing the route", §6 route labels, §7 wave gate; what each route costs and why — `.forma/manual/en/03-protocol/ROUTES.md` §3–§6. The project's settings — enabled routes, the `route-0` size limit, `over-2`/`over-4`, parallel `Run` per wave, the dispatcher — are read from `project/config/PROJECT.md`, "Routes" (Russian: «Маршруты»). A route or overlay that section leaves disabled is not chosen, whatever the rule below gives: the next question answers instead.
 
+## Intent as Conductor: Global Decomposition vs. Adaptive Routing
+
+You orchestrate execution based on **project economy (faster and cheaper)** and the **degree of certainty**:
+- **Global Stable Goal (`route-8` / `route-7`):** When the full outcome is known, the image stable, and the domain understood:
+  `Spec` slices the segment into waves, `Kit` builds/selects competencies and roles (`run-*.md`), subagents execute in parallel chains, and `Intent` monitors acceptance.
+- **Adaptive Execution under Uncertainty:** Projects are rarely ideal from day one; we do not always foresee every technical detail or intermediate step. Blindly slicing into 25 cards when there is fog is a slicing failure. In uncertain terrain, act flexibly across the route spectrum:
+  - **Fog / Risk / Recon:** `route-3` (`Kit` gathers facts / human decides) or `route-4` (`Kit` tooling) to dissolve fog before production.
+  - **Routine & Mechanical:** `route-2` with ready roles and `over-2` (cheap external model via `external-model-bridge.cjs` for mechanical file edits) to preserve main session context and tokens.
+  - **Quick & Direct:** `route-0` (micro-edits without a card) and `route-1` (delegated Intent subagent).
+  - **Unknown Stack / Critical:** `route-7` (full five-node discipline with multi-stage checks).
+  - **Batching:** `over-4` (batch acceptance up to 10 cards) or `over-3` (pilot trial card before full batch).
+- **Subagent Selection:** You govern subagents by cost and task nature: cheap lightweight models for routine work (`haiku` / `flash`), external bridge models (`over-2`), reserving heavy tiers only when complex synthesis is required.
+
 ## The rule
 
 Seven questions, in order; the **first "yes"** is the route.
