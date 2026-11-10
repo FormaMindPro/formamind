@@ -1,6 +1,6 @@
 ---
 name: project-setup
-description: Initial setup wizard for a new project in the Forma protocol. Guides step-by-step configuration of virtual RAM disk, project thresholds (volume=25, attempts=3), route settings (enabled routes, route-0 threshold, over-2 model and limit, over-4 batch, dispatcher), Plumb calibration and models (OpenRouter typesafe/jev-1.14 or builtin, calibration thresholds, and .env key), and language localization (ru, en, or package generation). Invoke when starting the protocol in a new project, when "STOP START" appears in the session start report, or upon project configuration requests.
+description: Initial setup wizard for a new project in the Forma protocol. Guides step-by-step configuration of virtual RAM disk, project thresholds (volume=25, attempts=3), route settings (enabled routes, route-0 threshold, over-2 model and limit, over-4 batch, dispatcher), the Claude Code auto-compact window (250000 or off), Plumb calibration and models (OpenRouter typesafe/jev-1.14 or builtin, calibration thresholds, and .env key), and language localization (ru, en, or package generation). Invoke when starting the protocol in a new project, when "STOP START" appears in the session start report, or upon project configuration requests.
 ---
 
 # project-setup — initial project setup wizard
@@ -46,6 +46,11 @@ Record the two fundamental protocol thresholds in `project/config/PROJECT.md` un
 
 > [!NOTE]
 > Token spend and elapsed time are statistics, not thresholds. They are recorded by fact in card history and are never capped or set in advance (`AGENTS.md` §3). No spending limit in dollars is ever set.
+
+**Auto-compact window for Claude Code** (when the project runs Claude Code). Ask the user: the token window after which Claude Code compacts the conversation in this project — recommended **250000**, or `off` (Claude Code's own default). The user fills in the value — never write it silently:
+- write `CLAUDE_CODE_AUTO_COMPACT_WINDOW` into the `env` of `.claude/settings.json` (the hooks wiring in the same file stays intact);
+- a value of the human's own — environment variable, `~/.claude/settings.json`, `settings.local.json`, or an edited project value — is **never** overwritten: report it and keep it;
+- the installer's `--compact <n>|off` writes the same key explicitly, without the wizard.
 
 ### Step 3. Routes
 

@@ -59,8 +59,9 @@ const HELP = `forma ${VERSION} init — install/update the Forma protocol in the
   --lang     <code>                  project document language (default: en). Catalogs shipped: en, ru; any other code (fr, de, ...)
                                      works too: the agent translates the scaffold after install, hook messages stay English
   --dir      <path>                  project root (default: current folder)
-  --compact  <n>|off                 Claude Code auto-compact window for this project (default: 250000); off — leave
-                                     Claude Code's default. Your own value (env, ~/.claude, settings.local.json) is never changed
+  --compact  <n>|off                 Claude Code auto-compact window for this project, written only by this explicit
+                                     flag — the installer asks nothing (project-setup offers it at setup). Your own value
+                                     (env, ~/.claude, settings.local.json) is never changed
   --adopt / --no-adopt               first install only: move the folders and files already in the project root into
                                      project/source/; only the protocol's files, Git's and .env* stay in the
                                      root. Without either flag: asked in a terminal, skipped otherwise
@@ -254,7 +255,10 @@ function applyCompact(env, compact) {
     if (ours && compact.own.where !== '.claude/settings.json') delete env[COMPACT_KEY]
     return `auto-compact window: your ${compact.own.value} (${compact.own.where}) — left as is`
   }
-  if (compact === 'off') { // reached only without a value of the human's own, or by the explicit --compact off
+  if (compact === 'leave') { // the installer asks nothing and writes nothing — project-setup offers the window
+    return 'auto-compact window: not set by the installer — project-setup offers it (or --compact <n|off>)'
+  }
+  if (compact === 'off') { // reached only by the explicit --compact off
     delete env[COMPACT_KEY]
     return 'auto-compact window: Claude Code default (not set by Forma)'
   }
@@ -435,7 +439,7 @@ function board(mode) {
 async function chooseEngines(o, ask) {
   let engines = o.engines
   if (!engines && ask) {
-    console.log('\n[1/5] Engines (Claude Code is the core — selected by default):')
+    console.log('\n[1/4] Engines (Claude Code is the core — selected by default):')
     ACTIVE_ENGINES.forEach((e, i) => console.log(e.id === 'claude'
       ? `  ${i + 1}. ${e.label}  ${verifyInstall.colorMark(true)} default — the core, always installed`
       : `  ${i + 1}. ${e.label}`))
@@ -455,7 +459,7 @@ async function chooseEngines(o, ask) {
 async function chooseTemplate(o, ask, templates) {
   let template = o.template
   if (!template && ask) {
-    console.log('\n[2/5] Project template:')
+    console.log('\n[2/4] Project template:')
     console.log('  0. no template — the route is worked out in the interview (default)')
     templates.forEach((t, i) => console.log(`  ${i + 1}. ${t.name}${t.title ? ' — ' + t.title : ''}`))
     const a = (await ask('Number [0]: ')).trim()
@@ -470,7 +474,7 @@ async function chooseTemplate(o, ask, templates) {
 async function chooseBoard(o, ask) {
   let boardMode = o.board
   if (!boardMode && ask) {
-    console.log('\n[3/5] Kanban board — the Kanban Markdown editor extension:')
+    console.log('\n[3/4] Kanban board — the Kanban Markdown editor extension:')
     const a = (await ask('Find editors and install it? [Y/n]: ')).trim().toLowerCase()
     boardMode = a === 'n' || a === '\u043d' || a === 'no' ? 'skip' : 'auto'
   }
@@ -500,7 +504,7 @@ async function chooseLang(o, ask) {
   const bundled = scaffoldLangs()
   let lang = o.lang
   if (!lang && ask) {
-    console.log('\n[4/5] Project document language:')
+    console.log('\n[4/4] Project document language:')
     bundled.forEach((id, i) => console.log(`  ${i + 1}. ${langName(id)}${id === 'en' ? ' (default)' : ' (bundled scaffold)'}`))
     console.log('  or type another language code (fr, de, ...): installs English scaffold, agent translates after install')
     const a = (await ask('Number or code [1]: ')).trim()
@@ -787,8 +791,9 @@ function install(root, choice) {
   return { report, boardLines: board(choice.boardMode) }
 }
 
-// step 5: auto-compact window — only for Claude Code and only when the human has no value of their own
-async function chooseCompact(o, ask, root, engines) {
+// The auto-compact window is not the installer's question anymore: project-setup offers it at setup,
+// next to the cycle thresholds; `--compact` remains the explicit path. The human's own value always wins.
+function chooseCompact(o, root, engines) {
   if (!engines.includes('claude')) return 'off'
   const flag = o.compact ? String(o.compact).trim().toLowerCase() : null
   if (flag && flag !== 'off' && !/^[1-9]\d{4,6}$/.test(flag)) {
@@ -798,11 +803,7 @@ async function chooseCompact(o, ask, root, engines) {
   const own = ownCompact(root)
   if (own && !(flag && own.where === '.claude/settings.json')) return { own }
   if (flag) return flag
-  if (!ask) return COMPACT_DEFAULT
-  console.log(`\n[5/5] Auto-compact window for Claude Code in this project: ${COMPACT_DEFAULT} tokens`)
-  console.log('      (the conversation is compacted when it grows past it; your own setting is never changed)')
-  const a = (await ask('Set it? [Y/n]: ')).trim().toLowerCase()
-  return a === 'n' || a === '\u043d' || a === 'no' ? 'off' : COMPACT_DEFAULT
+  return 'leave' // no question at install, nothing written — project-setup will offer it
 }
 
 function printReport({ report, boardLines }) {
@@ -844,7 +845,7 @@ A plugin cache or an old checkout is not a source of the version. Use the newer 
   const template = await chooseTemplate(o, ask, templates)
   const boardMode = await chooseBoard(o, ask)
   const lang = await chooseLang(o, ask)
-  const compact = await chooseCompact(o, ask, root, engines)
+  const compact = chooseCompact(o, root, engines)
   const adopt = await chooseAdopt(o, root, ask)
   if (ask) ask.close()
 

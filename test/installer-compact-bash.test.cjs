@@ -1,5 +1,6 @@
 'use strict';
-// Installer: the auto-compact window is offered (250000 by default) and never overrides the human's own value;
+// Installer: the auto-compact window is not asked and not written by default (project-setup offers it at setup);
+// the explicit --compact sets or removes it, and the human's own value is never overridden;
 // a missing bash is said out loud, since without it no Claude Code hook runs.
 const { test } = require('node:test');
 const assert = require('node:assert');
@@ -24,13 +25,16 @@ function writeEnv(file, value) {
   fs.writeFileSync(file, JSON.stringify({ env: { [KEY]: value } }));
 }
 
-test('auto-compact: 250000 by default, --compact sets or removes it', () => {
+test('auto-compact: nothing asked nor written by default, --compact sets or removes it', () => {
   const dir = tmp('forma-c-'), home = tmp('forma-h-');
   let r = install(dir, home);
   assert.equal(r.status, 0, r.out);
-  assert.equal(envOf(dir)[KEY], '250000');
-  assert.match(r.out, /auto-compact window: 250000/);
+  assert.equal(envOf(dir)[KEY], undefined, 'without the explicit flag nothing is written');
+  assert.match(r.out, /auto-compact window: not set by the installer/);
+  assert.doesNotMatch(r.out, /\[5\/5\]/);
   install(dir, home, ['--compact', '400000']);
+  assert.equal(envOf(dir)[KEY], '400000');
+  r = install(dir, home); // rerun without the flag: the value written by the flag is kept as the project's own
   assert.equal(envOf(dir)[KEY], '400000');
   r = install(dir, home, ['--compact', 'off']);
   assert.equal(envOf(dir)[KEY], undefined);

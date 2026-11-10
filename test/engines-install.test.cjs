@@ -110,9 +110,9 @@ test('--engines zcode: claude is installed by the core automatically, the skills
 test('the menu: Claude Code is the frozen default, another number only adds to it', () => {
   const d7 = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-menu-'));
   try {
-    // "3" adds ZCode; the empty line answers the compact question with the default
+    // "3" adds ZCode; the installer asks nothing else (the compact question moved to project-setup)
     const r = spawnSync(process.execPath, [FORMA, 'init', '--dir', d7, '--template', 'none', '--board', 'skip', '--lang', 'en'],
-      { encoding: 'utf8', input: '3\n\n' });
+      { encoding: 'utf8', input: '3\n' });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /selected by default/);
     assert.match(r.stdout, /✓ default — the core, always installed/);

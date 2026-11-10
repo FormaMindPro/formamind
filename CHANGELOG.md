@@ -3,6 +3,13 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.15] - 2026-11-10
+
+### Changed
+
+- Installer: the auto-compact window is no longer asked or set at install — the menu is four steps ([1/4]…[4/4]); the `project-setup` skill offers the window at setup next to the cycle thresholds, and `--compact <n|off>` remains the explicit path (the human's own value is still never overwritten)
+- `project-setup` skill: the adapter copies catch up with the core canon — the Routes step enters the claude/codex/minimax copies (six steps), and the thresholds step offers the Claude Code auto-compact window
+
 ## [0.0.14] - 2026-11-10
 
 ### Fixed

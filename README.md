@@ -332,7 +332,7 @@ Author's thesis: this framework has no alternative — other methodologies (PMBO
 npx github:FormaMindPro/formamind init
 ```
 
-The installer asks: engines (`claude`, `gemini`, `zcode` ready; `codex` is dormant — not offered and not installed until it is woken in `core/engines.json`), project template (or no template), kanban board, document language, auto-compaction window. Non-interactive: `npx github:FormaMindPro/formamind init --engines claude --template none --board auto`. No npm registry package — only `github:`.
+The installer asks: engines (`claude`, `gemini`, `zcode` ready; `codex` is dormant — not offered and not installed until it is woken in `core/engines.json`), project template (or no template), kanban board, document language. The auto-compaction window is offered by the `project-setup` skill at project setup, not by the installer. Non-interactive: `npx github:FormaMindPro/formamind init --engines claude --template none --board auto`. No npm registry package — only `github:`.
 
 **Method 2 — git clone.**
 
@@ -380,7 +380,7 @@ Three layers (`AGENTS.md` §6): 1 — engine roles and skills; 2 — `.forma/`, 
 - **Notification.** Once a day at session start, the Claude Code hook compares the version with the latest on GitHub and reports only if GitHub has a newer one. Without network access it stays silent.
 - **Update.** Run `npx github:FormaMindPro/formamind init` again in the project folder; `project/`, the board, and `living/` are preserved.
 - **Update without questions.** `npx github:FormaMindPro/formamind init --yes` pulls the latest version from GitHub and overwrites the schema configuration with no menu and no prompts (defaults for anything missing). Add `--no-adopt` to skip the first-install question about moving root files, `--no-dashboard` not to start the dashboard. Only the project extensions: `npx github:FormaMindPro/formamind extensions` (`--check` reports without copying).
-- **Auto-compaction window.** The installer suggests 250000 tokens (`.claude/settings.json`) and does not overwrite your existing value. `--compact <tokens>` sets a different limit, `--compact off` leaves the Claude Code default.
+- **Auto-compaction window.** The installer asks nothing and writes nothing — the `project-setup` skill offers 250000 tokens (`.claude/settings.json`) at setup and does not overwrite your existing value. `--compact <tokens>` sets a different limit without the wizard, `--compact off` leaves the Claude Code default.
 
 ## If something doesn't work
 
