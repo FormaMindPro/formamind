@@ -11,11 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - Board: `card-move --stage` — the stage history line in the same call as the move, without a status change; the closed key list of seven, fail-closed on an unknown key or empty text, composes with `--session-spend`
 - Board: `new-card --node` — the history lines carry the calling node (default `Intent`); numbering without a race: exclusive file create, rescan when the number is taken
 - `project-setup` skill: a Routes step asks the project's human the five route questions (enabled routes, the small-task threshold, the external cheap model with its per-cycle cap, the batch acceptance size, the dispatcher) with recommended starting values — the human fills the values, the wizard never writes them silently
+- release-check: publishing requires the changelog section of the declared version — a declared version without its section fails the release gate
 
 ### Changed
 
 - i18n: live dictionaries synced with the clone (en/ru parity in both trees); plumb threshold aliases learn the scaffold's localized wording, so a fresh template's row parses
 - Plumb: the reading line's verdict text reflects the actual comparison against the declared thresholds — a below-threshold noul no longer reports "passed"; fraction and percent spellings normalize to one scale
+- README: the static version badge is replaced with a shields.io badge that follows the latest release tag
+- The engine's console log speaks English across the board: the dashboard, `release-check` and the last six scripts that kept a Russian canon (test-runner, forma-commit, template-push, scaffold-engine and the rest), with the test expectations aligned to the English log
 
 ### Fixed
 
