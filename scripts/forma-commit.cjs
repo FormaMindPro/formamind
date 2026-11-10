@@ -127,6 +127,11 @@ function release() {
   const pk = path.join(proto, 'package.json'); // package.json carries the same version as plugin.json
   const pkj = fs.readFileSync(pk, 'utf8');
   fs.writeFileSync(pk, pkj.replace(/"version": "[^"]*"/, `"version": "${nv}"`));
+  const pkl = path.join(proto, 'package-lock.json');
+  if (fs.existsSync(pkl)) {
+    const pklj = fs.readFileSync(pkl, 'utf8');
+    fs.writeFileSync(pkl, pklj.replace(new RegExp(`"version": "${v}"`, 'g'), `"version": "${nv}"`));
+  }
   pgit('add', '-A');
   r = pgit('commit', '-q', '-m', `v${nv} — ${list.length} commit(s)\n\n${list.reverse().map((s) => '- ' + s).join('\n')}\n\n${CO}`);
   if (r.code) stop(tr('commit.merge_commit_failed', { out: r.out }));

@@ -13,6 +13,24 @@ Read this file only when **opening a new goal** (interview, `GOAL.md`, epic assi
 
 Check which one you have before opening the epic, not mid-interview: switching surfaces halfway loses the answers already given. This epic's card readiness criterion isn't the image's quality (that's still "beautifully," your own qualification, checked by no one against a fact) but a fact: `brief/interview.md` and `brief/reference.md` are filled in, the human confirmed the frontier is empty.
 
+### The Focus of Questions: Epic 9 as the Single Source for All Goals
+
+**Questions must focus strictly on Epic "9. Goal achievement" (`results`) — what the human wants.**
+Do not burden the human with bureaucratic questions about roadmaps, engineering channel breakdowns, or technical parameters. The human talks about **the desired result**: what they want to achieve, what problem it solves, what the outcome looks and feels like, and how they will judge that it was reached.
+
+**From the human's answers about Epic 9, `Intent` derives and populates ALL remaining project goals (Epics 1 through 8):**
+- **Epic 9 (`results` — Desired final goal):** The root end-image, purpose, and arrival criterion (`project/goals/goal-results/GOAL.md`). Formed directly from what the human wants and how they will test and accept the outcome.
+- **Epic 4 (`resources` — Source resources and materials):** What raw materials, references, texts, assets, designs, APIs, and credentials are needed to realize Epic 9. Gathered from the human directly or via light indirect questions: *"What do we already have in hand (mockups, texts, references, accounts)? What needs to be prepared?"* Populates `project/goals/goal-resources/GOAL.md` and `brief/reference.md`.
+- **Epic 2 (`structure` — Structure, roadmap, documentation):** The project structure, milestone roadmap (`ROADMAP.md`), and documentation architecture (`project/docs/`). `Intent` decomposes the Epic 9 end-image into logical stages, technical components, and documentation sections, and presents it to the human for confirmation. Populates `project/goals/goal-structure/GOAL.md`.
+- **Epic 7 (`channels` — Production channels and competence pipelines):** Which production channels, technical stacks, tools, and execution pipelines will manufacture each part of the Epic 9 product (subgoals `goal-NN`). Synthesized by `Intent` from what the product consists of. Populates `project/goals/goal-channels/GOAL.md`.
+- **Epic 8 (`competencies` — Competence segments and skills):** What specific capabilities, tools, skills, and experience roles are needed to accomplish Epic 9. `Intent` checks the arsenal against the required outcome. Populates `project/goals/goal-competencies/GOAL.md`.
+- **Epic 1 (`analytics` — Project economy):** How the economy (faster and cheaper) applies to Epic 9: tracking tokens, attempts, caching strategy, and cost per cycle. Populates `project/goals/goal-analytics/GOAL.md`.
+- **Epic 6 (`discussion` — Communication channel and affairs):** How feedback rounds, clarifications, and design decisions on Epic 9 will be conducted with the human. Populates `project/goals/goal-discussion/GOAL.md`.
+- **Epic 3 (`protocol` — Project protocol and engine):** Which routes (`route-0`…`route-8`) and engine calibrations best fit the execution of Epic 9. Populates `project/goals/goal-protocol/GOAL.md`.
+- **Epic 5 (`balance` — Form balance and partnership):** How the 5 nodes balance each other specifically for this product domain to deliver Epic 9 without distortions. Populates `project/goals/goal-balance/GOAL.md`.
+
+**Every goal of the nine is grounded in the human's answers about Epic 9 and filled from this interview before production cycles begin.** Once all nine goals have their images in place, the start gate is fully cleared (`AGENTS.md` §3).
+
 The end-image is extracted through questions, not through retelling — and extracted **inconspicuously**: a question never announces which quality it's fishing for, the human just answers an ordinary conversational question (a human on the path of least effort can't objectively answer a direct question about a criterion — see `PROTOCOL.md`, "The path of least effort"). Ask five — all five, not four with a fifth you infer on your own:
 
 1. **(beautifully)** What image or moment here catches attention? What does the eye, the thought, linger on?
@@ -89,7 +107,19 @@ Opening a goal or a new standing category of work, you give it an epic — a lan
 
 ## How goals are formed
 
-Nine main goals, one per kind, pursued in parallel. Who forms each one:
+Nine main goals, one per kind, pursued in parallel.
+The human answers questions only about **Epic 9 (what they desire and want to see)**. From those answers, `Intent` shapes, contextualizes, and populates **all nine goals**:
+1. **Epic "9. Goal achievement" (`results`):** The primary focus with the human — what is the desired final outcome, and by what criterion will the human test and accept that it was reached?
+2. **Epic "4. Project resources" (`resources`):** What raw materials, references, assets, prompts, and APIs are needed to fulfill the result? (Derived from Epic 9 answers or asked lightly).
+3. **Epic "2. Project structure" (`structure`):** Into what stages, milestones (`ROADMAP.md`), and documentation sections the project is structured (`Intent` decomposes Epic 9 into structure for human confirmation).
+4. **Epic "7. Production channels" (`channels`):** The production channels and competence pipelines where deliverables are built (subgoals `goal-NN`, derived from what components make up the product).
+5. **Epic "8. Competence segments" (`competencies`):** The skills, roles, and experience needed to build the product.
+6. **Epic "1. Project analytics" (`analytics`):** Economy baseline (faster & cheaper) tailored to the project's scale.
+7. **Epic "6. Discussion of affairs" (`discussion`):** Channel and protocol for ongoing dialogue and feedback.
+8. **Epic "3. Project protocol" (`protocol`):** Engine configuration and routes tuned to the project.
+9. **Epic "5. Form balance" (`balance`):** Node harmony and balanced partnership.
+
+Who forms each one:
 
 | Kind | Default main goal | Formed by |
 |---|---|---|
