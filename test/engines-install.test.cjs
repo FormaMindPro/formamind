@@ -17,12 +17,17 @@ test('claude,gemini: the Gemini adapter installed, Codex not installed, the sync
   assert.equal(r.status, 0, r.stdout + r.stderr);
   for (const f of [
     '.forma/engines.json',
-    '.agents/rules/gemini-8.md', '.agents/forma-adapter.cjs', '.agents/plugins/forma/plugin.json', '.agents/plugins/forma/agents/kit.md', '.agents/plugins/forma/mcp_config.json',
+    '.agents/rules/gemini-8.md', '.agents/forma-adapter.cjs', '.agents/verify-profile.cjs',
+    '.agents/plugins/forma/plugin.json', '.agents/plugins/forma/agents/kit.md', '.agents/plugins/forma/mcp_config.json',
   ]) assert.ok(fs.existsSync(path.join(dir, f)), f);
   assert.ok(!fs.existsSync(path.join(dir, '.codex')), 'Codex sleeps - .codex/ is not installed');
   assert.match(r.stdout, /Gemini \(Antigravity\)/);
   assert.doesNotMatch(r.stdout, /Codex/);
+  assert.doesNotMatch(r.stdout, /not verified/);
   assert.match(r.stdout, /install is intact/);
+  const m = JSON.parse(fs.readFileSync(path.join(dir, '.forma', 'install-manifest.json'), 'utf8'));
+  const gemini = (m.engines || []).find((e) => e.id === 'gemini');
+  assert.ok(gemini && gemini.profile === '.agents/verify-profile.cjs', 'manifest declares gemini profile');
 });
 
 test('a second run does not overwrite the project mcp_config.json', () => {

@@ -567,6 +567,7 @@ function installGemini(root) {
   const P = path.join(root, '.agents', 'plugins', 'forma')
   copyTree(path.join(A, 'rules'), path.join(root, '.agents', 'rules'))
   copyFile(path.join(A, 'forma-adapter.cjs'), path.join(root, '.agents', 'forma-adapter.cjs'))
+  copyFile(path.join(A, 'verify-profile.cjs'), path.join(root, '.agents', 'verify-profile.cjs'))
   copyTree(path.join(A, 'tests'), path.join(root, '.agents', 'tests')) // test-gemini-adapter.cjs: adapter-conformance.cjs looks for it here
   if (fs.existsSync(path.join(A, 'scripts'))) {
     copyTree(path.join(A, 'scripts'), path.join(root, '.agents', 'scripts'))
@@ -678,12 +679,18 @@ function claudeExpect() {
   }
   return { hooks }
 }
+function geminiExpect() {
+  const hooksFile = path.join(ADAPTERS, 'gemini', 'hooks.json')
+  return { hooks: fs.existsSync(hooksFile) }
+}
 function writeManifest(root, { engines, lang, template, projectCreated }) {
   let previous = null
   try { previous = verifyInstall.readManifest(root) } catch { /* a broken earlier manifest is recreated */ }
-  const rows = engines.map((id) => (id === 'claude'
-    ? { id, profile: '.claude/verify-profile.cjs', expect: claudeExpect() }
-    : { id, note: 'not verified: no profile yet' }))
+  const rows = engines.map((id) => {
+    if (id === 'claude') return { id, profile: '.claude/verify-profile.cjs', expect: claudeExpect() }
+    if (id === 'gemini') return { id, profile: '.agents/verify-profile.cjs', expect: geminiExpect() }
+    return { id, note: 'not verified: no profile yet' }
+  })
   const manifest = verifyInstall.buildManifest(root, { owned, projectCreated, previous, engines: rows, lang, version: VERSION, line: LINE, template })
   const f = path.join(root, verifyInstall.MANIFEST)
   fs.mkdirSync(path.dirname(f), { recursive: true })
