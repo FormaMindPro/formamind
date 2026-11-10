@@ -122,7 +122,7 @@ The human answers questions only about **Epic 9 (what they desire and want to se
 8. **Epic "3. Project protocol" (`protocol`):** Engine configuration and routes tuned to the project.
 9. **Epic "5. Form balance" (`balance`):** Node harmony and balanced partnership.
 
-Who forms each one:
+Who forms each one — the table names who sets each goal's **default at installation**; the Epic-9 interview above refines all nine from the human's answers: installation seeds, the interview corrects:
 
 | Kind | Default main goal | Formed by |
 |---|---|---|

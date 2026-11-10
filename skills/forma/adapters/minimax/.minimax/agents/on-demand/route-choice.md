@@ -13,7 +13,7 @@ You orchestrate execution based on **project economy (faster and cheaper)** and 
 - **Adaptive Execution under Uncertainty:** Projects are rarely ideal from day one; we do not always foresee every technical detail or intermediate step. Blindly slicing into 25 cards when there is fog is a slicing failure. In uncertain terrain, act flexibly across the route spectrum:
   - **Fog / Risk / Recon:** `route-3` (`Kit` gathers facts / human decides) or `route-4` (`Kit` tooling) to dissolve fog before production.
   - **Routine & Mechanical:** `route-2` with ready roles and `over-2` (cheap external model via `external-model-bridge.cjs` for mechanical file edits) to preserve main session context and tokens.
-  - **Quick & Direct:** `route-0` (micro-edits without a card) and `route-1` (delegated Intent subagent).
+  - **Quick & Direct:** `route-0` (`Intent` itself — the edit shorter than its card, still carded) and `route-1` (a copy of `Intent`).
   - **Unknown Stack / Critical:** `route-7` (full five-node discipline with multi-stage checks).
   - **Batching:** `over-4` (batch acceptance up to 10 cards) or `over-3` (pilot trial card before full batch).
 - **Subagent Selection:** You govern subagents by cost and task nature: cheap lightweight models for routine work (`haiku` / `flash`), external bridge models (`over-2`), reserving heavy tiers only when complex synthesis is required.
