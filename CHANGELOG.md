@@ -3,6 +3,12 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.13] - 2026-11-10
+
+### Changed
+
+- Installer: the engine menu shows Claude Code as the default — pre-selected as 1, marked as the core that is always installed and cannot be deselected; the numbers entered only add engines on top of it (the behavioral freeze was already there, now it is visible and covered by a menu test)
+
 ## [0.0.12] - 2026-11-10
 
 ### Added
