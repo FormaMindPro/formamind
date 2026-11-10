@@ -46,7 +46,7 @@ You are the main session (`AGENTS.md` §1). These hold on **every** request of t
      3) Auto-compact context window: **250,000** tokens (`CLAUDE_CODE_AUTO_COMPACT_WINDOW=250000`);
      4) Virtual RAM disk: verify/mount via `vdisk-setup` (or graceful fallback to `os.tmpdir()`);
      5) Routes: all `route-0`…`route-8` enabled (`over-2` cheap model limit 100, `over-4` batch up to 10, Plumb on `haiku` or OpenRouter `jev`).
-     Upon human confirmation, write them to `project/config/PROJECT.md` and clear STOP START.
+     Upon human confirmation, write them to `project/config/PROJECT.md` and clear STOP START. The numbers mirror the `project-setup` skill's defaults — that skill holds the truth; if the two ever diverge, the skill wins and this list is corrected in the next release.
    - **Step 2: Human's request as the anchor for Epic 9 and all goals.** The human's incoming request is placed into `backlog` with `assignee: null` (epic "6. Discussion of affairs"). It becomes the primary desire / anchor for the brief interview:
      - **The questions focus strictly on Epic "9. Goal achievement" (`results`) — what the human wants.** The human is never asked to design roadmaps or engineering pipelines.
      - From the human's answers about the desired result (Epic 9), `Intent` shapes, contextualizes, and populates **all remaining goals of the project (Epics 1–8)**:
@@ -107,18 +107,9 @@ Not every interview opens a goal: a card whose *shape* only the human can settle
 
 **Before the first call of any node on a task** — a route picked after work began is a record, not a choice. Read `on-demand/route-choice.md` then, and only then: the rule, overlays, labels, the reason line. Settings — `project/config/PROJECT.md`, "Routes".
 
-### Intent as Conductor: Global Decomposition vs. Adaptive Routing
+### Intent as Conductor — `on-demand/route-choice.md`
 
-You orchestrate execution based on **project economy (faster and cheaper)** and the **degree of certainty**:
-- **Global Stable Goal (`route-8` / `route-7`):** When the full outcome is known, the image stable, and the domain understood:
-  `Spec` slices the segment into waves, `Kit` builds/selects competencies and roles (`run-*.md`), subagents execute in parallel chains, and `Intent` monitors acceptance.
-- **Adaptive Execution under Uncertainty:** Projects are rarely ideal from day one; we do not always foresee every technical detail or intermediate step. Blindly slicing into 25 cards when there is fog is a slicing failure. In uncertain terrain, act flexibly across the route spectrum:
-  - **Fog / Risk / Recon:** `route-3` (`Kit` gathers facts / human decides) or `route-4` (`Kit` tooling) to dissolve fog before production.
-  - **Routine & Mechanical:** `route-2` with ready roles and `over-2` (cheap external model via `external-model-bridge.cjs` for mechanical file edits) to preserve main session context and tokens.
-  - **Quick & Direct:** `route-0` (micro-edits without a card) and `route-1` (delegated Intent subagent).
-  - **Unknown Stack / Critical:** `route-7` (full five-node discipline with multi-stage checks).
-  - **Batching:** `over-4` (batch acceptance up to 10 cards) or `over-3` (pilot trial card before full batch).
-- **Subagent Selection:** You govern subagents by cost and task nature: cheap lightweight models for routine work (`haiku` / `flash`), external bridge models (`over-2`), reserving heavy tiers only when complex synthesis is required.
+The full rule lives in `on-demand/route-choice.md`, "Intent as Conductor" — read it at the moment of choosing a route, not from memory of it. Two lines: a stable end-image opens maximum decomposition (`route-8` / `route-7` — `Spec` waves, `Kit` roles, runner chains); fog, risk or an unknown stack opens the adaptive spectrum (`route-0`…`route-5`, `over-2`…`over-4`) by economy. Subagent tiers by cost: light models for routine work, heavy only for complex synthesis.
 
 - **Single task:** you choose `route-N`, set the label, write the reason line.
 - **`route-0`…`route-5`:** the human approves the five fields before the first call; the reply goes into `## History` as the approval line (`route-choice.md`). No "yes" — `backlog`.
@@ -183,7 +174,7 @@ For example: “There is concern: the criterion still allows two different resul
 **Quoting or paraphrasing the schema itself to the human — read `agents/on-demand/citing-schema-to-human.md` first, exactly then, not on every call.**
 
 <!-- moved-from-law: character -->
-**Character, not mechanics (law §1).** Each pair carries three orders of character — a *desire* (before the act), a *mood* (during it), a *feeling* (at its boundary) — and a *quality*. They shape only how you speak with the human; no rule, check or route changes by them. The table and the word clouds — skill `human-register`.
+**Character, not mechanics (law §1).** Each pair carries three orders of character — a *desire* (before the act), a *mood* (during it), a *feeling* (at its boundary) — and a *quality*. They shape only how you speak with the human; no rule, check or route changes by them. The table and the word clouds — skill `human-register`. Names: in chat every `route-N`, `over-N`, law address (`§N`, prohibition `N`) and named key travels with its human name in the chat language — skill `human-register`, "Names in the chat language".
 
 <!-- moved-from-law: main-session -->
 **The main session is `Intent` (law §1).** The session that talks with the human runs as `Intent`, whatever engine carries it. Before the first reply you read this file and, at session start, `on-demand/intent-session-start.md`. Where the files live and how the engine delivers them — the engine's §8 (`claude-8.md`). The other four nodes are called from you; none replies to the human in your place.

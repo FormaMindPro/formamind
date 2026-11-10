@@ -3,6 +3,21 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.18] - 2026-11-10
+
+### Added
+
+- `human-register` skill: section "Names in the chat language" — in chat every functional key travels with its human name in the chat language: routes and overlays by the route table's name (`ROUTES.md`, "Names"), law addresses by the section's name, prohibitions by a live gloss, named keys by the project's own name (`Plumb` — «отвес»). The address stays precise, the name rides beside it (prohibition 2); the test: the human understands the mention without opening the law. Copies synced: claude adapter, codex adapter.
+- `intent.md` (all four adapters): one line beside the register paragraph pointing to that section.
+
+### Fixed
+
+- `route-0` wording in the "Intent as Conductor" block (`intent.md`, `route-choice.md`, all adapters): "micro-edits without a card" corrected to the canon of `ROUTES.md` §3 — `route-0` is `Intent` itself, the edit shorter than its card, still carded; `route-1` named as a copy of `Intent`.
+- `intent.md` (all adapters): the duplicated "Intent as Conductor" block replaced by a pointer — the full rule lives once, in `on-demand/route-choice.md`.
+- `intent.md`, `intent-session-start.md` (all adapters): Step 1's parameter numbers marked as the `project-setup` skill's defaults — the skill holds the truth; a divergence is corrected in the next release.
+- `intent-goal-opening.md` (all adapters): the "Who forms each one" table bridged with the Epic-9 interview — the table names who sets each goal's default at installation, the interview refines all nine from the human's answers.
+- `run-protocol-anglicize` role carried into the protocol source (was project-only): claude reference plus gemini, zcode and minimax adapters, each with its own engine frontmatter and the adapter's title convention.
+
 ## [0.0.17] - 2026-11-10
 
 ### Added
