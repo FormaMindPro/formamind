@@ -590,6 +590,13 @@ function installGemini(root) {
 // nobody else installs the mirror (codex, its first consumer, is dormant). Roles are regenerated from
 // .claude/agents so the mirror matches the reference actually installed, not the shipped snapshot.
 // Machine state (.state/) is never shipped — it belongs to the host, not to the protocol.
+// The role mirror (.zcode/agents) is generated from .claude/agents by the shipped gen-roles script.
+function rebuildZcodeRoles(root, why) {
+  const r = spawnSync(process.execPath, [path.join(root, '.zcode', 'scripts', 'gen-roles.cjs')], { encoding: 'utf8' })
+  return r.status === 0
+    ? '  gen-roles: role mirror rebuilt from .claude/agents' + (why ? ` — ${why}` : '')
+    : '  ! gen-roles exited with code ' + r.status + ': ' + ((r.stdout || '') + (r.stderr || '')).trim().split(/\r?\n/).slice(-3).join(' | ')
+}
 function installZCode(root) {
   const A = path.join(ADAPTERS, 'zcode')
   const Z = path.join(root, '.zcode')
@@ -600,14 +607,8 @@ function installZCode(root) {
   copyTree(path.join(A, 'agents'), path.join(Z, 'agents'))
   copyTree(path.join(ADAPTERS, 'codex', '.agents', 'skills'), path.join(root, '.agents', 'skills'))
   const out = ['ZCode: .zcode/rules, .zcode/tests, .zcode/scripts, .zcode/agents, .agents/skills (shared mirror) — installed']
-  if (fs.existsSync(path.join(root, '.claude', 'agents'))) {
-    const r = spawnSync(process.execPath, [path.join(Z, 'scripts', 'gen-roles.cjs')], { encoding: 'utf8' })
-    out.push(r.status === 0
-      ? '  gen-roles: role mirror rebuilt from .claude/agents'
-      : '  ! gen-roles exited with code ' + r.status + ': ' + ((r.stdout || '') + (r.stderr || '')).trim().split(/\r?\n/).slice(-3).join(' | '))
-  } else {
-    out.push('  ! .claude/agents not found — roles ship as installed; install Claude Code, then run: node .zcode/scripts/gen-roles.cjs')
-  }
+  if (fs.existsSync(path.join(root, '.claude', 'agents'))) out.push(rebuildZcodeRoles(root))
+  else out.push('  ! .claude/agents not found — roles ship as installed; install Claude Code, then run: node .zcode/scripts/gen-roles.cjs')
   return out
 }
 
@@ -644,18 +645,22 @@ function installEngines(root, choice, protectedPaths, report) {
   syncExtensions(root, report)
 }
 
+// Returns the template result (or null when nothing was installed) so install() can react to what was written.
 function installTemplateStep({ root, template, existingTemplate }, core, report) {
   if (template === 'none') {
     report.push(`template: ${existingTemplate ? `kept the recorded «${existingTemplate}» (the core does not overwrite its files)` : 'none (project/config/PROJECT.md, "Project template" — can be changed any time)'}`)
-  } else if (existingTemplate && existingTemplate !== template) {
-    report.push(`template: project/config/PROJECT.md already records «${existingTemplate}» — not installing «${template}», project/ untouched`)
-  } else {
-    const t = installTemplate(root, template, core.projectCreated)
-    let line = `template ${template}: written ${t.written}, left as is ${t.kept}${core.projectCreated ? '' : ' (project/ already existed — its template files are untouched)'}`
-    if (t.runRoles.written.length) line += `; run roles written: ${t.runRoles.written.length}`
-    if (t.runRoles.kept.length) line += `; run roles kept (an existing profile is not overwritten): ${t.runRoles.kept.join(', ')}`
-    report.push(line)
+    return null
   }
+  if (existingTemplate && existingTemplate !== template) {
+    report.push(`template: project/config/PROJECT.md already records «${existingTemplate}» — not installing «${template}», project/ untouched`)
+    return null
+  }
+  const t = installTemplate(root, template, core.projectCreated)
+  let line = `template ${template}: written ${t.written}, left as is ${t.kept}${core.projectCreated ? '' : ' (project/ already existed — its template files are untouched)'}`
+  if (t.runRoles.written.length) line += `; run roles written: ${t.runRoles.written.length}`
+  if (t.runRoles.kept.length) line += `; run roles kept (an existing profile is not overwritten): ${t.runRoles.kept.join(', ')}`
+  report.push(line)
+  return t
 }
 
 // Install manifest: what the installer wrote and what must be wired for each ready engine.
@@ -766,7 +771,11 @@ function install(root, choice) {
   report.push(adoptStep(root, choice.adopt))
   report.push(`core: AGENTS.md, .forma/manual/, .forma/board/, .forma/skills/, .forma/dashboard/ synced; .forma/living/ — missing files added; board .devtool/features/ — ${core.boardState}; project/ — ${core.projectState}`)
   installEngines(root, choice, protectedPaths, report)
-  installTemplateStep({ root, template: choice.template, existingTemplate }, core, report)
+  const templateResult = installTemplateStep({ root, template: choice.template, existingTemplate }, core, report)
+  // Engines (and the zcode mirror rebuild) run before the template, so the run roles the template just
+  // wrote into .claude/agents/run/ are not in the mirror yet — rebuild again, the mirror must match.
+  if (templateResult && templateResult.runRoles.written.length && fs.existsSync(path.join(root, '.zcode', 'scripts', 'gen-roles.cjs')))
+    report.push(rebuildZcodeRoles(root, `the template wrote ${templateResult.runRoles.written.length} run roles after the first rebuild`))
   if (core.projectCreated) {
     const n = applyLanguage(root, choice.lang)
     const isBundled = choice.lang === 'en' || fs.existsSync(path.join(SCAFFOLD, choice.lang))

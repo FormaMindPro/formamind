@@ -3,6 +3,12 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.14] - 2026-11-10
+
+### Fixed
+
+- Installer: the ZCode role mirror is rebuilt after the template step — the run roles the template writes into `.claude/agents/run/` landed in `.zcode/agents/` only on a rerun, so a first install with ZCode and a template ended "install is broken" (the mirror had 24 roles against 31 in the reference); covered by a regression test
+
 ## [0.0.13] - 2026-11-10
 
 ### Changed

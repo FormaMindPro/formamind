@@ -162,3 +162,24 @@ test('the template run roles: an existing profile is kept and named in the repor
     assert.match(second.stdout, /run roles kept \(an existing profile is not overwritten\): .*run-site-upload\.md/);
   } finally { fs.rmSync(d6, { recursive: true, force: true }); }
 });
+
+// The regression: engines (with the zcode mirror rebuild) ran before the template, so the run roles the
+// template wrote landed in .claude/agents/run/ after the mirror was built — a first install with zcode
+// ended "install is broken" (the mirror had 24 roles against 31 in .claude/agents/run).
+test('zcode + template: the roles the template wrote land in the mirror too — the install stays intact', () => {
+  const d8 = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-templ-roles-'));
+  try {
+    const r = spawnSync(process.execPath, [FORMA, 'init', '--dir', d8, '--engines', 'claude,zcode', '--template', TEMPLATE, '--board', 'skip', '--lang', 'en', '--yes'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /install is intact/);
+    assert.match(r.stdout, /run roles written: /);
+    // the adapter conformance with the mirror, as the installed project runs it
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'zcode-home-'));
+    fs.mkdirSync(path.join(home, 'cli', 'rollout'), { recursive: true });
+    try {
+      const t = spawnSync(process.execPath, [path.join(d8, '.zcode', 'tests', 'test-zcode-adapter.cjs')],
+        { encoding: 'utf8', cwd: d8, env: { ...process.env, ZCODE_HOME: home } });
+      assert.equal(t.status, 0, t.stdout + t.stderr);
+    } finally { fs.rmSync(home, { recursive: true, force: true }); }
+  } finally { fs.rmSync(d8, { recursive: true, force: true }); }
+});
