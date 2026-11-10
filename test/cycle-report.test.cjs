@@ -139,7 +139,9 @@ test('five fields, the last stage line, the gate statuses and the verdict, per c
   assert.ok(r.stdout.includes(EN['board.cycle-report.stage'] + ': `Run`') && r.stdout.includes('stage exec — second.'),
     'the last stage line is the latest one');
   assert.ok(!r.stdout.includes('— first.'), 'an earlier stage line is not shown');
-  assert.ok(r.stdout.includes(`gate-1: ${EN['board.cycle-report.gate_green']}`), 'the green gate of the green-gate card');
+  assert.ok(r.stdout.includes(`gate-1: ${EN['board.cycle-report.gate_green']}`),
+    'the green gate of the green-gate card; the card section as rendered: ' +
+    r.stdout.slice(r.stdout.indexOf('## ' + probe(1)), r.stdout.indexOf('## ' + probe(3))));
   assert.ok(r.stdout.includes(EN['board.cycle-report.ready']), 'the green verdict');
   assert.ok(r.stdout.includes(`gate-1: ${EN['board.cycle-report.gate_red']}`), 'the red gate of the red-gate card');
   assert.ok(r.stdout.includes(EN['board.cycle-report.not_ready']), 'the red verdict');
