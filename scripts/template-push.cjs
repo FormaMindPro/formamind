@@ -17,7 +17,7 @@ const path = require('path');
 const { TRACES } = require('./check-release.cjs');
 const { FORBIDDEN_PREFIX } = require('./lib/forbidden-transfer.cjs');
 const i18n = require('../skills/forma/core/i18n/index.cjs');
-const tr = (code, params) => i18n.message(code, params, 'ru');
+const tr = (code, params) => i18n.message(code, params, 'en');
 
 const root = process.cwd();
 const protoDir = path.join(root, '.forma/protocol');

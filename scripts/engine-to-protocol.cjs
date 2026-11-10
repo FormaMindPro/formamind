@@ -25,7 +25,7 @@ const { walk: walkTree } = require('../skills/forma/core/dashboard/lib/fs.cjs');
 const { gitOut } = require('./lib/git.cjs');
 const { readOwnLayer, isForbiddenTransfer } = require('./lib/forbidden-transfer.cjs');
 const i18n = require('../skills/forma/core/i18n/index.cjs');
-const msg = (code, params) => i18n.message(code, params, 'ru');
+const msg = (code, params) => i18n.message(code, params, 'en');
 
 const root = process.cwd();
 const protoDir = path.join(root, '.forma/protocol');

@@ -42,7 +42,7 @@ test('--apply F without --add refuses with the new-file message, nothing written
   try {
     const r = run(dir, '--apply', NEW);
     assert.equal(r.status, 1);
-    assert.match(r.stderr, new RegExp('\u043d\u043e\u0432\u044b\u0439 \u0444\u0430\u0439\u043b: \u043f\u0435\u0440\u0435\u043d\u043e\u0441\u0438\u0442\u0441\u044f \u043f\u043e --add'));
+    assert.match(r.stderr, new RegExp('a new file: carried by --add'));
     assert.equal(fs.existsSync(dst(dir)), false);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
@@ -53,7 +53,7 @@ test('--add for a file outside the MAP, layer 4 or not from the new list refuses
     try {
       const r = run(dir, '--apply', NEW, '--add', NEW, '--add', bad);
       assert.equal(r.status, 1, bad + ': ' + r.stderr);
-      assert.match(r.stderr, new RegExp('--add (\u043e\u0442\u043a\u0430\u0437\u0430\u043d|\u043d\u0435 \u0438\u0437 \u0441\u043f\u0438\u0441\u043a\u0430 \u043d\u043e\u0432\u044b\u0445)'), bad);
+      assert.match(r.stderr, new RegExp('--add (refused|not from the new list)'), bad);
       assert.equal(fs.existsSync(dst(dir)), false, bad);
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   }

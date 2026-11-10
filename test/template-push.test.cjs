@@ -33,7 +33,7 @@ test('a dry-run writes nothing', () => {
   const root = fixture();
   const r = run(root, '--add', '.claude/scripts/shot.cjs');
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, new RegExp('\u043d\u043e\u0432\u044b\u0439\\s+\\.claude\\/scripts\\/shot\\.cjs'));
+  assert.match(r.stdout, new RegExp('new\\s+\\.claude\\/scripts\\/shot\\.cjs'));
   assert.equal(fs.existsSync(tplFile(root, 'skills/tpl/template/scripts/shot.cjs')), false);
   assert.equal(JSON.parse(fs.readFileSync(tplFile(root, '.claude-plugin/plugin.json'), 'utf8')).version, '0.0.1');
 });
@@ -65,7 +65,7 @@ test('a repeat without changes does not raise the version', () => {
   run(root, '--add', '.claude/scripts/shot.cjs', '--apply');
   const r = run(root, '--add', '.claude/scripts/shot.cjs', '--apply');
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, new RegExp('\u0417\u0430\u043f\u0438\u0441\u044b\u0432\u0430\u0442\u044c \u043d\u0435\u0447\u0435\u0433\u043e'));
+  assert.match(r.stdout, new RegExp('Nothing to write'));
   assert.equal(JSON.parse(fs.readFileSync(tplFile(root, '.claude-plugin/plugin.json'), 'utf8')).version, '0.0.2');
 });
 

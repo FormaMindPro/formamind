@@ -21,7 +21,7 @@ const { walk: walkTree, projectFile } = require('../skills/forma/core/dashboard/
 const { run, gitRun } = require('./lib/git.cjs');
 const { scanTraces, scanMessages } = require('./check-release.cjs');
 const i18n = require('../skills/forma/core/i18n/index.cjs');
-const tr = (code, params) => i18n.message(code, params, 'ru');
+const tr = (code, params) => i18n.message(code, params, 'en');
 
 const root = process.cwd();
 const proto = path.join(root, '.forma/protocol');

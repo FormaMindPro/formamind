@@ -19,7 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const i18n = require('../skills/forma/core/i18n/index.cjs');
-const msg = (code, params) => i18n.message(code, params, 'ru');
+const msg = (code, params) => i18n.message(code, params, 'en');
 
 const args = process.argv.slice(2);
 let name = null;

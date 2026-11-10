@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const i18n = require('../skills/forma/core/i18n/index.cjs');
-const tr = (code, params) => i18n.message(code, params, 'ru');
+const tr = (code, params) => i18n.message(code, params, 'en');
 
 const ROOT = path.resolve(__dirname, '..');
 const TEST_DIR = path.join(ROOT, 'test');
