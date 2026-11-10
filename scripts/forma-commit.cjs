@@ -107,7 +107,8 @@ function release() {
   if (!list.length) { ok(tr('commit.release_no_commits')); return; }
   if (pgit('status', '--porcelain').out.trim()) stop(tr('commit.release_dirty'));
   // The pre-release check: carry-over corruptions, tests, linter. Red - no release, nothing merged or pushed.
-  const chk = run('node', [path.join(proto, 'scripts', 'check-release.cjs')]);
+  const chkArgs = [path.join(proto, 'scripts', 'check-release.cjs')].concat(has('--no-tests') ? ['--no-tests'] : []);
+  const chk = run('node', chkArgs);
   if (chk.code) stop(tr('commit.release_check_failed', { out: chk.out }));
   ok(tr('commit.release_check_ok'));
   pgit('fetch', '-q', 'origin');
