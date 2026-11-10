@@ -87,6 +87,13 @@ test('claude,zcode: the ZCode adapter installed, .state not shipped, the skill m
   assert.ok(!fs.existsSync(path.join(dir, '.zcode', '.state')), 'the .state/ machine state is not shipped into someone else\'s project');
   assert.match(r.stdout, /ZCode: .*— installed/);
   assert.match(r.stdout, /gen-roles: role mirror rebuilt/);
+  // The zcode verify profile is declared and shipped: the note is gone, the mirror parity is checked at every install.
+  assert.doesNotMatch(r.stdout, /not verified/);
+  assert.ok(fs.existsSync(path.join(dir, '.zcode', 'verify-profile.cjs')), '.zcode/verify-profile.cjs installed');
+  const m7 = JSON.parse(fs.readFileSync(path.join(dir, '.forma', 'install-manifest.json'), 'utf8'));
+  const zrow = (m7.engines || []).find((e) => e.id === 'zcode');
+  assert.ok(zrow && zrow.profile === '.zcode/verify-profile.cjs', 'manifest declares zcode profile');
+  assert.equal(zrow.expect && zrow.expect.mirrorFrom, '.claude/agents', 'manifest records the mirror reference');
   // The v0.0.5 red regression: the adapter conformance entirely on a fresh install. ZCODE_HOME
   // is swapped to an empty rollout - the check does not depend on whether ZCode sits on this machine.
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'zcode-home-'));
@@ -178,6 +185,7 @@ test('zcode + template: the roles the template wrote land in the mirror too — 
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /install is intact/);
     assert.match(r.stdout, /run roles written: /);
+    assert.doesNotMatch(r.stdout, /not verified/);
     // the adapter conformance with the mirror, as the installed project runs it
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'zcode-home-'));
     fs.mkdirSync(path.join(home, 'cli', 'rollout'), { recursive: true });
@@ -187,4 +195,22 @@ test('zcode + template: the roles the template wrote land in the mirror too — 
       assert.equal(t.status, 0, t.stdout + t.stderr);
     } finally { fs.rmSync(home, { recursive: true, force: true }); }
   } finally { fs.rmSync(d8, { recursive: true, force: true }); }
+});
+
+// The profile's value over the hashes: a role the reference gains after the install (the template or the
+// human adds one) moves no hash - only a regeneration sees the mirror lag. The zcode row names it with the
+// address and the fix; the red verdict itself belongs to the main layer - with claude always installed,
+// the core's parity checks (check-ready, sync-engines) catch the same drift and turn the install red.
+test('zcode profile: a role new to the reference is named with its address and the fix, the red verdict stays the main layer\'s', () => {
+  const d9 = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-zdrift-'));
+  try {
+    const r = spawnSync(process.execPath, [FORMA, 'init', '--dir', d9, '--engines', 'claude,zcode', '--board', 'skip', '--lang', 'en', '--yes'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    fs.writeFileSync(path.join(d9, '.claude', 'agents', 'zz-drift-probe.md'), '# drift probe\n');
+    const v = spawnSync(process.execPath, [path.join(d9, '.forma', 'verify', 'verify-install.cjs')], { cwd: d9, encoding: 'utf8' });
+    assert.equal(v.status, 1, 'the drift turns the install red on the main layer: ' + v.stdout);
+    assert.match(v.stdout, /! warning: .*zcode\/agents/);
+    assert.match(v.stdout, /gen-roles --check/);
+    assert.match(v.stdout, /zz-drift-probe/);
+  } finally { fs.rmSync(d9, { recursive: true, force: true }); }
 });

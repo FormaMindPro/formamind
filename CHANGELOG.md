@@ -3,6 +3,13 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.16] - 2026-11-10
+
+### Added
+
+- Installer: a verify profile for ZCode — the role mirror's parity with the reference (`gen-roles --check`), the adapter files from the manifest, the §8 reference closure, and the adapter's fit test run at every install; the `not verified: no profile yet` note for zcode is gone, and a drift is named with the address and the fix in the zcode row (the red verdict stays the main layer's — the core owns parity)
+- Installer: a verify profile for Gemini is declared the same way (a parallel land in the same version)
+
 ## [0.0.15] - 2026-11-10
 
 ### Changed

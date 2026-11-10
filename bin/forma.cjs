@@ -606,6 +606,7 @@ function installZCode(root) {
   const A = path.join(ADAPTERS, 'zcode')
   const Z = path.join(root, '.zcode')
   copyFile(path.join(A, 'forma-adapter.cjs'), path.join(Z, 'forma-adapter.cjs'))
+  copyFile(path.join(A, 'verify-profile.cjs'), path.join(Z, 'verify-profile.cjs')) // install verify profile: the core finds it via the manifest
   copyTree(path.join(A, 'rules'), path.join(Z, 'rules'))
   copyTree(path.join(A, 'tests'), path.join(Z, 'tests'))
   copyTree(path.join(A, 'scripts'), path.join(Z, 'scripts'))
@@ -683,12 +684,21 @@ function geminiExpect() {
   const hooksFile = path.join(ADAPTERS, 'gemini', 'hooks.json')
   return { hooks: fs.existsSync(hooksFile) }
 }
+// ZCode: the adapter files laid down and where the role mirror is generated from — the profile checks the
+// mirror against that reference (a regeneration is the only check that sees the mirror lag behind it).
+function zcodeExpect() {
+  return {
+    files: ['.zcode/forma-adapter.cjs', '.zcode/rules/zcode-8.md', '.zcode/scripts/gen-roles.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs', '.agents/skills'],
+    mirrorFrom: '.claude/agents',
+  }
+}
 function writeManifest(root, { engines, lang, template, projectCreated }) {
   let previous = null
   try { previous = verifyInstall.readManifest(root) } catch { /* a broken earlier manifest is recreated */ }
   const rows = engines.map((id) => {
     if (id === 'claude') return { id, profile: '.claude/verify-profile.cjs', expect: claudeExpect() }
     if (id === 'gemini') return { id, profile: '.agents/verify-profile.cjs', expect: geminiExpect() }
+    if (id === 'zcode') return { id, profile: '.zcode/verify-profile.cjs', expect: zcodeExpect() }
     return { id, note: 'not verified: no profile yet' }
   })
   const manifest = verifyInstall.buildManifest(root, { owned, projectCreated, previous, engines: rows, lang, version: VERSION, line: LINE, template })
