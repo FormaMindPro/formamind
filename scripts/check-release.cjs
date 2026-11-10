@@ -166,7 +166,7 @@ function main() {
   console.log(tr('rel.no_corruption'));
   if (argv.includes('--no-tests')) return;
   for (const [label, args] of [[tr('rel.label_tests'), ['test']], [tr('rel.label_lint'), ['run', 'lint']]]) {
-    const r = spawnSync('npm', args, { cwd: dir, encoding: 'utf8', shell: true });
+    const r = spawnSync('npm', args, { cwd: dir, encoding: 'utf8', shell: true, maxBuffer: 64 << 20 });
     if (r.status) {
       const lines = (r.stdout + r.stderr).split(/\r?\n/);
       // Red tests - by their names and count, not by the tail of the output: the tail undercounts them.

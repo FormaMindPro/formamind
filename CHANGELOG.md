@@ -3,6 +3,23 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.17] - 2026-11-10
+
+### Added
+
+- `Intent`: three-step launch and intake algorithm (`intent.md`, `intent-session-start.md`):
+  - Step 1: Project configuration proposal in chat (thresholds attempts=3, volume=25, auto-compact window=250k, RAM disk via `vdisk-setup`, standard routes) to clear STOP START before any production work or brief interview. Heavy filesystem audits and external interview UI server startups are prohibited during start turns.
+  - Step 2: The human's request is placed in `backlog` as the primary desire / anchor for the brief interview. The interview asks strictly about Epic 9 (`results` — what the human wants), from which `Intent` derives and populates all remaining project goals (Epics 1–8).
+  - Step 3: `Intent` acts as conductor and economist: global stable goal opens maximum decomposition (`route-8`/`route-7`, `Spec` waves, `Kit` roles, runner chains); uncertainty and fog open adaptive agile routes (`route-0`…`route-5`, `over-2`…`over-4`) to optimize tokens, speed, and subagent selection.
+- `SETUP.md` (core and scaffolds): Step 0 `setup-0-project-setup` in Epic "3. Project protocol" declaring the setup card explicitly.
+- `route-choice.md`: section "Intent as Conductor: Global Decomposition vs. Adaptive Routing".
+- `intent-goal-opening.md`: section "The Focus of Questions: Epic 9 as the Single Source for All Goals".
+
+### Fixed
+
+- `intent.md`: clarified `new-card.cjs` CLI flag syntax (`--route <N> --why <code> --stage card` or `--quick`), removed incorrect recommendation to run `sync-engines.cjs --check` during user turns.
+- `forma-commit.cjs`: added automatic synchronization of `package-lock.json` version upon `--release`.
+
 ## [0.0.16] - 2026-11-10
 
 ### Added
