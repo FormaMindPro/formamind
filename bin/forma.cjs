@@ -430,13 +430,16 @@ function board(mode) {
   return lines
 }
 
-/// step 1: engines — by flag, from the menu, or claude by default; an unknown one exits with 2
+/// step 1: engines — by flag, from the menu, or claude by default; an unknown one exits with 2.
+/// Claude Code is the default core: pre-selected as 1, cannot be deselected (the unshift below enforces it).
 async function chooseEngines(o, ask) {
   let engines = o.engines
   if (!engines && ask) {
-    console.log('\n[1/5] Engines (Claude Code is installed by default as core):')
-    ACTIVE_ENGINES.forEach((e, i) => console.log(`  ${i + 1}. ${e.label}`))
-    const a = await ask('Numbers, comma-separated [1]: ')
+    console.log('\n[1/5] Engines (Claude Code is the core — selected by default):')
+    ACTIVE_ENGINES.forEach((e, i) => console.log(e.id === 'claude'
+      ? `  ${i + 1}. ${e.label}  ${verifyInstall.colorMark(true)} default — the core, always installed`
+      : `  ${i + 1}. ${e.label}`))
+    const a = await ask('Numbers to add, comma-separated (Enter — Claude Code only): ')
     engines = (a.trim() || '1').split(/[\s,]+/).map((x) => (ACTIVE_ENGINES[Number(x) - 1] || {}).id || x).join(',')
   }
   engines = (engines || 'claude').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean)

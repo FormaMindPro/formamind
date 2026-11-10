@@ -105,6 +105,22 @@ test('--engines zcode: claude is installed by the core automatically, the skills
   } finally { fs.rmSync(d4, { recursive: true, force: true }); }
 });
 
+// The menu itself (piped stdin stands in for a TTY): Claude Code is shown as the frozen
+// default and stays installed even when the human's numbers name only other engines.
+test('the menu: Claude Code is the frozen default, another number only adds to it', () => {
+  const d7 = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-menu-'));
+  try {
+    // "3" adds ZCode; the empty line answers the compact question with the default
+    const r = spawnSync(process.execPath, [FORMA, 'init', '--dir', d7, '--template', 'none', '--board', 'skip', '--lang', 'en'],
+      { encoding: 'utf8', input: '3\n\n' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /selected by default/);
+    assert.match(r.stdout, /✓ default — the core, always installed/);
+    assert.ok(fs.existsSync(path.join(d7, '.claude', 'rules')), 'the frozen default (claude) is not installed');
+    assert.ok(fs.existsSync(path.join(d7, '.zcode', 'forma-adapter.cjs')), 'the picked engine (zcode) is not installed');
+  } finally { fs.rmSync(d7, { recursive: true, force: true }); }
+});
+
 // The template ships whole (v0.0.10): the template's own SKILL.md and its mcp.json lie down into
 // .claude/skills/<name>/ (mcp.json connects nothing by itself), the template's Run roles into
 // .claude/agents/run/ with the names recorded in .claude/project-layer.txt.
