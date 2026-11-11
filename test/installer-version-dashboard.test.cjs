@@ -25,8 +25,11 @@ test('version line: installed, refreshed, updated', () => {
     let r = install(dir, home);
     assert.equal(r.status, 0, r.out);
     assert.match(r.out, new RegExp(`✓ Forma ${VERSION.replace(/\./g, '\\.')} installed\\.`));
+    assert.match(r.out, /Next: open the folder in VSCode \(Antigravity\) or an agent harness — Intent will lead the setup per project\/config\/SETUP\.md, starting with the interview\./);
+    assert.doesNotMatch(r.out, /Claude Code — Intent/);
     r = install(dir, home);
     assert.match(r.out, new RegExp(`Forma ${VERSION.replace(/\./g, '\\.')} — already this version`));
+    assert.doesNotMatch(r.out, /Next: open the folder/);
     const m = JSON.parse(fs.readFileSync(manifestFile(dir), 'utf8'));
     m.version = '0.0.0';
     fs.writeFileSync(manifestFile(dir), JSON.stringify(m));

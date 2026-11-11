@@ -875,7 +875,7 @@ A plugin cache or an old checkout is not a source of the version. Use the newer 
   if (!ok) { console.error('\nInstall is broken — fix the items above and rerun (rerunning is safe).'); process.exit(1) }
   console.log('\n' + versionLine(versionBefore, VERSION))
   printDashboard(root, o)
-  if (!installedBefore) console.log('\nNext: open the folder in Claude Code — Intent will lead the setup per project/config/SETUP.md, starting with the interview.')
+  if (!installedBefore) console.log('\nNext: open the folder in VSCode (Antigravity) or an agent harness — Intent will lead the setup per project/config/SETUP.md, starting with the interview.')
 }
 
 main().catch((e) => { console.error(e.message || e); process.exit(1) })
