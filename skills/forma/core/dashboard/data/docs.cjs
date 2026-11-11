@@ -5,7 +5,7 @@
  * The TOC format - `.forma/templates/README-toc.md` and `.forma/templates/toc.json` (a sample without project traces).
  *
  * The "Project documentation" book (`project/docs/_toc.json`) - one language, `title` as a string.
- * The "Engine manual" book (`.forma/manual/_toc.json`) - one TOC over both branches `.forma/manual/en/` and `.forma/manual/ru/`
+ * The "Engine manual" book (`.forma/manual/_toc.json`) - one TOC over every language branch `.forma/manual/<lang>/`
  * (the file tree is identical by the contract in `.forma/manual/README.md`), `title` - `{en, ru}`.
  *
  * A broken TOC link is not a message in the data but a thrown error with the item's address (`items[0].items[1].page`):
@@ -76,24 +76,28 @@ function buildManualBook(projectRoot) {
   const tocFile = path.join(root, '_toc.json');
   const id = '.forma/manual';
   const fallbackTitle = { key: 'docs.title.manual' };
+  // Manual languages - the directory listing .forma/manual/*/ (en is the original), the same definition as the manual-languages check.
+  const langs = fs.readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  const emptyPages = () => Object.fromEntries(langs.map((l) => [l, {}]));
+  const emptyUnlisted = () => Object.fromEntries(langs.map((l) => [l, []]));
   if (!fs.existsSync(tocFile)) {
-    return { id, title: fallbackTitle, toc: null, pages: { en: {}, ru: {} }, unlisted: { en: [], ru: [] }, error: '.forma/manual/_toc.json not found' };
+    return { id, title: fallbackTitle, toc: null, pages: emptyPages(), unlisted: emptyUnlisted(), error: '.forma/manual/_toc.json not found' };
   }
   let toc;
   try { toc = readJson(tocFile); } catch (err) { throw new Error(`.forma/manual/_toc.json is not valid JSON: ${err.message}`); }
 
-  const pages = { en: {}, ru: {} };
+  const pages = emptyPages();
   const referenced = new Set();
   walkToc(toc.items || [], [], 'items', { sourceLabel: '.forma/manual/_toc.json', onLeaf: (item, trail, addr) => {
     referenced.add(item.page);
-    for (const lang of ['en', 'ru']) {
+    for (const lang of langs) {
       const file = path.join(root, lang, item.page);
       if (!fs.existsSync(file)) throw new Error(`.forma/manual/_toc.json ${addr}.page — file not found: ${lang}/${item.page}`);
       pages[lang][item.page] = { page: item.page, title: item.title, breadcrumbs: [...trail, item.title], text: fs.readFileSync(file, 'utf8') };
     }
   } });
   const unlisted = {};
-  for (const lang of ['en', 'ru']) {
+  for (const lang of langs) {
     const all = walkMd(path.join(root, lang), path.join(root, lang), []);
     unlisted[lang] = all.filter((p) => !referenced.has(p));
   }

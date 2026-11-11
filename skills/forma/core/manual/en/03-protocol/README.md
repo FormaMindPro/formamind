@@ -23,6 +23,7 @@ Complete reference documents of the engine live here — they are not divided in
 | [five-nodes.md](five-nodes.md) | the route of the five nodes, diagram |
 | [PLUMB.md](PLUMB.md) | the Plumb: role-fit measure between slicing and execution, executors, scrubbing, what `Core` reads |
 | [ROUTES.md](ROUTES.md) | route choice for a task: `route-0`…`route-8`, overlays `over-1`…`over-4`, the choice rule, waves at scale |
+| [NAMES.md](NAMES.md) | registry of the names: routes, overlays, law sections, prohibitions — a name and a description for each |
 | [LOCALIZATION.md](LOCALIZATION.md) | dashboard localization: two languages, dictionaries, the `locale-parity` check |
 | [PROTOCOL-DEVELOPMENT.md](PROTOCOL-DEVELOPMENT.md) | developing the protocol from a project: clone, engine alignment, transfer, trace check, push |
 | [ENGINE-MAP.md](ENGINE-MAP.md) | the engine map: three levels of rules with sizes, sources outside them, machinery, hooks, what the engine produces, gaps found |

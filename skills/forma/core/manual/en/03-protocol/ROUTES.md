@@ -28,7 +28,7 @@ A reference for choosing a route for a task. Written for two readers: the human 
 
 ## 3. Codes and summary table
 
-**Route code** — `route-N`; in speech, "route N" («маршрут N» in Russian). **Overlay code** — `over-N` (from *overlay*); in speech, "overlay N". One and the same code in the documentation, the law, the configuration, the card label and the dashboard; a route has no other names.
+**Route code** — `route-N`; in speech, "route N" («маршрут N» in Russian). **Overlay code** — `over-N` (from *overlay*); in speech, "overlay N". One and the same code in the documentation, the law, the configuration, the card label and the dashboard; the code is the address; key and name ride beside it.
 
 **Why the numbers go this way.** The number grows with the count of separate calls and with the independence of the criterion from the acceptor:
 
@@ -69,23 +69,23 @@ Scale: ●●● good, ● poor.
 
 ---
 
-**Names.** Every code has a movement name — what moves where — so a reply to the human never carries a bare number. The names are English keys (`.forma/i18n/keys.json`, `routeNames`); the dashboard shows the name next to the code, in Russian as the label in the third column.
+**Names.** Every code has a movement name — what moves where — so a reply to the human never carries a bare number. The registry of the names (including law sections and prohibitions) — `NAMES.md`; the English keys stay in `.forma/i18n/keys.json` (`routeNames`); the dashboard shows the name next to the code.
 
-| Code | Name | Russian label |
+| Code | Key | Name |
 |---|---|---|
-| `route-0` | `intent-self` | сам Intent |
-| `route-1` | `intent-copy` | копия Intent |
-| `route-2` | `intent-run` | Intent → Run |
-| `route-3` | `intent-kit-human` | вопрос человеку |
-| `route-4` | `intent-kit-intent` | Kit исполняет сам |
-| `route-5` | `intent-kit-run` | Intent → Kit → Run |
-| `route-6` | `spec-run` | Spec → Run по готовому набору |
-| `route-7` | `spec-kit-run` | полная цепь |
-| `route-8` | `segments-waves` | сегменты × волны |
-| `over-1` | `kit-library` | набор из библиотеки |
-| `over-2` | `external-model` | внешняя модель |
-| `over-3` | `series` | серия |
-| `over-4` | `batch-accept` | пакетная приёмка |
+| `route-0` | `intent-self` | on the fly |
+| `route-1` | `intent-copy` | the double |
+| `route-2` | `intent-run` | the errand |
+| `route-3` | `intent-kit-human` | the council |
+| `route-4` | `intent-kit-intent` | the workshop |
+| `route-5` | `intent-kit-run` | made to order |
+| `route-6` | `spec-run` | by the pattern |
+| `route-7` | `spec-kit-run` | full ahead |
+| `route-8` | `segments-waves` | the build |
+| `over-1` | `kit-library` | the warehouse |
+| `over-2` | `external-model` | the contractor |
+| `over-3` | `series` | the print run |
+| `over-4` | `batch-accept` | the lot |
 
 ## 4. Routes in detail
 

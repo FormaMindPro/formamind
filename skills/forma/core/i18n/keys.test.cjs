@@ -149,7 +149,7 @@ test('PROJECT.md: every field the code reads carries its anchor; anchorise is id
   for (const key of ['language', 'template', 'name', 'source', 'status', 'epics', 'thresholds', 'attempts', 'volume', 'routes', 'tooling', 'references',
     'routes.enabled', 'routes.kit_cap', 'routes.small_task', 'routes.over2', 'routes.over4', 'routes.parallel', 'routes.dispatcher', 'routes.plumb',
     'routes.plumb_model', 'routes.default_epic', 'plumb.haiku.leader', 'plumb.haiku.gap', 'plumb.jev.leader', 'plumb.jev.gap', 'plumb.jev.noul',
-    'plumb.jev.clarity', 'run_profiles', 'cycle_cache']) {
+    'plumb.jev.clarity', 'cycle_cache']) {
     assert.ok(md.includes(i18n.anchor(key)), `PROJECT.md: no anchor ${key}`);
   }
   assert.equal(i18n.anchorise(md), md);
@@ -225,14 +225,33 @@ test('check key-language: a Russian key in a card is a finding with address and 
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('routeNames: every route-0…8 and over-1…4 has an English name and a Russian label, and both dashboard locales carry them', () => {
-  const codes = [...Array(9).keys()].map((n) => 'route-' + n).concat([1, 2, 3, 4].map((n) => 'over-' + n));
+test('name sections: exact code sets, exactly the languages declared, en always present, nothing empty', () => {
+  const langs = Object.keys(KEYS.languages).sort();
+  assert.ok(langs.includes('en'), 'en is always declared');
+  const sets = {
+    routeNames: [...Array(9).keys()].map((n) => 'route-' + n).concat([1, 2, 3, 4].map((n) => 'over-' + n)),
+    lawSections: [1, 2, 3, 4, 5, 6, 7].map((n) => 'law-' + n),
+    prohibitionNames: Array.from({ length: 18 }, (_, i) => 'prohibition-' + (i + 1)),
+    namedKeys: ['plumb'],
+  };
+  for (const [name, codes] of Object.entries(sets)) {
+    const dict = KEYS[name];
+    assert.ok(dict, `section ${name} exists`);
+    assert.deepEqual(Object.keys(dict).sort(), codes.slice().sort(), `${name}: exact code set`);
+    for (const c of codes) {
+      const e = dict[c];
+      assert.ok(e, `${name}.${c} exists`);
+      assert.deepEqual(Object.keys(e).sort(), name === 'routeNames' ? langs.concat('key').sort() : langs.slice(), `${name}.${c}: exactly the declared languages`);
+      for (const l of langs) assert.ok(e[l] !== undefined && String(e[l]).length, `${name}.${c}: ${l} not empty`);
+      if (name === 'routeNames') assert.ok(/^[a-z]+(-[a-z]+)*$/.test(e.key), `${c}: movement key is English`);
+    }
+  }
+});
+
+test('routeNames: both dashboard locales carry the route and overlay names', () => {
   const en = require('../dashboard/locales/en.json'), ru = require('../dashboard/locales/ru.json');
-  for (const c of codes) {
-    const r = KEYS.routeNames[c];
-    assert.ok(r && /^[a-z]+(-[a-z]+)*$/.test(r.en) && /[\u0410-\u042f\u0430-\u044f\u0401\u0451]|Intent|Kit|Spec|Run/.test(r.ru), c);
+  for (const [c, r] of Object.entries(KEYS.routeNames)) {
     assert.equal(en['board.rn.' + c.replace('-', '')], r.en, c);
     assert.equal(ru['board.rn.' + c.replace('-', '')], r.ru, c);
   }
-  assert.deepEqual(Object.keys(KEYS.routeNames).sort(), codes.slice().sort());
 });

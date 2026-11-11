@@ -75,7 +75,7 @@ Configure Plumb in `project/config/PROJECT.md` under `## Routes` (`<!-- k:routes
    - `gapThreshold: 0.15` — minimum margin between top role and second candidate.
 2. **Model and provider:**
    - Recommended external model: `openrouter:typesafe/jev-1.14` (fast, low-cost structural classifier).
-   - Fallback in-family model: `claude-3-5-haiku` / `gemini-2.5-flash`.
+   - Fallback in-family model by engine: Claude Code — `claude-3-5-haiku` (`haiku`); Gemini (Antigravity) — `gemini-3.8-flash (low)`; Codex — `gpt-5.6-luna (low)`; MiniMax — `minimax-m3.1-flash`; ZCode — `glm-4-flash`.
 3. **Credentials check:**
    - Verify OpenRouter API key presence in `.env` (`OPENROUTER_API_KEY`).
    - If absent and external Plumb is chosen, prompt user to supply key.

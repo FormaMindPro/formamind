@@ -20,6 +20,13 @@ const EXCEPTIONS = {
   '.forma/dashboard/data/routes.cjs': 'headings of the routes manual are text, not keys',
   '.forma/dashboard/data/cards.cjs': 'spend lines of the cards tab, old unit words',
   // Free words of a human sentence, output of other tools, state values: not keys of a card or of PROJECT.md.
+  '.forma/board/check-ready-sandbox.cjs': 'a sandbox test of check-ready\'s Russian CLI messages',
+  '.forma/board/check-ready.cjs': 'the readiness dossier prints a Russian tier label (\u043a\u043b\u044e\u0447\u0435\u0432\u043e\u0435 \u0441\u043b\u043e\u0432\u043e «…»); a message, not a key',
+  '.forma/board/checks/budget-stop.cjs': 'patterns name Russian words of budget stop lines and illustrations in card history',
+  '.forma/board/checks/human-row-trace.cjs': 'patterns name Russian words of stop lines and quoted illustrations in card history',
+  '.forma/board/checks/goal-freeze.cjs': 'compares against the Russian state word of a frozen goal',
+  '.forma/board/checks/route-executor.cjs': 'patterns name Russian approval words of card history lines',
+  '.forma/board/checks/thresholds-declared.cjs': 'patterns name the Russian word of threshold lines in card history',
   '.claude/scripts/build-kit-graphs.cjs': 'a state value of the resources registry, not a key',
   '.claude/scripts/checks/root-rules.cjs': 'text of a check message',
   '.claude/scripts/checks/support/clean-zone.cjs': 'patterns of the clean-zone check name Russian words of a project trace',
@@ -32,6 +39,7 @@ const EXCEPTIONS = {
   '.claude/scripts/test-ledger-parity-reverse.cjs': 'a test of a Russian message',
 
   '.forma/dashboard/checks/locale-parity.cjs': 'the check looks for any Cyrillic letter',
+  '.forma/dashboard/cycle-metrics.cjs': 'patterns name Russian words of stage lines (route, task check, epic protocol)',
   '.forma/dashboard/data/board.cjs': 'free words «\u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0430 N» of a human sentence',
   '.forma/dashboard/serve.js': 'free word «\u043f\u043e\u0437\u0438\u0446\u0438\u044f» of a node tag',
   '.forma/dashboard/subagents-log.cjs': 'a state phrase of the log',

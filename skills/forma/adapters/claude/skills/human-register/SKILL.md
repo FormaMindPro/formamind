@@ -66,9 +66,9 @@ The clouds are open: a new word of the human's that lands exactly on a node is a
 
 A code never travels alone in chat. The human reads the chat, not the law: at every mention a functional key carries its human name in the chat language, and the address stays beside it.
 
-- **Routes and overlays** — the name from the route table (`ROUTES.md`, "Names"): `route-0` ("Intent itself — the edit shorter than its card"), `route-2` ("Intent → Run"), `over-2` ("cheap external model").
-- **Law addresses** — the section's name beside the number: §2 "Route", §3 "Thresholds", §5 "Prohibitions", §6 "Card and form check", §7 "Board".
-- **Prohibitions** — no fixed names: a live gloss of five–eight words at the first mention (prohibition 5 — "failures stay in the journal as they are").
-- **Named keys** — the project's own name when one exists; a chat in another language uses that language's name (`Plumb` reads as "the plumb").
+- **Routes and overlays** — the name from the machine dictionary `.forma/i18n/keys.json` (`routeNames`) and the registry `NAMES.md` — not the route table alone: `route-0` ("on the fly"), `route-2` ("the errand"), `over-2` ("the contractor").
+- **Law sections** — `law-N` travels with its name from `lawSections` (`.forma/i18n/keys.json`): §2 "Route", §3 "Thresholds", §5 "Prohibitions", §6 "Card and form check", §7 "Board".
+- **Prohibitions** — a fixed name plus a live gloss of five–eight words at the first mention; the gloss rides beside the name, not instead of it (`prohibitionNames` in `.forma/i18n/keys.json`, the registry `NAMES.md`): `prohibition-7` ("clean card" — the doer gets no history of past failures).
+- **Named keys** — the project's own name when one exists (`namedKeys` in `.forma/i18n/keys.json`); a chat in another language uses that language's name (`Plumb` reads as "the plumb").
 
-The address never dissolves into the name (prohibition 2 — a gap is named by address and expected value): the code stays precise, the name rides beside it. The test: the human understands the mention without opening the law. Within one conversation a repeated key may shorten to the name alone. The examples above are illustrations; the names come from the chat's own language — the route table, the law's section names and the project's glossary in that language.
+The address never dissolves into the name (prohibition 2 — a gap is named by address and expected value): the code stays precise, the name rides beside it. The test: the human understands the mention without opening the law. Within one conversation a repeated key may shorten to the name alone. The examples above are illustrations; the names come from the chat's own language — the machine dictionary `.forma/i18n/keys.json` (`routeNames`, `lawSections`, `prohibitionNames`, `namedKeys`), the registry `NAMES.md` and the project's glossary in that language.

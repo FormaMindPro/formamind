@@ -2,7 +2,7 @@
 // The state (book/language/page/search) lives in `docsState` and survives an SSE rebuild: the panel's
 // contents are redrawn on every update, the human's selection is not.
 
-const docsState = { book: null, lang: 'ru', page: null, q: '' };
+const docsState = { book: null, lang: null, page: null, q: '' };
 
 function docsTitleText(title, lang) {
   if (title && typeof title === 'object') return title.key ? t(title.key) : (title[lang] || title.ru || title.en || '');
@@ -49,10 +49,13 @@ function docsHtml(d) {
   if (!docsState.book) docsState.book = docs.books[0].id;
   const book = docs.books.find((b) => b.id === docsState.book) || docs.books[0];
   const isManual = book.id === '.forma/manual';
+  // A book's languages come from the data (the keys of the pages set); the human's choice lives in docsState, the default is the first available one.
+  const langs = isManual ? Object.keys(book.pages) : [];
+  if (isManual && (!docsState.lang || !langs.includes(docsState.lang))) docsState.lang = langs[0] || null;
   const lang = isManual ? docsState.lang : null;
 
   const switcher = `<nav class="doc-books">${docs.books.map((b) => `<span class="tab ${b.id === book.id ? 'on' : ''}" data-doc-book="${b.id}">${esc(docsTitleText(b.title, curLang()))}</span>`).join('')}
-    ${isManual ? `<span class="doc-langs"><span class="tab ${lang === 'en' ? 'on' : ''}" data-doc-lang="en">EN</span><span class="tab ${lang === 'ru' ? 'on' : ''}" data-doc-lang="ru">RU</span></span>` : ''}</nav>`;
+    ${isManual ? `<span class="doc-langs">${langs.map((code) => `<span class="tab ${lang === code ? 'on' : ''}" data-doc-lang="${code}">${code.toUpperCase()}</span>`).join('')}</span>` : ''}</nav>`;
 
   if (book.error) return `${switcher}<div class="chain-clean">${esc(t('docs.buildError', {err: book.error}))}</div>`;
 

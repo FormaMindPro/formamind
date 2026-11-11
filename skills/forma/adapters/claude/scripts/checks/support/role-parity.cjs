@@ -94,6 +94,7 @@ const toolRules = (table = TOOL_EQUIVALENCE) => table.flatMap(([canon, ...names]
 const AGENT_NORMALIZERS = [
   [/\b[A-Za-z]+-8\.md/g, 'ENGINE_RULES.md'], // §8 of any engine is `<engine>-8.md`; named without a path it needs no adapter to be read
   [/\bplumb-glmflash\b/g, 'plumb-haiku'], // the Plumb's built-in executor is named after each engine's own small model (plumb-gemini, plumb-glmflash)
+  [/\bPlumb on `?(?:gemini-3\.8-flash(?: \(low\))?|minimax-m3\.1-flash|glm-4-flash|haiku)`?(?: or OpenRouter `?jev`?|\/`?jev`?)/g, 'Plumb on haiku/jev'],
   [/agents\/on-demand\//g, 'AGENTS_DIR/on-demand/'],
   [/\bagents\//g, 'AGENTS_DIR/'],
   [/(\b(intent|spec|kit|run|core)\.md\b)/g, 'AGENTS_DIR/$1'],

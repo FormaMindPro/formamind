@@ -1,16 +1,10 @@
 {
-  "_doc": "Machine keys of the protocol. A key is always English; the labels are only a fallback for documents written without anchors (`<!-- k:KEY -->`). A new language needs no parser change: add its labels here.",
+  "_doc": "Machine keys of the protocol. A key is always English; the labels are only a fallback for documents written without anchors (`<!-- k:KEY -->`). The registry of the names lives here too: routes and overlays (`routeNames`), law sections (`lawSections`), prohibitions (`prohibitionNames`), named keys (`namedKeys`); a new language is a line in `languages` plus its field in each entry, and the tests require exactly the languages declared.",
   "languages": {
     "en": ["english"],
     "ru": ["russian", "русский"]
   },
   "labels": {
-    "term.limit": { "match": "prefix", "en": ["limit"], "ru": ["лимит"] },
-    "term.approver": { "match": "prefix", "en": ["approved", "approval", "accepted"], "ru": ["одобр", "утверд", "согласов"] },
-    "term.budget": { "match": "prefix", "en": ["budget"], "ru": ["бюджет"] },
-    "term.stop": { "match": "prefix", "en": ["stop"], "ru": ["останов"] },
-    "term.threshold": { "match": "prefix", "en": ["budget", "threshold", "attempt"], "ru": ["бюджет", "порог", "попытк"] },
-    "term.illustration": { "match": "prefix", "en": ["caught", "capture", "found", "quote", "quoting", "citing", "example"], "ru": ["поимк", "находк", "цитат", "цитиру", "пример", "например"] },
     "language": { "match": "prefix", "en": ["Project language"], "ru": ["Язык проекта"] },
     "template": { "match": "prefix", "en": ["Project template"], "ru": ["Шаблон проекта"] },
     "name": { "match": "exact", "en": ["Name"], "ru": ["Имя"] },
@@ -95,18 +89,50 @@
     "roadmap_placeholder": ["<The whole>", "<name of a part of the product>", "<Целое>", "<имя>"]
   },
   "routeNames": {
-    "route-0": { "en": "intent-self", "ru": "сам Intent" },
-    "route-1": { "en": "intent-copy", "ru": "копия Intent" },
-    "route-2": { "en": "intent-run", "ru": "Intent → Run" },
-    "route-3": { "en": "intent-kit-human", "ru": "вопрос человеку" },
-    "route-4": { "en": "intent-kit-intent", "ru": "Kit исполняет сам" },
-    "route-5": { "en": "intent-kit-run", "ru": "Intent → Kit → Run" },
-    "route-6": { "en": "spec-run", "ru": "Spec → Run по готовому набору" },
-    "route-7": { "en": "spec-kit-run", "ru": "полная цепь" },
-    "route-8": { "en": "segments-waves", "ru": "сегменты × волны" },
-    "over-1": { "en": "kit-library", "ru": "набор из библиотеки" },
-    "over-2": { "en": "external-model", "ru": "внешняя модель" },
-    "over-3": { "en": "series", "ru": "серия" },
-    "over-4": { "en": "batch-accept", "ru": "пакетная приёмка" }
+    "route-0": { "key": "intent-self", "en": "on the fly", "ru": "на ходу" },
+    "route-1": { "key": "intent-copy", "en": "the double", "ru": "двойник" },
+    "route-2": { "key": "intent-run", "en": "the errand", "ru": "поручение" },
+    "route-3": { "key": "intent-kit-human", "en": "the council", "ru": "совет" },
+    "route-4": { "key": "intent-kit-intent", "en": "the workshop", "ru": "мастерская" },
+    "route-5": { "key": "intent-kit-run", "en": "made to order", "ru": "под заказ" },
+    "route-6": { "key": "spec-run", "en": "by the pattern", "ru": "по образцу" },
+    "route-7": { "key": "spec-kit-run", "en": "full ahead", "ru": "полный ход" },
+    "route-8": { "key": "segments-waves", "en": "the build", "ru": "стройка" },
+    "over-1": { "key": "kit-library", "en": "the warehouse", "ru": "склад" },
+    "over-2": { "key": "external-model", "en": "the contractor", "ru": "подряд" },
+    "over-3": { "key": "series", "en": "the print run", "ru": "тираж" },
+    "over-4": { "key": "batch-accept", "en": "the lot", "ru": "партия" }
+  },
+  "lawSections": {
+    "law-1": { "en": "Five pairs", "ru": "Пять пар" },
+    "law-2": { "en": "Route", "ru": "Маршрут" },
+    "law-3": { "en": "Thresholds", "ru": "Пороги" },
+    "law-4": { "en": "Position marker", "ru": "Вешка" },
+    "law-5": { "en": "Prohibitions", "ru": "Запреты" },
+    "law-6": { "en": "Card and form check", "ru": "Карточка и форма" },
+    "law-7": { "en": "Board", "ru": "Доска" }
+  },
+  "prohibitionNames": {
+    "prohibition-1": { "en": "foreign acceptance", "ru": "чужая приёмка" },
+    "prohibition-2": { "en": "exact address", "ru": "точный адрес" },
+    "prohibition-3": { "en": "budget through a stop", "ru": "бюджет через стоп" },
+    "prohibition-4": { "en": "own threshold", "ru": "свой порог" },
+    "prohibition-5": { "en": "journal as is", "ru": "журнал как есть" },
+    "prohibition-6": { "en": "example is no measure", "ru": "пример — не мера" },
+    "prohibition-7": { "en": "clean card", "ru": "чистая карточка" },
+    "prohibition-8": { "en": "goal under lock", "ru": "цель под замком" },
+    "prohibition-9": { "en": "cache of the unchanging", "ru": "кэш неизменного" },
+    "prohibition-10": { "en": "a return changes the kit", "ru": "возврат меняет снаряжение" },
+    "prohibition-11": { "en": "instruction into the record", "ru": "указание — в запись" },
+    "prohibition-12": { "en": "a foreign defect goes back", "ru": "чужой дефект — назад" },
+    "prohibition-13": { "en": "address and expectation", "ru": "адрес и ожидание" },
+    "prohibition-14": { "en": "second diagnosis is a stop", "ru": "второй диагноз — стоп" },
+    "prohibition-15": { "en": "key in one house", "ru": "ключ в одном доме" },
+    "prohibition-16": { "en": "clean zones", "ru": "чистые зоны" },
+    "prohibition-17": { "en": "exit through the scrub", "ru": "выход через скраб" },
+    "prohibition-18": { "en": "commit in English", "ru": "коммит по-английски" }
+  },
+  "namedKeys": {
+    "plumb": { "en": "Plumb", "ru": "отвес" }
   }
 }

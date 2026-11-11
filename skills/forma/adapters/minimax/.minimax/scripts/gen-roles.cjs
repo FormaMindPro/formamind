@@ -37,6 +37,8 @@ const BODY_TRANSFORMS = [
   [/\.claude\/rules\/claude-8\.md/g, '.minimax/rules/minimax-8.md'],
   [/\bclaude-8\.md\b/g, 'minimax-8.md'],
   [/\bCLAUDE\.md\b/g, 'AGENTS.md'],
+  [/Plumb on `haiku` or OpenRouter `jev`/g, 'Plumb on `minimax-m3.1-flash` or OpenRouter `jev`'],
+  [/Plumb on `haiku`\/`jev`/g, 'Plumb on `minimax-m3.1-flash`\/`jev`'],
 ];
 
 /** The tools: the clone's name -> my runtime's name. The order matters: the long ones first. */

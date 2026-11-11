@@ -31,7 +31,8 @@
   const STORE = 'forma.lang';
   const dicts = {};
   let lang = FALLBACK;
-  let locales = [{ code: 'en', name: 'English' }, { code: 'ru', name: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439' }]; // i18n-keep: the language's native name
+  // The language list comes from the server (`locales.json`: the dictionary file and its `_meta.name`), not a constant.
+  let locales = [];
 
   const stored = () => { try { return localStorage.getItem(STORE); } catch { return null; } };
   const store = (code) => { try { localStorage.setItem(STORE, code); } catch { /* private mode - the choice is not remembered */ } };
@@ -71,7 +72,7 @@
     document.dispatchEvent(new CustomEvent('i18n', { detail: code }));
   });
 
-  /** Start: the language list from the server (no server - en and ru), en as the fallback, the language from localStorage, else en. */
+  /** Start: the language list from the server, en as the fallback, the language from localStorage, else en. */
   root.i18nInit = () => fetch('locales.json').then((r) => (r.ok ? r.json() : null)).catch(() => null)
     .then((j) => { if (j && Array.isArray(j.locales) && j.locales.length) locales = j.locales; })
     .then(() => loadDict(FALLBACK))

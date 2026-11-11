@@ -27,7 +27,11 @@ function ctxOf(root) {
   const tick = '`';
   // A role (with the `model:` frontmatter) gets the header suffix " (Gemini Engine)" and the full set
   // of path substitutions. On-demand (no frontmatter) gets only the substitution of its own folder.
-  const onDemand = [[re(`${R}/on-demand/`), `${rel}/on-demand/`]];
+  const onDemand = [
+    [re(`${R}/on-demand/`), `${rel}/on-demand/`],
+    [/Plumb on `haiku` or OpenRouter `jev`/g, 'Plumb on `gemini-3.8-flash (low)` or OpenRouter `jev`'],
+    [/Plumb on `haiku`\/`jev`/g, 'Plumb on `gemini-3.8-flash (low)`/`jev`'],
+  ];
   const roleTransforms = [
     ...onDemand,
     [re(`${R}/run/`), `${rel}/run/`],
