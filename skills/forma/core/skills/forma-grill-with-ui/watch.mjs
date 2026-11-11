@@ -1,28 +1,45 @@
 #!/usr/bin/env node
-// Watching a session in a way that does not die after the first event.
+// The watching of a session that does not die after the first event.
 //
 // `server.mjs wait` returns one event and exits. Under a background watcher that means:
-// an answer arrives - the watching is over, and the human's next answer goes into silence.
-// Unnoticeable exactly until the moment the agent gets distracted by work - and it always does,
-// because parsing the answer is its very work. The human then sees a boundless
-// "waiting for the agent" and cannot tell an absence from a breakage.
+// an answer arrived - the watching is over, and the human's next answer goes into silence.
+// Unnoticeable exactly until the moment the agent got distracted into work - and it gets
+// distracted always, because parsing the answer is its work. The human at that time sees
+// "waiting for the agent" without a limit and cannot tell an absence from a breakage.
 //
-// Here the watching lives as long as the monitor lives, and reports everything that changes the picture:
-// every new event, and the server's death. Silence then means exactly one thing -
+// Here the watching lives as long as the monitor lives, and reports everything that changes the situation:
+// every new event, and the death of the server. Silence then means exactly one thing -
 // nothing happened.
 //
 //   node watch.mjs --session <dir> [--after N]
+//
+// Printed labels come from the core dictionary: English key in code, ru value as data.
 import fs from 'node:fs';
 import path from 'node:path';
-import i18n from '../../i18n/index.cjs';
+import { createRequire } from 'node:module';
+
+// The core dictionary found upward from this file (the skill's depth differs per engine); none - the keys themselves.
+const findI18n = () => {
+  for (let d = import.meta.dirname; ; d = path.dirname(d)) {
+    for (const rel of ['skills/forma/core/i18n/index.cjs', '.forma/i18n/index.cjs']) {
+      const f = path.join(d, rel);
+      if (fs.existsSync(f)) return f;
+    }
+    if (path.dirname(d) === d) return null;
+  }
+};
+const i18nFile = findI18n();
+const msg = (code, params) => i18nFile
+  ? createRequire(import.meta.url)(i18nFile).message(code, params, 'ru')
+  : code;
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const dir = arg('--session');
 const root = arg('--root');
-if (!dir && !root) { console.error(i18n.message('grill.need_session_or_root', null, 'ru')); process.exit(2); }
+if (!dir && !root) { console.error(msg('grill.need_session_or_root')); process.exit(2); }
 let after = Number(arg('--after', 0)) || 0;
 
-// In --root mode each session has its own counter: the event numbers in them are independent.
+// In the --root mode every session has its own counter: the event numbers in them are independent.
 const seenBySession = new Map();
 const sessionDirs = () => {
   if (dir) return [dir];
@@ -40,20 +57,20 @@ const readEvents = (d) => {
   } catch { return []; }
 };
 
-// What exactly arrived, one line: the event type, the number and what was answered. The full
-// text lives in events.jsonl - dragging it here means putting the agent to sleep with bytes.
+// What exactly arrived, in one line: the event's type, the number and what was answered by. The full
+// text lies in events.jsonl - dragging it here means lulling the agent with bytes.
 const describe = (e) => {
   const kinds = {};
   for (const a of e.actions || []) kinds[a.type] = (kinds[a.type] || 0) + 1;
   const qs = [...new Set((e.actions || []).map((a) => a.q).filter(Boolean))];
   const bits = Object.entries(kinds).map(([k, n]) => (n > 1 ? `${k}×${n}` : k)).join(', ');
-  return i18n.message('grill.event_line', { seq: e.seq, what: (bits || e.type) + (qs.length ? ' · ' + qs.join(' ') : '') }, 'ru');
+  return msg('grill.event_line', { seq: e.seq, what: bits || e.type }) + (qs.length ? ' · ' + qs.join(' ') : '');
 };
 
 const serverAlive = (d) => {
   try {
     const pid = JSON.parse(fs.readFileSync(path.join(d, 'server.json'), 'utf8')).pid;
-    if (!pid) return true; // nothing to check against - no invented alarm
+    if (!pid) return true; // nothing to check with - no alarm is invented
     process.kill(pid, 0);
     return true;
   } catch (e) {
@@ -62,11 +79,11 @@ const serverAlive = (d) => {
 };
 
 console.log(dir
-  ? i18n.message('grill.watch_one', { name: path.basename(dir), after }, 'ru')
-  : i18n.message('grill.watch_all', { name: path.basename(root) }, 'ru'));
+  ? msg('grill.watch_one', { name: path.basename(dir), after })
+  : msg('grill.watch_all', { name: path.basename(root) }));
 
-// In --root mode the already-stored events are not retold: the monitor is set up to learn
-// about the new, and dumping the whole past conversation onto the agent is noise.
+// In the --root mode the already-lying events are not retold: the monitor is started to
+// learn about the new; unloading the whole past conversation onto the agent - that is noise.
 if (root) for (const d of sessionDirs()) {
   seenBySession.set(d, Math.max(0, ...readEvents(d).map((e) => Number(e.seq) || 0)));
 }
@@ -83,10 +100,10 @@ const tick = () => {
     }
     if (dir) after = last; else seenBySession.set(d, last);
   }
-  // One named session ended together with its server. In --root mode
-  // one session's death means nothing: the others live, and new ones are still coming.
+  // One named session is over together with its server. In the --root mode
+  // the death of one session means nothing: the others live, and new ones are still to come.
   if (dir && !serverAlive(dir)) {
-    console.log(i18n.message('grill.server_stopped', null, 'ru'));
+    console.log(msg('grill.server_stopped'));
     process.exit(0);
   }
 };
