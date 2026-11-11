@@ -9,10 +9,10 @@
  * `alive: false` means "the hook has never run".
  */
 
-const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
-const msg = (code, params) => i18n.message(code, params, 'ru');
 const fs = require('fs');
 const path = require('path');
+const msg = (code, params) => i18n.message(code, params, 'ru');
+const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
 
 const LOG = path.join('.forma', 'dashboard', 'tool-usage.log');
 const HOOK_ERROR = ['!ERROR', '!\u041e\u0428\u0418\u0411\u041a\u0410']; // the ru marker is a parse pattern (data), the escape pass holds it as \u sequences

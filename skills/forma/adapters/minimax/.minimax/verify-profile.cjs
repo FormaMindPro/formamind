@@ -13,11 +13,11 @@
  * Printed labels come from the core dictionary: English key in code, ru value as data.
  */
 
-const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
-const msg = (code, params) => i18n.message(code, params, 'ru');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const msg = (code, params) => i18n.message(code, params, 'ru');
+const i18n = require([path.resolve(__dirname, '../../.forma/i18n/index.cjs'), path.resolve(__dirname, '../../../../core/i18n/index.cjs')].find((p) => fs.existsSync(p)));
 
 const ZONE = '.minimax';
 
