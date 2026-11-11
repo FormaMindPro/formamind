@@ -40,13 +40,14 @@ You are the main session (`AGENTS.md` §1). These hold on **every** request of t
 0. **The Three Steps of Launch & Intake:**
    Your opening interaction and intake follow three clear steps:
    - **Step 1: Project configuration (Epic "3. Project protocol").** Check `project/config/PROJECT.md`. If thresholds (`attempts`, `volume`) are empty or missing, STOP START is active (`AGENTS.md` §3). No cycle opens, no production work, no brief interview or browser UI server.
+     Project setup is never executed empty-handed or off-board: the first card of any new project is always opened in Epic 3 ("3. Project protocol") via `node .forma/board/new-card.cjs --kind protocol --title "Initial project configuration, thresholds and routes" --goal goal-protocol --type tooling --delivers "Configure mandatory thresholds and routes in PROJECT.md" --criterion "check: node .forma/board/checks/thresholds-declared.cjs --project; gate is green" --budget 3 --next "human" --route 0 --why ready --stage card` (in fresh projects `card-NNN`).
      In your very first response, directly propose standard project parameters in chat (never launch a browser UI for this):
      1) Task attempt budget: **3** (`attempts`);
      2) Cycle volume cap: **25** cards per epic (`volume`);
      3) Auto-compact context window: **250,000** tokens (`CLAUDE_CODE_AUTO_COMPACT_WINDOW=250000`);
      4) Virtual RAM disk: verify/mount via `vdisk-setup` (or graceful fallback to `os.tmpdir()`);
      5) Routes: all `route-0`…`route-8` enabled (`over-2` cheap model limit 100, `over-4` batch up to 10, Plumb on `gemini-3.8-flash (low)` or OpenRouter `jev`).
-     Upon human confirmation, write them to `project/config/PROJECT.md` and clear STOP START. The numbers mirror the `project-setup` skill's defaults — that skill holds the truth; if the two ever diverge, the skill wins and this list is corrected in the next release.
+     Upon human confirmation, record approval in the card's history, write the parameters to `project/config/PROJECT.md`, verify with `node .forma/board/checks/thresholds-declared.cjs --project` and `node .forma/board/check-board.cjs`, and close the setup card via `node .forma/board/card-move.cjs <card> --to close --note "project configuration complete"`. Only after this card is closed is STOP START cleared and intake of applied user requests permitted. The numbers mirror the `project-setup` skill's defaults — that skill holds the truth; if the two ever diverge, the skill wins and this list is corrected in the next release.
    - **Step 2: Human's request as the anchor for Epic 9 and all goals.** The human's incoming request is placed into `backlog` with `assignee: null` (epic "6. Discussion of affairs"). It becomes the primary desire / anchor for the brief interview:
      - **The questions focus strictly on Epic "9. Goal achievement" (`results`) — what the human wants.** The human is never asked to design roadmaps or engineering pipelines.
      - From the human's answers about the desired result (Epic 9), `Intent` shapes, contextualizes, and populates **all remaining goals of the project (Epics 1–8)**:

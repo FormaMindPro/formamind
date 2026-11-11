@@ -1,6 +1,6 @@
 ---
 name: project-setup
-description: Initial setup wizard for a new project in the Forma protocol. Guides step-by-step configuration of virtual RAM disk, project thresholds (volume=25, attempts=3), route settings (enabled routes, route-0 threshold, over-2 model and limit, over-4 batch, dispatcher), the Claude Code auto-compact window (250000 or off), Plumb calibration and models (OpenRouter typesafe/jev-1.14 or builtin, calibration thresholds, and .env key), and language localization (ru, en, or package generation). Invoke when starting the protocol in a new project, when "STOP START" appears in the session start report, or upon project configuration requests.
+description: Initial setup wizard for a new project in the Forma protocol. Guides step-by-step mandatory opening and closing of setup card on the board, configuration of virtual RAM disk, project thresholds (volume=25, attempts=3), route settings (enabled routes, route-0 threshold, over-2 model and limit, over-4 batch, dispatcher), the Claude Code auto-compact window (250000 or off), Plumb calibration and models (OpenRouter typesafe/jev-1.14 or builtin, calibration thresholds, and .env key), and language localization (ru, en, or package generation). Invoke when starting the protocol in a new project, when "STOP START" appears in the session start report, or upon project configuration requests.
 ---
 
 # project-setup — initial project setup wizard
@@ -20,11 +20,25 @@ Without clearing the start gate, no production cycles can open: all work remains
 
 ---
 
-## 6 Setup Steps
+## 7 Setup Steps
 
 ```
-1. RAM disk (vdisk-setup) ➔ 2. Thresholds (25 / 3) ➔ 3. Routes (route table) ➔ 4. Plumb (role fit / model) ➔ 5. Localization (i18n) ➔ 6. Clear STOP START
+0. Open setup card ➔ 1. RAM disk (vdisk-setup) ➔ 2. Thresholds (25 / 3) ➔ 3. Routes (route table) ➔ 4. Plumb (role fit / model) ➔ 5. Localization (i18n) ➔ 6. Close setup card & Clear STOP START
 ```
+
+### Step 0. Open setup task card on the board
+
+Before making any changes to `project/config/PROJECT.md` or settings files, `Intent` MUST open a task card on the board in Epic "3. Project protocol" (`goal-protocol`, `route-0`):
+```bash
+node .forma/board/new-card.cjs --kind protocol --title "Initial project configuration, thresholds and routes" --goal goal-protocol --type tooling --delivers "Configure mandatory thresholds and routes in PROJECT.md" --criterion "check: node .forma/board/checks/thresholds-declared.cjs --project; gate is green" --budget 3 --next "human" --route 0 --why ready --stage card
+```
+In a fresh project, this creates the first card (`card-NNN`). In projects with existing cards, the next sequential card number is allocated. Localize `--title` and `--delivers` to the project language as appropriate.
+
+Record human approval in card `## History` and transition to execution:
+```bash
+node .forma/board/card-move.cjs <card> --to run --note "human approved project configuration setup"
+```
+No configuration edits occur off-board or empty-handed without this card.
 
 ### Step 1. Virtual RAM disk
 
@@ -87,11 +101,16 @@ Verify `<!-- k:language -->` in `project/config/PROJECT.md`:
 - `English` for English (`en`).
 - For unbundled languages (e.g. `de`, `fr`), verify `.forma/translation-pending.json` schedule.
 
-### Step 6. Clear STOP START gate
+### Step 6. Verify and close setup card, clear STOP START gate
 
-1. Run board and project integrity verification:
+1. Verify thresholds and configuration integrity:
    ```bash
+   node .forma/board/checks/thresholds-declared.cjs --project
    node .forma/board/check-board.cjs
    ```
-2. Confirm green gate across all configured thresholds.
-3. Inform the user that project initialization is complete and production cycles may begin.
+2. Confirm green gate across all checks.
+3. Record results in the card and move it to `done` (`close`):
+   ```bash
+   node .forma/board/card-move.cjs <card> --to close --note "project configuration complete: thresholds, routes and Plumb recorded, gates green"
+   ```
+4. Inform the user that project initialization is complete and production cycles may begin. Only after this setup card is closed may `Intent` proceed to intake of applied user requests.
