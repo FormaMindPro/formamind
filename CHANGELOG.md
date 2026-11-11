@@ -3,6 +3,25 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.19] - 2026-11-11
+
+### Added
+
+- `NAMES.md` registry in both manual mirrors (en, ru): every code carries a human name beside it — 9 routes `route-0…8`, 4 overlays `over-1…4`, 7 law sections `§1–7`, 18 prohibitions, named key (`Plumb` — «отвес») — each with a one-sentence description compressed from the existing sections; the `ROUTES.md` "Names"/«Имена» tables carry the agreed names and point to the registry; both `03-protocol/README.md` indexes list it.
+- `keys.json`: `routeNames` in the `{key, en, ru}` shape (key kept, names agreed), new sections `lawSections` (law-1…7), `prohibitionNames` (prohibition-1…18), `namedKeys` (`plumb`); `_doc` names the registry and the new-language rule.
+- `keys.test.cjs`: the name-sections test — exact code sets, exactly the languages declared in `languages` (en always present, nothing empty), `key` non-empty for `routeNames`; locales-carry test on the new shape. A new language turns the gates red until translated (fail-closed).
+
+### Changed
+
+- `human-register` skill (claude and codex adapters): prohibitions now carry fixed names — the rule is "name + live gloss at first mention"; route and overlay names come from `keys.json` (`routeNames`) and the `NAMES.md` registry; law sections added (`law-N` with the name from `lawSections`).
+- Dashboard: the UI language list comes from the server payload (`locales/*.json`, `_meta.name`), the manual language tabs from the book data (`docs.js`), no hardcoded EN/RU; `docs.cjs` enumerates manual languages from the directory listing (the same definition as the `manual-languages` check) — one definition of a language mirror across the code.
+- `locale-parity` check: enumerates `locales/*.json` against the en reference instead of the hardcoded en/ru pair; `manual-languages` check: every mirror against the en original instead of the en/ru pair; findings name the language.
+- Dashboard locales (`board.rn.*`): the agreed route and overlay names in en and ru.
+
+### Fixed
+
+- `key-language` test exceptions: eight engine files added whose Russian patterns read project-language card text (check-ready sandbox and checks, cycle-metrics); `run_profiles` removed from the anchor test's key list — grep showed zero consumers. (The project-side `PROJECT.md` anchors — plumb thresholds re-homed to per-key rows, `routes.enabled` — were fixed in the project, not in the protocol: `keys.test.cjs` asserts them for installed projects.)
+
 ## [0.0.18] - 2026-11-10
 
 ### Added
