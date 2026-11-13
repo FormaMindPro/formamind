@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 - The acceptance layer - three skills sharing one vocabulary: `kinship` (Intent's thin everyday manner with the human - held stakes, micro-signals; the likeness is held, not worn), `acceptance-vector` (what the interlocutor passes before a yes - barriers, extremes, moods, feelings, guards; grilling's rounds number in the acceptance order), `acceptance-market` (the layer deployed outward - marketing research, strategy, tactics, metrics under guards stricter than the interview's, because the two sides' interests diverge). Core copies in `skills/forma/core/skills/`, mirrors in the claude, codex (`.agents/skills`) and minimax adapters.
 - `grilling` (all copies): two pointers to the acceptance layer - the numbering clause in "Rounds and the frontier" (the frontier still decides the set) and the layer line after "Five axes of a whole picture".
+- `human-register` carried into the minimax adapter mirror (it had lived only in the claude and codex mirrors): every engine's Intent now holds the register the acceptance layer references - the layer is available and applied for all of Forma's engines.
 
 ### Changed
 
