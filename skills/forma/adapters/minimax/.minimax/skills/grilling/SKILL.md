@@ -33,7 +33,7 @@ The format of a round:
 ➡️ <your recommended answer>
 ```
 
-Each answer of the human rearranges the frontier: settled decisions open what depended on them. Recompute the frontier and ask the next round.
+Each answer of the human rearranges the frontier: settled decisions open what depended on them. Recompute the frontier and ask the next round. Number the round's questions in the acceptance order (`acceptance-vector`) - the frontier still decides the set.
 
 ## Five axes of a whole picture (any topic, not only goal opening)
 
@@ -46,6 +46,8 @@ Behind the five words of the nodes' criteria (`AGENTS.md` §1) stands not only "
 5. **Naturalness** - what needs to be known for the result to become inevitable, the only possible one, not one of many equally likely. Knowledge carried to completeness (the whole needed arsenal, place, context already established) collapses the choice by itself - acting otherwise is no longer possible. This is the same logic as the fifth question of goal opening ("light finds the shortest path not because it chooses it, but because it cannot do otherwise"), only not about the human's motive but about any knowledge the interview's topic requires.
 
 **The axes are not five direct questions but a structure of assembly; unfold them into questions by the topic's scale.** A small question - a minimum of subquestions per axis; somewhere an axis may remain an empty line. A large process/system - roast every axis to the foundation: round after round, until enough details gather for a whole picture on that axis, not half a phrase. Ask the questions in the same inconspicuous way as in the section above - do not announce aloud which axis a question belongs to; the layout over axes is your synthesis when assembling the outcome, not what the interlocutor sees along the way.
+
+Over these axes stands the acceptance layer - the `acceptance-vector` skill: what the interlocutor passes, the order a round is numbered in, and the guards.
 
 ## The record skeleton - `project/brief/idea.md`
 
