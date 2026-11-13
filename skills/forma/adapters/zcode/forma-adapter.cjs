@@ -11,7 +11,7 @@
  *    `model-io-sess_<id>.jsonl`, the step carries `usage: { inputTokens, outputTokens, totalTokens,
  *    cacheReadTokens, cacheWriteTokens }` or the provider ones `input_tokens/output_tokens/
  *    cache_read_input_tokens`
- *  - skillsDir `.agents/skills/` - ZCode opens them natively as the project's skills
+ *  - skillsDir `.forma/skills/` - ZCode opens them natively as the project's skills (the engine-neutral core canon)
  *  - nodeModels: the GLM family (Z.AI), the thinking levels low/high/max (no middle one)
  *  - the Forma nodes are not registered as the host's agent types - the route goes degraded,
  *    the stages in one context under the [STAGE] labels (`.zcode/rules/zcode-8.md`, Contract 2)
@@ -242,7 +242,7 @@ function readNodes(agentsDir) {
 
 function engineSettings(root = process.cwd()) {
   const agentsDir = path.join(root, '.zcode');
-  const skillsDir = path.join(root, '.agents', 'skills');
+  const skillsDir = path.join(root, '.forma', 'skills');
   return {
     present: fs.existsSync(agentsDir),
     env: {},
@@ -278,7 +278,7 @@ module.exports = {
     onDemandRolesDir: '.zcode/agents/on-demand',
     runRolesDir: '.zcode/agents/run',
     scriptsDir: '.zcode/scripts',
-    skillsDir: '.agents/skills',
+    skillsDir: '.forma/skills',
     testsDir: '.zcode/tests',
     mcpConfigs: [],
   },
@@ -294,7 +294,7 @@ module.exports = {
   rolesDir: '.zcode/agents',
   onDemandRolesDir: '.zcode/agents/on-demand',
   engineRulesFile: '.zcode/rules/zcode-8.md',
-  skillsDir: '.agents/skills',
+  skillsDir: '.forma/skills',
 
   instructionWeight,
   stepsFromCacheRead,

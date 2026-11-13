@@ -6,7 +6,7 @@
  * The mechanics - the same as the Gemini mirrors' (`gen-gemini-roles.cjs`) and MiniMax's
  * (`.minimax/scripts/gen-roles.cjs`), with two differences caused by the engine:
  *   - the role's body - a copy with the paths transposed to mine; the engine reads the skills from
- *     the shared `.agents/skills/` natively (like Kimi), so there is no renaming into there;
+ *     the core canon `.forma/skills/` natively, so the renaming goes straight into there;
  *   - the frontmatter - mine: the model, the effort and the tools are the engine's engineering choice,
  *     the parity check does not compare them (`role-parity.cjs` cuts `^---...---\n`).
  *
@@ -26,7 +26,7 @@ const DST = path.join(ROOT, '.zcode', 'agents');
 /**
  * The path transpositions in a role's body: my zone - `.zcode/`, the law - `AGENTS.md`.
  *
- * The paths are written full (`.agents/skills/`, `.zcode/rules/zcode-8.md`), not "from the engine's folder":
+ * The paths are written full (`.forma/skills/`, `.zcode/rules/zcode-8.md`), not "from the engine's folder":
  * the engines' parity check normalizes exactly the full paths (by the adapters' contract), and only they
  * match the reference. The roles folder is the exception: the check knows the short form too (`agents/…`).
  */
@@ -45,7 +45,7 @@ const BODY_TRANSFORMS = [
   [/\.claude\/agents\/on-demand\//g, 'agents/on-demand/'],
   [/\.claude\/agents\/run\//g, 'agents/run/'],
   [/\.claude\/agents\/(?=[,`\s)]|$)/g, 'agents/'],
-  [/\.claude\/skills\//g, '.agents/skills/'],
+  [/\.claude\/skills\//g, '.forma/skills/'],
   [/\.claude\/rules\/claude-8\.md/g, '.zcode/rules/zcode-8.md'],
   [/\bclaude-8\.md\b/g, 'zcode-8.md'],
   [/\bCLAUDE\.md\b/g, 'AGENTS.md'],

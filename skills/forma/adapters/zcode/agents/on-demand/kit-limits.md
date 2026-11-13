@@ -10,7 +10,7 @@ Read this file when a skill, tool, access or model kind is missing, or when `Run
 
 | What's missing | What you do |
 |---|---|
-| A skill | check the ready-made sources first (skill `skill-authoring`); found nowhere — set your own tier to `strongest` in `.claude/agents/kit.md` (for the next call — the tier is set by frontmatter at call time, not inside the current attempt) and design it yourself. **Formalize it as a skill** in `.agents/skills/<name>/SKILL.md` — there's no separate entity for skills. Process — `skill-creator`; project rules — skill `skill-authoring` |
+| A skill | check the ready-made sources first (skill `skill-authoring`); found nowhere — set your own tier to `strongest` in `.claude/agents/kit.md` (for the next call — the tier is set by frontmatter at call time, not inside the current attempt) and design it yourself. **Formalize it as a skill** in `.forma/skills/<name>/SKILL.md` — there's no separate entity for skills. Process — `skill-creator`; project rules — skill `skill-authoring` |
 | A tool, access, model kind — the task is unworkable | **stop and report to the human**, a line in "Blocks" |
 | A better tool — the task is workable | **a request**, a line in "Would improve," the cycle carries on |
 

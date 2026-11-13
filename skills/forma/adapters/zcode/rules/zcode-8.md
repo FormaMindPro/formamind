@@ -4,7 +4,7 @@
 
 ## Root rules (Contract 1: constructive)
 
-Корень читает `AGENTS.md` — единственный закон, обёртки в корне нет. Роли узлов — `.zcode/agents/` (зеркало `.claude/agents/`, собирается `node .zcode/scripts/gen-roles.cjs`). Скиллы проекта движок читает нативно из общих `.agents/skills/` — собственной копии скиллов зона не держит (как Kimi). Общие скрипты ядра (`.claude/scripts/*`, `.forma/**`) — зависимость по имени, не владение.
+Корень читает `AGENTS.md` — единственный закон, обёртки в корне нет. Роли узлов — `.zcode/agents/` (зеркало `.claude/agents/`, собирается `node .zcode/scripts/gen-roles.cjs`). Скиллы проекта движок читает нативно из канона ядра `.forma/skills/` — собственной копии скиллов зона не держит (как Kimi). Общие скрипты ядра (`.claude/scripts/*`, `.forma/**`) — зависимость по имени, не владение.
 
 ## Isolation of nodes (Contract 2: constructive)
 
