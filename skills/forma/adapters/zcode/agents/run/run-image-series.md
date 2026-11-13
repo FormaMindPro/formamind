@@ -28,7 +28,7 @@ Follow the chosen skill's chain step by step (model pick → cost check → conf
 
 ## Tooling note
 
-`magnific-generate` and `magnific-spaces` are **global** skills (`~/.agents/skills/`, not `.agents/skills/` of this project) — read-only reference, not owned by this repo.
+`magnific-generate` and `magnific-spaces` are **global** skills (`~/.agents/skills/`, not the project's skills in `.forma/skills/`) — read-only reference, not owned by this repo.
 
 Tool names are qualified as the live tool list shows them: `mcp__claude_ai_Magnific__<tool>` (the Magnific connector). The skills name the same tools without the prefix. If the server is wired in under another name, the prefix changes (`mcp__<server>__<tool>`) and the `tools` line here changes with it — a mismatch is reported, never worked around.
 

@@ -29,7 +29,7 @@ function ctxOf(root) {
     eight: (mine && mine.adapter.engineRulesFile) || `${dir}/rules/kimi-8.md`,
     agentsCode: `${dir}/agents-code`,
     hooks: `${dir}/hooks`,
-    skillsDir: (mine && mine.adapter.sources && mine.adapter.sources.skillsDir) || '.agents/skills',
+    skillsDir: (mine && mine.adapter.sources && mine.adapter.sources.skillsDir) || '.forma/skills',
   };
 }
 

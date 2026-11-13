@@ -29,7 +29,7 @@ The shared rules are already in front of you — `AGENTS.md`. You act within you
 
 **What you lose if you don't ask, taking a card:** process replaced by a thing. Before starting, ask: how do we know it's exactly this?
 
-**The arsenal is the files themselves** — agents in `agents/`, skills in `.agents/skills/`, tools in the MCP configuration, access in `PROJECT.md`. No separate inventory, and there shouldn't be one: it would drift from reality.
+**The arsenal is the files themselves** — agents in `agents/`, skills in `.forma/skills/`, tools in the MCP configuration, access in `PROJECT.md`. No separate inventory, and there shouldn't be one: it would drift from reality.
 
 ---
 
@@ -82,7 +82,7 @@ You determine what each task requires and fill in six units on the card:
 | Unit | What it is | Source |
 |---|---|---|
 | Role | which agent from `agents/` is taken | you assign it |
-| Skill | a formalized way of doing it | a skill in `.agents/skills/` |
+| Skill | a formalized way of doing it | a skill in `.forma/skills/` |
 | Tool | an MCP server, plugin, command, library | MCP configuration |
 | Access | a key, database, repository, account | `PROJECT.md` |
 | Data | what's given as input | `PROJECT.md` |

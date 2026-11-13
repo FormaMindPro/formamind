@@ -8,7 +8,7 @@ The protocol itself is `AGENTS.md`, imported by the line above — sections 1–
 * **Zone of edits:** role files under `.agents/plugins/forma/agents/` are verified against the canonical specification; no other engine edits this zone by hand.
 * **MCP configuration:** `.agents/mcp_config.json` and `.agents/plugins/forma/mcp_config.json`.
 * **Plugin and node roles:** `.agents/plugins/forma/` (manifest `plugin.json` and agent prompts in `agents/`, including the "on-demand" layer `agents/on-demand/`) — this is the "role directory" that sections 1–7 refer to by bare filename (`kit.md`, `spec.md`, `intent-goal-opening.md` and so on). **Run's own catalog:** `.agents/plugins/forma/agents/run/*.md` — one profile per `Run` subject (`run-site-build`, `run-site-php`, `run-image`, `run-image-series`, `run-text`, `run-mechanical`, `run-script`, `run-python`, `run-vector`, `run-visual-check`, `run-schema-markup`); profiles of one product live in the project's own catalog and are listed in `PROJECT.md`, never in the clean zone (`.agents/`); `run.md` stays the base template, not a role.
-* **Shared skills:** `.agents/skills/`.
+* **Skills:** the core canon `.forma/skills/` — laid by the installer's core step.
 
 ### Execution Modes in Antigravity (Contract 2: constructive)
 

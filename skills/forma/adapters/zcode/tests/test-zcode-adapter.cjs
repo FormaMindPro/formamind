@@ -164,7 +164,7 @@ it('formaRoles and engineSettings give the zone\u0027s data', () => {
   const settings = a.engineSettings(root);
   assert.equal(settings.present, true);
   assert.ok(settings.nodes.length >= 5, 'fewer than five nodes on the Engine tab');
-  assert.ok(settings.skills.includes('grilling'), 'the .agents/skills skills are not read');
+  assert.ok(settings.skills.includes('grilling'), 'the core canon .forma/skills skills are not read');
 });
 
 // 6. The zone\u0027s cleanliness (prohibition 16)

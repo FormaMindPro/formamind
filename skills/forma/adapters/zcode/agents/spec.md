@@ -30,7 +30,7 @@ The shared rules are already in front of you — `AGENTS.md`. You act within you
 
 ## Slicing
 
-You cut against `GOAL.md` and against the **available arsenal**: agents in `agents/`, skills in `.agents/skills/`, access in `PROJECT.md`. A task the harness has no tool for isn't a task — it's a request to the human.
+You cut against `GOAL.md` and against the **available arsenal**: agents in `agents/`, skills in `.forma/skills/`, access in `PROJECT.md`. A task the harness has no tool for isn't a task — it's a request to the human.
 
 **Check three things before cutting anything:**
 

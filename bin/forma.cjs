@@ -562,6 +562,7 @@ function installCodex(root, protectedPaths) {
 }
 
 // Gemini (beta, Antigravity): §8 wrapper, plugin, node roles; mcp_config.json is an empty stub, an existing one is not touched.
+// Skills are not laid here: the adapter declares the core canon .forma/skills, which the core step lays on every install.
 function installGemini(root) {
   const A = path.join(ADAPTERS, 'gemini')
   const P = path.join(root, '.agents', 'plugins', 'forma')
@@ -590,10 +591,10 @@ function installGemini(root) {
   return ['Gemini (Antigravity): .agents/rules, .agents/tests, .agents/plugins/forma (roles, plugin.json) — installed']
 }
 
-// ZCode: .zcode/ adapter, rules, agents, tests, scripts. The shared skills mirror comes with it: the adapter
-// declares .agents/skills as its skillsDir and the roles read skills there natively, while on a fresh machine
-// nobody else installs the mirror (codex, its first consumer, is dormant). Roles are regenerated from
-// .claude/agents so the mirror matches the reference actually installed, not the shipped snapshot.
+// ZCode: .zcode/ adapter, rules, agents, tests, scripts. Skills are not laid here: the zcode and gemini adapters
+// declare .forma/skills (the engine-neutral core canon) and read it natively, and the core step of every install
+// lays that canon first. The .agents/skills mirror is Codex's consumer path - installCodex lays it for codex.
+// Roles are regenerated from .claude/agents so the mirror matches the reference actually installed, not the shipped snapshot.
 // Machine state (.state/) is never shipped — it belongs to the host, not to the protocol.
 // The role mirror (.zcode/agents) is generated from .claude/agents by the shipped gen-roles script.
 function rebuildZcodeRoles(root, why) {
@@ -611,8 +612,7 @@ function installZCode(root) {
   copyTree(path.join(A, 'tests'), path.join(Z, 'tests'))
   copyTree(path.join(A, 'scripts'), path.join(Z, 'scripts'))
   copyTree(path.join(A, 'agents'), path.join(Z, 'agents'))
-  copyTree(path.join(ADAPTERS, 'codex', '.agents', 'skills'), path.join(root, '.agents', 'skills'))
-  const out = ['ZCode: .zcode/rules, .zcode/tests, .zcode/scripts, .zcode/agents, .agents/skills (shared mirror) — installed']
+  const out = ['ZCode: .zcode/rules, .zcode/tests, .zcode/scripts, .zcode/agents — installed (skills are read from the core .forma/skills)']
   if (fs.existsSync(path.join(root, '.claude', 'agents'))) out.push(rebuildZcodeRoles(root))
   else out.push('  ! .claude/agents not found — roles ship as installed; install Claude Code, then run: node .zcode/scripts/gen-roles.cjs')
   return out
@@ -688,7 +688,7 @@ function geminiExpect() {
 // mirror against that reference (a regeneration is the only check that sees the mirror lag behind it).
 function zcodeExpect() {
   return {
-    files: ['.zcode/forma-adapter.cjs', '.zcode/rules/zcode-8.md', '.zcode/scripts/gen-roles.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs', '.agents/skills'],
+    files: ['.zcode/forma-adapter.cjs', '.zcode/rules/zcode-8.md', '.zcode/scripts/gen-roles.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs'],
     mirrorFrom: '.claude/agents',
   }
 }

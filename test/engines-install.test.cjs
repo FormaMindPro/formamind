@@ -77,15 +77,16 @@ test('the default install: neither .minimax/ nor miniapps/minimax-engine/', () =
   } finally { fs.rmSync(d3, { recursive: true, force: true }); }
 });
 
-test('claude,zcode: the ZCode adapter installed, .state not shipped, the skill mirror in place, the adapter intact on a fresh machine', () => {
+test('claude,zcode: the ZCode adapter installed, .state not shipped, the core canon in place, the adapter intact on a fresh machine', () => {
   const r = init('claude,zcode');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   for (const f of [
     '.zcode/rules/zcode-8.md', '.zcode/forma-adapter.cjs', '.zcode/scripts/gen-roles.cjs',
-    '.zcode/tests/test-zcode-adapter.cjs', '.zcode/agents/intent.md', '.agents/skills/grilling',
+    '.zcode/tests/test-zcode-adapter.cjs', '.zcode/agents/intent.md',
   ]) assert.ok(fs.existsSync(path.join(dir, f)), f);
   assert.ok(!fs.existsSync(path.join(dir, '.zcode', '.state')), 'the .state/ machine state is not shipped into someone else\'s project');
   assert.match(r.stdout, /ZCode: .*— installed/);
+  assert.ok(!fs.existsSync(path.join(dir, '.agents', 'skills')), 'the .agents/skills mirror is Codex\'s consumer path - zcode/gemini read the core canon .forma/skills');
   assert.match(r.stdout, /gen-roles: role mirror rebuilt/);
   // The zcode verify profile is declared and shipped: the note is gone, the mirror parity is checked at every install.
   assert.doesNotMatch(r.stdout, /not verified/);
@@ -112,7 +113,8 @@ test('--engines zcode: claude is installed by the core automatically, the skills
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.ok(fs.existsSync(path.join(d4, '.zcode', 'forma-adapter.cjs')), '.zcode/ was not installed');
     assert.ok(fs.existsSync(path.join(d4, '.claude', 'rules')), 'claude was not installed by the core');
-    assert.ok(fs.existsSync(path.join(d4, '.agents', 'skills')), 'the shared skill mirror was not installed');
+    assert.ok(fs.existsSync(path.join(d4, '.forma', 'skills')), 'the core canon was not installed');
+    assert.ok(!fs.existsSync(path.join(d4, '.agents', 'skills')), 'the mirror is Codex\'s consumer path - zcode reads the core canon');
     assert.ok(!fs.existsSync(path.join(d4, '.zcode', '.state')), 'the machine state is not shipped');
   } finally { fs.rmSync(d4, { recursive: true, force: true }); }
 });

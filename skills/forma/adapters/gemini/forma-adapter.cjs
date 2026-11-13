@@ -263,7 +263,7 @@ function engineSettings(root = process.cwd()) {
   const nodesDir = path.join(agentsDir, 'plugins', 'forma', 'agents');
   const nodes = readNodes(nodesDir);
 
-  const skillsDir = path.join(agentsDir, 'skills');
+  const skillsDir = path.join(root, '.forma', 'skills');
   const skills = fs.existsSync(skillsDir)
     ? fs.readdirSync(skillsDir).filter((f) => fs.statSync(path.join(skillsDir, f)).isDirectory()).sort()
     : [];
@@ -306,6 +306,7 @@ module.exports = {
     onDemandRolesDir: '.agents/plugins/forma/agents/on-demand',
     runRolesDir: '.agents/plugins/forma/agents/run',
     scriptsDir: '.agents/scripts',
+    skillsDir: '.forma/skills',
     testsDir: '.agents/tests',
     packageManifest: '.agents/plugins/forma/plugin.json',
     mcpConfigs: ['.agents/mcp_config.json'],
@@ -322,7 +323,7 @@ module.exports = {
   rolesDir: '.agents/plugins/forma/agents',
   onDemandRolesDir: '.agents/plugins/forma/agents/on-demand',
   engineRulesFile: '.agents/rules/gemini-8.md',
-  skillsDir: '.agents/skills',
+  skillsDir: '.forma/skills',
 
   instructionWeight,
   stepsFromCacheRead,

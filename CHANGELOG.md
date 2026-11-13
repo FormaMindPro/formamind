@@ -3,6 +3,15 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.21] - 2026-11-13
+
+### Changed
+
+- Skills delivery: the gemini and zcode adapters read the engine-neutral core canon `.forma/skills` natively - `skillsDir` declared in both adapters' `sources` (the dashboard's `${dir}/skills` convention no longer fills it for gemini) and the reading functions scan the canon. No engine depends on which other engines are installed beside it: a gemini-only or zcode-only machine receives its skills from the core step every install lays.
+- Installer: `installZCode` no longer lays the `.agents/skills` mirror - the mirror is Codex's consumer path, laid by `installCodex`; the zcode manifest expectation drops it; the zcode-only install test asserts the canon in place and the mirror absent.
+- zcode role generator (`gen-roles.cjs`): the `.claude/skills/` path transposition goes straight into the canon; the gemini generator picks the sink's `sources.skillsDir` as before.
+- Engine rules and living dictionaries: `zcode-8.md`, `gemini-8.md` and the gemini dictionary files name the canon instead of the shared mirror; the role mirrors (gemini `kit.md`; zcode `kit.md`, `spec.md`, `core.md`, `kit-limits.md`, `intent-housekeeping.md`, `run-image-series.md`) regenerated accordingly; the kimi check's fallback points at the canon.
+
 ## [0.0.20] - 2026-11-13
 
 ### Added
