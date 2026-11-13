@@ -3,6 +3,25 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.20] - 2026-11-13
+
+### Added
+
+- The acceptance layer - three skills sharing one vocabulary: `kinship` (Intent's thin everyday manner with the human - held stakes, micro-signals; the likeness is held, not worn), `acceptance-vector` (what the interlocutor passes before a yes - barriers, extremes, moods, feelings, guards; grilling's rounds number in the acceptance order), `acceptance-market` (the layer deployed outward - marketing research, strategy, tactics, metrics under guards stricter than the interview's, because the two sides' interests diverge). Core copies in `skills/forma/core/skills/`, mirrors in the claude, codex (`.agents/skills`) and minimax adapters.
+- `grilling` (all copies): two pointers to the acceptance layer - the numbering clause in "Rounds and the frontier" (the frontier still decides the set) and the layer line after "Five axes of a whole picture".
+- `human-register` carried into the minimax adapter mirror (it had lived only in the claude and codex mirrors): every engine's Intent now holds the register the acceptance layer references - the layer is available and applied for all of Forma's engines.
+
+### Changed
+
+- Intent roles (claude, gemini, minimax, zcode adapters): `uses`/`skills` carry the three skills; the character paragraph names them beside `human-register` (navigation, not a rule).
+
+### Fixed
+
+- grill skill: the core skills copy matches the adapter copy byte for byte (the two anglicization passes left different wording; the installer lays the core copy into the delivered `.claude/skills`, so the drift re-entered the engine at every install).
+- locales and minimax adapter: the accepted route/overlay names carried into the dashboard locales (the values shipped stale, contradicting `keys.json` routeNames); minimax card-and-board on-demand mirror carries the engine frontmatter like every other mirror; minimax tool-usage and verify-profile declare fs/path before the i18n require that uses them (a load-order regression).
+- zcode adapter: the card-and-board on-demand mirror carries the engine frontmatter like every other mirror file (its absence made the installed mirror diverge from the template copy).
+- adapters: role mirrors for Gemini, ZCode and MiniMax synced with the three-step intake.
+
 ## [0.0.19] - 2026-11-11
 
 ### Added

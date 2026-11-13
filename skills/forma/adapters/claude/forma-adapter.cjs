@@ -81,7 +81,7 @@ module.exports = {
   skillsDir: '.claude/skills',
   // The skills the template delivers (the Claude adapter + the core interview): by them the "Project" tab tells the core from a project.
   // The list rides with the adapter - an installed project has no .forma/protocol/ clone; the check against the template - forma-adapter.test.cjs.
-  templateSkills: ['engine-switch', 'excalidraw-diagrams', 'forma-grill-with-ui', 'graph-build', 'graphify', 'grilling', 'human-register', 'law-shrink', 'project-knowledge', 'project-setup', 'skill-authoring', 'vdisk-setup'],
+  templateSkills: ['acceptance-market', 'acceptance-vector', 'engine-switch', 'excalidraw-diagrams', 'forma-grill-with-ui', 'graph-build', 'graphify', 'grilling', 'human-register', 'kinship', 'law-shrink', 'project-knowledge', 'project-setup', 'skill-authoring', 'vdisk-setup'],
   syncScript: '.claude/scripts/sync-engines.cjs',
 
   // The conversation spend: the script writes .forma/dashboard/.cache/session-current.json.

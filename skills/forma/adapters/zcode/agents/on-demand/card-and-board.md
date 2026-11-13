@@ -1,3 +1,7 @@
+---
+model: glm-5.3-flash
+effort: high
+---
 # Card, form check and board (law §6–§7)
 
 Sections 6 and 7 of the law, verbatim; numbers kept, so "§6" and "§7" elsewhere point here. Read before creating, editing or moving a card, or touching the board.
