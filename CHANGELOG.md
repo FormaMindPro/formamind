@@ -3,6 +3,14 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.22] - 2026-11-14
+
+### Changed
+
+- Names line in `intent.md` (claude, gemini, zcode and minimax adapters): the card joins the named key in the chat rule — `card-NNN` never raw to the human; in a Russian chat the engine prefix translates (Карточка-NNN) and the card's task title travels beside it.
+- `human-register` (claude, codex and minimax mirrors): the **Cards** bullet in "Names in the chat language" — the address stays precise in files, the law and the board; only the chat rendering is the human's; the section's closing paragraph names the board's card headlines as the source of a card's name — taken from the board, not from the dictionary.
+- `NAMES.md` registry (en, ru): "Where the name lives" gains the cards line — no registry row and no dictionary entry: a card's name is the project's, taken live from the board; the ru mirror names the Russian chat render (Карточка-NNN «Название задачи») beside the pointer.
+
 ## [0.0.21] - 2026-11-13
 
 ### Changed
