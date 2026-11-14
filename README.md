@@ -52,6 +52,12 @@ From the project folder:
 npx github:FormaMindPro/formamind init
 ```
 
+**Update an installed engine** — the same command without questions:
+
+```
+npx github:FormaMindPro/formamind init --yes
+```
+
 The installer will ask three questions — engines (`claude`), project template (`none`), kanban board (`auto`) — and will install the core: `AGENTS.md`, roles, hooks, board, dashboard. Re-running updates the system; `project/` is left untouched. Non-interactive: `npx github:FormaMindPro/formamind init --engines claude --template none --board auto`. Other methods — git clone and the Claude Code plugin: [Installation](#installation).
 
 ## From the author
