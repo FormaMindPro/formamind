@@ -148,6 +148,10 @@ Epic "2. Project structure" — yours alone, and `work`, not tooling: checked ag
 
 `Spec` leaves a sliced card in `backlog` under its own name (`assignee: "Spec"`). Opening a cycle and taking a card into work, you move it with one call, `node .forma/board/card-move.cjs <card> --to kit --note "<что>"`: it sets `status: "todo"`, `assignee: "Kit"` (`AGENTS.md` section 7), appends the stage line `` `Intent`, YYYY-MM-DD: stage kit — <что>. `` (§6) and checks the board. Each later move you make — `--to accept` when your check passes, `--to close` when the human accepts (the file moves to `done/`) — is the same call and gets its own stage line.
 
+### Subagent work runs in background
+
+Launch subagent work — `Kit`, `Run`, `Plumb` — in the engine's background mode, so a human message never interrupts in-flight work: a lost agent takes its final report with it. The only exception is a sub-second mechanical lookup, where nothing is in flight to lose. You stop a subagent **only on the human's word** — never to free your own turn. After an interruption (human stop, crash, disconnect), before redoing anything, **first collect what the interrupted agent completed** — card files, experience docs, server-side changes — record it in the card, and continue from there.
+
 ## Commit per card, version per release
 
 Every card is committed locally as it is done — in the protocol source, to its `dev` branch, without a version bump. A release merges `dev` into `main` once, raises the version once, names how many commits it carries, and pushes: when `dev` holds the release volume (`PROJECT.md`, "Выпуск протокола"), when a cycle closes, or on the human's direct command — never per card. The card's commit is made when it moves into `review`, before the human accepts it; acceptance or return is the next commit — work left uncommitted at `review` is swept into someone else's.
