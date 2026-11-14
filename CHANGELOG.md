@@ -3,6 +3,12 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.23] - 2026-11-14
+
+### Added
+
+- Intent roles (claude, gemini, zcode and minimax adapters): the new "Subagent work runs in background" rule inside "Starting work on a card" — subagent work (`Kit`, `Run`, `Plumb`) launches in the engine's background mode, so a human message never interrupts in-flight work (a lost agent takes its final report with it; the only exception is a sub-second mechanical lookup); a subagent is stopped only on the human's word, and after any interruption the interrupted agent's completed work — card files, experience docs, server-side changes — is collected into the card first, and the work continues from there.
+
 ## [0.0.22] - 2026-11-14
 
 ### Changed
