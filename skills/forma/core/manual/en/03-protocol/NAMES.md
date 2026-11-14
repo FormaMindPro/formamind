@@ -72,4 +72,5 @@ The Plumb: role-fit measure between slicing and execution (`PLUMB.md`). The ru m
 
 - chat — skill `human-register`, "Names in the chat language";
 - machine dictionary — `.forma/i18n/keys.json` (`routeNames` for routes and overlays, `lawSections` for law sections, `prohibitionNames` for prohibitions, `namedKeys` for named keys);
-- law sections and prohibitions — this registry.
+- law sections and prohibitions — this registry;
+- cards — the board's card headlines (no registry row and no dictionary entry: a card's name is the project's, taken live from the board).
