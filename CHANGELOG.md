@@ -3,6 +3,12 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.24] - 2026-11-15
+
+### Added
+
+- Installer: foreign files self-resolution at install — after the engines, template and mirrors are laid, `clean-engine-files.cjs` walks the managed subfolders of the engine roots (`.claude`, `.zcode`, `.agents`, `.codex`) and classifies every file: owned by this pass, delivered from `project/extensions/`, protected (`settings.json`, `config.toml`, `project-layer.txt`, `.env`) or carried in the manifest of a previous install stays; a stale forma file (was in the previous manifest, not written now) is removed; anything else is foreign and moves whole, path preserved, into `project/source/engine-archive-<timestamp>/` with a rollback journal `.forma/living/migrations/engine-clean-<timestamp>.json` (`clean-engine-files.cjs --rollback <journal> --root .`). Dangling hook registrations in `settings.json` whose commands point at archived files are cleaned (unparseable JSON - a warning, left untouched). The gen-roles mirror zone (`.zcode/agents`) is classified by regeneration - `gen-roles --print-paths` prints the expected set of mirrors, so foreign mirrors leave with their source and forma mirrors (including the renamed `plumb-haiku` → `plumb-glmflash`) stay. Flag `--archive-foreign` / `--no-archive-foreign` (default on), line in HELP.
+
 ## [0.0.23] - 2026-11-14
 
 ### Added

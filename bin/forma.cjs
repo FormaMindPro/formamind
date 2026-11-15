@@ -15,6 +15,7 @@ const { parseLong } = require('../skills/forma/core/dashboard/lib/cli.cjs')
 const verifyInstall = require('../skills/forma/core/verify/verify-install.cjs')
 const extensions = require('../skills/forma/core/extensions/extensions.cjs')
 const adoptExisting = require('../scripts/layout/adopt-existing.cjs')
+const { cleanEngineFiles } = require('../scripts/layout/clean-engine-files.cjs')
 const { findBash } = require('../skills/forma/adapters/claude/verify-profile.cjs')
 
 const PKG = path.resolve(__dirname, '..')
@@ -42,7 +43,7 @@ const ACTIVE_ENGINES = ENGINES.filter((e) => !DORMANT.includes(e.id))
 
 // ---------- arguments ----------
 function parseArgs(argv) {
-  const { opts, rest } = parseLong(argv, ['help', 'yes', 'version', 'dashboard', 'no-dashboard', 'adopt', 'no-adopt', 'check', 'allow-downgrade'])
+  const { opts, rest } = parseLong(argv, ['help', 'yes', 'version', 'dashboard', 'no-dashboard', 'adopt', 'no-adopt', 'archive-foreign', 'no-archive-foreign', 'check', 'allow-downgrade'])
   const o = { cmd: 'init', dir: process.cwd(), ...opts }
   if (rest[0]) o.cmd = rest[0]
   o.dir = path.resolve(o.dir)
@@ -65,6 +66,13 @@ const HELP = `forma ${VERSION} init — install/update the Forma protocol in the
   --adopt / --no-adopt               first install only: move the folders and files already in the project root into
                                      project/source/; only the protocol's files, Git's and .env* stay in the
                                      root. Without either flag: asked in a terminal, skipped otherwise
+  --archive-foreign / --no-archive-foreign
+                                     after the install, files in the engine folders' managed subfolders that this
+                                     pass did not write (a foreign framework's agents, hooks, scripts) move into
+                                     project/source/engine-archive-<time>/; stale forma files (the previous manifest
+                                     lists them, this release does not ship them) are removed; hook registrations in
+                                     .claude/settings.json pointing at archived files are cleaned. A journal with a
+                                     rollback command is written to .forma/living/migrations/ (default: on)
   --allow-downgrade                  install even if this installer is older than the installed version or than the .forma/protocol clone
   --yes                              no questions, defaults for anything missing
   --dashboard / --no-dashboard       start the dashboard at the end (default: start it when run in a terminal); print the link either way
@@ -99,6 +107,7 @@ function makeAsk() {
 // ---------- files ----------
 const stats = { written: 0, kept: 0 }
 const owned = new Set() // files written by the installer in this pass: the install manifest is built from them
+const keptFiles = new Set() // files found and deliberately left (live edits): written-or-kept for the hygiene pass
 // live counter of installed files (terminal only, so piped output and tests stay clean)
 function progress() {
   if (process.stdout.isTTY && stats.written % 5 === 0) process.stdout.write(`\r  installing files: ${stats.written}`)
@@ -108,7 +117,7 @@ function progressDone() {
 `)
 }
 function copyFile(src, dst, { overwrite = true } = {}) {
-  if (fs.existsSync(dst) && !overwrite) { stats.kept++; return false }
+  if (fs.existsSync(dst) && !overwrite) { stats.kept++; keptFiles.add(dst); return false }
   fs.mkdirSync(path.dirname(dst), { recursive: true })
   fs.copyFileSync(src, dst)
   stats.written++
@@ -377,8 +386,8 @@ function installTemplate(root, name, projectCreated) {
     const inProject = rel.split(path.sep)[0] === 'project'
     const inRun = rel.startsWith(path.join('.claude', 'agents', 'run') + path.sep)
     if (inRun) layerLines.push('.claude/agents/run/' + path.basename(rel))
-    if (inProject && !projectCreated) { if (inRun) runRoles.kept.push(path.basename(rel)); kept++; continue }
-    if (fs.existsSync(dst) && !projectCreated) { if (inRun) runRoles.kept.push(path.basename(rel)); kept++; continue }
+    if (inProject && !projectCreated) { if (inRun) runRoles.kept.push(path.basename(rel)); keptFiles.add(dst); kept++; continue }
+    if (fs.existsSync(dst) && !projectCreated) { if (inRun) runRoles.kept.push(path.basename(rel)); keptFiles.add(dst); kept++; continue }
     copyFile(src, dst); if (inRun) runRoles.written.push(path.basename(rel)); written++
   }
   // the template's run roles travel into .claude/project-layer.txt (the layer-4 list): the names are
@@ -797,6 +806,20 @@ function install(root, choice) {
   // wrote into .claude/agents/run/ are not in the mirror yet — rebuild again, the mirror must match.
   if (templateResult && templateResult.runRoles.written.length && fs.existsSync(path.join(root, '.zcode', 'scripts', 'gen-roles.cjs')))
     report.push(rebuildZcodeRoles(root, `the template wrote ${templateResult.runRoles.written.length} run roles after the first rebuild`))
+  // Foreign files in the engine folders: everything is written by now (engines, extensions, template, the zcode
+  // mirror rebuilt last), so any file in the managed subfolders that this pass did not write, is not a project
+  // extension copy, is protected or is absent from the previous manifest is foreign — it moves into
+  // project/source/engine-archive-<stamp>/ (scripts/layout/clean-engine-files.cjs, journal with a rollback
+  // command). The zcode mirror zone is classified by the regeneration, not by ownership: a mirror whose source
+  // was just archived follows it out.
+  if (choice.archiveForeign !== false) {
+    const extensionPaths = new Set(extensions.sources(root).map((s) => path.resolve(root, s.dst)))
+    const mirrors = [{ target: '.zcode/agents', genScript: '.zcode/scripts/gen-roles.cjs' }]
+    const writtenOrKept = new Set([...owned, ...keptFiles]) // a kept live edit is not a stale forma file
+    const clean = cleanEngineFiles(root, { owned: writtenOrKept, extensionPaths, mirrors })
+    report.push(clean.report)
+    if (clean.rollbackCmd) report.push(`  undo: ${clean.rollbackCmd}`)
+  }
   if (core.projectCreated) {
     const n = applyLanguage(root, choice.lang)
     const isBundled = choice.lang === 'en' || fs.existsSync(path.join(SCAFFOLD, choice.lang))
@@ -867,7 +890,7 @@ A plugin cache or an old checkout is not a source of the version. Use the newer 
   if (ask) ask.close()
 
   console.log('Installing…')
-  const result = install(root, { engines, template, boardMode, lang, compact, adopt })
+  const result = install(root, { engines, template, boardMode, lang, compact, adopt, archiveForeign: !o['no-archive-foreign'] })
   progressDone()
   printReport(result)
   const ok = printVerify(root)
