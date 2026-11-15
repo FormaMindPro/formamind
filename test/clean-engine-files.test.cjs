@@ -121,6 +121,49 @@ test('the zcode mirror zone follows the regeneration: foreign mirrors archive, f
   fs.rmSync(dir, { recursive: true, force: true })
 })
 
+// The template's files are forma's even when the template step did not run this pass (a plain --yes update
+// keeps the recorded template): a skill written this pass, a skill kept as is (whether the previous manifest
+// lists it or not) and any file the recorded template still puts in place survive; a file the template no
+// longer ships is not in the set and is still removed as stale.
+test('template files survive the clean: written this pass, kept as is, expected by the recorded template; a dropped one is still stale', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-clean-template-'))
+  w(dir, '.claude/skills/forma-core/SKILL.md', 'engine skill written this pass')
+  w(dir, '.claude/skills/novamira-wp-elementor/SKILL.md', 'template skill written this pass')
+  w(dir, '.claude/skills/forma-wordpress-novamira/SKILL.md', 'template skill installed by an earlier release')
+  w(dir, '.claude/skills/forma-wordpress-novamira/mcp.json', '{}')
+  w(dir, '.claude/skills/novamira-wp-deploy/SKILL.md', 'template skill the manifest does not list')
+  w(dir, '.claude/skills/old-skill/SKILL.md', 'skill the current template no longer ships')
+  w(dir, '.forma/install-manifest.json', JSON.stringify({
+    manifestVersion: 1,
+    files: {
+      '.claude/skills/forma-wordpress-novamira/SKILL.md': 'a',
+      '.claude/skills/forma-wordpress-novamira/mcp.json': 'b',
+      '.claude/skills/old-skill/SKILL.md': 'c',
+    },
+  }))
+  const owned = new Set([
+    abs(dir, '.claude', 'skills', 'forma-core', 'SKILL.md'),
+    abs(dir, '.claude', 'skills', 'novamira-wp-elementor', 'SKILL.md'),
+  ])
+  const template = new Set([
+    abs(dir, '.claude', 'skills', 'forma-wordpress-novamira', 'SKILL.md'),
+    abs(dir, '.claude', 'skills', 'forma-wordpress-novamira', 'mcp.json'),
+    abs(dir, '.claude', 'skills', 'novamira-wp-deploy', 'SKILL.md'),
+    abs(dir, '.claude', 'skills', 'novamira-wp-elementor', 'SKILL.md'),
+  ])
+  const r = cleanEngineFiles(dir, { owned, templatePaths: template })
+  assert.equal(r.archived, 0)
+  assert.equal(r.deleted, 1)
+  assert.match(r.report, /1 stale forma files removed/)
+  assert.ok(fs.existsSync(abs(dir, '.claude', 'skills', 'novamira-wp-elementor', 'SKILL.md')), 'a template skill written this pass survives')
+  assert.ok(fs.existsSync(abs(dir, '.claude', 'skills', 'forma-wordpress-novamira', 'SKILL.md')), 'a manifest-listed template skill kept as is survives')
+  assert.ok(fs.existsSync(abs(dir, '.claude', 'skills', 'forma-wordpress-novamira', 'mcp.json')))
+  assert.ok(fs.existsSync(abs(dir, '.claude', 'skills', 'novamira-wp-deploy', 'SKILL.md')), 'a template skill the manifest does not list survives')
+  assert.ok(!fs.existsSync(abs(dir, '.claude', 'skills', 'old-skill', 'SKILL.md')), 'a skill the template no longer ships is still removed as stale')
+  assert.ok(fs.existsSync(abs(dir, '.claude', 'skills', 'forma-core', 'SKILL.md')), 'the engine skill written this pass stays')
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
 // the full scenario of the readiness criterion: a foreign framework (its agent, hook and settings entry)
 // sat in the engine folders before the install; after init the install is intact without hand cleaning
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-clean-init-'))
@@ -169,4 +212,32 @@ test('an update finds nothing foreign; the rollback CLI restores the archive and
   assert.ok(fs.existsSync(p('.claude', 'agents', 'gsd-fake.md')))
   assert.ok(fs.existsSync(p('.claude', 'hooks', 'gsd-fake.js')))
   assert.match(fs.readFileSync(p('.claude', 'settings.json'), 'utf8'), /gsd-fake\.js/)
+})
+
+// The wiring in bin/forma.cjs: the recorded template's set (the same protectedTemplatePaths the engines get)
+// reaches the clean. The live reinstall that exposed the defect ran a plain init --yes: the template step did
+// not run ("kept the recorded"), and the clean removed the template's skill files as stale. Now they survive.
+const TEMPLATE = 'forma-wordpress-novamira'
+test('a plain --yes update on a template project keeps the template files the clean used to remove', () => {
+  const tdir = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-clean-tpl-'))
+  try {
+    const tinit = (...extra) => spawnSync(process.execPath, [FORMA, 'init', '--dir', tdir, '--engines', 'claude', '--board', 'skip', '--yes', ...extra], { encoding: 'utf8' })
+    const tp = (...s) => path.join(tdir, ...s)
+    const first = tinit('--template', TEMPLATE)
+    assert.equal(first.status, 0, first.stdout + first.stderr)
+    const skillDirs = fs.readdirSync(tp('.claude', 'skills')).filter((n) => fs.statSync(tp('.claude', 'skills', n)).isDirectory())
+    assert.ok(skillDirs.includes(TEMPLATE), 'the template skill dir from the first install')
+    // a plain update: no --template flag - the template step does not run ("kept the recorded")
+    const upd = tinit()
+    assert.equal(upd.status, 0, upd.stdout + upd.stderr)
+    assert.match(upd.stdout, /kept the recorded/)
+    assert.match(upd.stdout, /foreign files: none/, 'the clean keeps every template file: ' + upd.stdout)
+    for (const s of skillDirs) {
+      for (const rel of fs.readdirSync(tp('.claude', 'skills', s), { recursive: true })) {
+        assert.ok(fs.existsSync(tp('.claude', 'skills', s, rel)), 'the template skill survives the update clean: ' + s + '/' + rel)
+      }
+    }
+    assert.ok(fs.existsSync(tp('.claude', 'agents', 'run', 'run-site-upload.md')), 'a template run role survives the update clean')
+    assert.match(fs.readFileSync(tp('.claude', 'project-layer.txt'), 'utf8'), /run-site-upload\.md/, 'project-layer.txt keeps the recorded roles')
+  } finally { fs.rmSync(tdir, { recursive: true, force: true }) }
 })

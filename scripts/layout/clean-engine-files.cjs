@@ -6,7 +6,9 @@
 // installer itself wrote in this pass (the scan zones are derived from the owned set, the top two levels under
 // the root: .claude/agents, .claude/hooks, ...; an engine folder's own root files and run-time folders such as
 // .claude/memory are never touched). A file there that is
-//   - owned by this pass, a project extension copy, protected, or expected by a mirror regeneration: kept;
+//   - owned by this pass, a project extension copy, a file the project's recorded template puts in place
+//     (the template step may not run this pass - "kept the recorded" - but its files are still forma's),
+//     protected, or expected by a mirror regeneration: kept;
 //   - listed in the previous install manifest but not written now: a stale forma file - removed;
 //   - everything else: foreign - moved whole, relative path kept, into project/source/engine-archive-<stamp>/.
 // Hook registrations in .claude/settings.json whose command points at an archived file are removed (the JSON
@@ -109,6 +111,9 @@ function moveOne(from, to) {
 
 /** Runs the pass. `owned`: absolute paths written this pass (or deliberately kept - a live edit the installer
  *  found and left is not a stale forma file); `extensionPaths`: absolute paths of the project extension copies;
+ *  `templatePaths`: absolute paths the project's recorded template puts in place - known to the pass without
+ *  creating scan zones, the same way as the extension copies (the template step may not run this pass, but
+ *  the files are still the template's; a file the template no longer ships is not in the set and stays stale);
  *  `manifestFiles`: posix rel paths of the previous manifest (default: read from the root);
  *  `mirrors`: [{ target, genScript }] - zones classified by their regeneration, not by ownership. Returns
  *  { report, journal, archived, deleted, unhooked, failed, archiveDir, rollbackCmd }. */
@@ -116,6 +121,7 @@ function cleanEngineFiles(root, opts = {}) {
   root = path.resolve(root)
   const owned = new Set([...(opts.owned || [])].map((p) => path.resolve(p)))
   const extSet = new Set([...(opts.extensionPaths || [])].map((p) => path.resolve(p)))
+  const templateSet = new Set([...(opts.templatePaths || [])].map((p) => path.resolve(p)))
   const manifest = opts.manifestFiles ? new Set(opts.manifestFiles) : readManifestFiles(root)
   const protectedNames = opts.protectedNames || PROTECTED_NAMES
   const zones = zonesFrom(owned, root)
@@ -129,11 +135,11 @@ function cleanEngineFiles(root, opts = {}) {
   const taken = new Set()
   const archivedBasenames = new Set()
 
-  // one file's verdict and execution: owned, extension or protected - keep; in the previous manifest but not
-  // written now - stale, remove; otherwise foreign - archive
+  // one file's verdict and execution: owned, extension, template or protected - keep; in the previous manifest
+  // but not written now - stale, remove; otherwise foreign - archive
   const settle = (rel) => {
     const abs = path.resolve(root, rel)
-    if (owned.has(abs) || extSet.has(abs)) return
+    if (owned.has(abs) || extSet.has(abs) || templateSet.has(abs)) return
     if (protectedNames.has(path.basename(rel).toLowerCase())) return
     if (manifest.has(rel)) {
       try { fs.rmSync(abs, { force: true }) } catch (e) { failed.push({ from: rel, error: e.message }); return }
