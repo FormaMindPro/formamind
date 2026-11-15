@@ -808,15 +808,17 @@ function install(root, choice) {
     report.push(rebuildZcodeRoles(root, `the template wrote ${templateResult.runRoles.written.length} run roles after the first rebuild`))
   // Foreign files in the engine folders: everything is written by now (engines, extensions, template, the zcode
   // mirror rebuilt last), so any file in the managed subfolders that this pass did not write, is not a project
-  // extension copy, is protected or is absent from the previous manifest is foreign — it moves into
-  // project/source/engine-archive-<stamp>/ (scripts/layout/clean-engine-files.cjs, journal with a rollback
-  // command). The zcode mirror zone is classified by the regeneration, not by ownership: a mirror whose source
-  // was just archived follows it out.
+  // extension copy, is not a file of the recorded template, is protected or is absent from the previous manifest
+  // is foreign — it moves into project/source/engine-archive-<stamp>/ (scripts/layout/clean-engine-files.cjs,
+  // journal with a rollback command). The zcode mirror zone is classified by the regeneration, not by ownership:
+  // a mirror whose source was just archived follows it out.
   if (choice.archiveForeign !== false) {
     const extensionPaths = new Set(extensions.sources(root).map((s) => path.resolve(root, s.dst)))
     const mirrors = [{ target: '.zcode/agents', genScript: '.zcode/scripts/gen-roles.cjs' }]
     const writtenOrKept = new Set([...owned, ...keptFiles]) // a kept live edit is not a stale forma file
-    const clean = cleanEngineFiles(root, { owned: writtenOrKept, extensionPaths, mirrors })
+    // the recorded template's files are forma's even when the template step did not run this pass (--yes keeps
+    // the recorded template): the same set the engines are told not to overwrite, no scan zones of its own
+    const clean = cleanEngineFiles(root, { owned: writtenOrKept, extensionPaths, templatePaths: protectedPaths, mirrors })
     report.push(clean.report)
     if (clean.rollbackCmd) report.push(`  undo: ${clean.rollbackCmd}`)
   }

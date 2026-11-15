@@ -3,6 +3,12 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.25] - 2026-11-15
+
+### Fixed
+
+- Installer: the install-time clean no longer removes template-written files — the recorded template's paths (its own skill and `mcp.json`, sibling skills, template scripts and run roles; the same set the engines are told not to overwrite, computed from the recorded template even when the template step does not run on a plain `--yes` update) reach `clean-engine-files.cjs` as their own keep set beside owned, extension copies and protected names, without creating scan zones of their own; a file the template no longer ships is not in the set and is still removed as stale. Two tests: template files survive the clean (written this pass, kept as is, expected by the recorded template; a dropped one still stale), and a plain `--yes` update on a template project keeps the template files the clean used to remove.
+
 ## [0.0.24] - 2026-11-15
 
 ### Added
