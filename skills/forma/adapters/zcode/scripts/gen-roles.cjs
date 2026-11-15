@@ -12,6 +12,8 @@
  *
  * Run: node .zcode/scripts/gen-roles.cjs [--check]
  *   --check - writes nothing, only reports the divergences (a role whose body has drifted).
+ *   --print-paths - writes nothing, prints the destination paths the regeneration names (one per line,
+ *     relative to .zcode/agents/): the expected mirror set the installer's hygiene pass classifies by.
  */
 
 const fs = require('fs');
@@ -164,15 +166,18 @@ function listRoleFiles(dir, base = '') {
 }
 
 function generate() {
+  const printPaths = process.argv.includes('--print-paths');
   const files = listRoleFiles(SRC);
   const written = [];
   const drift = [];
+  const paths = [];
   for (const rel of files) {
     const src = fs.readFileSync(path.join(SRC, ...rel.split('/')), 'utf8');
     const { fm, body } = splitFrontmatter(src);
     const text = myFrontmatter(fm || '', rel) + transformBody(body, rel);
     const stem = rel.replace(/\.md$/, '');
     const dstRel = EXECUTOR_RENAME[stem] ? `${EXECUTOR_RENAME[stem]}.md` : rel;
+    if (printPaths) { paths.push(dstRel); continue; } // destinations only, nothing written
     const dst = path.join(DST, ...dstRel.split('/'));
     if (fs.existsSync(dst) && fs.readFileSync(dst, 'utf8') === text) continue;
     drift.push(rel);
@@ -182,11 +187,13 @@ function generate() {
       written.push(rel);
     }
   }
-  return { files, written, drift };
+  return { files, written, drift, paths: printPaths ? [...new Set(paths)].sort() : null };
 }
 
-const { files, written, drift } = generate();
-if (process.argv.includes('--check')) {
+const { files, written, drift, paths } = generate();
+if (paths) {
+  console.log(paths.join('\n'));
+} else if (process.argv.includes('--check')) {
   if (drift.length) {
     console.error(msg('zgen.drift') + drift.join(', '));
     console.error(msg('zgen.rebuild'));
