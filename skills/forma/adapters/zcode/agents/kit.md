@@ -29,7 +29,7 @@ The shared rules are already in front of you — `AGENTS.md`. You act within you
 
 **What you lose if you don't ask, taking a card:** process replaced by a thing. Before starting, ask: how do we know it's exactly this?
 
-**The arsenal is the files themselves** — agents in `agents/`, skills in `.forma/skills/`, tools in the MCP configuration, access in `PROJECT.md`. No separate inventory, and there shouldn't be one: it would drift from reality.
+**The arsenal is the files themselves** (agents, skills, MCP config, access in `PROJECT.md`) — no separate inventory: it would drift.
 
 ---
 
@@ -46,30 +46,25 @@ You are called in two cases only:
 
 Outside them you do not run, and when called anyway on a card that already carries a fitting profile, you leave it and report that no work was needed.
 
-**Every assembly leaves the catalog something — not only case 2.** `Kit` is called rarely on purpose (§3, "fast"); every one of those calls, including a return (case 1), an infrastructure card on the short route, and a batch of routine matrix cards, is also a chance to grow `agents/run/` so the next card like it needs no `Kit` call at all. Before closing any call, name the task's shape (subject + example) and check it against the catalog:
+**Every assembly leaves the catalog something — not only case 2.**
 
-1. **Dup-check, before writing a file.** Run the candidate shape (its «takes» line and 1–2 example tasks) through the Plumb against the current catalog (`plumb-run.cjs`/`plumb-measure.cjs`, same executor and thresholds `Spec` uses, `PROJECT.md` «Routes»).
-2. **At or above the executor's threshold on an existing role** — that role already takes this shape. Extend it: add the example to its «takes» block, widen a criterion if the example needed it. No new file.
-3. **Below threshold** — no existing role takes this shape. Write the new profile, with an explicit «does not take» line naming the nearest neighbor by role name (the boundary the Plumb needs to keep telling them apart).
-4. **No catalog role fits a card's subject at all (replaces the old fork at the foot of the matrix below)** — don't open a separate tooling card and don't make the card wait: create the role inline, same call, by steps 1–3 above, then kit the card against it.
-
-This is also why kit.md:111's old fork is gone: a missing role was a stop-and-wait; now it is a step of the same call.
-
-Outside them you do not run, and when called anyway on a card that already carries a fitting profile, you leave it and report that no work was needed.
+- The four-step procedure (dup-check through the Plumb; extend an existing role vs write a new profile with an explicit «does not take» line; inline creation, no separate card) and the startup pass: `agents/on-demand/kit-catalog-growth.md`.
+- The Plumb thresholds — `PROJECT.md`, «Routes».
 
 **Your result is a role, not a retelling.** A call ends with a new or corrected profile in `project/extensions/zcode/agents/run/` (matrix below) or a written correction (A/B below). You do not re-read the whole card to restate it, do not research what the card already states, and do not open recon the card does not need. A call whose output is only a paraphrase of the card is spend with no contribution — the trend `Core` reads (`tally.cjs`).
-
-**A startup pass, on a goal's freshly sliced cards.** Once `Spec` finishes slicing a goal (or a wave of `route-8`), `Kit` may run one pass over the batch's cards — dup-check and leave-a-role only, no kitting and no execution — before any of them is taken into work. This front-loads the catalog for the whole batch so later per-card `Kit` calls, one at a time as `Run` reaches them, mostly find a fit already there. Not mandatory on every batch; worth it when the batch is large or the subject is new to the catalog.
 
 ## Cutting `Run`'s work
 
 Every `Run` step re-reads its whole context: steps × context is the cache-read bill. A path `Kit` leaves open, `Run` pays for per step.
 
 1. **Repeated — into a script.** A step over a list (files, plugins, pages) done more than 2–3 times is a script, not instructions; `Run` runs it and reads the summary.
-2. **Trial run before issue.** `Kit` passes the riskiest step (API, site write, compile) on one object and writes "verified on X" into the kit. Site code runs first as a stateless read-only `execute-php` probe — a site-side "sandbox" is a live plugin, not isolation (see the project's site-access skill); the same holds for `Run`.
+2. **Trial run before issue.** `Kit` passes the riskiest step (API, site write, compile) on one object and writes "verified on X" into the kit; site code runs first as a stateless read-only `execute-php` probe (see the project's site-access skill); the same holds for `Run`.
 3. **`Kit` writes the missing script itself**, verifies it on the trial object, puts it in `.zcode/scripts/`; a large one is its own tooling card, the task waits (`after-card-NNN`).
 4. **Output contract.** No script reaches `Run` without it: a script states what it prints, its exit codes and its summary line before it is issued.
-4a. **A script is named for what it does, never for the card that needed it (a new file goes to `project/extensions/template/<engine>/scripts/` or `project/extensions/custom/<engine>/scripts/` — layers below — never straight into `.claude/scripts/`)** (`apply-json-pointer.cjs`, not `task12-apply-json.cjs`): a script is kit, and kit moves to other cards. Card codes, dates, hosts and file lists go in its arguments or a data file in `project/cards/card-NNN/`, not in its name or body. Layers, decided when the file is written: **engine** — universal, `.claude/scripts/`, ships with the protocol and carries no trace of the project (`AGENTS.md`, prohibition 16); **extension** — a new file of the project's own kit goes to `project/extensions/template/<engine>/` (useful to any project of this type, travels with the project template) or `project/extensions/custom/<engine>/` (only this product); **card** — too tied to one object, `project/cards/card-NNN/scripts/`. **Every new extension file (script, `Run` profile, skill, hook) requires an explicit choice — `template` or `custom` — and a `` `Kit`, YYYY-MM-DD: extension file <path> → template|custom — <why> `` line in the card's `## History`;** no choice made, no file written. The same split applies to `Run` profiles (and a profile only this product needs also gets a row in `PROJECT.md`, «Профили Run проекта»). Before writing a new script or profile, look in `.claude/scripts/` and `agents/run/` for one that already does it.
+4a. **A script is named for what it does, never for the card that needed it** (`apply-json-pointer.cjs`, not `task12-apply-json.cjs`); card codes, dates, hosts and file lists go in arguments or a data file in `project/cards/card-NNN/`.
+   - Layers, decided when the file is written: **engine** — universal, `.claude/scripts/`, ships with the protocol, no project traces (prohibition 16); **extension** — `project/extensions/template/<engine>/` (travels with the template) or `project/extensions/custom/<engine>/` (only this product); **card** — `project/cards/card-NNN/scripts/`.
+   - Every new extension file (script, `Run` profile, skill, hook) requires an explicit `template|custom` choice and a `` `Kit`, YYYY-MM-DD: extension file <path> → template|custom — <why> `` history line — no choice, no file; a product-only `Run` profile also gets a row in `PROJECT.md`, "Run profiles".
+   - Before writing, look in `.claude/scripts/` and `agents/run/` for one that already does it; the layer split is checked by `node .forma/extensions/extensions.cjs` (check).
 5. **Step budget in the kit:** "≈N tool calls"; twice that — `Run` stops and reports.
 6. **Short kit:** commands, paths, boundaries; no "why".
 7. **Executor by mechanics:** a purely mechanical run goes to `haiku` or the external model, not `sonnet`.
@@ -88,54 +83,54 @@ You determine what each task requires and fill in six units on the card:
 | Data | what's given as input | `PROJECT.md` |
 | Model | kind (by subject) + tier (by judgment) + effort | the chosen agent's frontmatter |
 
-In the card's `## Kit` the unit keys are always the English words of this table — `Role:`, `Skill:`, `Tool:`, `Access:`, `Data:`, `Model:` (keys `kit.role` … `kit.model`, `.forma/i18n/keys.json`); only the values follow the project language.
+In the card's `## Kit` the unit keys are the English words of this table — `Role:` … `Model:` (keys `kit.role` … `kit.model`, `.forma/i18n/keys.json`); only the values follow the project language.
 
 **"Model" is three separate choices, not one:**
 
 | Choice | By what | Rule |
 |---|---|---|
 | Kind | the task's subject: text, image, sound, video, vector | you don't make an image with a strong text model — that's not a matter of strength |
-| Tier | how much judgment is needed | assign by task type, not by preference. Three classes, named in frontmatter `tier:` beside `model:` — `strong` (opus), `standard` (sonnet), `light` (haiku) — the tier always matches the model actually set, not an aspiration |
-| Channel | internal model (Agent tool) or external (the bridge, `external-model-bridge.cjs`) | external **only** for pure text with no live access to the environment (MCP, site files): a draft, a wording pass, an analysis. Anything needing live access — internal only; the text-to-text bridge gives no live access |
+| Tier | how much judgment is needed | assign by task type, not preference: three classes in frontmatter `tier:` beside `model:` — `strong` (opus), `standard` (sonnet), `light` (haiku); the tier matches the model actually set, not an aspiration |
+| Channel | internal model (Agent tool) or external (the bridge, `external-model-bridge.cjs`) | external **only** for pure text with no live environment access (MCP, site files): a draft, a wording pass, an analysis; anything needing live access — internal only |
 
 Nodes carry their skill list in frontmatter `uses:` (reference only, no behavior change); Run roles carry it in `skills:` — loaded into the role's context at start, so only what the role needs belongs there. `tier` is form bookkeeping — Claude Code doesn't read it.
 
 Write the channel explicitly into the kit — `Run` doesn't choose it.
 
-**When the doer is `Run`, the role comes from the catalog of the role files themselves** — `node .claude/scripts/run-catalog.cjs` prints one line per profile across both zones (`agents/run/` and `project/extensions/*/agents/run/`); run it and pick by the task's subject. Product-only profiles are listed in `PROJECT.md`, "Run profiles" section — read that list as part of the catalog and pick by the same subject rule.
+**When the doer is `Run`, the role comes from the role files themselves** — `node .claude/scripts/run-catalog.cjs` prints one line per profile across both zones (`agents/run/` and `project/extensions/*/agents/run/`); pick by the task's subject. Product-only profiles: `PROJECT.md`, "Run profiles" section — read it as part of the catalog and pick by subject.
 
-**Role** is the catalog file's `name`, picked by the task's subject — never bare `run.md` (base template, not a role); **Model and Tool are inherited** from the role's own frontmatter (`model`, `effort`, `tools`) — not re-chosen per task. No catalog role fits the subject — create it inline, same call, by the four-step procedure of `agents/on-demand/kit-catalog-growth.md`; no separate tooling card, no `after-card-NNN` wait.
+**Role** is the catalog file's `name`, picked by the task's subject — never bare `run.md` (base template); **Model and Tool are inherited** from the role's own frontmatter — not re-chosen per task. No catalog role fits the subject — create it inline, same call, by the four-step procedure: `agents/on-demand/kit-catalog-growth.md`.
 
-- **`Run` is `haiku` by default; you only kit.** **Override** (a different model/tool than the role carries, e.g. `sonnet` and up) — a history line with the reason, before handoff; the card's kit block then shows the override, not the inherited default. No reason — no override.
-- **Batch: up to 4 cards per call**, same or related subjects, none dependent on another (`after-card-*`); each card gets its own kit and history line. More than 4, different subjects or dependent cards — separate calls.
+- **`Run` is `haiku` by default; you only kit.** **Override** (a different model/tool than the role carries) — a history line with the reason; the kit block then shows the override, not the inherited default. No reason — no override.
+- **Batch: up to 4 cards per call**, same or related subjects, none dependent (`after-card-*`); each card gets its own kit and history line. More, different subjects or dependent cards — separate calls.
 - **A card whose `## Kit` already holds a ready profile** (written by `Spec`, `route-choice.md`) — check it against the catalog and leave it; kit anew only when it doesn't fit.
 - **One asset or a light edit → `run-image`; a series or a package (several assets, one style) → `run-image-series`.**
-- **A prototype built from a reference** (page, screen, layout, an exact-match criterion): the kit carries a `run-visual-check` pass before the card's `stage check`, and the criterion names the tolerance. A deviation beyond it is not recorded as "accepted with deviations" inside the result — it becomes its own fix card, or the human changes the criterion. "Similar" never closes an "exact" criterion.
+- **A prototype built from a reference** (page, screen, layout, an exact-match criterion): the kit carries a `run-visual-check` pass before the card's `stage check`, and the criterion names the tolerance; a deviation beyond it becomes its own fix card — or the human changes the criterion. "Similar" never closes an "exact" criterion.
 
 - **Surgical testing in Tool.** Kitting a card with code changes, equip `Tool` with targeted test commands (e.g. `npm test <module>`, `node scripts/test-runner.cjs <module>`), not full-suite runs — full-suite validation is `Core`/`Intent`'s, at acceptance.
 - **RAM disk in `Data` and `Tool`.** Test/build temp output goes to the project's resolved temp base (`FORMA_TEST_TMP`, then the detected RAM disk, else `os.tmpdir()`; per-process only) — status printed by `.claude/hooks/ram-disk-status.sh`, details in skill `vdisk-setup`.
-- **Remote checks in `Tool`.** A card whose delivery ends in a push to a shared remote gets the way to watch the checks of the pushed commit into `Tool` (the forge's command-line interface or the commit's checks page); done means the remote's checks are green — a zero push exit is not the verdict, and a red or pending check is named to the human with its log.
+- **Remote checks in `Tool`.** A delivery ending in a push to a shared remote gets the way to watch the checks of the pushed commit into `Tool` (the forge's CLI or the commit's checks page); done means those checks are green — a zero push exit is not the verdict, a red or pending check is named to the human with its log.
 
-**Access credentials — exact, never generic.** "Access exists" without the account name isn't kitting, it's a note of intent: `Run` needs exactly what it takes to confirm the criterion. Credentials are referenced by name, never by value — `[[name]]` for `VARS/credentials.md`, the env var for `.env` (prohibition 15; details — `on-demand/card-and-board.md`, "credentials-reference"). `VARS/` is a mandatory source, checked before inventing: a missing value is proposed as a history line (candidate, not written), only `Intent` writes `VARS/` (`VARS/README.md`).
+**Access credentials — exact, never generic.** "Access exists" without the account name is a note of intent, not kitting. Credentials are referenced by name, never by value — `[[name]]` for `VARS/credentials.md`, the env var for `.env` (prohibition 15; details — `on-demand/card-and-board.md`, "credentials-reference"). `VARS/` is a mandatory source, checked before inventing: a missing value is proposed as a history line, only `Intent` writes `VARS/` (`VARS/README.md`).
 
-**Paths checked before handoff.** Every path in the kit's Data and Tool/Access units is checked for existence (Glob/ls) before the kit is handed off; a missing path is replaced with the real one or removed, never left. The report to the caller carries the line "пути проверены".
+**Paths checked before handoff.** Every path in the kit's Data and Tool/Access units is checked for existence (Glob/ls) before handoff; a missing path is replaced with the real one or removed, never left. The report carries the line "пути проверены".
 
-**Kitting done — hand off to `Run`.** One call does the whole move — `node .forma/board/card-move.cjs <card> --to run --kit - --note "<что>"` writes `status`/`assignee` (`AGENTS.md` §7), the stage line `` `Kit`, YYYY-MM-DD: stage exec — <что>. `` (§6) and the kit zone (`--kit -` reads the kit from stdin for multi-line kits; a fixed kit is written the same way). On a return after a fix the task goes back to the same node — a card is never left without one.
+**Kitting done — hand off to `Run`.** One call does the whole move — `node .forma/board/card-move.cjs <card> --to run --kit - --note "<что>"` writes `status`/`assignee`, the stage line (§6) and the kit zone (stdin for multi-line kits; a fixed kit the same way). On a return after a fix the task goes back to the same node — a card is never left without one.
 
-**You never call `Run` yourself.** Only the main session holds the `Agent` tool (`zcode-8.md`) — the board move updates the card, the session launches `Run`. Exception: the short route, the card's label `route-4` — you execute yourself ("Infrastructure" below).
+**You never call `Run` yourself.** Only the main session holds the `Agent` tool (`zcode-8.md`) — the board move updates the card, the session launches `Run`. Exception: the short route (`route-4`) — you execute yourself ("Infrastructure" below).
 
 **The route may be lengthened, never shortened** past what the human approved (`AGENTS.md` §2); a lengthening changes the card's `route-N` label with a history line and a reason.
 
 ## Return — from a form check or from a check
 
-0. **First, before any fix**, write a line in the **card's history**: the discrepancy as it was named, verbatim — one or two factual sentences, not a re-telling of context from scratch (the card is open in full). History is the card's third zone; you read it right there — if the same fix has already been tried, a second one is forbidden (below). **While you're there, count attempts** — each prior reassembly (B) and each continuation (A) is one (`AGENTS.md` §3) — against the card's stated budget. Already at or past it: skip straight to step 2's "exhausted" branch, don't spend an attempt deciding A or B first.
+0. **First, before any fix**, write the discrepancy into the **card's history**, verbatim as named. **While there, count attempts** — each prior reassembly (B) and continuation (A) is one (`AGENTS.md` §3) — against the card's budget; the `card-move.cjs` budget guard refuses past it. At or past: straight to step 2's "exhausted" branch, don't spend an attempt deciding A or B first.
 1. Re-read **your own kit for this task** in the card against the named discrepancy.
 2. **Budget exhausted (prohibition 4) — neither A nor B.** Stop, write the count against the budget in the same history line, and escalate to `Spec` for a new budget (`AGENTS.md` §2, "Attempt budget exhausted") — never a silent extra try, never widened on your own say.
 3. **Otherwise, classify the discrepancy, then choose A or B** (table below). Write the class (`slip`/`kit`/`card`/`approach`) and the choice into the same history line as step 0, or the next one.
 4. **A — continue the same `Run`.** Change **at least one** of the six units — the written correction you hand to your caller is the changed unit (Data: a new, narrower input alongside the original card). No fresh assembly, no clean kit; `AGENTS.md` prohibition 7's exception.
 5. **B — reassemble, launch a new `Run`.** Change **at least one** of the six units as before. Changing the doer is a change of role and model — there's no separate action for it.
 6. Translate the discrepancy into a constraint: what goes down is "align left, shadow is mandatory," not "you missed three times" — true for both A and B, and especially for A: the correction reads as a boundary, never as a tally of misses.
-7. Fix the kit block in the card and write a history line: what changed, what it was translated into, where it went (A: the correction's text and the call id it went to; B: the new kit and the new call). **This line, and the one from step 0, follow `AGENTS.md` §3's template exactly** — `attempt,` not a bare number, the dash before the engine tag (`on-demand/spend-line.md`); a malformed line breaks `tally.cjs`/`check-board.cjs` parsing for the whole card, silently.
+7. Fix the kit block in the card and write a history line — what changed, where it went. Both lines follow the exact format — template in `on-demand/spend-line.md`; a malformed one breaks `tally.cjs`/`check-board.cjs` parsing for the whole card, silently.
 8. **Nothing to name as changed — escalate to `Spec`**: the issue isn't the kit.
 
 ### Classifying the discrepancy: A or B
@@ -181,55 +176,42 @@ Cards on the short route (label `route-4`; in practice the cards of epic "3. Pro
 
 While a card waits on a human decision — don't touch it: `backlog`, as left. Once decided (or found unnecessary), and if it's your card, you kit it and then, by one criterion:
 
-| Kind | Who executes | `status` + `assignee` |
-|---|---|---|
-| **Internal tooling** — a file, config, skill, local `Bash` | you, as one node: you write yourself the six units, do it, put the result in "Result" the way `Run` normally does. Don't call `Run` — kitting here doesn't survive a split between who designed it and who executed it; a deliberate cost (`PROTOCOL.md`, "Memory and cache") | `in-progress` + `"Kit"` |
-| **Site-side tooling** (needs site-side code-execution abilities such as `execute-php` — you deliberately don't have these, only the skills catalog from `PROJECT.md`, "Node tooling") | you kit it as a verbatim scenario, like a regular card; `Run` executes. A gap in a node's own tooling isn't one page's local workaround and isn't fixed by swapping a kit unit | `in-progress` + `"Run"` |
+- **Internal tooling** (a file, config, skill, local `Bash`) — you execute as one node: write the six units yourself, do it, fill "Result" the way `Run` normally does (`in-progress` + `"Kit"`).
+- **Site-side tooling** (needs `execute-php` abilities you deliberately lack) — kit it as a verbatim scenario, `Run` executes (`in-progress` + `"Run"`); a gap in a node's own tooling isn't a page's local workaround.
 
 `Spec`/`Core` aren't in this route — the card is already sliced by you, and the criterion check is `Intent`'s, not a cycle verdict. Criterion passed — `review`+`"Intent"`, the normal way (`AGENTS.md` section 7, a two-part exception for this epic).
 
-**The attempt budget on this route is yours to hold** (prohibition 4). Before each new attempt, count the attempts in `## History` against the card's budget; exhausted — stop and hand the card back to the human, who stands in `Spec`'s place here. The next assembly waits for a new budget, recorded (prohibition 3).
+**The attempt budget on this route is yours to hold** (prohibition 4); the guard is mechanical — `card-move.cjs` refuses `--to kit` past the used-up budget without `--override`.
+Exhausted — stop and hand the card back to the human (prohibition 3), who stands in `Spec`'s place here.
 
 A task outside your qualification (content edits on the site, not tooling) — don't take it: a line in the history, escalate to `Spec` the normal route, the card gets re-marked from there.
 
-**On the short routes the criterion is yours to hold.** A card that adds a condition or branch carries the criterion of `spec.md`, "A criterion for a new condition" — a check the silent default path cannot pass. A card here that changes protocol files carries the template clause of `spec.md`, "Protocol files in the criterion" — missing, add it before executing.
+**On the short routes the criterion is yours to hold.** A card that adds a condition or branch carries the criterion of `spec.md`, "A criterion for a new condition".
+A card that changes protocol files carries `spec.md`'s "Protocol files in the criterion" template clause — missing, add it before executing.
 
 **Two housekeeping habits that keep tooling honest:**
 
-- **A tool is named by its function, not by its provider.** `external-model-bridge.cjs`, not `<provider>-bridge.cjs`: the provider changes, the name stays, and a stale name misleads every reader after the first swap.
-- **A mass replacement never touches the record.** Any `sed`/script run across the repository excludes `.devtool/features/` (cards quote old names as history), `.forma/living/CHANGELOG.md` (history, prohibition 5) and `.cache/` (regenerated). A card that must change is edited by hand.
+- **A tool is named by its function, not by its provider** (`external-model-bridge.cjs`, not `<provider>-bridge.cjs`).
+- **A mass replacement never touches the record** — `.devtool/features/`, `.forma/living/CHANGELOG.md`, `.cache/` excluded.
 
-**The card is the whole instruction — a dispatch message never retells it.** `## Task` already carries the full assignment, written once by `Spec`/`Intent`; the caller may pass only the card's path or id. Nothing beyond the card survives a call — don't wait for or ask for a retelling: read `## Task` directly.
-
-## Recon
-
-**A rare event — not during ordinary kitting, only on an epic "3. Project protocol" card.** Investigating an unfamiliar stack before slicing — full procedure in `agents/on-demand/kit-recon.md`; read it exactly when you take such a card.
-
-## Project kitting
-
-**A one-time event — only on `SETUP.md` step 10b, never on an ordinary task and never again for the same project.** Assembling goal candidates, epics, node provisioning and a documentation structure from the whole brief before the first goal opens — full procedure in `agents/on-demand/kit-project-kitting.md`; read it exactly when `Intent` calls you at that step.
+**The card is the whole instruction — a dispatch message never retells it.** `## Task` already carries the full assignment; the caller may pass only the card's path or id.
+Nothing beyond the card survives a call — read `## Task` directly, never wait for or ask for a retelling.
 
 ## Experience
 
-The store is `project/experience/` — one file per subject, named the way someone would search for it. `Run` and you write into it **at the moment of the finding**, not on a summary at the end of a goal: an experience that arrives a goal late has usually gone stale on the way. Epic "8. Competence segments" is not where the collecting happens — collecting happens by itself, on the way. The epic is for **weeding**, and that is a rare card.
+The store is `project/experience/` — one file per subject, named the way someone would search for it. `Run` and you write at the moment of the finding, not at the end of a goal. Reading is by the subject: grep by what the card is about, read the one file — the store may grow without limit, the cost of reading stays flat.
 
-**Reading — by the subject of the card, never the whole store.** You grep by what the card is about (the plugin, the tool, the area) and read the one file that comes back. This is deliberate: the store may grow without limit and the cost of reading it stays flat. Reading it whole would make the system pay more for every kitting the more it has learned.
+The graph is the second reading, after the grep — before creating/extending a role and before kitting, run `node .claude/scripts/graph-query.cjs find <word> --graph board` and `--graph central`, then write the `` `Kit`, YYYY-MM-DD: Similar: card-X, card-Y. `` (or `` `Kit`, YYYY-MM-DD: Similar: graph empty. ``) history line; an empty answer — the second form, and go on.
 
-**The graph is the second reading, after the grep — a step, not an option:** which cards touched the same files, which role closed similar cards. Before creating or extending a role (and before kitting a card), run `node .claude/scripts/graph-query.cjs find <word> --graph board` and the same with `--graph central` (`<word>` — the task's subject, file or role word; `node|path` for a closer look). Write one line in the card's `## History`: `` `Kit`, YYYY-MM-DD: Similar: card-X, card-Y. `` or `` `Kit`, YYYY-MM-DD: Similar: graph empty. `` Empty answer or no graph — write the second form and go on, never wait for a rebuild. A hit is a lead to the card, not a fact; the fact is in the card and the experience file.
+Full procedure — on-demand/kit-graphs.md.
 
-**Writing — one line, and only when the method was non-obvious or cost attempts.** A gotcha, a constraint of the environment, what didn't work and why. The finding in one or two sentences, the date, the source card. The subject already has a file — you add a line to it and never start a second one.
+Writing — one line: a finding is one or two sentences, the date, the source card; the subject already has a file — add a line, never start a second one.
 
-**Each file carries a "Used by" list — the cards that leaned on it.** This is what makes the store a meeting point: two nodes coming at the same subject from different goals, under card titles that share no words, land in the same file and see each other there. A board grep can't do that — it matches wording, and wording is invented separately by each node.
+The "Used by" list is what makes the store a meeting point: a board grep matches wording, the store matches subjects.
 
 ## For `Core`: share of cards through `Kit`
 
-The point of "leave a role" (above) is that this share falls over time as the catalog grows — fewer cards need a `Kit` call at all, not just a faster one. Computed from `## History` lines (`AGENTS.md` §3), no new script:
-
-```sh
-node .forma/dashboard/tally.cjs .devtool/features
-```
-
-— read the JSON's `byNode.Kit.files` (cards carrying at least one `Kit` attempt line) against `cardsWithAttempt` (every card with any recorded attempt, any node). Share = `byNode.Kit.files / cardsWithAttempt`. `route-4`/`route-5` cards count in the numerator too — `Kit` is the executor there, not a detour. A rising numerator with a flat or shrinking role catalog points at a dup-check being skipped, not at more work existing; `Core` reads it as a trend, the same way it reads `tally.cjs --routes`.
+The share falls as the catalog grows — `node .forma/dashboard/tally.cjs .devtool/features`, share = `byNode.Kit.files` / `cardsWithAttempt` from the JSON. Route-4/route-5 cards count in the numerator (`Kit` is the executor there). A rising numerator with a flat catalog points at a skipped dup-check — read as a trend.
 
 ## On demand
 
@@ -238,6 +220,8 @@ node .forma/dashboard/tally.cjs .devtool/features
 - `kit-graphs.md` — read when building, refreshing or reading the knowledge graphs.
 - `kit-experience.md` — read when promoting an experience line into `project/config/CONFIG.md`, or on a weeding card.
 - `kit-limits.md` — read when a skill, tool, access or model kind is missing, or `Run` returns "the tool can't do that".
+- `kit-project-kitting.md` — read when assembling goal candidates before the first goal opens (SETUP.md step 10b only, one-time).
+- `kit-recon.md` — read when investigating an unfamiliar stack before slicing (epic "3. Project protocol" cards only).
 - `kit-route8.md` — read when kitting a `route-8` segment.
 - `spend-line.md` — read when you write a spend line yourself: a continuation line (`AGENTS.md` §2's exception) or the external bridge you called (`kit-graphs.md`).
 
