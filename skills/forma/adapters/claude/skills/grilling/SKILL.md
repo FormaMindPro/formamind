@@ -17,7 +17,7 @@ The five questions of the "Interview" section are not a linear checklist but the
 
 ## Rounds and the frontier
 
-**The frontier** - all questions whose premises have already settled (they can be asked right now, without guessing at an answer not yet heard). Ask the frontier in full per round, numbered, with a recommended answer - not one question at a time and not the whole tree at once. A question that depends on another, not yet answered in the same round, moves to the next round, not this one.
+**The frontier** - all questions whose premises have already settled (they can be asked right now, without guessing at an answer not yet heard). Ask the frontier in full per round, numbered, with a recommended answer - not one question at a time and not the whole tree at once. **Word each question so that "yes" accepts its recommended answer** - agreement takes one word, not a restatement. A question that depends on another, not yet answered in the same round, moves to the next round, not this one.
 
 The format of a round:
 

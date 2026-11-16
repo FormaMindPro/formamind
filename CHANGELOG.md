@@ -3,6 +3,9 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.29] - 2026-11-17
+### Added
+- grilling: word each question so "yes" accepts its recommended answer - the body of a frontier question is phrased so that agreement with the round's recommended answer takes one word, not a restatement; the technique lands in the source (`core/skills/grilling`) and the claude and minimax mirrors, closing the gap the codex mirror carried alone since 0.0.28.
 ## [0.0.28] - 2026-11-16
 ### Changed
 - `kit.md` compressed to holders (37 580 -> 26 314 body chars, -30%): the prose leaves the law - the run-role catalog is built by `run-catalog.cjs` from the role files themselves, the dup-check procedure and the startup pass move to `agents/on-demand/kit-catalog-growth.md`, the infrastructure and return mechanics to the `card-move.cjs` guard, `spend-line.md` and `extensions.cjs`; the judged canon (the six units, the A/B classification, the limits, the route rules) stays intact.
