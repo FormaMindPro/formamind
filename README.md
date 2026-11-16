@@ -58,6 +58,8 @@ npx github:FormaMindPro/formamind init
 npx github:FormaMindPro/formamind init --yes
 ```
 
+An update without `--engines` reinstalls every engine the project's install manifest records, not `claude` alone; every recorded component in one explicit run — `--all` (a project without a manifest yet: every active engine).
+
 The installer will ask three questions — engines (`claude`), project template (`none`), kanban board (`auto`) — and will install the core: `AGENTS.md`, roles, hooks, board, dashboard. Re-running updates the system; `project/` is left untouched. Non-interactive: `npx github:FormaMindPro/formamind init --engines claude --template none --board auto`. Other methods — git clone and the Claude Code plugin: [Installation](#installation).
 
 ## From the author

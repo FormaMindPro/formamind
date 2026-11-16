@@ -43,7 +43,7 @@ const ACTIVE_ENGINES = ENGINES.filter((e) => !DORMANT.includes(e.id))
 
 // ---------- arguments ----------
 function parseArgs(argv) {
-  const { opts, rest } = parseLong(argv, ['help', 'yes', 'version', 'dashboard', 'no-dashboard', 'adopt', 'no-adopt', 'archive-foreign', 'no-archive-foreign', 'check', 'allow-downgrade'])
+  const { opts, rest } = parseLong(argv, ['help', 'yes', 'version', 'dashboard', 'no-dashboard', 'adopt', 'no-adopt', 'archive-foreign', 'no-archive-foreign', 'check', 'allow-downgrade', 'all'])
   const o = { cmd: 'init', dir: process.cwd(), ...opts }
   if (rest[0]) o.cmd = rest[0]
   o.dir = path.resolve(o.dir)
@@ -54,7 +54,10 @@ const HELP = `forma ${VERSION} init — install/update the Forma protocol in the
 
   npx github:FormaMindPro/formamind init [flags]
 
-  --engines  claude[,gemini,zcode]   engines (claude is always core; codex and minimax are dormant: core/engines.json)
+  --engines  claude[,gemini,zcode]   engines (claude is always core; codex and minimax are dormant: core/engines.json).
+                                     On an update without the flag the recorded engines are reinstalled, not claude alone
+  --all                              every component the project records, one run: the engines of its install manifest
+                                     (no manifest yet — a first install: every active engine); --engines wins over --all
   --template <name>|none             project template from templates/ (default: none)
   --board    auto|skip               Kanban Markdown: find editor CLIs and install (default: auto)
   --lang     <code>                  project document language (default: en). Catalogs shipped: en, ru; any other code (fr, de, ...)
@@ -443,17 +446,48 @@ function board(mode) {
   return lines
 }
 
-/// step 1: engines — by flag, from the menu, or claude by default; an unknown one exits with 2.
+// The engines the project's install manifest records — what an update refreshes when nothing is named.
+// An id dormant in this release (core/engines.json) or unknown to this installer is skipped with a note,
+// not an error; claude lands anyway (the unshift in chooseEngines enforces the core). `all` without a
+// manifest — a first install — takes every active engine; without it the claude default stands.
+function manifestEngines(root, all) {
+  let ids = []
+  try { ids = (verifyInstall.readManifest(root).engines || []).map((e) => e && e.id).filter(Boolean) } catch { /* no manifest: a first install */ }
+  if (!ids.length) return all
+    ? { engines: ACTIVE_ENGINES.map((e) => e.id).join(','), fromManifest: false, notes: ['--all: no install manifest — every active engine of this release'] }
+    : { engines: null, fromManifest: false, notes: [] }
+  const notes = []
+  const kept = ids.filter((id) => {
+    if (DORMANT.includes(id)) { notes.push(`engine ${id}: recorded in the manifest, dormant in this release — skipped (wake it in core/engines.json)`); return false }
+    if (!ENGINES.some((x) => x.id === id)) { notes.push(`engine ${id}: recorded in the manifest, unknown to this installer — skipped`); return false }
+    return true
+  })
+  return { engines: kept.length ? kept.join(',') : null, fromManifest: true, notes }
+}
+
+/// step 1: engines — by flag (--engines wins over --all), --all or a plain update takes the set recorded in the
+/// project's install manifest (a first install with --all and no manifest: every active engine), from the menu,
+/// or claude by default; an unknown one exits with 2.
 /// Claude Code is the default core: pre-selected as 1, cannot be deselected (the unshift below enforces it).
-async function chooseEngines(o, ask) {
+async function chooseEngines(o, ask, root) {
   let engines = o.engines
+  if (engines && o.all) console.error('! --engines and --all together — --engines wins')
+  let recorded = null
+  if (!engines && (o.all || !ask)) recorded = manifestEngines(root, o.all)
+  else if (ask && !engines) recorded = manifestEngines(root, false) // the Enter default on an update: the recorded set, not claude alone
+  if (recorded) {
+    recorded.notes.forEach((n) => console.log('! ' + n))
+    engines = recorded.engines
+    if (engines && recorded.fromManifest && (o.all || !ask)) console.log(`Engines: ${engines.split(',').join(', ')} — the set recorded in .forma/install-manifest.json (--engines to change)`)
+  }
   if (!engines && ask) {
     console.log('\n[1/4] Engines (Claude Code is the core — selected by default):')
     ACTIVE_ENGINES.forEach((e, i) => console.log(e.id === 'claude'
       ? `  ${i + 1}. ${e.label}  ${verifyInstall.colorMark(true)} default — the core, always installed`
       : `  ${i + 1}. ${e.label}`))
-    const a = await ask('Numbers to add, comma-separated (Enter — Claude Code only): ')
-    engines = (a.trim() || '1').split(/[\s,]+/).map((x) => (ACTIVE_ENGINES[Number(x) - 1] || {}).id || x).join(',')
+    const def = recorded && recorded.engines ? recorded.engines : '1'
+    const a = await ask(`Numbers to add, comma-separated (Enter — ${def === '1' ? 'Claude Code only' : def.split(',').join(', ') + ' (the recorded set)'}): `)
+    engines = (a.trim() || def).split(/[\s,]+/).map((x) => (ACTIVE_ENGINES[Number(x) - 1] || {}).id || x).join(',')
   }
   engines = (engines || 'claude').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean)
   if (!engines.includes('claude')) engines.unshift('claude')
@@ -883,7 +917,7 @@ A plugin cache or an old checkout is not a source of the version. Use the newer 
   console.log(`Forma ${VERSION} → ${root}${installedBefore ? ' (update)' : ''}`)
   console.log(`Git: ${gitBoundary(root)}`)
 
-  const engines = await chooseEngines(o, ask)
+  const engines = await chooseEngines(o, ask, root)
   const template = await chooseTemplate(o, ask, templates)
   const boardMode = await chooseBoard(o, ask)
   const lang = await chooseLang(o, ask)
