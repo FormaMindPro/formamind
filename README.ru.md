@@ -58,6 +58,8 @@ npx github:FormaMindPro/formamind init
 npx github:FormaMindPro/formamind init --yes
 ```
 
+Обновление без `--engines` переустанавливает все движки, записанные в манифесте установки проекта, а не только `claude`; все записанные компоненты одной явной командой — `--all` (на проекте, где манифеста ещё нет: все активные движки).
+
 Установщик задаст три вопроса — движки (`claude`), шаблон проекта (`none`), канбан-доска (`auto`) — и поставит ядро: `AGENTS.md`, роли, хуки, доску, дашборд. Повторный запуск — обновление, `project/` не трогается. Без вопросов: `npx github:FormaMindPro/formamind init --engines claude --template none --board auto`. Другие способы — git-клон и плагин Claude Code: [Установка](#установка).
 
 ## От автора

@@ -3,6 +3,12 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.26] - 2026-11-16
+### Fixed
+- Installer: an update without `--engines` reinstalls the engines the project's install manifest records, not claude alone (before, a plain `init --yes` refreshed only Claude Code, the engines installed beside it lagged a release behind, and their mirrors had to be rebuilt by hand); the interactive menu's Enter default on an update is the recorded set too. A recorded id dormant in this release or unknown to the installer is skipped with a note, not an error.
+### Added
+- Installer: `--all` — every component the project records in one run: the engines of its install manifest (a project without a manifest yet: every active engine of this release); `--engines` wins over `--all` and the conflict says so on stderr. A non-interactive update names the set it took: `Engines: … — the set recorded in .forma/install-manifest.json`.
+
 ## [0.0.25] - 2026-11-15
 
 ### Fixed
