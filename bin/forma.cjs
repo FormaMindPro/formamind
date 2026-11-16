@@ -238,9 +238,9 @@ function installCore(root, protectedPaths, lang = 'en') {
 
 // ---------- Claude adapter ----------
 const CLAUDE_HOOKS = {
-  PreToolUse: [{ hooks: ['guard-delete.sh', 'tool-usage.sh'] }],
+  PreToolUse: [{ hooks: ['guard-delete.sh', 'tool-usage.sh'] }, { matcher: 'Write|Edit', hooks: ['guard-cards.sh'] }],
   UserPromptSubmit: [{ hooks: ['unlock-delete.sh'] }],
-  SessionStart: [{ matcher: 'startup', hooks: ['check-ready.sh', ['check-plugin-update.sh', 15], 'check-dashboard.sh', 'intent-start.sh'] }],
+  SessionStart: [{ matcher: 'startup', hooks: ['check-ready.sh', ['check-plugin-update.sh', 15], 'check-dashboard.sh', 'intent-start.sh', 'check-thresholds-gate.sh', ['ram-disk-status.sh', 30]] }],
   PostToolUse: [{ matcher: 'Write|Edit', hooks: ['check-card.sh', 'sync-extensions.sh', 'auto-graphs.sh'] }],
 }
 // Auto-compact window. Forma proposes COMPACT_DEFAULT and asks first; the human's own value always wins:

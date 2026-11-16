@@ -42,6 +42,10 @@
 //           card (done, assignee "Core") the line "closed - <the grounds>" in "History" and assignee: null; the rest does not change.
 //           An unknown number, a repeat or a card not in done/Core - a stop before any write. The spend and section flags are not accepted here.
 // --dry   - show the changes, do not write the file.
+// --override - with --to kit only: one pass beyond the used-up attempt budget (§3) - refused without it; with it the pass
+//           goes through and writes the "budget override" line into History (prohibition 3: the budget itself never changes silently).
+// --selftest - the gauges of the card sampling by code, the five-field approval and the attempt budget in the OS
+//           temp directory (a dummy board); writes nothing; exit 0 - green.
 // --selftest - the gauges of the card sampling by code in the OS temp directory (a dummy board); writes nothing; exit 0 - green.
 // Writes `modified` (on `close` - and `completedAt`), appends a line into "History", then checks the board over this card.
 // Part of the core: one for all engines, it knows no engine paths.
@@ -171,14 +175,65 @@ function selftest() {
     // (e) an unknown number - an empty sampling (the call dies "not on the board")
     const rd = resolveCardFiles(dir, probe(500));
     check('(e) an unknown number - no candidates', !rd.file && !rd.ambiguous);
+    // (f) the five-field approval (§6, route-labels.cjs): route-0…5 without the Intent line is flagged,
+    // with the line passes; route-6…8 carry no approval condition.
+    const { run: routeRun } = require('./checks/route-labels.cjs');
+    const rroot = path.join(dir, 'routes');
+    const rboard = path.join(rroot, '.devtool', 'features');
+    fs.mkdirSync(rboard, { recursive: true });
+    const day = new Date().toISOString().slice(0, 10);
+    const mkRoute = (name, route, approved) => '---\nid: "' + name + '"\nstatus: "todo"\ncreated: "' + new Date().toISOString() + '"\nlabels: ["goal-x", "' + route + '"]\n---\n\n# ' + name + '\n\n## Task\na sampling probe.\n\n## History\n' + (approved ? '- `Intent`, ' + day + ': the human approved the five fields - the route is unlocked.\n' : '') + '\n## Result\n';
+    fs.writeFileSync(path.join(rboard, probe(911) + '-r2-no.md'), mkRoute(probe(911) + '-r2-no', 'route-2', false));
+    fs.writeFileSync(path.join(rboard, probe(912) + '-r2-ok.md'), mkRoute(probe(912) + '-r2-ok', 'route-2', true));
+    fs.writeFileSync(path.join(rboard, probe(913) + '-r7-no.md'), mkRoute(probe(913) + '-r7-no', 'route-7', false));
+    const rp = (num) => routeRun({ root: rroot, since: new Date(Date.now() - 864e5 * 365).toISOString().slice(0, 10) }).filter((p) => p.includes(probe(num)));
+    check('(f) route-2 without the approval line - flagged', rp(911).length > 0);
+    check('(f) route-2 with the approval line - green', rp(912).length === 0);
+    check('(f) route-7 without the approval - untouched', rp(913).length === 0);
+    // (g) the attempt budget (§3): the lines count, the Task field parses, the gate blocks and lets through
+    const mkHist = (m) => Array.from({ length: m }, (_, i) => '- `Run`, ' + day + ': attempt, 100 tokens (10 cache-read), 5 s, "id-' + i + '" - a pass.').join('\n');
+    check('(g) the attempt lines are counted', attemptsIn(mkHist(2) + '\n- `Kit`, ' + day + ': stage kit - x.') === 2);
+    check('(g) the budget is parsed from the Task row', budgetOf('901 · tooling | a probe | check: true | 2 | core') === 2);
+    check('(g) no number in the budget field - no gate', budgetOf('901 · tooling | a probe | check: true | core') === null);
+    check('(g) the gate blocks at the budget', budgetGate({ attempts: 2, budget: 2, override: false }) === 'block');
+    check('(g) the gate passes under the budget', budgetGate({ attempts: 1, budget: 2, override: false }) === 'pass');
+    check('(g) the gate passes with --override', budgetGate({ attempts: 3, budget: 2, override: true }) === 'pass');
+    check('(g) no budget declared - no gate', budgetGate({ attempts: 9, budget: null, override: false }) === 'pass');
     const failed = results.filter((r) => !r.ok);
     console.log((failed.length ? '✗ ' : '✓ ') + (failed.length
       ? 'mismatch: ' + failed.map((r) => r.name).join('; ')
-      : 'the sampling is exact, ' + results.length + ' probes green: the full code resolves among the prefix collisions, a short one under a collision refuses with the list of both paths, a short unique one resolves as before, the refusal writes nothing'));
+      : 'the gauges green, ' + results.length + ' probes: the exact sampling, the five-field approval over route-0…5, the attempt budget gate'));
     return failed.length === 0;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+}
+/** The body of a zone by its key: from under the heading line to the next `## ` heading - the same
+ *  slice the History appends use; localized headings are resolved by the dictionary (zoneHeadingIn). */
+function zoneText(src, key) {
+  const zh = zoneHeadingIn(src, key);
+  if (!zh) return '';
+  const ls = src.split('\n');
+  const at = ls.findIndex((l) => l.replace(/\r$/, '') === '## ' + zh);
+  if (at < 0) return '';
+  let end = ls.length;
+  for (let k = at + 1; k < ls.length; k++) if (ls[k].startsWith('## ')) { end = k; break; }
+  return ls.slice(at + 1, end).join('\n');
+}
+/** The attempt lines of a History zone: `- ` + "Node" + `, YYYY-MM-DD: attempt, ...` - one pass of a task each (§3). */
+function attemptsIn(hist) {
+  return String(hist).split('\n').filter((l) => /^-\s*`\w+`,\s*\d{4}-\d{2}-\d{2}:\s*attempt,/.test(l)).length;
+}
+/** The attempt budget: the 4th field of the Task row (`N · kind | what | criterion | budget | next`); no number - no gate. */
+function budgetOf(task) {
+  const row = String(task).split('\n').map((s) => s.trim()).find((l) => l && !l.startsWith('#') && l.includes('|'));
+  if (!row) return null;
+  const f = row.split('|').map((s) => s.trim());
+  return f.length >= 4 && /^\d+$/.test(f[3]) ? Number(f[3]) : null;
+}
+/** The gate: at the used-up budget a --to kit is refused, unless the caller carries --override. */
+function budgetGate({ attempts, budget, override }) {
+  return budget != null && attempts >= budget && !override ? 'block' : 'pass';
 }
 if (process.argv.includes('--selftest')) process.exit(selftest() ? 0 : 1);
 
@@ -431,6 +486,17 @@ const cardId = path.basename(file, '.md');
 let text = fs.readFileSync(file, 'utf8');
 const fm = parseFrontmatter(text);
 
+// 1b. The attempt budget (§3, prohibition 3): --to kit at the used-up budget is refused before any write;
+// an explicit --override unlocks this one pass and writes the bypass line into History below.
+const override = flag('override');
+let budgetBlocked = false;
+if (to === 'kit') {
+  const attempts = attemptsIn(zoneText(text, 'history'));
+  const budget = budgetOf(zoneText(text, 'task'));
+  budgetBlocked = budgetGate({ attempts, budget, override }) === 'block';
+  if (budgetBlocked) die(msg('board.card-move.budget_exhausted', { id: cardId, budget, attempts }));
+}
+
 // 2. Who holds `run` (§7): by the route-N label - the short route (route-4) is executed by Kit, route-0/1 - by Intent
 let assignee = t.assignee;
 if (to === 'run') {
@@ -474,6 +540,7 @@ const resAt = zoneRes ? text.indexOf('\n## ' + zoneRes, histAt + 1) : -1;
 const histEnd = resAt === -1 ? text.length : resAt;
 const body = text.slice(histAt, histEnd).replace(/\s*$/, '');
 const n = note.replace(/\.?\s*$/, '.');
+const bypass = budgetBlocked && override ? `\n- \`${node}\`, ${day}: budget override — ${n}` : '';
 const spend = !spendGiven ? '' : formatSpendLine({
   node, date: day,
   tokens: fromTr ? fromTr.input + fromTr.cacheCreate + fromTr.cacheRead + fromTr.output : (tokens != null ? Number(tokens) : null),
@@ -484,7 +551,7 @@ const spend = !spendGiven ? '' : formatSpendLine({
 }).replace(/^/, '- ') + '\n';
 const sessionLines = sessionSpendArg == null ? '' : sessionSpendLines(sessionSpendArg.padStart(3, '0'))
   .filter((l) => !text.includes(l.split(' — ')[0])).map((l) => l + '\n').join('');
-text = text.slice(0, histAt) + body + '\n' + spend + sessionLines + line + '\n' + (resAt === -1 ? '' : text.slice(resAt));
+text = text.slice(0, histAt) + body + '\n' + spend + sessionLines + line + bypass + '\n' + (resAt === -1 ? '' : text.slice(resAt));
 
 // 5c. The early spend-parity check - before the write and before --dry: a numeric drift of the line from the journal
 // stops the handover before the status mutation (the exit not after the write); "the journal does not cover" - a summary, not a barrier.

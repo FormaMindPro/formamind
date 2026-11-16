@@ -396,6 +396,7 @@
   "board.card-move.exit_code": "code {code}",
   "board.card-move.no_card": "the card {id} is not on the board",
   "board.card-move.in_done": "{id} lies in done/ — a closed card is not handed over",
+  "board.card-move.budget_exhausted": "{id}: the attempt budget is used up - {attempts} of {budget} attempts in history; the card goes to the human, not to a new pass (§3); one --override unlocks the pass with the bypass line",
   "board.card-move.bad_node": "--node \"{node}\" — not a node name",
   "board.card-move.no_field": "the frontmatter has no {key} field",
   "board.card-move.no_zone": "the card has no \"{key}\" zone",

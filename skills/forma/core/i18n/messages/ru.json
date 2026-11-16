@@ -396,6 +396,7 @@
   "board.card-move.exit_code": "код {code}",
   "board.card-move.no_card": "карточки {id} нет на доске",
   "board.card-move.in_done": "{id} лежит в done/ — закрытую карточку не передают",
+  "board.card-move.budget_exhausted": "{id}: бюджет попыток исчерпан — в истории {attempts} из {budget}; дальше карточка идёт человеку, а не на новый заход (§3); один --override снимает барьер с записью обхода в историю",
   "board.card-move.bad_node": "--node \"{node}\" — не имя узла",
   "board.card-move.no_field": "в frontmatter нет поля {key}",
   "board.card-move.no_zone": "в карточке нет зоны «{key}»",
