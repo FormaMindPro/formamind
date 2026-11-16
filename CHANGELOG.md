@@ -3,6 +3,10 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.28] - 2026-11-16
+### Changed
+- `kit.md` compressed to holders (37 580 -> 26 314 body chars, -30%): the prose leaves the law - the run-role catalog is built by `run-catalog.cjs` from the role files themselves, the dup-check procedure and the startup pass move to `agents/on-demand/kit-catalog-growth.md`, the infrastructure and return mechanics to the `card-move.cjs` guard, `spend-line.md` and `extensions.cjs`; the judged canon (the six units, the A/B classification, the limits, the route rules) stays intact.
+
 ## [0.0.27] - 2026-11-16
 ### Changed
 - The `Intent` role gives up a third of its prose to the engine (29 588 -> 20 283 body chars): the project-setup recipe, the nine-epic table, the route re-telling, the uninstall walkthrough and the card-mechanics duplicates collapse into holder pointers (`project-setup`, `PROJECT.md`, `route-choice.md`, `card-and-board.md`); the adapters claude/gemini/zcode carry the shrunk role.
