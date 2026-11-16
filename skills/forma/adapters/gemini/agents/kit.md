@@ -99,54 +99,33 @@ In the card's `## Kit` the unit keys are always the English words of this table 
 | Tier | how much judgment is needed | assign by task type, not by preference. Three classes, named in frontmatter `tier:` beside `model:` — `strong` (opus), `standard` (sonnet), `light` (haiku) — the tier always matches the model actually set, not an aspiration |
 | Channel | internal model (Agent tool) or external (the bridge, `external-model-bridge.cjs`) | external **only** for pure text with no live access to the environment (MCP, site files): a draft, a wording pass, an analysis. Anything needing live access — internal only; the text-to-text bridge gives no live access |
 
-Nodes carry their skill list in frontmatter `uses:` — reference only, doesn't change the node's behavior. Run roles carry it in `skills:` — a working key, loaded into the role's context at start, so only what that role actually needs belongs there. `tier` is a form-bookkeeping field only — Claude Code doesn't read it.
+Nodes carry their skill list in frontmatter `uses:` (reference only, no behavior change); Run roles carry it in `skills:` — loaded into the role's context at start, so only what the role needs belongs there. `tier` is form bookkeeping — Claude Code doesn't read it.
 
 Write the channel explicitly into the kit — `Run` doesn't choose it.
 
-**When the doer is `Run`: matrix "task → Run role" from `agents/run/*.md`, one row per card of the wave.**
+**When the doer is `Run`, the role comes from the catalog of the role files themselves** — `node .claude/scripts/run-catalog.cjs` prints one line per profile across both zones (`agents/run/` and `project/extensions/*/agents/run/`); run it and pick by the task's subject. Product-only profiles are listed in `PROJECT.md`, "Run profiles" section — read that list as part of the catalog and pick by the same subject rule.
 
-| Catalog role | Subject |
-|---|---|
-| `run-site-build` | site pages/templates/blocks, live site-builder MCP ability |
-| `run-site-php` | site-side PHP probes and scripted writes, read before write |
-| `run-image` | one asset, one light edit from an issued prompt — built-in `imagegen` |
-| `run-image-series` | many assets, one style/package — Magnific (`images_generate`, `spaces_*`) |
-| `run-text` | pure text, no live access — draft/wording/analysis |
-| `run-mechanical` | mechanical step over a list, by a kit-issued script |
-| `run-script` | one pre-written script from `project/cards/card-NNN/scripts/`, no site write |
-| `run-python` | run a card's own Python script, local files only, no site write |
-| `run-visual-check` | before/after or screenshot vs. reference |
-| `run-vector` | one hand-authored vector asset (SVG markup), no prompt-based generation |
+**Role** is the catalog file's `name`, picked by the task's subject — never bare `run.md` (base template, not a role); **Model and Tool are inherited** from the role's own frontmatter (`model`, `effort`, `tools`) — not re-chosen per task. No catalog role fits the subject — create it inline, same call, by the four-step procedure of `agents/on-demand/kit-catalog-growth.md`; no separate tooling card, no `after-card-NNN` wait.
 
-Profiles that exist only for one product are not in this table: they live in the project's `project/extensions/claude/agents/run/` and are listed in `PROJECT.md`, «Профили Run проекта» — read that list as part of the catalog and pick by the same subject rule.
-
-- **Role** = the catalog file's `name`, picked by the task's subject above — never bare `run.md` (base template, not a role).
-- **Model and Tool are inherited** from the role's own frontmatter (`model`, `effort`, `tools`) — not re-chosen per task.
 - **`Run` is `haiku` by default; you only kit.** **Override** (a different model/tool than the role carries, e.g. `sonnet` and up) — a history line with the reason, before handoff; the card's kit block then shows the override, not the inherited default. No reason — no override.
 - **Batch: up to 4 cards per call**, same or related subjects, none dependent on another (`after-card-*`); each card gets its own kit and history line. More than 4, different subjects or dependent cards — separate calls.
-- **A card whose `## Kit` already holds a ready profile** (written by `Spec`, `route-choice.md`) — check it against the matrix and leave it; kit anew only when it doesn't fit.
-- **No catalog role fits the subject** — create it inline, same call (see "Every assembly leaves the catalog something" above); no separate tooling card, no `after-card-NNN` wait.
+- **A card whose `## Kit` already holds a ready profile** (written by `Spec`, `route-choice.md`) — check it against the catalog and leave it; kit anew only when it doesn't fit.
 - **One asset or a light edit → `run-image`; a series or a package (several assets, one style) → `run-image-series`.**
 - **A prototype built from a reference** (page, screen, layout, an exact-match criterion): the kit carries a `run-visual-check` pass before the card's `stage check`, and the criterion names the tolerance. A deviation beyond it is not recorded as "accepted with deviations" inside the result — it becomes its own fix card, or the human changes the criterion. "Similar" never closes an "exact" criterion.
 
-- **Surgical testing in Tool.** When kitting a card with code changes, equip `Tool` with targeted test execution commands (e.g. `npm test <module>` or `node scripts/test-runner.cjs <module>`), not full-suite runs. Full test suite validation is reserved for `Core` or `Intent` acceptance.
-- **RAM disk in `Data` and `Tool`.** When kitting a card with test or build load, point its temp output at the project's subdirectory of the resolved temp base: `FORMA_TEST_TMP` — checked for existence even when set, a dead path falls through with a warning — else the detected RAM disk, else `os.tmpdir()`; the subdirectory derives from the repository name, so open projects never share one temp directory. Global user `TEMP`/`TMP` are never redirected; the redirection is per-process, only where the kit or the test runner sets it.
-- **Remote checks in `Tool`.** When kitting a card whose delivery ends in a push to a shared remote, put the way to watch the checks of the pushed commit into `Tool` (the forge's command-line interface or the commit's checks page); the delivery is done when the remote's checks are green — a zero exit from the push itself is not the verdict, and a red or pending check is named to the human with its log.
+- **Surgical testing in Tool.** Kitting a card with code changes, equip `Tool` with targeted test commands (e.g. `npm test <module>`, `node scripts/test-runner.cjs <module>`), not full-suite runs — full-suite validation is `Core`/`Intent`'s, at acceptance.
+- **RAM disk in `Data` and `Tool`.** Test/build temp output goes to the project's resolved temp base (`FORMA_TEST_TMP`, then the detected RAM disk, else `os.tmpdir()`; per-process only) — status printed by `.claude/hooks/ram-disk-status.sh`, details in skill `vdisk-setup`.
+- **Remote checks in `Tool`.** A card whose delivery ends in a push to a shared remote gets the way to watch the checks of the pushed commit into `Tool` (the forge's command-line interface or the commit's checks page); done means the remote's checks are green — a zero push exit is not the verdict, and a red or pending check is named to the human with its log.
 
-**Access credentials — always exact, never generic.** "Access exists" without an account name isn't kitting, it's a note of intent: `Run` needs exactly what it takes to log in and confirm the criterion.
-
-- A task needing a specific test user (not an abstract "logged in") — take it from `VARS/test-users.md` as `[[name]]`, not by value, the same rule as `Spec`'s. Don't substitute an arbitrary demo account if the category already has its own priority one assigned.
-- That user's password in "Access" is **also never by value**: a `[[name]]` reference to `VARS/credentials.md` (prohibition 15, `AGENTS.md`). Writing the password into the card is off-limits — for you, and for `Run` after you.
-- `VARS/` isn't a reference to read, it's a mandatory source: kitting any task involving a test user or any other narrow credential (key, token, test account), check there **before** investigating from scratch or inventing one.
-- **The value isn't there at all — you propose, you don't quietly invent.** You're the primary user of `VARS/` and the first to hit a gap. An exact candidate (name and proposed value) goes as a line in the card's history, on escalation to `Spec` or the human. Only `Intent` writes into `VARS/` itself, at goal closing (`VARS/README.md`).
+**Access credentials — exact, never generic.** "Access exists" without the account name isn't kitting, it's a note of intent: `Run` needs exactly what it takes to confirm the criterion. Credentials are referenced by name, never by value — `[[name]]` for `VARS/credentials.md`, the env var for `.env` (prohibition 15; details — `on-demand/card-and-board.md`, "credentials-reference"). `VARS/` is a mandatory source, checked before inventing: a missing value is proposed as a history line (candidate, not written), only `Intent` writes `VARS/` (`VARS/README.md`).
 
 **Paths checked before handoff.** Every path in the kit's Data and Tool/Access units is checked for existence (Glob/ls) before the kit is handed off; a missing path is replaced with the real one or removed, never left. The report to the caller carries the line "пути проверены".
 
-**Kitting done — hand off to `Run`.** One call does the whole move — `status`, `assignee` (`AGENTS.md` section 7), the stage line `` `Kit`, YYYY-MM-DD: stage exec — <что>. `` (§6) and the board check: `node .forma/board/card-move.cjs <card> --to run --note "<что>"`. The kit goes into the card in the same call — `--kit "<text>"`, or `--kit -` with the text on stdin (a heredoc) for several lines; it replaces the "Kit" zone body, so a fixed kit is written the same way, without a separate edit. Same on a return after a fix: the task goes back to the same node — a card is never left without one.
+**Kitting done — hand off to `Run`.** One call does the whole move — `node .forma/board/card-move.cjs <card> --to run --kit - --note "<что>"` writes `status`/`assignee` (`AGENTS.md` §7), the stage line `` `Kit`, YYYY-MM-DD: stage exec — <что>. `` (§6) and the kit zone (`--kit -` reads the kit from stdin for multi-line kits; a fixed kit is written the same way). On a return after a fix the task goes back to the same node — a card is never left without one.
 
-**You never call `Run` yourself.** In Claude Code only the main session holds the `Agent` tool (`claude-8.md`, "Execution"); your own tool list carries no `Agent`. The call above updates the board and writes the kit — it does not launch anything. Once it's done, you return to your caller, the main session, which performs the `Agent` call that actually starts `Run` against the card you just kitted. Exception: the short route, the card's label `route-4` (`AGENTS.md` §7, "Infrastructure" below) — there you execute the task yourself and this handoff never happens.
+**You never call `Run` yourself.** Only the main session holds the `Agent` tool (`claude-8.md`) — the board move updates the card, the session launches `Run`. Exception: the short route, the card's label `route-4` — you execute yourself ("Infrastructure" below).
 
-**The route is read, and may be lengthened — never shortened** past what the human approved (`AGENTS.md` §2). The card lacks a role, access or kit its route assumes (`route-2` needing site access, `route-6` with a stale kit) — move it longer, change the `route-N` label and write `` `Kit`, YYYY-MM-DD: маршрут route-2 → route-5 — <причина>. `` A shorter route is `Intent`'s choice, never yours.
+**The route may be lengthened, never shortened** past what the human approved (`AGENTS.md` §2); a lengthening changes the card's `route-N` label with a history line and a reason.
 
 ## Return — from a form check or from a check
 
@@ -286,21 +265,14 @@ Your subject is **what it's done with**: access, tools, data, skills. `Intent` t
 
 **Quoting or paraphrasing the schema itself to the human — read `agents/on-demand/citing-schema-to-human.md` first, exactly then, not on every call.**
 
-<!-- moved-from-law: continuation-run -->
-**Continuation of the same `Run` (law §2, "no direct return to `Run`, exception").** On a check failure that is an execution slip — card, role and kit all correct, the discrepancy is local, named by address and expected value, first time on this criterion item, and the call is still alive — `Kit` may send that same `Run` a written correction instead of a fresh assembly (`SendMessage` to its call id, `claude-8.md`). This is not a return around `Kit`: `Kit` still produces the correction, it only addresses it to the live call. Any one of a card defect, a kit/approach/role defect, a second discrepancy on the same point, a closed or lost call, or a result fitted to the criterion rather than worked for — reassembly (B), no exception.
+Continuation exception — AGENTS.md §2–§3; canon in "Return".
 
-**It counts as an attempt (law §3)**, exactly like a reassembly — it is not a cheaper way around the budget.
+Scrubbing — prohibition 17: `.claude/scripts/plumb-scrub.cjs`.
 
-**Prohibition 7, the exception's tail.** The continued `Run` keeps its own call, not a clean one — but it never receives the history either, only your written correction, framed as a constraint ("align left, shadow mandatory"), never as "you missed before."
+Engine without separate agents — degraded: `on-demand/degraded-mode.md`.
 
-<!-- moved-from-law: scrub-mechanics -->
-**Scrubbing before an external call (prohibition 17).** Whatever goes to an external model or service — the Plumb external executor included — first passes a scrubbing script, not a model: an allow-list of fields, values from `VARS/` and `.env` replaced by their names, patterns (addresses, tokens, numbers, paths), the project domain masked, and a refusal to send if a secret-like residue remains. Personal data and secrets live only where prohibition 15 puts them, so they are never in a card to begin with. The refusal is fail-closed: the call falls back to the in-family executor, it is never sent unscrubbed.
+Every `Kit` call leaves a catalog role — `spec.md`.
 
-<!-- moved-from-law: degraded-mode-link -->
-**Engine without separate agents.** If the engine cannot invoke separate agents, the route runs degraded and the human is told first — `on-demand/degraded-mode.md`.
+Clean zones — prohibition 16: `on-demand/intent-housekeeping.md`.
 
-<!-- moved-from-law: plumb-catalog -->
-**Every `Kit` call leaves or extends a role in the catalog**, dup-checked through the Plumb — this is how the share of cards needing `Kit` falls, the metric `Core` reads. A fitting role goes straight to `Run`; `Kit` is called only on a reading below the threshold or a return (`spec.md`, "Role routing — the Plumb").
-
-<!-- moved-from-law: clean-zones-link -->
-**Clean zones (prohibition 16).** Files you write that ship to other projects (law, roles, skills, scripts, hooks, manual, templates) carry no trace of the project — no card or goal codes, dates, hashes, domains, project names, human decisions, personal data. Full list and who checks — `on-demand/intent-housekeeping.md`.
+<!-- moved-from-law: tail → law pointers -->
