@@ -3,6 +3,13 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.27] - 2026-11-16
+### Changed
+- The `Intent` role gives up a third of its prose to the engine (29 588 -> 20 283 body chars): the project-setup recipe, the nine-epic table, the route re-telling, the uninstall walkthrough and the card-mechanics duplicates collapse into holder pointers (`project-setup`, `PROJECT.md`, `route-choice.md`, `card-and-board.md`); the adapters claude/gemini/zcode carry the shrunk role.
+### Added
+- Claude hooks that enforce what the prose used to ask: `check-thresholds-gate.sh` (SessionStart: one STOP START line while the thresholds and the nine goals are undeclared), `guard-cards.sh` (PreToolUse Write|Edit: a hand-made card, an off-enum status, a foreign goal or route label - refused), `ram-disk-status.sh` (SessionStart: the RAM disk in one line, one provision try, a spoken degradation to `os.tmpdir()`); the installer registers all three.
+- `card-move.cjs`: the five-field approval gate - a route-0…5 card does not move to `kit` without the human approval line in `## History`; the attempt-budget guard - a return to `kit` at the used-up budget is refused, an explicit `--override` passes and records the bypass (the budget itself never changes); i18n keys in ru and en; the selftest grows to 17 probes, its fixture dates assembled dynamically.
+
 ## [0.0.26] - 2026-11-16
 ### Fixed
 - Installer: an update without `--engines` reinstalls the engines the project's install manifest records, not claude alone (before, a plain `init --yes` refreshed only Claude Code, the engines installed beside it lagged a release behind, and their mirrors had to be rebuilt by hand); the interactive menu's Enter default on an update is the recorded set too. A recorded id dormant in this release or unknown to the installer is skipped with a note, not an error.
