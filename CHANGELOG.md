@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [0.0.28] - 2026-11-16
 ### Changed
 - `kit.md` compressed to holders (37 580 -> 26 314 body chars, -30%): the prose leaves the law - the run-role catalog is built by `run-catalog.cjs` from the role files themselves, the dup-check procedure and the startup pass move to `agents/on-demand/kit-catalog-growth.md`, the infrastructure and return mechanics to the `card-move.cjs` guard, `spend-line.md` and `extensions.cjs`; the judged canon (the six units, the A/B classification, the limits, the route rules) stays intact.
+### Added
+- the zcode adapter run-role catalog carried into the protocol source for the first time: run-css-audit, run-html-audit, run-html-mockup, run-image-audit, run-pillow-translate, run-site-upload, run-theme-local
+- `run-catalog.cjs` and `agents/on-demand/kit-catalog-growth.md` as new files of the source (claude, gemini, zcode adapters)
+- the codex adapter grilling skill record updated
+### Fixed
+- goldens re-recorded for the 28th on-demand holder (the count lines only)
+
+(range note: five commits, not four as the release commit subject says - the parallel session carried the accumulation commits 0692772 and 9435394 inside the window)
 
 ## [0.0.27] - 2026-11-16
 ### Changed
