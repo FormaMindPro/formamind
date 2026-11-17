@@ -83,7 +83,7 @@ Card anatomy — four zones, who writes what — is shared knowledge, `AGENTS.md
 After slicing, every card goes through the Plumb before `Kit` (`AGENTS.md` §2, "The Plumb"). The reading is obtained for you by the caller (how — §8, `claude-8.md`); you read it and decide.
 
 1. **Scrubbing comes first, for `plumb-haiku`** — `node .claude/scripts/plumb-scrub.cjs <card>` builds the input from the five `## Task` fields only (prohibition 17). A refusal means the in-family executor, not a send; a secret-like residue means the card goes to the human. For `jev` there is no separate step: the driver scrubs the task and the catalog itself, and a refusal comes back as the fallback marker.
-2. **The executor** is the one named by `plumb` in `PROJECT.md` (`plumb-haiku`, or `jev`); it gets the scrubbed task and the role catalog (`agents/run/`, each profile's «takes / does not take») and returns `choice`, `score`, `noul`. For `jev` the caller runs `node .forma/plumb/plumb-run.cjs <card> --write` — the driver sends the scrubbed task and catalog to the OpenRouter Decisions API (`typesafe/jev-1.14`) through the bridge, one call, strict JSON. A `{"fallback":"haiku", "reason": ...}` from that call (no key, a bridge error, a scrub refusal) means the caller runs `plumb-haiku` instead and the reading is recorded as `haiku`, with the reason named — never recorded as a `jev` reading that didn't happen.
+2. **The executor** is the one named by `plumb` in `PROJECT.md` (`plumb-haiku`, or `jev`); it gets the scrubbed task and the role catalog (`agents/run/`, each profile's «takes / does not take») and returns `choice`, `score`, `noul` — *choice*: which role is closest, with a probability for each; *score*: how clearly the task is stated; *noul*: whether the leading role takes this task, yes/no as a probability. For `jev` the caller runs `node .forma/plumb/plumb-run.cjs <card> --write` — the driver sends the scrubbed task and catalog to the OpenRouter Decisions API (`typesafe/jev-1.14`) through the bridge, one call, strict JSON. A `{"fallback":"haiku", "reason": ...}` from that call (no key, a bridge error, a scrub refusal) means the caller runs `plumb-haiku` instead and the reading is recorded as `haiku`, with the reason named — never recorded as a `jev` reading that didn't happen.
 3. **Decide by the thresholds in `PROJECT.md`:**
    - leading role at or above the threshold, gap to the second at or above its threshold, `noul` for the leader high → write the role into `## Kit`, `route-2`, `why: plumb`, straight to `Run`. The model is the profile's own; you never override it.
    - below either threshold → leave `## Kit` empty for `Kit`, whose job is to create the role.
@@ -144,16 +144,8 @@ A pointer, not a retelling: the card's path, how many criterion items, the budge
 
 You don't — with one exception: a value recorded in `VARS/` is unattainable in the environment (`AGENTS.md` §2, "Value unattainable in this environment"; `spec-unattainable-value.md`). There you stop and report directly, because there's no one else to name it as `Intent` or `Kit` would: you found the break yourself, while slicing. In everything else, slicing is derived from the image and the arsenal, and disputes about how it's divided belong with `Intent` or `Kit`.
 
-<!-- moved-from-law: plumb-block -->
-**The Plumb (law §2).** The measure between slicing and execution; not a sixth node — it takes no card, decides nothing, confirms nothing.
-- **What it answers.** From the scrubbed task (prohibition 17) and the catalog of `Run` roles, three typed readings: *choice* — which role is closest, with a probability for each; *score* — how clearly the task is stated; *noul* — whether the leading role takes this task, yes/no as a probability. It never writes text and never explains.
-- **Who decides.** `Spec` — by the thresholds in `PROJECT.md` (a leading probability and a gap to the second, separate per executor). The Plumb advises; its agreement does not replace `Intent`'s check of the result.
-- **`Kit` is not a stage of every card.** A fitting role goes straight to `Run`. `Kit` is called on a reading below the threshold or a return; its first job is to create the exact role, tested with the same Plumb call; precision of the role depends on the card's precision, which is yours.
-- **Too vague to read.** A low clarity score returns the card to you once, to be restated — not in a loop, and never split only to raise a percentage.
-- **Executor.** Set in `PROJECT.md`: the built-in small model by default; an external decision model is recommended. A missing key, an error or a scrubbing refusal falls back to the built-in executor; the reason is a line in the card's `## History`.
+**The Plumb.** What it is, who decides, by what thresholds — `AGENTS.md` §2, "The Plumb".
 
-<!-- moved-from-law: degraded-mode-link -->
-**Engine without separate agents.** If the engine cannot invoke separate agents, the route runs degraded and the human is told first; stage markers apply to you too — `on-demand/degraded-mode.md`.
+**Engine without separate agents.** The route runs degraded, the human is told first, stage markers apply to you too — `on-demand/degraded-mode.md`.
 
-<!-- moved-from-law: scrub-pointer -->
-**Scrubbing (prohibition 17):** the mechanics and the fail-closed rule are in `kit.md`; the Plumb call above follows them.
+**Scrubbing (prohibition 17).** The mechanics and the fail-closed rule — `kit.md`; the Plumb call above follows them.
