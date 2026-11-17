@@ -3,6 +3,10 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.32] - 2026-11-17
+### Changed
+- spec role compression completed, claude, gemini and zcode adapters byte-identical: the `On demand` list reads file - trigger per line; the Slicing intro, the Batches bullets and the No-external-model remainder tightened with every judgment core kept; the role body shrinks from 18739 to 14376 chars (-23.3%). The codex and minimax adapters keep the pre-package role (dormant engines).
+
 ## [0.0.31] - 2026-11-17
 ### Added
 - the constructive start gate: a red gate stops being a wall and starts asking - `node .forma/i18n/cli.cjs gate` opens the setup card itself (epic 3, when none is open yet; the readiness criterion stays `thresholds-declared.cjs --project`) and names the standard parameters with an explicit request for the human's decisions; `--json` wraps the same text into a strict `hookSpecificOutput` and the exit stays 0 always; the mechanic lives in the new `core/board/setup-card.cjs` (`ensureSetupCard` + a six-probe selftest, honors `FORMA_SUPPRESS_SETUP_CARD`), `new-card` and `check-board` accept `--root`, and `startGate` checks all four human goals (structure, channels, resources, results).
