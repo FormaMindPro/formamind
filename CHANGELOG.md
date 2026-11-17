@@ -3,6 +3,14 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.31] - 2026-11-17
+### Added
+- the constructive start gate: a red gate stops being a wall and starts asking - `node .forma/i18n/cli.cjs gate` opens the setup card itself (epic 3, when none is open yet; the readiness criterion stays `thresholds-declared.cjs --project`) and names the standard parameters with an explicit request for the human's decisions; `--json` wraps the same text into a strict `hookSpecificOutput` and the exit stays 0 always; the mechanic lives in the new `core/board/setup-card.cjs` (`ensureSetupCard` + a six-probe selftest, honors `FORMA_SUPPRESS_SETUP_CARD`), `new-card` and `check-board` accept `--root`, and `startGate` checks all four human goals (structure, channels, resources, results).
+- the local backlog digest: `core/board/backlog.cjs` (`scanBacklog`) reads three sources in one pass - live cards standing on the backlog lane, follow-up labels in closed cards' Result zones, and uncarded "What was missing" journal lines - and speaks only when there is something to say (`--project` digest for the human, `--line` and `--json` for hooks, `--selftest`, exit 0 always); after a successful `--to close` `card-move.cjs` scans the closed card's Result for follow-up labels and tells the human which ones await a card, never aborting the move; the `backlog` CLI command (alias `backlog-line`, the same strict `--json` wrapper) carries the scan to every session start.
+### Changed
+- start-gate delivery: the Claude SessionStart gains the `resume|clear|compact` group beside startup, and the installer's verify runs under `FORMA_SUPPRESS_SETUP_CARD` - `init` creates no cards, the first real session creates exactly one; the zcode install copies `adapters/zcode/config.json` (the gate `--json` process hook on `startup|resume|clear|compact`) and covers it in the manifest; gemini, codex and minimax rules carry the first-session gate command in §8; project-setup and intent session docs point at the auto-opened card.
+- backlog delivery: the Claude `check-ready.sh` prints the backlog line at session start; the zcode config gains a second SessionStart group for the digest (canon template + install); gemini, codex and minimax rules carry the optional first-session command in §8; the `followup` label prefixes live in the dictionary (en, ru) with `keys.test` parity.
+
 ## [0.0.30] - 2026-11-17
 ### Added
 - `cardMask` in `skills/forma/core/i18n/keys.json`: the chat rendering of a card's name becomes a dictionary mask, not per-role prose - `Card-{n} "{title}"` (en), `Задача-{n} «{title}»` (ru); the rule pointers travel in `intent.md` (claude, gemini, zcode adapters), `NAMES.md` (en, ru) and the codex `human-register` mirror.
