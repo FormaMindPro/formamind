@@ -148,3 +148,5 @@ You don't — with one exception: a value recorded in `VARS/` is unattainable in
 **Engine without separate agents.** The route runs degraded, the human is told first, stage markers apply to you too — `on-demand/degraded-mode.md`.
 
 **Scrubbing (prohibition 17).** The mechanics and the fail-closed rule — `kit.md`; the Plumb call above follows them.
+
+<!-- moved-from-law: tail → law pointers -->
