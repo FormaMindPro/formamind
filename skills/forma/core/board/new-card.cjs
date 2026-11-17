@@ -41,6 +41,67 @@ const cli = makeCli();
 const { arg, flag, values: args } = cli;
 const die = cli.die('new-card');
 
+// --help: the invocation reference in the console (the flags by this script's own parser, English only).
+const HELP = `
+new-card.cjs - create a card on the .devtool/features/ board without manually
+copying the epic name, the number and the template.
+
+Usage:
+  node .forma/board/new-card.cjs --kind <code> --title "<title>" [flags]
+  node .forma/board/new-card.cjs --quick "<title>"   (fast incubator mode)
+
+Flags:
+  --kind <code>          The kind code from PROJECT.md, "Project epics"; the
+                         epic name is substituted from that table:
+                         analytics, structure, protocol, resources, balance,
+                         discussion, channels, competencies, results.
+  --title "<title>"      The card title.
+  --goal <label>         The goal label; by default the kind's main goal
+                         \`goal-<code>\`. Exactly one label per card.
+  --type <kind>          work | tooling | decision; by default tooling
+                         (work for the channels kind and --quick).
+  --status <status>      The board lane; by default backlog.
+  --assignee <node>      Who holds the card; by default Intent (Spec for the
+                         channels kind).
+  --priority <level>     low | medium | high; by default medium.
+  --lang <ru|en>         The placeholder language of the task fields; by
+                         default the project's language from PROJECT.md.
+  --node <name>          The node signing the history lines; by default
+                         Intent (the cards are opened by Intent).
+  --route <N>            The route label \`route-N\` (0-8).
+  --over <N>             The overlay label \`over-N\` (1-4); repeatable.
+  --seg <N>              The segment label \`seg-N\`.
+  --wave <N>             The wave label \`wave-N\`.
+  --after <NNN>          The dependency label \`after-card-NNN\`; repeatable.
+  --trial                The \`trial\` label.
+  --demo                 The \`demo\` label: a demonstration cycle card; it
+                         does not go into the spend and the statistics.
+  --delivers "<text>"    The task's "what it delivers" field.
+  --criterion "<text>"   The readiness criterion field.
+  --budget "<attempts>"  The attempt budget field.
+  --next "<text>"        The "where it goes next" field.
+  --why <code>           The route reason, written into History as
+                         \`route route-N (why: <code>)\`; requires --route.
+                         Codes: human, ready, scale, risk, decision,
+                         tooling, plumb.
+  --why-detail "<text>"  A note appended to the route reason line.
+  --stage <key>          The stage line written into History: card (the task
+                         is written) or approve (awaits the human's "yes").
+  --root <path>          The project the card lands in; by default the
+                         script's own project.
+  --quick "<title>"      Fast incubator mode: kind=discussion,
+                         goal=goal-discussion, route=0; creates the card and
+                         the materials folder project/cards/card-NNN/.
+
+The number is the next free card-NNN over the board and done/. After the
+write the board check runs over this card; an error on it - exit code 1.
+
+Example:
+  node .forma/board/new-card.cjs --kind protocol --title "Fix the board check" \\
+    --route 2 --why ready --stage card --budget 2 --next "Intent check"
+`;
+if (flag('help')) { console.log(HELP.trim()); process.exit(0); }
+
 // The root of the board: the script's own project by default, or --root for a caller working on another
 // project - PROJECT.md, the board and the checks are read from that root, not from the install's home.
 const ROOT = path.resolve(arg('root') || path.join(__dirname, '..', '..'));
