@@ -69,6 +69,66 @@ const cli = makeCli();
 const { arg, flag } = cli;
 const die = cli.die('card-move');
 
+// --help: the invocation reference in the console (the transfer flags by this script's own parser, English only).
+const HELP = `
+card-move.cjs - hand a card to the next node in one call: the status + the
+assignee + the stage line + the board check (AGENTS.md §6-7).
+
+Usage:
+  node .forma/board/card-move.cjs <card> --to kit|run|intent|accept|close --note "<what is done>" [flags]
+  node .forma/board/card-move.cjs <cards...> --to core-close --note "<the grounds>"
+  node .forma/board/card-move.cjs <card> --stage <key> --node <node> --note "<what>"   (the line only, no move)
+
+Flags:
+  --to <target>          Where the card goes: kit (todo, Kit), run
+                         (in-progress, Run - or Kit/Intent by the route-N
+                         label), intent (review, Intent), accept (review,
+                         Intent), close (done, Core), core-close (the cycle
+                         closing: several done cards, "closed" lines, the
+                         assignee reset to null).
+  --note "<text>"        The "what" of the stage line; required on every form.
+  --kit "<text>"|-       The body of the "Kit" zone; only with --to run (Kit
+                         writes the kit at the handover).
+  --result "<text>"|-    The body of the "Result" zone; only with --to intent
+                         (the executor writes the result at the return to the
+                         check). The value "-" reads the text from stdin
+                         (multiline - via a heredoc); only one of --kit and
+                         --result may be "-".
+  --session-spend <NNN>  The main session's spend line over the card; only
+                         with --to accept|close; NNN - this same card's
+                         number.
+  --stage <key>          The stage key, a closed list of seven:
+                         card|approve|kit|exec|check|accept|close; with --to
+                         the key must match the target's stage; without --to
+                         - the line only: the status and the assignee do not
+                         change, --node names whose line it is.
+  --node <name>          Whose line; by default the node making the handover
+                         (for --to intent - the previous executor).
+  --duration-ms MS       The spend line (AGENTS.md §3): the duration and the
+  --agent-id <id>        call id - both required for a spend line; N, R and O
+  --tokens N             are read from the call's transcript, --tokens N is
+                         the fallback (the line written as is).
+  --cache-read R         The cache-read tokens; without it - "(cache-read
+                         unknown)" with the reason in the description.
+  --turns K              The number of turns; --engine <tag> - the engine
+                         tag (without it - the newest transcripts).
+  --override             With --to kit only: one pass beyond the used-up
+                         attempt budget; writes the "budget override" line
+                         into History.
+  --dry                  Show the changes, do not write the file.
+  --selftest             The sampling gauges in the OS temp directory; writes
+                         nothing; exit 0 - green.
+  --help                 This reference.
+
+The card is "NNN", "card-NNN" or the full "card-NNN-slug"; a short number is
+accepted only with a single candidate; a card in done/ - nothing to hand over.
+After the write the board check runs over this card; an error on it - exit 1.
+
+Example:
+  node .forma/board/card-move.cjs <NNN> --to intent --note "the result goes to the check" --result "<the result text>"
+`;
+if (flag('help')) { console.log(HELP.trim()); process.exit(0); }
+
 const TARGETS = {
   kit: { status: 'todo', assignee: 'Kit', stage: 'kit', by: 'Intent' },
   run: { status: 'in-progress', assignee: 'Run', stage: 'exec', by: 'Kit' },
