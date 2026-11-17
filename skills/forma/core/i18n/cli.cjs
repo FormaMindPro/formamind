@@ -7,6 +7,9 @@
 //                         proposes the standard parameters and asks the human for a decision - never blocks.
 //                         --json wraps the same text into the strict schema of a config hook
 //                         ({hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:"…"}}).
+//   backlog|--line alias  the local backlog's summary line (board/backlog.cjs, scanBacklog): un-carded
+//   backlog-line [--json] observations in the project's language; an empty scan - silence. --json wraps the
+//                         same line into the strict SessionStart schema (the ZCode config hook's shape).
 //   demo [value]          the demo-cycle marker: print it, or set none|declined|done|later:<n>
 //   demo-tick             one session start passed: `later:<n>` counts down
 //   lang                  language code of the project documents (FORMA_LANG overrides)
@@ -47,6 +50,13 @@ else if (cmd === 'gate') {
     ? JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: text } })
     : text);
 }
+else if (cmd === 'backlog' || cmd === 'backlog-line') {
+  let text = '';
+  try { text = require('../board/backlog.cjs').lineFor(root, i18n.projectLang(root)); } catch { /* an older install without the scanner */ }
+  process.stdout.write(rest.includes('--json') && text
+    ? JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: text } })
+    : text);
+}
 else if (cmd === 'demo') {
   try {
     if (rest[0] !== undefined) demo.writeDemo(root, rest[0]);
@@ -66,6 +76,6 @@ else if (cmd === 'msg' && rest[0]) {
     hookSpecificOutput: { hookEventName: rest[0], additionalContext: i18n.message(rest[2], {}, lang) + '\n' + details },
   }));
 } else {
-  process.stderr.write('usage: cli.cjs ready|gate|demo [value]|demo-tick|lang|msg <code> [k=v ...]|hook-output <event> <user-code> <agent-code> [--root <dir>]\n');
+  process.stderr.write('usage: cli.cjs ready|gate|backlog|backlog-line|demo [value]|demo-tick|lang|msg <code> [k=v ...]|hook-output <event> <user-code> <agent-code> [--root <dir>]\n');
   process.exit(2);
 }

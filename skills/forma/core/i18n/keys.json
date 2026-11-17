@@ -756,9 +756,26 @@
       "ru": [
         "(служебная)"
       ]
+    },
+    "followup": {
+      "match": "prefix",
+      "en": [
+        "follow-up",
+        "for a separate card",
+        "observation"
+      ],
+      "ru": [
+        "наблюдение",
+        "для отдельной карточки",
+        "вне объёма"
+      ]
     }
   },
   "phrases": {
+    "journal_missing": [
+      "What was missing",
+      "Чего не хватало"
+    ],
     "unset": [
       "not set",
       "не задан"

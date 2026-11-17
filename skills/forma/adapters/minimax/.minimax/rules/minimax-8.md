@@ -199,7 +199,10 @@ The first command of the main-context session is the start gate (`AGENTS.md` §3
 `node .forma/i18n/cli.cjs gate` — constructive, it opens the setup card itself and asks the human
 for the decisions, it blocks nothing; a host without session-start hooks carries the divergence
 named in this file, and a host with its own session-start mechanism (this plugin's `SessionStart`
-is one) may deliver the gate wired like the ZCode config hook.
+is one) may deliver the gate wired like the ZCode config hook. Первая команда сессии может включать
+и дайджест локального беклога: `node .forma/i18n/cli.cjs backlog` (незакарточенные наблюдения —
+backlog-дорожка доски, метки follow-up в Result закрытых карт, строки JOURNAL без ссылки на карту) —
+конструктивен, ничего не блокирует, пустой беклог молчит.
 
 The belt stays anyway, because a belt that costs one file read is cheap: this engine reads its
 role file as the first action of the session — `.minimax/agents/intent.md`, plus

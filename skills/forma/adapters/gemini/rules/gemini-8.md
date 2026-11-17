@@ -91,6 +91,7 @@ Deletion protection is held **by construction**:
 
 The main Antigravity session runs as `Intent`: before its first reply it reads `intent.md` and `intent-session-start.md`.
 * **The start gate (`AGENTS.md` §3) is the first command of the main-context session:** `node .forma/i18n/cli.cjs gate`. The gate is constructive — it opens the setup card itself and asks the human for the decisions, it blocks nothing; the host has no standardized `SessionStart` hooks (the divergence is named below), and a host with its own session-start mechanism wires the gate like the ZCode config hook.
+* **The local backlog (`node .forma/i18n/cli.cjs backlog`)** may join the first command of the session: the digest of un-carded observations (the board's backlog lane, follow-up labels in closed cards' Results, un-carded JOURNAL lines) — constructive, blocks nothing, silent when the backlog is empty.
 * **Decisive experiment finding:** Plain stdout from lifecycle hooks does not reach the model's context window; Antigravity ignores non-JSON hook output. Content injection requires returning JSON with `{ "injectSteps": [ ... ] }` (`systemMessage` or `ephemeralMessage`) in `PreInvocation`.
 * **Current status:** Because session-level instructions (`intent.md`) are project rules, they are loaded via `.agents/rules/session-start.md` and read by `Intent` at session start; full automatic context injection via `PreInvocation` is experimental and declared as **discipline** until native project-level `SessionStart` is standardized.
 

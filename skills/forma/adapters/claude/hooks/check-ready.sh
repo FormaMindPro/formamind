@@ -15,4 +15,6 @@ I18N=.forma/i18n/cli.cjs
 node "$I18N" demo-tick
 node "$I18N" gate
 node "$I18N" ready
+# the local backlog's digest line (board/backlog.cjs): un-carded observations; empty - silence, never blocks
+node "$I18N" backlog-line
 exit 0

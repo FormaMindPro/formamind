@@ -7,6 +7,8 @@
  *  1. The presence and the content of .zcode/rules/zcode-8.md (nine contracts, the zcode: tag, the degradation divergence);
  *  1b. The start-gate config hook: .zcode/config.json is valid JSON, hooks.enabled is true, the gate --json command is wired
  *      on the matcher startup|resume|clear|compact (the gate is constructive, it blocks nothing - it opens the setup card);
+ *  1c. The backlog digest hook: a second SessionStart group on the same matcher wires backlog --json (the local
+ *      backlog's summary at session start; constructive, silent when the backlog is empty);
  *  2. The adapter's shape: the core finds it by the file name, the engines.cjs contract items - all passed;
  *  3. The zone's roles parity with the canonical roles - by a regeneration (gen-roles --check);
  *  4. The spend line parse: a synthetic step and the host's real usage shape; the zcode: tag - in the core's tag wall;
@@ -65,6 +67,22 @@ it('.zcode/config.json wires the gate hook (gate --json) on startup|resume|clear
   assert.ok(entry, 'no process hook with command node');
   assert.ok((entry.args || []).some((a) => a.includes('${ZCODE_PROJECT_DIR}/.forma/i18n/cli.cjs')), 'the project cli.cjs is not in the hook args');
   assert.deepEqual((entry.args || []).slice(1), ['gate', '--json'], 'the gate --json invocation is not in the hook args');
+});
+
+// 1c. The local backlog hook: a second SessionStart group delivers the digest on the same four events
+it('.zcode/config.json wires the backlog hook (backlog --json) as the second SessionStart group', () => {
+  const file = path.join(root, '.zcode', 'config.json');
+  let cfg;
+  try { cfg = JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch (e) { assert.fail('.zcode/config.json is not valid JSON: ' + e.message); }
+  const groups = (cfg.hooks && cfg.hooks.events && cfg.hooks.events.SessionStart) || [];
+  const g = groups.find((x) => String(x.matcher || '').replace(/\s+/g, '') === 'startup|resume|clear|compact'
+    && (x.hooks || []).some((h) => (h.args || []).some((a) => String(a).includes('backlog'))));
+  assert.ok(g, 'no second SessionStart group wiring the backlog digest');
+  const entry = (g.hooks || []).find((h) => h.type === 'process' && h.command === 'node');
+  assert.ok(entry, 'the backlog hook is not a process hook with command node');
+  assert.ok((entry.args || []).some((a) => a.includes('${ZCODE_PROJECT_DIR}/.forma/i18n/cli.cjs')), 'the project cli.cjs is not in the backlog hook args');
+  assert.deepEqual((entry.args || []).slice(1), ['backlog', '--json'], 'the backlog --json invocation is not in the hook args');
 });
 
 // 2. The adapter's shape: all the core contract items

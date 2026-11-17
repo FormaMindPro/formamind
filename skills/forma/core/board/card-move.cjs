@@ -601,4 +601,13 @@ if (to === 'close') {
     const note = count >= cycleVol ? msg('board.card-move.cycle_time') : msg('board.card-move.cycle_accumulating');
     console.log(msg('board.card-move.cycle_line', { epic, count, vol: cycleVol, note }));
   }
+  // The local backlog scan of the closed card (backlog.cjs's shared matcher): the Result's follow-up
+  // observations are printed with the open-a-card hint - a reminder only; the move never aborts here,
+  // even on an older install without the scanner.
+  let followups = [];
+  try { followups = zoneText(text, 'result').split('\n').map((l) => require('./backlog.cjs').followupTail(l)).filter(Boolean); } catch {}
+  if (followups.length) {
+    for (const l of followups) console.log(l);
+    console.log(i18n.message('board.backlog.close_hint', {}, i18n.projectLang(ROOT)));
+  }
 }
