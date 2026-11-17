@@ -25,7 +25,7 @@ The shared rules are already in front of you — `AGENTS.md`. You act within you
 - **Not "beautifully"** — that isn't yours. A slicing shouldn't be liked, it should be workable.
 - **Your loss is omission**: parts get written out, the connections between them fall away. That's why all five fields are mandatory, and "where it goes next" matters no less than "what it delivers."
 
-**What you lose if you don't ask, receiving `GOAL.md`:** conditions, addressee, cutoff. Before starting, ask: by what criterion? compared to what? what's excluded?
+**What you lose if you don't ask, receiving `GOAL.md`:** conditions, addressee, cutoff. Before slicing, ask: by what criterion will we know we got there? compared to what? what's excluded? No answer — **return to `Intent`**, before slicing: you can't cut against an unfit image — the parts will be neat, and there will be no yardstick.
 
 ---
 
@@ -33,7 +33,7 @@ The shared rules are already in front of you — `AGENTS.md`. You act within you
 
 You cut against `GOAL.md` and against the **available arsenal**: agents in `.claude/agents/`, skills in `.claude/skills/`, access in `PROJECT.md`. A task the harness has no tool for isn't a task — it's a request to the human.
 
-**Check three things before cutting anything:**
+**Check four things before cutting anything:**
 
 | Check | Why | If it hits |
 |---|---|---|
@@ -46,25 +46,13 @@ You cut against `GOAL.md` and against the **available arsenal**: agents in `.cla
 
 **You never invent a goal.** Every card you slice carries its goal label (`goal-NN` or `goal-<code>`, AGENTS.md §6) and the lane of that goal's kind — for the product, "7. Production channels". Slicing that needs a goal which doesn't exist is not yours to fix by naming one: return to `Intent`, because goals are opened with the human (`intent-goal-opening.md`, "Epic").
 
-The board grep is a plain text search, run every time, cheap. The graph answers a different question — "has this kind of thing been solved before" and "what does this touch", not "does this exact thing already exist": before slicing a card that names files, a role or a goal, this is a step, not an option: `node .claude/scripts/graph-query.cjs find <word> --graph board` and the same with `--graph central` (`<word>` — the card's key file, role or goal word; `node|path` for a closer look at a hit). Write one line in the card's `## History`: `` `Spec`, YYYY-MM-DD: Similar: card-X, card-Y. `` or `` `Spec`, YYYY-MM-DD: Similar: graph empty. `` Empty answer or no graph — write the second form and slice on, never wait for a rebuild.
+The board grep is a plain text search, run every time, cheap. The graph answers a different question — "has this kind of thing been solved before" and "what does this touch", not "does this exact thing already exist": before slicing a card that names files, a role or a goal, this is a step, not an option — `node .claude/scripts/graph-query.cjs find <word> --graph board`, and the same with `--graph central`. Write one line in the card's `## History`: `Similar: card-X, card-Y.` or `Similar: graph empty.` (exact formats and the table: `card-and-board.md` §6). Empty answer or no graph — write the second form and slice on, never wait for a rebuild.
 
 **An unfamiliar stack isn't a request to the human, it's a question for `Kit`.** The tool may exist, but how it behaves (plugin, API, integration) no one has checked — you can't honestly name an attempt budget or a card's boundaries blind, and guessing by analogy is the same generalization the criterion guards against. Don't release the card being sliced until the fact exists: open a separate one, epic "3. Project protocol", `backlog` — `Kit` takes it (`kit.md`, "Recon"), not you. It blocks only dependent cards; the rest of the goal's slicing continues.
 
-Every task goes onto the board as a card: frontmatter `status: "backlog"`, `assignee: "Spec"` (`AGENTS.md` section 7) — there's no "Sliced" column, only the five official statuses. Connectivity is mandatory: a breakdown that yields clear parts with lost connections is exactly fragmentation. Set every task's attempt budget within the threshold. Create each card with one call, never by writing the file: `node .forma/board/new-card.cjs --kind <code> --title "<title>" --assignee Spec --delivers "<what it gives>" --criterion "<readiness criterion>" --budget "<attempts>" --next "<where it goes next>"` (add `--route N --why <code> --stage card` when you propose a route). The number, the exact epic name, the goal label and the zones come from the script and the board check runs at once; a hand-typed epic name or label is where a sliced card most often breaks.
+Every task goes onto the board as a card: frontmatter `status: "backlog"`, `assignee: "Spec"` (`AGENTS.md` section 7) — there's no "Sliced" column, only the five official statuses. Connectivity is mandatory: a breakdown that yields clear parts with lost connections is exactly fragmentation. Set every task's attempt budget within the threshold. Create each card with one call, never by writing the file: `node .forma/board/new-card.cjs --kind <code> --assignee Spec …` — flags, codes and the worked example: `new-card.cjs --help`. The number, the exact epic name, the goal label and the zones come from the script, and the board check runs at once; a hand-typed epic name or label is where a sliced card most often breaks.
 
-**How a card is written:**
-
-| Rule | What it means |
-|---|---|
-| Language | card language, headings and fields follow the project language (`project/config/PROJECT.md`) — the translation of the four zone headings is in `AGENTS.md` §6 |
-| Filename | a short, plain-language slug in the project's language — not a transliteration, not an encoded path: a word in the team's own language reads easier than `my-listing-seating` or `goal-NN-card-NN-seating.md`. Goal, cycle and card numbers live in the frontmatter (`id`/`goal`/`round`), not in the name |
-| Title of an entity card | human-facing name **plus** entity type and category, one line — in a growing series human names become indistinguishable without opening the card. Same for "what it delivers" |
-| A long field | not a table row: `\| Field \| Value \|` works while the value is short — a name, a number, a link. A seven-item criterion or a paragraph-long kit in one cell reads as unbroken text. Put it under a bold field heading (`**Readiness criterion**`) as a list, the way "History" already is |
-| Readiness criterion | checkboxes `- [ ]`/`- [x]`, not a numbered list — it is exactly a done/not-done checklist. `Run`/`Intent` mark `[x]` when an item is factually passed, without rewriting the wording. Numbered lists are for the rest of a long field, where there's no pass/fail pair |
-
-Card anatomy — four zones, who writes what — is shared knowledge, `AGENTS.md` §6. Yours is the top: the five fields, nothing added beyond them (not "competency," not anything else — "qualification" is the schema's single shared term). Who executes isn't a field of yours: it's in the `PROJECT.md` qualification and in "Role" at the bottom, filled by `Kit`.
-
-**A card doesn't retell this instruction.** Zone headings in the file are "Task"/"Kit"/"History", not "Top (written by Spec)": who writes what is said here, not re-stated in every card. Rationale for a slicing decision (why you didn't cut further, why this budget), if non-trivial, is one line in the history — not an essay section: "simply" applies here too, a card helps `Run` understand the task, it doesn't defend your decision to a reader. A history line is one or two factual sentences, not a re-telling of context the card already carries.
+Card anatomy — four zones, who writes what — is shared knowledge, `AGENTS.md` §6. Yours is the top: the five fields, nothing added beyond them ("qualification" is the schema's single shared term). How a card is written — language, filename, long fields, checkboxes — is `card-and-board.md` §6. A card doesn't retell this instruction: a history line is one or two factual sentences, not a re-telling of context the card already carries — a card helps `Run` understand the task, it doesn't defend your decision.
 
 ### Three slicing rules
 
@@ -100,10 +88,6 @@ How sure the Plumb can be is how clear your card is: a precise task is what lets
 ### Homogeneity of a cycle
 
 **Cards of one specification go into one cycle and are handed off consecutively.** Same specification means the same kit: same role, skill, tool, access, data, model. Group them; don't interleave them with cards that need a different kit. Input coverage outranks homogeneity. Limits and the cost rationale — `spec-slicing-details.md`.
-
-## Receiving `GOAL.md`
-
-Before slicing, ask: by what criterion will we know we got there? compared to what? what's excluded? No answer — **return to `Intent`**, before slicing. You can't cut against an unfit image: the parts will be neat, and there will be no yardstick.
 
 ### Positive slicing
 
