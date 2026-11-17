@@ -237,6 +237,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 - Law compressed to its holders
 
+## [0.0.8] - 2026-11-07
+
+### Added
+
+- Push-verdict rule in engine roles: a push is finished by the remote's checks verdict, not by git's exit code
+- zcode adapter: card-and-board paragraph parity (gate-and-verdict criterion)
+
 ## [0.0.7] - 2026-11-07
 
 ### Added
@@ -295,10 +302,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ### Added
 
 - initial release: the Forma engine imported at `FormaMind v0.0.1` - the `.claude-plugin` manifests, the `bin/` installer, engine skills and adapters, `scripts/`, `templates/`, `docs/`, `test/` and the en/ru READMEs (869 files)
-
-## [0.0.8] - 2026-11-07
-
-### Added
-
-- Push-verdict rule in engine roles: a push is finished by the remote's checks verdict, not by git's exit code
-- zcode adapter: card-and-board paragraph parity (gate-and-verdict criterion)
