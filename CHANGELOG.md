@@ -237,6 +237,65 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 - Law compressed to its holders
 
+## [0.0.7] - 2026-11-07
+
+### Added
+
+- adaptive test runner `scripts/test-runner.cjs` with RAM disk auto-detection and a `setup-ramdisk.ps1` helper; the surgical-testing rules land in the engine roles - intermediate passes run only the affected module's tests
+- the board's readiness checks enter the template core: `check-ready.cjs` and `check-ready-sandbox.cjs` under `skills/forma/core/board/`, registered in the checks index
+- ram-disk temp rule in all engine roles (intent, kit, run - claude, gemini, minimax, zcode adapters): temporary artifacts go to a per-project subdirectory of the resolved temp base; setup notes in `SETUP.md`
+
+### Fixed
+
+- zcode adapter test passes on a machine without the ZCode host: `transcriptsDir` answers null where no host rollout exists (CI red on ubuntu), and `mainSessions` restores the outer `ZCODE_HOME` provided by the caller
+
+## [0.0.6] - 2026-11-07
+
+### Changed
+
+- the zcode install is self-sufficient on a fresh machine: `installZCode` ships the shared skills mirror (`.agents/skills`, the codex adapter zone copy) and rebuilds the role mirror from `.claude/agents` at install time; host runtime data (`.state/`) leaves the shipped adapter and is never installed
+- the `engine-to-protocol` transfer map covers the zcode adapter with flat subpaths; the adapter test checks `transcriptsDir` existence only where the host runs ZCode; `engines-install` tests cover zcode - fresh install green end to end, claude auto-installed as core, dormant rejections unchanged
+
+## [0.0.5] - 2026-11-07
+
+### Added
+
+- ZCode engine in the installer: the adapter suite in `skills/forma/adapters/zcode/` - role files, on-demand holders, run roles, `forma-adapter.cjs`, `gen-roles.cjs`, `lint-agent-keys.cjs`, `rules/zcode-8.md` and the adapter test
+- Gemini promoted from beta; Claude ensured by default as the core engine
+
+### Changed
+
+- READMEs (en, ru): Gemini and ZCode promoted to ready status in badges and docs; community website URLs move to formamind.pro and formamind.tech
+
+### Fixed
+
+- date trace in `test-zcode-adapter`
+
+## [0.0.4] - 2026-11-07
+
+### Changed
+
+- `engine-switch` rebuild skips engines whose adapter is not installed, covered by new test cases
+
+## [0.0.3] - 2026-11-07
+
+### Changed
+
+- the installer, plugin update hooks and docs point at `FormaMindPro/formamind` - repository URLs across `marketplace.json`, `plugin.json`, `LICENSE`, the en/ru READMEs, `bin/forma.cjs`, the package files, adapter skills and `check-plugin-update` hooks, i18n messages and the manuals
+- i18n: the live module and `keys.json` carried into the template, `.forma/i18n` covered in the transfer map; test fixtures and golden records aligned with the live checks
+
+## [0.0.2] - 2026-11-06
+
+### Changed
+
+- version bump to `0.0.2` in `.claude-plugin/plugin.json` - the engine continues the FormaMind numbering
+
+## [0.0.1] - 2026-11-06
+
+### Added
+
+- initial release: the Forma engine imported at `FormaMind v0.0.1` - the `.claude-plugin` manifests, the `bin/` installer, engine skills and adapters, `scripts/`, `templates/`, `docs/`, `test/` and the en/ru READMEs (869 files)
+
 ## [0.0.8] - 2026-11-07
 
 ### Added
