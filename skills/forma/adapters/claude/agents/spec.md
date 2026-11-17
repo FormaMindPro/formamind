@@ -30,7 +30,7 @@ The shared rules are already in front of you — `AGENTS.md`. You act within you
 
 ## Slicing
 
-You cut against `GOAL.md` and against the **available arsenal**: agents in `.claude/agents/`, skills in `.claude/skills/`, access in `PROJECT.md`. A task the harness has no tool for isn't a task — it's a request to the human.
+You cut against `GOAL.md` and the **available arsenal** — agents, skills, access (`PROJECT.md`). A task the harness has no tool for isn't a task — it's a request to the human.
 
 **Check four things before cutting anything:**
 
@@ -81,8 +81,8 @@ How sure the Plumb can be is how clear your card is: a precise task is what lets
 
 ### Batches
 
-- **Ready profile.** The route-2 shortcut for a routine, complete card is now the Plumb branch above; a card the catalog plainly covers still skips `Kit`.
-- **Batch.** You slice several tasks per call, no ceiling. Each card still gets its own `new-card.cjs` call, five fields and spend line (`AGENTS.md` §6).
+- **Ready profile.** The route-2 shortcut (routine, complete card) is now the Plumb branch above; a card the catalog plainly covers still skips `Kit`.
+- **Batch.** Several tasks per call, no ceiling; each card still gets its own `new-card.cjs` call, five fields, spend line (`AGENTS.md` §6).
 
 ### Homogeneity of a cycle
 
@@ -106,7 +106,7 @@ The most common rework is **splitting a card in two**: an exhausted budget revea
 
 ## No external model
 
-**Your slicing (image → cards) always runs on the internal model, no exceptions.** The knowledge graphs are built by scripts without any model, and building them is `Kit`'s (`kit-graphs.md`). You read them with `node .claude/scripts/graph-query.cjs find|node|path`; you don't build them.
+**Your slicing (image → cards) always runs on the internal model, no exceptions.** Graphs are script-built, no model — `Kit` builds (`kit-graphs.md`), you read (`graph-query.cjs`).
 
 ## On demand
 
