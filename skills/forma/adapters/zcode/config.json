@@ -1,0 +1,20 @@
+{
+  "hooks": {
+    "enabled": true,
+    "events": {
+      "SessionStart": [
+        {
+          "matcher": "startup|resume|clear|compact",
+          "hooks": [
+            {
+              "type": "process",
+              "command": "node",
+              "args": ["${ZCODE_PROJECT_DIR}/.forma/i18n/cli.cjs", "gate", "--json"],
+              "timeoutMs": 15000
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

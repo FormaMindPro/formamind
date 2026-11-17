@@ -41,7 +41,14 @@ function tickDemo(root) {
   return readDemo(root);
 }
 
-/** The board holds no real card: nothing outside `done/` and nothing outside the demo (label `demo`). */
+// The start gate's own setup card: still open, and its five-field Task line names the thresholds check - a
+// machine-opened card asking the human for decisions is not the human's work either. The marker regex is
+// duplicated in board/setup-card.cjs (this file stays dependency-free); a marker change - edit both.
+const OPEN_RE = /^status:\s*"?(backlog|todo|in-progress|review)"?/m;
+const SETUP_LINE_RE = /^\d+ · (?:work|tooling|decision) \|.*thresholds-declared\.cjs/m;
+
+/** The board holds no real card: nothing outside `done/` and nothing outside the demo (label `demo`)
+ *  or the start gate's own setup card. */
 function boardEmpty(root) {
   const dir = path.join(root, '.devtool', 'features');
   const scan = (d) => {
@@ -51,7 +58,7 @@ function boardEmpty(root) {
       if (e.isDirectory()) return scan(path.join(d, e.name));
       if (!/^card-\d+.*\.md$/.test(e.name)) return false;
       const text = fs.readFileSync(path.join(d, e.name), 'utf8');
-      return !/^labels:\s*\[[^\]]*"demo"/m.test(text);
+      return !/^labels:\s*\[[^\]]*"demo"/m.test(text) && !(OPEN_RE.test(text) && SETUP_LINE_RE.test(text));
     });
   };
   return !scan(dir);

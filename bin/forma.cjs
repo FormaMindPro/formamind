@@ -240,7 +240,8 @@ function installCore(root, protectedPaths, lang = 'en') {
 const CLAUDE_HOOKS = {
   PreToolUse: [{ hooks: ['guard-delete.sh', 'tool-usage.sh'] }, { matcher: 'Write|Edit', hooks: ['guard-cards.sh'] }],
   UserPromptSubmit: [{ hooks: ['unlock-delete.sh'] }],
-  SessionStart: [{ matcher: 'startup', hooks: ['check-ready.sh', ['check-plugin-update.sh', 15], 'check-dashboard.sh', 'intent-start.sh', 'check-thresholds-gate.sh', ['ram-disk-status.sh', 30]] }],
+  SessionStart: [{ matcher: 'startup', hooks: ['check-ready.sh', ['check-plugin-update.sh', 15], 'check-dashboard.sh', 'intent-start.sh', 'check-thresholds-gate.sh', ['ram-disk-status.sh', 30]] },
+                 { matcher: 'resume|clear|compact', hooks: ['check-ready.sh'] }],
   PostToolUse: [{ matcher: 'Write|Edit', hooks: ['check-card.sh', 'sync-extensions.sh', 'auto-graphs.sh'] }],
 }
 // Auto-compact window. Forma proposes COMPACT_DEFAULT and asks first; the human's own value always wins:
@@ -651,6 +652,7 @@ function installZCode(root) {
   const Z = path.join(root, '.zcode')
   copyFile(path.join(A, 'forma-adapter.cjs'), path.join(Z, 'forma-adapter.cjs'))
   copyFile(path.join(A, 'verify-profile.cjs'), path.join(Z, 'verify-profile.cjs')) // install verify profile: the core finds it via the manifest
+  copyFile(path.join(A, 'config.json'), path.join(Z, 'config.json')) // the SessionStart config hook (gate --json on startup, resume, clear, compact)
   copyTree(path.join(A, 'rules'), path.join(Z, 'rules'))
   copyTree(path.join(A, 'tests'), path.join(Z, 'tests'))
   copyTree(path.join(A, 'scripts'), path.join(Z, 'scripts'))
@@ -731,7 +733,7 @@ function geminiExpect() {
 // mirror against that reference (a regeneration is the only check that sees the mirror lag behind it).
 function zcodeExpect() {
   return {
-    files: ['.zcode/forma-adapter.cjs', '.zcode/rules/zcode-8.md', '.zcode/scripts/gen-roles.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs'],
+    files: ['.zcode/forma-adapter.cjs', '.zcode/config.json', '.zcode/rules/zcode-8.md', '.zcode/scripts/gen-roles.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs'],
     mirrorFrom: '.claude/agents',
   }
 }
@@ -820,10 +822,17 @@ function printDashboard(root, o) {
 }
 
 // Install integrity check: red on the main engine stops; secondary engines only warn.
+// The verify behavior layer runs the start hook (the gate) — the gate must not open the setup card here:
+// a card belongs to a real session start, where the human is present (setup-card.cjs honors the marker).
 function printVerify(root) {
-  const res = verifyInstall.verify(root)
-  console.log('Install integrity (node .forma/verify/verify-install.cjs): ' + verifyInstall.format(res))
-  return res.ok
+  process.env.FORMA_SUPPRESS_SETUP_CARD = '1'
+  let ok
+  try {
+    const res = verifyInstall.verify(root)
+    console.log('Install integrity (node .forma/verify/verify-install.cjs): ' + verifyInstall.format(res))
+    ok = res.ok
+  } finally { delete process.env.FORMA_SUPPRESS_SETUP_CARD }
+  return ok
 }
 
 // install: core, engines, template, board; returns the report lines and the board result

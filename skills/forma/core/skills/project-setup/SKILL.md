@@ -34,6 +34,8 @@ node .forma/board/new-card.cjs --kind protocol --title "Initial project configur
 ```
 In a fresh project, this creates the first card (`card-NNN`). In projects with existing cards, the next sequential card number is allocated. Localize `--title` and `--delivers` to the project language as appropriate.
 
+The setup card may already exist: the start gate (`AGENTS.md` §3) opens it by itself — `node .forma/i18n/cli.cjs gate` creates the setup card in an unconfigured project at session start. Do not duplicate it: find the open setup card (its readiness criterion names `thresholds-declared.cjs`), verify its fields against this step and continue with it.
+
 Record human approval in card `## History` and transition to execution:
 ```bash
 node .forma/board/card-move.cjs <card> --to run --note "human approved project configuration setup"

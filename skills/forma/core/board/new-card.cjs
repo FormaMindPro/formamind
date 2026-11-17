@@ -21,8 +21,10 @@
 //            --stage - the line `stage <key>` (card - the task is written, approve - awaits the human's "yes"). Without the flag the line is not written.
 // --node  - the node signing the history lines (the route reason, the stage); `Intent` by default - the cards
 //            are opened by Intent (§7). A bare name only (`Intent`, `Run`); `9x` stops before any write.
+// --root  - the project the card lands in; by default the script's own project (the parent of .forma/).
+//            The start gate's setup card is created in the project the gate has just checked (setup-card.cjs).
 // The number - the next free `card-NNN` over the board and done/. The zones - in the project language (§6).
-// After the write - the core's board check (.forma/board/check-board.cjs) over this card; an error on it - exit code 1.
+// After the write - the core's board check (.forma/board/check-board.cjs --root <root>) over this card; an error on it - exit code 1.
 // Part of the core: one for all engines, it knows no engine paths.
 
 const fs = require('fs');
@@ -33,13 +35,16 @@ const { makeCli } = require('../dashboard/lib/cli.cjs');
 const { cardFiles, zoneHeading } = require('../dashboard/lib/card.cjs');
 const i18n = require('../i18n/index.cjs');
 
-const ROOT = path.resolve(__dirname, '..', '..');
-const BOARD = path.join(ROOT, '.devtool', 'features');
 const msg = (key, params) => i18n.message(key, params, 'ru');
 
 const cli = makeCli();
 const { arg, flag, values: args } = cli;
 const die = cli.die('new-card');
+
+// The root of the board: the script's own project by default, or --root for a caller working on another
+// project - PROJECT.md, the board and the checks are read from that root, not from the install's home.
+const ROOT = path.resolve(arg('root') || path.join(__dirname, '..', '..'));
+const BOARD = path.join(ROOT, '.devtool', 'features');
 
 // 1. The epics from PROJECT.md
 const projectMd = fs.readFileSync(projectFile(ROOT, 'PROJECT.md'), 'utf8');
@@ -205,9 +210,9 @@ if (quick || flag('materials')) {
   }
 }
 
-// 6. The check over this card
+// 6. The check over this card (of the root the card landed in)
 let out = '';
-try { out = execFileSync(process.execPath, [path.join(__dirname, 'check-board.cjs'), id], { cwd: ROOT, encoding: 'utf8' }); }
+try { out = execFileSync(process.execPath, [path.join(__dirname, 'check-board.cjs'), '--root', ROOT, id], { encoding: 'utf8' }); }
 catch (e) { out = (e.stdout || '') + (e.stderr || ''); }
 const mine = out.split('\n').filter(l => l.includes(id));
 if (mine.length) { console.error(mine.join('\n')); process.exit(1); }

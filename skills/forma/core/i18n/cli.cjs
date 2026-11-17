@@ -2,7 +2,11 @@
 'use strict';
 // Entry for shell hooks: `node .forma/i18n/cli.cjs <command> [--root <dir>]`
 //   ready                 notes about unchecked places (empty output when everything is in place)
-//   gate                  start stop (AGENTS.md §3); empty when the cycle may open
+//   gate [--json]         start stop (AGENTS.md §3); empty when the cycle may open. Constructive: with the
+//                         stop text it names the setup card (opened by the gate itself, setup-card.cjs),
+//                         proposes the standard parameters and asks the human for a decision - never blocks.
+//                         --json wraps the same text into the strict schema of a config hook
+//                         ({hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:"…"}}).
 //   demo [value]          the demo-cycle marker: print it, or set none|declined|done|later:<n>
 //   demo-tick             one session start passed: `later:<n>` counts down
 //   lang                  language code of the project documents (FORMA_LANG overrides)
@@ -21,8 +25,28 @@ const at = argv.indexOf('--root');
 const root = path.resolve(at >= 0 ? argv.splice(at, 2)[1] : (process.env.CLAUDE_PROJECT_DIR || process.cwd()));
 const [cmd, ...rest] = argv;
 
+/** The stop text plus the constructive tail (the setup card, the standard parameters, the decision request);
+ *  `''` when the cycle may open. Nothing inside may fail the session: every step is guarded, the exit stays 0. */
+function gateOutput(root) {
+  let text = '';
+  try { text = checks.gateText(root); } catch { /* an unreadable project reads as a green gate */ }
+  if (!text) return '';
+  let card = null;
+  try { card = require('../board/setup-card.cjs').ensureSetupCard(root); } catch { /* an older install without the module */ }
+  const lang = i18n.projectLang(root);
+  const lines = [];
+  if (card && card.code) lines.push(i18n.message(card.created ? 'gate.setup_card.created' : 'gate.setup_card.open', { code: card.code }, lang));
+  lines.push(i18n.message('gate.setup_card.proposal', {}, lang), i18n.message('gate.setup_card.request', {}, lang));
+  return text + lines.join('\n') + '\n';
+}
+
 if (cmd === 'ready') process.stdout.write(checks.readyText(root));
-else if (cmd === 'gate') process.stdout.write(checks.gateText(root));
+else if (cmd === 'gate') {
+  const text = gateOutput(root);
+  process.stdout.write(rest.includes('--json') && text
+    ? JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: text } })
+    : text);
+}
 else if (cmd === 'demo') {
   try {
     if (rest[0] !== undefined) demo.writeDemo(root, rest[0]);

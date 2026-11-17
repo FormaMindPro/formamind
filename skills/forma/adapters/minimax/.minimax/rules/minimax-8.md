@@ -195,6 +195,12 @@ context as the session-start block, and the node read it. The witness is
 `.minimax/.state/observed-runtime.json`; the probe reports `roleDelivery.available: true` with that
 witness named as the proof.
 
+The first command of the main-context session is the start gate (`AGENTS.md` §3):
+`node .forma/i18n/cli.cjs gate` — constructive, it opens the setup card itself and asks the human
+for the decisions, it blocks nothing; a host without session-start hooks carries the divergence
+named in this file, and a host with its own session-start mechanism (this plugin's `SessionStart`
+is one) may deliver the gate wired like the ZCode config hook.
+
 The belt stays anyway, because a belt that costs one file read is cheap: this engine reads its
 role file as the first action of the session — `.minimax/agents/intent.md`, plus
 `.minimax/agents/on-demand/intent-session-start.md`.

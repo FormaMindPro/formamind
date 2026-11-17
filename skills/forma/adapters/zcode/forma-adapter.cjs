@@ -240,13 +240,30 @@ function readNodes(agentsDir) {
   });
 }
 
+/** The zone's hooks from the host's workspace config (.zcode/config.json), the Claude tab's shape:
+ *  `{ event, matcher, commands }`. The start gate (§3) lives here; the deletion guard (Contract 6)
+ *  is still discipline - no hook event for it, the divergence stays named in zcode-8.md. */
+function readHooks(root) {
+  const file = path.join(root, '.zcode', 'config.json');
+  if (!fs.existsSync(file)) return [];
+  let cfg;
+  try { cfg = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return []; }
+  const out = [];
+  for (const [event, groups] of Object.entries((cfg.hooks && cfg.hooks.events) || {})) {
+    for (const g of groups || []) {
+      out.push({ event, matcher: g.matcher || '', commands: (g.hooks || []).map((h) => [h.command, ...(h.args || [])].join(' ')) });
+    }
+  }
+  return out;
+}
+
 function engineSettings(root = process.cwd()) {
   const agentsDir = path.join(root, '.zcode');
   const skillsDir = path.join(root, '.forma', 'skills');
   return {
     present: fs.existsSync(agentsDir),
     env: {},
-    hooks: [], // ZCode has no project hook package - a divergence, see zcode-8.md (Contract 6)
+    hooks: readHooks(root),
     nodes: readNodes(path.join(agentsDir, 'agents')),
     skills: fs.existsSync(skillsDir)
       ? fs.readdirSync(skillsDir).filter((f) => fs.statSync(path.join(skillsDir, f)).isDirectory()).sort()

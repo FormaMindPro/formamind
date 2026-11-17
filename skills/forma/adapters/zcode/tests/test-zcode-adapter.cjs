@@ -5,6 +5,8 @@
  * test-zcode-adapter.cjs - the ZCode adapter's fit test.
  * It checks:
  *  1. The presence and the content of .zcode/rules/zcode-8.md (nine contracts, the zcode: tag, the degradation divergence);
+ *  1b. The start-gate config hook: .zcode/config.json is valid JSON, hooks.enabled is true, the gate --json command is wired
+ *      on the matcher startup|resume|clear|compact (the gate is constructive, it blocks nothing - it opens the setup card);
  *  2. The adapter's shape: the core finds it by the file name, the engines.cjs contract items - all passed;
  *  3. The zone's roles parity with the canonical roles - by a regeneration (gen-roles --check);
  *  4. The spend line parse: a synthetic step and the host's real usage shape; the zcode: tag - in the core's tag wall;
@@ -45,6 +47,24 @@ it('.zcode/rules/zcode-8.md declares the nine contracts and the engine tag', () 
   assert.ok(text.includes('zcode:'), 'section 8 lacks the zcode: engine tag');
   assert.ok(/\u0434\u0435\u0433\u0440\u0430\u0434\u0438\u0440\u043e\u0432\u0430\u043d/i.test(text), 'section 8 does not name the route\u0027s degraded mode'); // the ru word pinned (data)
   assert.ok(text.includes('[STAGE:'), 'section 8 does not name the stage labels');
+});
+
+// 1b. The start gate hook: the host's workspace config delivers it on all four session events
+it('.zcode/config.json wires the gate hook (gate --json) on startup|resume|clear|compact', () => {
+  const file = path.join(root, '.zcode', 'config.json');
+  assert.ok(fs.existsSync(file), '.zcode/config.json is missing');
+  let cfg;
+  try { cfg = JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch (e) { assert.fail('.zcode/config.json is not valid JSON: ' + e.message); }
+  assert.equal(cfg.hooks && cfg.hooks.enabled, true, 'hooks.enabled is not true');
+  const groups = (cfg.hooks.events && cfg.hooks.events.SessionStart) || [];
+  assert.ok(Array.isArray(groups) && groups.length > 0, 'no SessionStart groups in config');
+  const g = groups.find((x) => String(x.matcher || '').replace(/\s+/g, '') === 'startup|resume|clear|compact');
+  assert.ok(g, 'no SessionStart group matching all four events');
+  const entry = (g.hooks || []).find((h) => h.type === 'process' && h.command === 'node');
+  assert.ok(entry, 'no process hook with command node');
+  assert.ok((entry.args || []).some((a) => a.includes('${ZCODE_PROJECT_DIR}/.forma/i18n/cli.cjs')), 'the project cli.cjs is not in the hook args');
+  assert.deepEqual((entry.args || []).slice(1), ['gate', '--json'], 'the gate --json invocation is not in the hook args');
 });
 
 // 2. The adapter's shape: all the core contract items
