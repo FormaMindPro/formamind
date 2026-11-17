@@ -132,20 +132,20 @@ test('POST /interview/answer - answers are appended verbatim, bad input - 400', 
   assert.equal(lines[0].position, 1);
 });
 
-test('GET /interview/answer - the route is POST-only: the rest goes to statics and gives 404', async () => {
+test('GET /interview/answer - the route is POST-only: a known path under a wrong method is 405', async () => {
   const r = await hit('GET', '/interview/answer', { keepBody: true });
-  assert.equal(r.status, 404);
-  assert.equal(r.body, 'not found: /interview/answer');
+  assert.equal(r.status, 405);
+  assert.deepEqual(json(r), { ok: false, error: 'method not allowed' });
 });
 
 test('/interview/open - a position without questions 400; with questions it raises the page, the second call the same one', async () => {
-  const none = await hit('GET', '/interview/open?position=5', { keepBody: true });
+  const none = await hit('POST', '/interview/open?position=5', { keepBody: true });
   assert.equal(none.status, 400);
   assert.deepEqual(json(none), { ok: false, error: 'the questions for this position are not written yet' });
-  const noParam = await hit('GET', '/interview/open', { keepBody: true });
+  const noParam = await hit('POST', '/interview/open', { keepBody: true });
   assert.equal(noParam.status, 400);
 
-  const first = await hit('GET', '/interview/open?position=1');
+  const first = await hit('POST', '/interview/open?position=1');
   assert.equal(first.status, 200, first.body);
   const a = json(first);
   assert.equal(a.ok, true);
@@ -157,11 +157,11 @@ test('/interview/open - a position without questions 400; with questions it rais
   const sessions = JSON.parse(fs.readFileSync(brief('sessions.json'), 'utf8'));
   assert.deepEqual(sessions['1'], [a.session], 'the session is written into sessions.json');
 
-  const again = json(await hit('GET', '/interview/open?position=1'));
+  const again = json(await hit('POST', '/interview/open?position=1'));
   assert.equal(again.session, a.session, 'a live session is not started a second time');
   assert.equal(again.url, a.url);
 
-  const resumed = await hit('GET', '/interview/open?position=1&resume=1');
+  const resumed = await hit('POST', '/interview/open?position=1&resume=1');
   assert.equal(resumed.status, 200);
   const r = json(resumed);
   assert.notEqual(r.session, a.session, 'a resume - a new session');
@@ -170,14 +170,14 @@ test('/interview/open - a position without questions 400; with questions it rais
 });
 
 test('/interview/expand - no node 404; the node unwinds into a live session, a repeat does not duplicate the question', async () => {
-  const miss = await hit('GET', '/interview/expand?node=absent', { keepBody: true });
+  const miss = await hit('POST', '/interview/expand?node=absent', { keepBody: true });
   assert.equal(miss.status, 404);
   assert.deepEqual(json(miss), { ok: false, error: 'node not found: absent' });
-  const noNode = await hit('GET', '/interview/expand', { keepBody: true });
+  const noNode = await hit('POST', '/interview/expand', { keepBody: true });
   assert.equal(noNode.status, 404);
   assert.deepEqual(json(noNode), { ok: false, error: 'node not found: null' });
 
-  const first = await hit('GET', '/interview/expand?node=n1');
+  const first = await hit('POST', '/interview/expand?node=n1');
   assert.equal(first.status, 200, first.body);
   const a = json(first);
   assert.equal(a.ok, true);
@@ -188,7 +188,7 @@ test('/interview/expand - no node 404; the node unwinds into a live session, a r
   assert.equal(asked.length, 1);
   assert.match(asked[0].body, new RegExp(DATA.firstNode));
 
-  const again = json(await hit('GET', '/interview/expand?node=n1'));
+  const again = json(await hit('POST', '/interview/expand?node=n1'));
   assert.equal(again.ok, true);
   assert.equal(again.session, a.session);
   assert.equal(again.existing, asked[0].id, 'an open question on a node is not duplicated');

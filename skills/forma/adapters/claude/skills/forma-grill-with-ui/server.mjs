@@ -272,7 +272,7 @@ const readBytes = (req) => new Promise((resolve, reject) => {
 // The name comes from a human and goes into the file system: everything that could lead out of
 // the session folder is cut off. The extension is kept - by it one later sees what this is.
 const safeName = (name) => {
-  const base = String(name || "file").split(/[\\/]/).pop().replace(/[\\x00-\\x1f<>:\"|?*]/g, "").trim();
+  const base = String(name || "file").split(/[\\/]/).pop().replace(/[\x00-\x1f<>:"|?*]/g, "").trim();
   return (base && base !== "." && base !== ".." ? base : "file").slice(0, 120);
 };
 

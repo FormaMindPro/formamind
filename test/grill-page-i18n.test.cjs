@@ -84,16 +84,18 @@ test('the adapter mirrors are byte-identical to the core page', () => {
 
 // ---- the browser part: the page script runs in a sandbox with fake window, document, fetch and localStorage ----
 function makeEl() {
-  return { textContent: '', innerHTML: '', title: '', hidden: false, disabled: false, className: '', value: '',
+  const el = { textContent: '', innerHTML: '', title: '', hidden: false, disabled: false, className: '', value: '',
     dataset: {}, style: {}, scrollHeight: 0,
     classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
     focus() {}, scrollIntoView() {}, setAttribute() {}, removeAttribute() {}, setSelectionRange() {},
-    appendChild() {}, insertAdjacentHTML() {}, querySelector: () => null };
+    appendChild() {}, insertAdjacentHTML() {}, querySelector: () => null, querySelectorAll: () => [] };
+  el.parentElement = el;
+  return el;
 }
 function sandbox(lang, store, stateText) {
   const els = new Map();
   const doc = {
-    documentElement: { lang: '' },
+    documentElement: { lang: '', dataset: {} },
     body: { classList: { toggle() {}, add() {}, contains: () => false } },
     activeElement: null,
     title: '',
@@ -106,7 +108,8 @@ function sandbox(lang, store, stateText) {
   doc.createElement = () => { const e = makeEl(); created.push(e); return e; };
   const ctx = {
     document: doc, Intl, Date, Math, Number, String, Object, Array, Map, Set, JSON, console, Promise,
-    isNaN, parseInt, parseFloat, encodeURIComponent, decodeURIComponent,
+    isNaN, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, URLSearchParams,
+    location: { search: '' },
     navigator: { language: lang },
     localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; } },
     setTimeout: () => 0,
