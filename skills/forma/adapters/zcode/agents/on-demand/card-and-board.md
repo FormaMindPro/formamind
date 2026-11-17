@@ -109,6 +109,18 @@ Prohibition 16 names the clean zones this keeps clean; the release check (`check
 
 There is no separate file for history or result — the task's whole life is in the one card file. Frontmatter `status`/`assignee` — §7.
 
+**How a card is written:**
+
+| Rule | What it means |
+|---|---|
+| Language | card language, headings and fields follow the project language (`project/config/PROJECT.md`) — the translation of the four zone headings is in `AGENTS.md` §6 |
+| Filename | a short, plain-language slug in the project's language — not a transliteration, not an encoded path: a word in the team's own language reads easier than `my-listing-seating` or `goal-NN-card-NN-seating.md`. Goal, cycle and card numbers live in the frontmatter (`id`/`goal`/`round`), not in the name |
+| Title of an entity card | human-facing name **plus** entity type and category, one line — in a growing series human names become indistinguishable without opening the card. Same for "what it delivers" |
+| A long field | not a table row: `\| Field \| Value \|` works while the value is short — a name, a number, a link. A seven-item criterion or a paragraph-long kit in one cell reads as unbroken text. Put it under a bold field heading (`**Readiness criterion**`) as a list, the way "History" already is |
+| Readiness criterion | checkboxes `- [ ]`/`- [x]`, not a numbered list — it is exactly a done/not-done checklist. `Run`/`Intent` mark `[x]` when an item is factually passed, without rewriting the wording. Numbered lists are for the rest of a long field, where there's no pass/fail pair |
+
+**A similar-cards search leaves one line in `## History`**, written by `Spec` at slicing: `` `Spec`, YYYY-MM-DD: Similar: card-X, card-Y. `` or, with an empty answer or no graph, `` `Spec`, YYYY-MM-DD: Similar: graph empty. ``
+
 **A card carries a code** — the `card-NNN` prefix of its filename (goals: `goal-NN`); the title may change, the code never, and everything points at the card by it.
 
 **Material born of a card** — interview records, prototypes, evidence, an external model's output — lives in `project/cards/card-NNN/`, outside the board (the card moves into `done/`, the folder must not). The folder keeps the grounds, the card keeps the decision; project material is referenced, never copied there.
