@@ -1,144 +1,983 @@
 {
   "_doc": "Machine keys of the protocol. A key is always English; the labels are only a fallback for documents written without anchors (`<!-- k:KEY -->`). The registry of the names lives here too: routes and overlays (`routeNames`), law sections (`lawSections`), prohibitions (`prohibitionNames`), named keys (`namedKeys`); a new language is a line in `languages` plus its field in each entry, and the tests require exactly the languages declared.",
   "languages": {
-    "en": ["english"],
-    "ru": ["russian", "русский"]
+    "en": [
+      "english"
+    ],
+    "ru": [
+      "russian",
+      "русский"
+    ]
   },
   "labels": {
-    "term.limit": { "match": "prefix", "en": ["limit"], "ru": ["лимит"] },
-    "term.approver": { "match": "prefix", "en": ["approved", "approval", "accepted"], "ru": ["одобр", "утверд", "согласов"] },
-    "term.budget": { "match": "prefix", "en": ["budget"], "ru": ["бюджет"] },
-    "term.stop": { "match": "prefix", "en": ["stop"], "ru": ["останов"] },
-    "term.threshold": { "match": "prefix", "en": ["budget", "threshold", "attempt"], "ru": ["бюджет", "порог", "попытк"] },
-    "term.illustration": { "match": "prefix", "en": ["caught", "capture", "found", "quote", "quoting", "citing", "example"], "ru": ["поимк", "находк", "цитат", "цитиру", "пример", "например"] },
-    "language": { "match": "prefix", "en": ["Project language"], "ru": ["Язык проекта"] },
-    "template": { "match": "prefix", "en": ["Project template"], "ru": ["Шаблон проекта"] },
-    "name": { "match": "exact", "en": ["Name"], "ru": ["Имя"] },
-    "source": { "match": "exact", "en": ["Source"], "ru": ["Источник"] },
-    "status": { "match": "exact", "en": ["Status"], "ru": ["Статус"] },
-    "thresholds": { "match": "prefix", "en": ["Thresholds", "Threshold"], "ru": ["Пороги", "Порог"] },
-    "attempts": { "match": "prefix", "en": ["Attempts"], "ru": ["Заходов"] },
-    "volume": { "match": "prefix", "en": ["Cycle volume", "Volume"], "ru": ["Объём"] },
-    "release": { "match": "prefix", "en": ["Protocol release"], "ru": ["Выпуск протокола"] },
-    "epics": { "match": "prefix", "en": ["Project epics"], "ru": ["Эпики проекта"] },
-    "services": { "match": "prefix", "en": ["External services"], "ru": ["Внешние сервисы"] },
-    "service": { "match": "exact", "en": ["Service"], "ru": ["Сервис"] },
-    "tooling": { "match": "prefix", "en": ["Node tooling"], "ru": ["Оснастка узлов"] },
-    "references": { "match": "prefix", "en": ["Project references"], "ru": ["Справочники проекта"] },
-    "zone.task": { "match": "exact", "en": ["Task"], "ru": ["Задача"] },
-    "zone.kit": { "match": "exact", "en": ["Kit"], "ru": ["Снаряжение"] },
-    "zone.history": { "match": "exact", "en": ["History"], "ru": ["История"] },
-    "zone.result": { "match": "exact", "en": ["Result"], "ru": ["Результат"] },
-    "kind.work": { "match": "exact", "en": ["work"], "ru": ["дело"] },
-    "kind.tooling": { "match": "exact", "en": ["tooling"], "ru": ["оснастка"] },
-    "kind.decision": { "match": "exact", "en": ["decision"], "ru": ["решение"] },
-    "kit.role": { "match": "prefix", "en": ["Role"], "ru": ["Роль"] },
-    "kit.access": { "match": "prefix", "en": ["Access"], "ru": ["Доступ"] },
-    "kit.model": { "match": "prefix", "en": ["Model"], "ru": ["Модель"] },
-    "kit.data": { "match": "prefix", "en": ["Data"], "ru": ["Данные"] },
-    "kit.skill": { "match": "prefix", "en": ["Skill"], "ru": ["Скилл", "Навык", "Умени"] },
-    "kit.tool": { "match": "prefix", "en": ["Tool"], "ru": ["Инструмент"] },
-    "kit.sources": { "match": "prefix", "en": ["Sources"], "ru": ["Источники"] },
-    "kit.order": { "match": "prefix", "en": ["Order"], "ru": ["Порядок"] },
-    "kit.steps": { "match": "prefix", "en": ["Steps"], "ru": ["Шаги"] },
-    "kit.forbidden": { "match": "prefix", "en": ["Forbidden"], "ru": ["Запрещено"] },
-    "kit.budget": { "match": "prefix", "en": ["Budget"], "ru": ["Бюджет"] },
-    "hist.card": { "match": "prefix", "en": ["Card"], "ru": ["Карточка", "Карточки"] },
-    "hist.attempt": { "match": "exact", "en": ["attempt"], "ru": ["заход", "попытка"] },
-    "hist.closed": { "match": "exact", "en": ["closed"], "ru": ["закрыто"] },
-    "hist.approved": { "match": "prefix", "en": ["human approved", "human accepted"], "ru": ["человек одобрил", "человек принял", "одобрил"] },
-    "hist.override": { "match": "exact", "en": ["override"], "ru": ["оверрайд", "подъём", "подъем"] },
-    "hist.window_end": { "match": "exact", "en": ["window end"], "ru": ["граница"] },
-    "hist.error": { "match": "exact", "en": ["!ERROR"], "ru": ["!ОШИБКА"] },
-    "hist.session": { "match": "exact", "en": ["session"], "ru": ["сессия"] },
-    "plumb.leader": { "match": "prefix", "en": ["leader"], "ru": ["лидер"] },
-    "plumb.gap": { "match": "prefix", "en": ["gap"], "ru": ["отрыв от второго", "отрыв", "зазор", "разрыв"] },
-    "plumb.clarity": { "match": "prefix", "en": ["clarity"], "ru": ["ясность"] },
-    "plumb.noul": { "match": "prefix", "en": ["noul"], "ru": ["noul", "ноуль"] },
-    "routes": { "match": "prefix", "en": ["Routes"], "ru": ["Маршруты"] },
-    "routes.enabled": { "match": "prefix", "en": ["Enabled routes"], "ru": ["Включённые маршруты"] },
-    "routes.over2": { "match": "prefix", "en": ["over-2"], "ru": ["over-2"] },
-    "routes.over4": { "match": "prefix", "en": ["over-4"], "ru": ["over-4"] },
-    "plumb.haiku.leader": { "match": "prefix", "en": ["Plumb haiku: leader threshold, %"], "ru": ["Plumb haiku: порог лидера, %"] },
-    "plumb.haiku.gap": { "match": "prefix", "en": ["Plumb haiku: gap threshold, pp"], "ru": ["Plumb haiku: порог отрыва от второго, п.п."] },
-    "plumb.jev.leader": { "match": "prefix", "en": ["Plumb jev: leader threshold, %"], "ru": ["Plumb jev: порог лидера, %"] },
-    "plumb.jev.gap": { "match": "prefix", "en": ["Plumb jev: gap threshold, pp"], "ru": ["Plumb jev: порог отрыва от второго, п.п."] },
-    "plumb.jev.noul": { "match": "prefix", "en": ["Plumb jev: leader noul threshold, %"], "ru": ["Plumb jev: порог noul лидера, %"] },
-    "plumb.jev.clarity": { "match": "prefix", "en": ["Plumb jev: clarity threshold, of 4"], "ru": ["Plumb jev: порог ясности, из 4"] },
-    "hist.check": { "match": "prefix", "en": ["review"], "ru": ["провер"] },
-    "hist.accepted": { "match": "prefix", "en": ["accepted"], "ru": ["принят"] },
-    "hist.route": { "match": "prefix", "en": ["route"], "ru": ["маршрут"] },
-    "run_profiles": { "match": "prefix", "en": ["Project Run profiles"], "ru": ["Профили Run проекта"] },
-    "cycle_cache": { "match": "prefix", "en": ["What goes into the cycle cache"], "ru": ["Что попадает в кэш цикла"] },
-    "routes.kit_cap": { "match": "prefix", "en": ["Kit batch cap"], "ru": ["Потолок пакета Kit"] },
-    "routes.small_task": { "match": "prefix", "en": ["route-0 threshold"], "ru": ["Порог малой задачи route-0"] },
-    "routes.parallel": { "match": "prefix", "en": ["Run parallelism"], "ru": ["Параллелизм Run в волне"] },
-    "routes.dispatcher": { "match": "prefix", "en": ["Dispatcher"], "ru": ["Диспетчер"] },
-    "routes.plumb": { "match": "prefix", "en": ["Plumb"], "ru": ["Отвес", "Plumb"] },
-    "routes.plumb_model": { "match": "prefix", "en": ["External model for plumb"], "ru": ["Внешняя модель для plumb"] },
-    "routes.default_epic": { "match": "prefix", "en": ["Default epic route"], "ru": ["Маршрут эпика по умолчанию"] },
-    "project.image": { "match": "prefix", "en": ["Image in this project"], "ru": ["Образ в этом проекте"] },
-    "project.image_default": { "match": "prefix", "en": ["Default image"], "ru": ["Образ по умолчанию"] },
-    "project.closer": { "match": "prefix", "en": ["Closed by"], "ru": ["Кто закрывает"] },
-    "project.guard": { "match": "prefix", "en": ["Guard"], "ru": ["Защита"] },
-    "id.prohibition": { "match": "prefix", "en": ["prohibition-"], "ru": ["запрет-"] },
-    "translate.col": { "match": "exact", "en": ["Translation"], "ru": ["Перевод"] },
-    "translate.service": { "match": "exact", "en": ["(service)"], "ru": ["(служебная)"] }
+    "term.limit": {
+      "match": "prefix",
+      "en": [
+        "limit"
+      ],
+      "ru": [
+        "лимит"
+      ]
+    },
+    "term.approver": {
+      "match": "prefix",
+      "en": [
+        "approved",
+        "approval",
+        "accepted"
+      ],
+      "ru": [
+        "одобр",
+        "утверд",
+        "согласов"
+      ]
+    },
+    "term.budget": {
+      "match": "prefix",
+      "en": [
+        "budget"
+      ],
+      "ru": [
+        "бюджет"
+      ]
+    },
+    "term.stop": {
+      "match": "prefix",
+      "en": [
+        "stop"
+      ],
+      "ru": [
+        "останов"
+      ]
+    },
+    "term.threshold": {
+      "match": "prefix",
+      "en": [
+        "budget",
+        "threshold",
+        "attempt"
+      ],
+      "ru": [
+        "бюджет",
+        "порог",
+        "попытк"
+      ]
+    },
+    "term.illustration": {
+      "match": "prefix",
+      "en": [
+        "caught",
+        "capture",
+        "found",
+        "quote",
+        "quoting",
+        "citing",
+        "example"
+      ],
+      "ru": [
+        "поимк",
+        "находк",
+        "цитат",
+        "цитиру",
+        "пример",
+        "например"
+      ]
+    },
+    "language": {
+      "match": "prefix",
+      "en": [
+        "Project language"
+      ],
+      "ru": [
+        "Язык проекта"
+      ]
+    },
+    "template": {
+      "match": "prefix",
+      "en": [
+        "Project template"
+      ],
+      "ru": [
+        "Шаблон проекта"
+      ]
+    },
+    "name": {
+      "match": "exact",
+      "en": [
+        "Name"
+      ],
+      "ru": [
+        "Имя"
+      ]
+    },
+    "source": {
+      "match": "exact",
+      "en": [
+        "Source"
+      ],
+      "ru": [
+        "Источник"
+      ]
+    },
+    "status": {
+      "match": "exact",
+      "en": [
+        "Status"
+      ],
+      "ru": [
+        "Статус"
+      ]
+    },
+    "thresholds": {
+      "match": "prefix",
+      "en": [
+        "Thresholds",
+        "Threshold"
+      ],
+      "ru": [
+        "Пороги",
+        "Порог"
+      ]
+    },
+    "attempts": {
+      "match": "prefix",
+      "en": [
+        "Attempts"
+      ],
+      "ru": [
+        "Заходов"
+      ]
+    },
+    "volume": {
+      "match": "prefix",
+      "en": [
+        "Cycle volume",
+        "Volume"
+      ],
+      "ru": [
+        "Объём"
+      ]
+    },
+    "release": {
+      "match": "prefix",
+      "en": [
+        "Protocol release"
+      ],
+      "ru": [
+        "Выпуск протокола"
+      ]
+    },
+    "epics": {
+      "match": "prefix",
+      "en": [
+        "Project epics"
+      ],
+      "ru": [
+        "Эпики проекта"
+      ]
+    },
+    "services": {
+      "match": "prefix",
+      "en": [
+        "External services"
+      ],
+      "ru": [
+        "Внешние сервисы"
+      ]
+    },
+    "service": {
+      "match": "exact",
+      "en": [
+        "Service"
+      ],
+      "ru": [
+        "Сервис"
+      ]
+    },
+    "tooling": {
+      "match": "prefix",
+      "en": [
+        "Node tooling"
+      ],
+      "ru": [
+        "Оснастка узлов"
+      ]
+    },
+    "references": {
+      "match": "prefix",
+      "en": [
+        "Project references"
+      ],
+      "ru": [
+        "Справочники проекта"
+      ]
+    },
+    "zone.task": {
+      "match": "exact",
+      "en": [
+        "Task"
+      ],
+      "ru": [
+        "Задача"
+      ]
+    },
+    "zone.kit": {
+      "match": "exact",
+      "en": [
+        "Kit"
+      ],
+      "ru": [
+        "Снаряжение"
+      ]
+    },
+    "zone.history": {
+      "match": "exact",
+      "en": [
+        "History"
+      ],
+      "ru": [
+        "История"
+      ]
+    },
+    "zone.result": {
+      "match": "exact",
+      "en": [
+        "Result"
+      ],
+      "ru": [
+        "Результат"
+      ]
+    },
+    "kind.work": {
+      "match": "exact",
+      "en": [
+        "work"
+      ],
+      "ru": [
+        "дело"
+      ]
+    },
+    "kind.tooling": {
+      "match": "exact",
+      "en": [
+        "tooling"
+      ],
+      "ru": [
+        "оснастка"
+      ]
+    },
+    "kind.decision": {
+      "match": "exact",
+      "en": [
+        "decision"
+      ],
+      "ru": [
+        "решение"
+      ]
+    },
+    "kit.role": {
+      "match": "prefix",
+      "en": [
+        "Role"
+      ],
+      "ru": [
+        "Роль"
+      ]
+    },
+    "kit.access": {
+      "match": "prefix",
+      "en": [
+        "Access"
+      ],
+      "ru": [
+        "Доступ"
+      ]
+    },
+    "kit.model": {
+      "match": "prefix",
+      "en": [
+        "Model"
+      ],
+      "ru": [
+        "Модель"
+      ]
+    },
+    "kit.data": {
+      "match": "prefix",
+      "en": [
+        "Data"
+      ],
+      "ru": [
+        "Данные"
+      ]
+    },
+    "kit.skill": {
+      "match": "prefix",
+      "en": [
+        "Skill"
+      ],
+      "ru": [
+        "Скилл",
+        "Навык",
+        "Умени"
+      ]
+    },
+    "kit.tool": {
+      "match": "prefix",
+      "en": [
+        "Tool"
+      ],
+      "ru": [
+        "Инструмент"
+      ]
+    },
+    "kit.sources": {
+      "match": "prefix",
+      "en": [
+        "Sources"
+      ],
+      "ru": [
+        "Источники"
+      ]
+    },
+    "kit.order": {
+      "match": "prefix",
+      "en": [
+        "Order"
+      ],
+      "ru": [
+        "Порядок"
+      ]
+    },
+    "kit.steps": {
+      "match": "prefix",
+      "en": [
+        "Steps"
+      ],
+      "ru": [
+        "Шаги"
+      ]
+    },
+    "kit.forbidden": {
+      "match": "prefix",
+      "en": [
+        "Forbidden"
+      ],
+      "ru": [
+        "Запрещено"
+      ]
+    },
+    "kit.budget": {
+      "match": "prefix",
+      "en": [
+        "Budget"
+      ],
+      "ru": [
+        "Бюджет"
+      ]
+    },
+    "hist.card": {
+      "match": "prefix",
+      "en": [
+        "Card"
+      ],
+      "ru": [
+        "Карточка",
+        "Карточки"
+      ]
+    },
+    "hist.attempt": {
+      "match": "exact",
+      "en": [
+        "attempt"
+      ],
+      "ru": [
+        "заход",
+        "попытка"
+      ]
+    },
+    "hist.closed": {
+      "match": "exact",
+      "en": [
+        "closed"
+      ],
+      "ru": [
+        "закрыто"
+      ]
+    },
+    "hist.approved": {
+      "match": "prefix",
+      "en": [
+        "human approved",
+        "human accepted"
+      ],
+      "ru": [
+        "человек одобрил",
+        "человек принял",
+        "одобрил"
+      ]
+    },
+    "hist.override": {
+      "match": "exact",
+      "en": [
+        "override"
+      ],
+      "ru": [
+        "оверрайд",
+        "подъём",
+        "подъем"
+      ]
+    },
+    "hist.window_end": {
+      "match": "exact",
+      "en": [
+        "window end"
+      ],
+      "ru": [
+        "граница"
+      ]
+    },
+    "hist.error": {
+      "match": "exact",
+      "en": [
+        "!ERROR"
+      ],
+      "ru": [
+        "!ОШИБКА"
+      ]
+    },
+    "hist.session": {
+      "match": "exact",
+      "en": [
+        "session"
+      ],
+      "ru": [
+        "сессия"
+      ]
+    },
+    "plumb.leader": {
+      "match": "prefix",
+      "en": [
+        "leader"
+      ],
+      "ru": [
+        "лидер"
+      ]
+    },
+    "plumb.gap": {
+      "match": "prefix",
+      "en": [
+        "gap"
+      ],
+      "ru": [
+        "отрыв от второго",
+        "отрыв",
+        "зазор",
+        "разрыв"
+      ]
+    },
+    "plumb.clarity": {
+      "match": "prefix",
+      "en": [
+        "clarity"
+      ],
+      "ru": [
+        "ясность"
+      ]
+    },
+    "plumb.noul": {
+      "match": "prefix",
+      "en": [
+        "noul"
+      ],
+      "ru": [
+        "noul",
+        "ноуль"
+      ]
+    },
+    "routes": {
+      "match": "prefix",
+      "en": [
+        "Routes"
+      ],
+      "ru": [
+        "Маршруты"
+      ]
+    },
+    "routes.enabled": {
+      "match": "prefix",
+      "en": [
+        "Enabled routes"
+      ],
+      "ru": [
+        "Включённые маршруты"
+      ]
+    },
+    "routes.over2": {
+      "match": "prefix",
+      "en": [
+        "over-2"
+      ],
+      "ru": [
+        "over-2"
+      ]
+    },
+    "routes.over4": {
+      "match": "prefix",
+      "en": [
+        "over-4"
+      ],
+      "ru": [
+        "over-4"
+      ]
+    },
+    "plumb.haiku.leader": {
+      "match": "prefix",
+      "en": [
+        "Plumb haiku: leader threshold, %"
+      ],
+      "ru": [
+        "Plumb haiku: порог лидера, %"
+      ]
+    },
+    "plumb.haiku.gap": {
+      "match": "prefix",
+      "en": [
+        "Plumb haiku: gap threshold, pp"
+      ],
+      "ru": [
+        "Plumb haiku: порог отрыва от второго, п.п."
+      ]
+    },
+    "plumb.jev.leader": {
+      "match": "prefix",
+      "en": [
+        "Plumb jev: leader threshold, %"
+      ],
+      "ru": [
+        "Plumb jev: порог лидера, %"
+      ]
+    },
+    "plumb.jev.gap": {
+      "match": "prefix",
+      "en": [
+        "Plumb jev: gap threshold, pp"
+      ],
+      "ru": [
+        "Plumb jev: порог отрыва от второго, п.п."
+      ]
+    },
+    "plumb.jev.noul": {
+      "match": "prefix",
+      "en": [
+        "Plumb jev: leader noul threshold, %"
+      ],
+      "ru": [
+        "Plumb jev: порог noul лидера, %"
+      ]
+    },
+    "plumb.jev.clarity": {
+      "match": "prefix",
+      "en": [
+        "Plumb jev: clarity threshold, of 4"
+      ],
+      "ru": [
+        "Plumb jev: порог ясности, из 4"
+      ]
+    },
+    "hist.check": {
+      "match": "prefix",
+      "en": [
+        "review"
+      ],
+      "ru": [
+        "провер"
+      ]
+    },
+    "hist.accepted": {
+      "match": "prefix",
+      "en": [
+        "accepted"
+      ],
+      "ru": [
+        "принят"
+      ]
+    },
+    "hist.route": {
+      "match": "prefix",
+      "en": [
+        "route"
+      ],
+      "ru": [
+        "маршрут"
+      ]
+    },
+    "run_profiles": {
+      "match": "prefix",
+      "en": [
+        "Project Run profiles"
+      ],
+      "ru": [
+        "Профили Run проекта"
+      ]
+    },
+    "cycle_cache": {
+      "match": "prefix",
+      "en": [
+        "What goes into the cycle cache"
+      ],
+      "ru": [
+        "Что попадает в кэш цикла"
+      ]
+    },
+    "routes.kit_cap": {
+      "match": "prefix",
+      "en": [
+        "Kit batch cap"
+      ],
+      "ru": [
+        "Потолок пакета Kit"
+      ]
+    },
+    "routes.small_task": {
+      "match": "prefix",
+      "en": [
+        "route-0 threshold"
+      ],
+      "ru": [
+        "Порог малой задачи route-0"
+      ]
+    },
+    "routes.parallel": {
+      "match": "prefix",
+      "en": [
+        "Run parallelism"
+      ],
+      "ru": [
+        "Параллелизм Run в волне"
+      ]
+    },
+    "routes.dispatcher": {
+      "match": "prefix",
+      "en": [
+        "Dispatcher"
+      ],
+      "ru": [
+        "Диспетчер"
+      ]
+    },
+    "routes.plumb": {
+      "match": "prefix",
+      "en": [
+        "Plumb"
+      ],
+      "ru": [
+        "Отвес",
+        "Plumb"
+      ]
+    },
+    "routes.plumb_model": {
+      "match": "prefix",
+      "en": [
+        "External model for plumb"
+      ],
+      "ru": [
+        "Внешняя модель для plumb"
+      ]
+    },
+    "routes.default_epic": {
+      "match": "prefix",
+      "en": [
+        "Default epic route"
+      ],
+      "ru": [
+        "Маршрут эпика по умолчанию"
+      ]
+    },
+    "project.image": {
+      "match": "prefix",
+      "en": [
+        "Image in this project"
+      ],
+      "ru": [
+        "Образ в этом проекте"
+      ]
+    },
+    "project.image_default": {
+      "match": "prefix",
+      "en": [
+        "Default image"
+      ],
+      "ru": [
+        "Образ по умолчанию"
+      ]
+    },
+    "project.closer": {
+      "match": "prefix",
+      "en": [
+        "Closed by"
+      ],
+      "ru": [
+        "Кто закрывает"
+      ]
+    },
+    "project.guard": {
+      "match": "prefix",
+      "en": [
+        "Guard"
+      ],
+      "ru": [
+        "Защита"
+      ]
+    },
+    "id.prohibition": {
+      "match": "prefix",
+      "en": [
+        "prohibition-"
+      ],
+      "ru": [
+        "запрет-"
+      ]
+    },
+    "translate.col": {
+      "match": "exact",
+      "en": [
+        "Translation"
+      ],
+      "ru": [
+        "Перевод"
+      ]
+    },
+    "translate.service": {
+      "match": "exact",
+      "en": [
+        "(service)"
+      ],
+      "ru": [
+        "(служебная)"
+      ]
+    }
   },
   "phrases": {
-    "unset": ["not set", "не задан"],
-    "attempt": ["attempt", "заход"],
-    "awaiting_decision": ["awaiting a decision", "awaiting decision", "ожидает решени", "ожидают решени", "ожидание решени", "ждёт решени"],
-    "manual_window": ["set by --from/--to", "задано --from/--to"],
-    "access_unconfirmed": ["unconfirmed", "неподтвержд"],
-    "access_ok": ["confirmed", "not needed", "none", "подтвержд", "не нужен", "не требуется"],
-    "roadmap_placeholder": ["<The whole>", "<name of a part of the product>", "<Целое>", "<имя>"]
+    "unset": [
+      "not set",
+      "не задан"
+    ],
+    "attempt": [
+      "attempt",
+      "заход"
+    ],
+    "awaiting_decision": [
+      "awaiting a decision",
+      "awaiting decision",
+      "ожидает решени",
+      "ожидают решени",
+      "ожидание решени",
+      "ждёт решени"
+    ],
+    "manual_window": [
+      "set by --from/--to",
+      "задано --from/--to"
+    ],
+    "access_unconfirmed": [
+      "unconfirmed",
+      "неподтвержд"
+    ],
+    "access_ok": [
+      "confirmed",
+      "not needed",
+      "none",
+      "подтвержд",
+      "не нужен",
+      "не требуется"
+    ],
+    "roadmap_placeholder": [
+      "<The whole>",
+      "<name of a part of the product>",
+      "<Целое>",
+      "<имя>"
+    ]
   },
   "routeNames": {
-    "route-0": { "key": "intent-self", "en": "on the fly", "ru": "на ходу" },
-    "route-1": { "key": "intent-copy", "en": "the double", "ru": "двойник" },
-    "route-2": { "key": "intent-run", "en": "the errand", "ru": "поручение" },
-    "route-3": { "key": "intent-kit-human", "en": "the council", "ru": "совет" },
-    "route-4": { "key": "intent-kit-intent", "en": "the workshop", "ru": "мастерская" },
-    "route-5": { "key": "intent-kit-run", "en": "made to order", "ru": "под заказ" },
-    "route-6": { "key": "spec-run", "en": "by the pattern", "ru": "по образцу" },
-    "route-7": { "key": "spec-kit-run", "en": "full ahead", "ru": "полный ход" },
-    "route-8": { "key": "segments-waves", "en": "the build", "ru": "стройка" },
-    "over-1": { "key": "kit-library", "en": "the warehouse", "ru": "склад" },
-    "over-2": { "key": "external-model", "en": "the contractor", "ru": "подряд" },
-    "over-3": { "key": "series", "en": "the print run", "ru": "тираж" },
-    "over-4": { "key": "batch-accept", "en": "the lot", "ru": "партия" }
+    "route-0": {
+      "key": "intent-self",
+      "en": "on the fly",
+      "ru": "на ходу"
+    },
+    "route-1": {
+      "key": "intent-copy",
+      "en": "the double",
+      "ru": "двойник"
+    },
+    "route-2": {
+      "key": "intent-run",
+      "en": "the errand",
+      "ru": "поручение"
+    },
+    "route-3": {
+      "key": "intent-kit-human",
+      "en": "the council",
+      "ru": "совет"
+    },
+    "route-4": {
+      "key": "intent-kit-intent",
+      "en": "the workshop",
+      "ru": "мастерская"
+    },
+    "route-5": {
+      "key": "intent-kit-run",
+      "en": "made to order",
+      "ru": "под заказ"
+    },
+    "route-6": {
+      "key": "spec-run",
+      "en": "by the pattern",
+      "ru": "по образцу"
+    },
+    "route-7": {
+      "key": "spec-kit-run",
+      "en": "full ahead",
+      "ru": "полный ход"
+    },
+    "route-8": {
+      "key": "segments-waves",
+      "en": "the build",
+      "ru": "стройка"
+    },
+    "over-1": {
+      "key": "kit-library",
+      "en": "the warehouse",
+      "ru": "склад"
+    },
+    "over-2": {
+      "key": "external-model",
+      "en": "the contractor",
+      "ru": "подряд"
+    },
+    "over-3": {
+      "key": "series",
+      "en": "the print run",
+      "ru": "тираж"
+    },
+    "over-4": {
+      "key": "batch-accept",
+      "en": "the lot",
+      "ru": "партия"
+    }
   },
   "lawSections": {
-    "law-1": { "en": "Five pairs", "ru": "Пять пар" },
-    "law-2": { "en": "Route", "ru": "Маршрут" },
-    "law-3": { "en": "Thresholds", "ru": "Пороги" },
-    "law-4": { "en": "Position marker", "ru": "Вешка" },
-    "law-5": { "en": "Prohibitions", "ru": "Запреты" },
-    "law-6": { "en": "Card and form check", "ru": "Карточка и форма" },
-    "law-7": { "en": "Board", "ru": "Доска" }
+    "law-1": {
+      "en": "Five pairs",
+      "ru": "Пять пар"
+    },
+    "law-2": {
+      "en": "Route",
+      "ru": "Маршрут"
+    },
+    "law-3": {
+      "en": "Thresholds",
+      "ru": "Пороги"
+    },
+    "law-4": {
+      "en": "Position marker",
+      "ru": "Вешка"
+    },
+    "law-5": {
+      "en": "Prohibitions",
+      "ru": "Запреты"
+    },
+    "law-6": {
+      "en": "Card and form check",
+      "ru": "Карточка и форма"
+    },
+    "law-7": {
+      "en": "Board",
+      "ru": "Доска"
+    }
   },
   "prohibitionNames": {
-    "prohibition-1": { "en": "foreign acceptance", "ru": "чужая приёмка" },
-    "prohibition-2": { "en": "exact address", "ru": "точный адрес" },
-    "prohibition-3": { "en": "budget through a stop", "ru": "бюджет через стоп" },
-    "prohibition-4": { "en": "own threshold", "ru": "свой порог" },
-    "prohibition-5": { "en": "journal as is", "ru": "журнал как есть" },
-    "prohibition-6": { "en": "example is no measure", "ru": "пример — не мера" },
-    "prohibition-7": { "en": "clean card", "ru": "чистая карточка" },
-    "prohibition-8": { "en": "goal under lock", "ru": "цель под замком" },
-    "prohibition-9": { "en": "cache of the unchanging", "ru": "кэш неизменного" },
-    "prohibition-10": { "en": "a return changes the kit", "ru": "возврат меняет снаряжение" },
-    "prohibition-11": { "en": "instruction into the record", "ru": "указание — в запись" },
-    "prohibition-12": { "en": "a foreign defect goes back", "ru": "чужой дефект — назад" },
-    "prohibition-13": { "en": "address and expectation", "ru": "адрес и ожидание" },
-    "prohibition-14": { "en": "second diagnosis is a stop", "ru": "второй диагноз — стоп" },
-    "prohibition-15": { "en": "key in one house", "ru": "ключ в одном доме" },
-    "prohibition-16": { "en": "clean zones", "ru": "чистые зоны" },
-    "prohibition-17": { "en": "exit through the scrub", "ru": "выход через скраб" },
-    "prohibition-18": { "en": "commit in English", "ru": "коммит по-английски" }
+    "prohibition-1": {
+      "en": "foreign acceptance",
+      "ru": "чужая приёмка"
+    },
+    "prohibition-2": {
+      "en": "exact address",
+      "ru": "точный адрес"
+    },
+    "prohibition-3": {
+      "en": "budget through a stop",
+      "ru": "бюджет через стоп"
+    },
+    "prohibition-4": {
+      "en": "own threshold",
+      "ru": "свой порог"
+    },
+    "prohibition-5": {
+      "en": "journal as is",
+      "ru": "журнал как есть"
+    },
+    "prohibition-6": {
+      "en": "example is no measure",
+      "ru": "пример — не мера"
+    },
+    "prohibition-7": {
+      "en": "clean card",
+      "ru": "чистая карточка"
+    },
+    "prohibition-8": {
+      "en": "goal under lock",
+      "ru": "цель под замком"
+    },
+    "prohibition-9": {
+      "en": "cache of the unchanging",
+      "ru": "кэш неизменного"
+    },
+    "prohibition-10": {
+      "en": "a return changes the kit",
+      "ru": "возврат меняет снаряжение"
+    },
+    "prohibition-11": {
+      "en": "instruction into the record",
+      "ru": "указание — в запись"
+    },
+    "prohibition-12": {
+      "en": "a foreign defect goes back",
+      "ru": "чужой дефект — назад"
+    },
+    "prohibition-13": {
+      "en": "address and expectation",
+      "ru": "адрес и ожидание"
+    },
+    "prohibition-14": {
+      "en": "second diagnosis is a stop",
+      "ru": "второй диагноз — стоп"
+    },
+    "prohibition-15": {
+      "en": "key in one house",
+      "ru": "ключ в одном доме"
+    },
+    "prohibition-16": {
+      "en": "clean zones",
+      "ru": "чистые зоны"
+    },
+    "prohibition-17": {
+      "en": "exit through the scrub",
+      "ru": "выход через скраб"
+    },
+    "prohibition-18": {
+      "en": "commit in English",
+      "ru": "коммит по-английски"
+    }
   },
   "namedKeys": {
-    "plumb": { "en": "Plumb", "ru": "отвес" }
+    "plumb": {
+      "en": "Plumb",
+      "ru": "отвес"
+    }
+  },
+  "cardMask": {
+    "key": "card-mask",
+    "en": "Card-{n} \"{title}\"",
+    "ru": "Задача-{n} «{title}»"
   }
 }

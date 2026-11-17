@@ -71,7 +71,7 @@ for (const loc of LOCATIONS) {
       assert.equal(page.status, 200);
       assert.match(page.headers['content-type'], /text\/html/);
       assert.equal(page.headers['cache-control'], 'no-store');
-      assert.equal(page.body, fs.readFileSync(path.join(fx.root, ...loc.slice(0, -1), 'page.html'), 'utf8'));
+      assert.equal(page.body, fs.readFileSync(path.join(fx.root, ...loc.slice(0, -1), 'page.html'), 'utf8').replace('__GRILL_THEME__', 'system'));
 
       const state = await request(s.port, 'GET', '/state');
       assert.equal(state.status, 200);

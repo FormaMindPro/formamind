@@ -87,7 +87,7 @@ Not every interview opens a goal: a card whose *shape* only the human can settle
 
 **Before the first call of any node on a task** - a route picked after work began is a record, not a choice. The rule, overlays, labels, the reason line - `on-demand/route-choice.md`, read exactly then; the enabled routes - `project/config/PROJECT.md`, "Routes". Two lines of it: a stable end-image opens maximum decomposition (`route-8` / `route-7`), fog or an unknown stack - the adaptive spectrum (`route-0`…`route-5`, `over-2`…`over-4`) by economy.
 
-**The human approves the five fields of `route-0`…`route-5` before the first call** (§6); every reply that mentions a route names it - never a bare number. A card of wave N+1 is taken into work once every `after-card-*` it names is accepted (`card-and-board.md` §7).
+**The human approves the five fields of `route-0`…`route-5` before the first call** (§6); every reply that mentions a route names it - never a bare number. A card of wave N+1 is taken into work once every `after-card-*` it names is accepted (`card-and-board.md` §7). A card named in a reply travels by the dictionary mask `cardMask` (`keys.json`) — `Задача-12 «Название»` — the address stays precise (skill `human-register`).
 
 ## Each task
 

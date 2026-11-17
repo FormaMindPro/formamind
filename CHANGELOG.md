@@ -3,6 +3,14 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.30] - 2026-11-17
+### Added
+- `cardMask` in `skills/forma/core/i18n/keys.json`: the chat rendering of a card's name becomes a dictionary mask, not per-role prose - `Card-{n} "{title}"` (en), `Задача-{n} «{title}»` (ru); the rule pointers travel in `intent.md` (claude, gemini, zcode adapters), `NAMES.md` (en, ru) and the codex `human-register` mirror.
+### Changed
+- `forma-grill-with-ui` synced to upstream: dark theme, question importance levels, answer ratings, inline markdown rendering of question bodies (new `markdown.mjs`), a `--lan` mode for answering from a second machine behind a per-serve access token, and request hardening on the interview server (Host allowlist, Origin checks, a 1 MB body limit); per-language locales (en, ru) - a new pair in the codex mirror, extended in the core copy; the sync lands in the core canon and the claude and codex adapter mirrors (gemini and zcode read the core canon natively).
+### Fixed
+- dashboard server hardening: the listener binds loopback by default (`FORMA_DASH_HOST` is the escape hatch for an unusual setup), every request passes a Host allowlist (DNS rebinding), the interview state routes take POST with an Origin check (CSRF - a browser sets Origin on every cross-site POST; curl and tests send none and pass), and the static path check computes `path.relative` instead of a string prefix; the guards live in `dashboard/lib/http-guards.cjs`, covered by the new `serve-routes.test.cjs`.
+
 ## [0.0.29] - 2026-11-17
 ### Added
 - grilling: word each question so "yes" accepts its recommended answer - the body of a frontier question is phrased so that agreement with the round's recommended answer takes one word, not a restatement; the technique lands in the source (`core/skills/grilling`) and the claude and minimax mirrors, closing the gap the codex mirror carried alone since 0.0.28.

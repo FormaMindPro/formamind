@@ -19,6 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync, spawn } = require('child_process');
 const { writeJsonAtomic } = require('./lib/fs.cjs');
+const guards = require('./lib/http-guards.cjs');
 const i18n = require('./lib/i18n.cjs');
 const { DEFAULT_PORT } = require('./port.cjs');
 // Canonical English strings of the console log live in the core dictionary; the log language is fixed.
@@ -40,6 +41,9 @@ const SERVER_FILE = path.join(CACHE_DIR, 'server.json');
 const DEBOUNCE_MS = 300;
 const GRILL_WAIT_MS = 8000;              // how long to wait for the interview page to come up
 const MAX_ANSWER_BYTES = 256 * 1024;     // a human answer, not a file
+// Loopback only: the dashboard serves this machine's human, never a network (the grill server made
+// the same choice). FORMA_DASH_HOST is the escape hatch for an unusual setup.
+const HOST = process.env.FORMA_DASH_HOST || '127.0.0.1';
 
 fs.mkdirSync(CACHE_DIR, { recursive: true });
 
@@ -624,7 +628,7 @@ function handleAnswer(req, res) {
 function handleStatic(req, res, urlPath) {
   const base = urlPath.startsWith('/graphs/') ? path.join(PROJECT_ROOT, '.forma/living') : ROOT;
   const filePath = path.join(base, urlPath === '/' ? 'index.html' : urlPath);
-  if (!filePath.startsWith(base)) { res.writeHead(403); res.end('forbidden'); return; }
+  if (!guards.pathUnder(base, filePath)) { res.writeHead(403); res.end('forbidden'); return; }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); res.end('not found: ' + urlPath); return; }
     // The board is live, and its page is never cached. Without this the browser is free to show
@@ -643,12 +647,14 @@ function handleLocales(req, res) { sendJson(res, 200, { default: i18n.FALLBACK, 
 
 // The routes table: method + path -> a `(req, res)` function. No row - `handleStatic`.
 // ANY - a route that never looked at the method, even before the table; left so on purpose, so that request parsing does not change behavior.
+// `state: true` - the row changes this machine's state (sessions, the brief): POST only, and the
+// Origin guard applies, so that a foreign page cannot make the browser exercise it. Read-only rows stay ANY.
 const ANY = '*';
 const ROUTES = [
   { method: ANY, path: '/events', handle: handleEvents },
-  { method: ANY, path: '/interview/expand', handle: handleExpand },
-  { method: ANY, path: '/interview/open', handle: handleOpen },
-  { method: 'POST', path: '/interview/answer', handle: handleAnswer },
+  { method: 'POST', state: true, path: '/interview/expand', handle: handleExpand },
+  { method: 'POST', state: true, path: '/interview/open', handle: handleOpen },
+  { method: 'POST', state: true, path: '/interview/answer', handle: handleAnswer },
   { method: ANY, path: '/data.json', handle: handleData },
   { method: ANY, path: '/locales.json', handle: handleLocales },
 ];
@@ -664,12 +670,27 @@ function decodePath(rawUrl) {
   } catch { return null; }
 }
 
+// The port the listener actually took; the Host/Origin guards compare against it. Requests cannot
+// arrive before `listening` fires, so it is always set by the time a request needs it.
+let serverPort = null;
+
 function handleRequest(req, res) {
   const urlPath = decodePath(req.url);
   if (urlPath === null) return sendJson(res, 400, { ok: false, error: 'bad address' });
+  // The Host guard is against DNS rebinding: a page whose hostname re-points at 127.0.0.1 becomes
+  // "same-origin" in the browser's eyes, but it still must say its own name in Host - and a Host
+  // this server never printed (`localhost:<port>` is all it ever says) is refused.
+  if (!guards.hostAllowed(req.headers.host, serverPort)) return sendJson(res, 403, { ok: false, error: 'foreign host' });
   const route = findRoute(req.method, urlPath);
-  if (route) route.handle(req, res);
-  else handleStatic(req, res, urlPath);
+  if (route) {
+    // State rows carry the Origin guard: a browser sets Origin on every cross-site POST, so a
+    // foreign page driving this machine's state through the human's browser is stopped here.
+    if (route.state && !guards.originAllowed(req.headers.origin, serverPort))
+      return sendJson(res, 403, { ok: false, error: 'cross-origin request rejected' });
+    return route.handle(req, res);
+  }
+  if (ROUTES.some((r) => r.path === urlPath)) return sendJson(res, 405, { ok: false, error: 'method not allowed' });
+  handleStatic(req, res, urlPath);
 }
 
 // ---------- startup ----------
@@ -688,7 +709,7 @@ function onServerError(err) {
   if (!srv.listening && attempt !== 0 && err.code === 'EADDRINUSE') {
     console.log(logMsg('serve.port_busy', { port: attempt }));
     attempt = 0;
-    srv.listen(0);
+    srv.listen(0, HOST);
     return;
   }
   console.error(logMsg('serve.server_error'), err.message);
@@ -697,6 +718,7 @@ function onServerError(err) {
 
 function onListening() {
   const { port } = srv.address();
+  serverPort = port;
   const url = `http://localhost:${port}/`;
   writeJsonAtomic(SERVER_FILE, { url, port, pid: process.pid, started: new Date().toISOString() });
   console.log(logMsg('serve.started', { url }));
@@ -710,4 +732,4 @@ function onListening() {
 
 srv.on('error', onServerError);
 srv.on('listening', onListening);
-srv.listen(attempt);
+srv.listen(attempt, HOST);

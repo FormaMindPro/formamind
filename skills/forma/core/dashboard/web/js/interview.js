@@ -206,7 +206,7 @@ function mdHtml(src){
 // meanwhile "what else shall we talk about" would mean making them recall what is
 // right in front of their eyes. The question is assembled from the item itself, on the server.
 function expandNode(id){
-  fetch('/interview/expand?node=' + encodeURIComponent(id)).then(r => r.json()).then(r => {
+  fetch('/interview/expand?node=' + encodeURIComponent(id), { method: 'POST' }).then(r => r.json()).then(r => {
     if (!r.ok) { alert(t('iv.err.grow', {err: r.error})); return; }
     const w = window.open(r.url, 'forma-grill-' + r.position);
     if (!w) alert(t('iv.err.popup', {url: r.url}));
@@ -221,7 +221,7 @@ function expandNode(id){
 function openPosition(n, resume){
   const btn = document.querySelector(`#interview [data-pos="${n}"]`);
   if (btn) { btn.disabled = true; btn.textContent = t('iv.opening'); }
-  fetch('/interview/open?position=' + n + (resume ? '&resume=1' : '')).then(r => r.json()).then(r => {
+  fetch('/interview/open?position=' + n + (resume ? '&resume=1' : ''), { method: 'POST' }).then(r => r.json()).then(r => {
     if (btn) { btn.disabled = false; btn.textContent = t('iv.openBtn'); }
     if (!r.ok) { alert(t('iv.err.open', {err: r.error})); return; }
     // A named window, not an unnamed one: a second click on the same position returns
