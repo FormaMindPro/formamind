@@ -24,7 +24,26 @@ const i18n = require('../skills/forma/core/i18n/index.cjs');
 const tr = (code, params) => i18n.message(code, params, 'en');
 
 const root = process.cwd();
-const proto = path.join(root, '.forma/protocol');
+
+// Git directories, not the assumption that `.git` is a directory: in a linked worktree `.git` is a file and the
+// real directories live under the main clone's `.git/worktrees/<name>`. The common dir is shared by every worktree,
+// so the pre-commit hook goes there once for all of them. No answer from git - the plain `.git` of the root.
+function gitDirOf(dir, flag) {
+  const r = gitRun(dir, 'rev-parse', '--path-format=absolute', flag);
+  const lines = r.code === 0 ? r.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : [];
+  return path.resolve(lines.find((l) => /^[A-Za-z]:[\\/]|^\//.test(l)) || path.join(dir, '.git'));
+}
+const GIT_DIR = gitDirOf(root, '--git-dir');
+const COMMON_DIR = gitDirOf(root, '--git-common-dir');
+const LINKED = GIT_DIR !== COMMON_DIR;
+const MAIN_ROOT = LINKED ? path.dirname(COMMON_DIR) : root;
+
+// The protocol clone: the worktree's own copy once its submodule is initialized, otherwise the main clone's -
+// a linked worktree starts without one. No clone in either place is still a stop.
+const protoLocal = path.join(root, '.forma/protocol');
+const protoMain = path.join(MAIN_ROOT, '.forma/protocol');
+const proto = fs.existsSync(path.join(protoLocal, '.git')) ? protoLocal
+  : LINKED && fs.existsSync(path.join(protoMain, '.git')) ? protoMain : protoLocal;
 const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
 const toAt = args.indexOf('--to'); // --release --to X.Y.Z: release with the named version instead of +1 to the patch
@@ -177,15 +196,20 @@ function release() {
 }
 const ENG = '.claude/scripts/sync-engines.cjs';
 const CDX = '.codex/scripts/sync-codex.cjs';
-const E2P = '.forma/protocol/scripts/engine-to-protocol.cjs';
+// The engine's script of the resolved clone: a relative path in a normal tree, the main clone's absolute path in a
+// linked worktree whose own submodule is not initialized - the object of the check is the same template either way.
+const E2P = proto === protoLocal ? '.forma/protocol/scripts/engine-to-protocol.cjs' : path.join(proto, 'scripts', 'engine-to-protocol.cjs');
 function codexDormant() { try { return JSON.parse(fs.readFileSync('.forma/engines.json', 'utf8')).dormant.includes('codex'); } catch { return false; } }
 
 // The project's pre-commit: any commit, a plain git commit too, carries Claude -> Gemini/Codex
 // and takes their files into the same commit. Carrying into the protocol source and the version - still forma-commit.
 // First in the hook is the version-freeze gate (goal-freeze.cjs): if this constant rewrites the hook, the gate restores it itself.
-const HOOK = path.join(root, '.git', 'hooks', 'pre-commit');
-const HOOK_BODY = '#!/bin/sh\n# forma: ' + tr('board.goal-freeze.wire_comment') + '\nnode .forma/board/checks/goal-freeze.cjs --staged || exit 1\n# forma: ' + tr('board.goal-freeze.hook_fallback_comment') + '\nexec node .forma/protocol/scripts/forma-commit.cjs --sync-staged\n';
+// The hook lives in the common dir - one hook for the main clone and its worktrees. Its body finds the script by itself:
+// a worktree without the submodule falls back to the first worktree of the list, which is the main clone.
+const HOOK = path.join(COMMON_DIR, 'hooks', 'pre-commit');
+const HOOK_BODY = '#!/bin/sh\n# forma: ' + tr('board.goal-freeze.wire_comment') + '\nnode .forma/board/checks/goal-freeze.cjs --staged || exit 1\n# forma: ' + tr('board.goal-freeze.hook_fallback_comment') + '\nscript=".forma/protocol/scripts/forma-commit.cjs"\n[ -f "$script" ] || script="$(git worktree list --porcelain | sed -n \'s/^worktree //p\' | head -n 1)/.forma/protocol/scripts/forma-commit.cjs"\nexec node "$script" --sync-staged\n';
 function installHook() {
+  fs.mkdirSync(path.dirname(HOOK), { recursive: true });
   fs.writeFileSync(HOOK, HOOK_BODY);
   try { fs.chmodSync(HOOK, 0o755); } catch { /* a filesystem without chmod (Windows) - git runs the hook anyway */ }
 }
@@ -193,16 +217,18 @@ if (has('--install-hook')) { installHook(); ok(tr('commit.hook_installed_path', 
 try { if (fs.readFileSync(HOOK, 'utf8') !== HOOK_BODY) throw 0; } catch { installHook(); ok(tr('commit.hook_installed_check')); }
 
 // The protocol clone's hooks: a commit or push carrying project traces (card codes, dates, site names) is impossible past forma-commit too.
+// They go into the protocol repository's real git dir: a submodule has `.git` as a file, and a write into `<proto>/.git/hooks` fails silently there.
+const PROTO_GIT_DIR = gitDirOf(proto, '--git-dir');
 const PROTO_HOOKS = {
   'pre-commit': 'node scripts/check-release.cjs --traces',
   'commit-msg': 'node scripts/check-release.cjs --message "$1"',
   'pre-push': 'node scripts/check-release.cjs --prepush',
 };
 for (const [name, cmd] of Object.entries(PROTO_HOOKS)) {
-  const f = path.join(proto, '.git', 'hooks', name);
+  const f = path.join(PROTO_GIT_DIR, 'hooks', name);
   const body = tr('commit.hook_proto_body', { cmd });
   try { if (fs.readFileSync(f, 'utf8') === body) continue; } catch { /* no hook */ }
-  try { fs.writeFileSync(f, body); fs.chmodSync(f, 0o755); } catch { /* a filesystem without chmod - git runs the hook anyway */ }
+  try { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, body); fs.chmodSync(f, 0o755); } catch { /* a filesystem without chmod - git runs the hook anyway */ }
 }
 
 // Engine parity. Unclosed Core cards are not engine drift: a warning, not a stop.
@@ -273,6 +299,10 @@ if (has('--check')) {
   ok(tr('commit.no_drift'));
   process.exit(0);
 }
+
+// A linked worktree shares the branch and the refs with the main clone: a protocol commit, a release or a push
+// from here would move the main clone's `dev` under it. The checks stay available; the commit runs from MAIN_ROOT.
+if (LINKED && (msg || has('--release') || has('--push'))) stop(tr('commit.linked_worktree_stop', { main: MAIN_ROOT }));
 
 // --push without a message - pushing the already made commits only.
 if (!msg && !has('--push') && !has('--release')) stop(tr('commit.need_message'), 2);

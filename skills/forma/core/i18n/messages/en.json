@@ -1053,6 +1053,7 @@
   "commit.dev_behind_main": "dev did not catch up with main:\n{out}",
   "commit.push_dev_failed": "push protocol/ dev failed:\n{out}",
   "commit.mark_failed": "! --mark did not record the base (engine and template diverge) - the next check will show false conflicts:\n{out}",
+  "commit.linked_worktree_stop": "this is a linked worktree: it shares the branch and the refs with the main clone, so a protocol commit, release or push runs from {main}; here --check, --sync-staged and --install-hook stay available.",
   "commit.pushed": "protocol/ pushed: main and dev",
   "commit.gh_release_created": "GitHub Release v{v} created via the gh CLI",
   "commit.gh_release_failed": "! gh release create failed, GitHub Actions will pick the release up:\n{out}",

@@ -1052,6 +1052,7 @@
   "commit.dev_behind_main": "dev не догнал main:\n{out}",
   "commit.push_dev_failed": "push protocol/ dev не прошёл:\n{out}",
   "commit.mark_failed": "! --mark не записал базу (движок и шаблон расходятся) — следующая сверка покажет ложные конфликты:\n{out}",
+  "commit.linked_worktree_stop": "это связанное рабочее дерево: ветку и ссылки оно делит с основным клоном, поэтому коммит протокола, выпуск и push идут из {main}; здесь остаются --check, --sync-staged и --install-hook.",
   "commit.pushed": "protocol/ отправлен: main и dev",
   "commit.gh_release_created": "GitHub Release v{v} создан через gh CLI",
   "commit.gh_release_failed": "! gh release create не удался, релиз подхватит GitHub Actions:\n{out}",
