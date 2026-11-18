@@ -14,6 +14,9 @@ function run({ root }) {
   const mLiving = clText.match(/- \*\*(\d+\.\d+\.\d+)\*\*/);
   if (!mLiving) return [];
 
+  const protoGit = path.join(root, '.forma', 'protocol', '.git');
+  if (!fs.existsSync(protoGit)) return [];
+
   const protoPkg = path.join(root, '.forma', 'protocol', 'package.json');
   if (!fs.existsSync(protoPkg)) return [];
   try {
