@@ -3,6 +3,10 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.35] - 2026-11-18
+### Fixed
+- card-session-spend.cjs stream-reads the session transcript (createReadStream + readline over the JSONL lines): a session with a transcript above Node's string limit crashed the read with ERR_STRING_TOO_LONG (~512 MB and larger), which broke `card-move --to close --session-spend` on long sessions; memory now holds only the normalized rows, not the file. Behavior on short transcripts is unchanged (byte-identical output parity against the previous version, the script's self-test passes).
+
 ## [0.0.34] - 2026-11-18
 ### Changed
 - core role compression completed, claude, gemini and zcode adapters byte-identical: the prose moved into holders - the balance rules into `on-demand/core-balance.md`, the diagnosis rules into `on-demand/core-diagnosis.md`, the trend reading into the new `scripts/core-trend.cjs`, with `moved-from-law` pointers in place of the tail's blocks; the role body shrinks from 18743 to 11236 chars (-40.0%). The codex and minimax adapters keep the pre-package role (dormant engines).
