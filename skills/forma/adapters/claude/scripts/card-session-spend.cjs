@@ -42,6 +42,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline');
 const economy = require('../../.forma/dashboard/economy.cjs');
 const { formatSpendLine, sessionWindowEnd } = require('../../.forma/dashboard/spend-line.cjs');
 const { makeCli } = require('../../.forma/dashboard/lib/cli.cjs');
@@ -101,19 +102,29 @@ function sources() {
   return out;
 }
 
-/** Normalized records of the `src` log with their place in the file. */
-function readRows(file, src) {
+/** Normalized records of the `src` log with their place in the file. Streamed line by line
+ *  (the transcript is JSONL, the lines are independent): memory holds only the normalized rows
+ *  and the previous raw record (`stepOf` needs it), never the whole file - a transcript above
+ *  Node's string limit (ERR_STRING_TOO_LONG on ~512MB+) no longer kills the read. */
+async function readRows(file, src) {
   const rows = [];
   let prev = null;
-  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-    if (!line) continue;
-    let j;
-    try { j = JSON.parse(line); } catch { continue; } // a truncated log line is not a record
-    let row = null;
-    try { row = src.stepOf(j, prev); } catch { row = null; }
-    prev = j;
-    if (row) rows.push(row);
-  }
+  const input = fs.createReadStream(file, 'utf8');
+  const rl = readline.createInterface({ input, crlfDelay: Infinity });
+  await new Promise((resolve, reject) => {
+    rl.on('line', (line) => {
+      if (!line) return;
+      let j;
+      try { j = JSON.parse(line); } catch { return; } // a truncated log line is not a record
+      let row = null;
+      try { row = src.stepOf(j, prev); } catch { row = null; }
+      prev = j;
+      if (row) rows.push(row);
+    });
+    rl.on('close', resolve);
+    rl.on('error', reject);
+    input.on('error', reject);
+  });
   return rows;
 }
 
@@ -205,8 +216,8 @@ function sumWindow(rows, inWin, after, parse) {
 }
 
 /** `{ spend, accounted }`: the session's spend over the uncounted; `accounted` - a window exists but everything in it is recorded already. */
-function scan(file, src, after) {
-  const rows = readRows(file, src);
+async function scan(file, src, after) {
+  const rows = await readRows(file, src);
   const inWin = MANUAL ? manualWindow(rows) : eventWindow(rows);
   if (!inWin.length) return { spend: null, accounted: false };
   const spend = sumWindow(rows, inWin, MANUAL ? null : after, src.parseUsage);
@@ -269,7 +280,7 @@ function appendToHistory(card, text, lines) {
   console.log(msg('spend.card-session.written', { file: path.relative(root, card), count: fresh.length }));
 }
 
-function main() {
+async function main() {
   const srcs = sources().filter((s) => !ONLY || s.id.startsWith(ONLY));
   if (!srcs.length) { console.error(msg('spend.card-session.no_dirs')); process.exit(AUTO ? 0 : 2); }
   const card = cardFiles(root, (name) => name.startsWith(`card-${num}-`))[0];
@@ -278,7 +289,7 @@ function main() {
   const accounted = [];
   for (const src of srcs) {
     const until = accountedUntil(text, src.id);
-    const { spend, accounted: done } = scan(src.file, src, until);
+    const { spend, accounted: done } = await scan(src.file, src, until);
     if (spend) results.push({ id: src.id, tag: src.tag, ...spend });
     else if (done) accounted.push({ id: src.id, until });
   }
@@ -307,7 +318,7 @@ function main() {
  * taken; nothing to write - nothing is written. Any error - exit code 0 (the hook does not block), the
  * reason on stderr.
  */
-function auto() {
+async function auto() {
   let id = ONLY;
   if (!id) { try { id = (JSON.parse(fs.readFileSync(0, 'utf8')) || {}).session_id || null; } catch {} }
   const srcs = sources();
@@ -315,18 +326,18 @@ function auto() {
   if (!src && !id) src = srcs.map((s) => { let st; try { st = fs.statSync(s.file); } catch { return null; } return { s, t: st.mtimeMs }; })
     .filter(Boolean).sort((a, b) => b.t - a.t)[0]?.s;
   if (!src) { console.error(msg('spend.card-session.auto_no_log')); return; }
-  const rows = readRows(src.file, src);
+  const rows = await readRows(src.file, src);
   const touched = [...new Set(rows.map(ownerOf).filter(Boolean))].sort();
   for (const n of touched) {
     num = n;
     const card = cardFiles(root, (name) => name.startsWith(`card-${n}-`))[0];
     if (!card) continue;
     const text = fs.readFileSync(card, 'utf8');
-    const { spend } = scan(src.file, src, accountedUntil(text, src.id));
+    const { spend } = await scan(src.file, src, accountedUntil(text, src.id));
     if (!spend) continue;
     appendToHistory(card, text, [spendLine({ id: src.id, tag: src.tag, ...spend })]);
   }
 }
 
-if (AUTO) { try { auto(); } catch (e) { console.error('card-session-spend --auto: ' + (e && e.message)); } process.exit(0); }
-else main();
+if (AUTO) auto().catch((e) => { console.error('card-session-spend --auto: ' + (e && e.message)); }).then(() => process.exit(0));
+else main().catch((e) => { console.error(e && e.stack || e); process.exit(1); });
