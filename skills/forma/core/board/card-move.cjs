@@ -44,17 +44,22 @@
 // --dry   - show the changes, do not write the file.
 // --override - with --to kit only: one pass beyond the used-up attempt budget (§3) - refused without it; with it the pass
 //           goes through and writes the "budget override" line into History (prohibition 3: the budget itself never changes silently).
-// --selftest - the gauges of the card sampling by code, the five-field approval and the attempt budget in the OS
-//           temp directory (a dummy board); writes nothing; exit 0 - green.
-// --selftest - the gauges of the card sampling by code in the OS temp directory (a dummy board); writes nothing; exit 0 - green.
-// Writes `modified` (on `close` - and `completedAt`), appends a line into "History", then checks the board over this card.
+// --gate-hash <hex> - record the readiness criterion's hash explicitly; only after the approval (--stage approve) or with
+//           --to run. Without the flag the hash is recorded by itself at those two moments. A supplied hash must match the
+//           current criterion - a mismatch is a stop before any write.
+// --selftest - the gauges of the card sampling by code, the five-field approval, the executor-only attempt budget and
+//           the gate hash in the OS temp directory (a dummy board); writes nothing; exit 0 - green.
+// Writes `modified` (on `close` - and `completedAt`), appends a line into "History", then checks the board over this card;
+// a red check restores the card (and for `close` removes the copy in done/), so a move never leaves a broken state.
 // Part of the core: one for all engines, it knows no engine paths.
 
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 const { makeCli } = require('../dashboard/lib/cli.cjs');
-const { cardFiles, parseFrontmatter, frontmatterBlock, zoneHeadingIn, labelsOf } = require('../dashboard/lib/card.cjs');
+const { cardFiles, parseFrontmatter, frontmatterBlock, zoneHeadingIn, labelsOf, createdDay } = require('../dashboard/lib/card.cjs');
+const { cardProblems: routeStageProblems } = require('./checks/route-stage.cjs');
 const { normalize } = require('./run-in-card.cjs');
 const { checkBoard } = require('./check-board.cjs');
 const i18n = require('../i18n/index.cjs');
@@ -115,6 +120,9 @@ Flags:
   --override             With --to kit only: one pass beyond the used-up
                          attempt budget; writes the "budget override" line
                          into History.
+  --gate-hash <hex>      Record the readiness criterion's hash explicitly;
+                         only with --stage approve or --to run. Without it
+                         the hash is recorded at those moments by itself.
   --dry                  Show the changes, do not write the file.
   --selftest             The sampling gauges in the OS temp directory; writes
                          nothing; exit 0 - green.
@@ -250,19 +258,36 @@ function selftest() {
     check('(f) route-2 without the approval line - flagged', rp(911).length > 0);
     check('(f) route-2 with the approval line - green', rp(912).length === 0);
     check('(f) route-7 without the approval - untouched', rp(913).length === 0);
-    // (g) the attempt budget (§3): the lines count, the Task field parses, the gate blocks and lets through
+    // (g) the attempt budget (§3): only the executor's lines count, the Task field parses, the gate blocks and lets through
     const mkHist = (m) => Array.from({ length: m }, (_, i) => '- `Run`, ' + day + ': attempt, 100 tokens (10 cache-read), 5 s, "id-' + i + '" - a pass.').join('\n');
-    check('(g) the attempt lines are counted', attemptsIn(mkHist(2) + '\n- `Kit`, ' + day + ': stage kit - x.') === 2);
+    const mixed = mkHist(2) + '\n- `Kit`, ' + day + ': attempt, 100 tokens (10 cache-read), 5 s, "id-k" - a pass.'
+      + '\n- `Plumb`, ' + day + ': attempt, 100 tokens (10 cache-read), 5 s, "id-p" - a reading.'
+      + '\n- `Kit`, ' + day + ': stage kit - x.';
+    check('(g) the executor attempts are counted', attemptsIn(mixed, 'Run') === 2);
+    check('(g) another node\'s passes are not the executor\'s attempts', attemptsIn(mixed, 'Kit') === 1);
+    check('(g) the fixture holds four attempt lines in all', attemptsIn(mixed) === 4);
+    check('(g) the executor follows the route-4 label', executorOf(['goal-x', 'route-4']) === 'Kit');
+    check('(g) the executor follows the route-2 label', executorOf(['goal-x', 'route-2']) === 'Run');
     check('(g) the budget is parsed from the Task row', budgetOf('901 · tooling | a probe | check: true | 2 | core') === 2);
     check('(g) no number in the budget field - no gate', budgetOf('901 · tooling | a probe | check: true | core') === null);
-    check('(g) the gate blocks at the budget', budgetGate({ attempts: 2, budget: 2, override: false }) === 'block');
-    check('(g) the gate passes under the budget', budgetGate({ attempts: 1, budget: 2, override: false }) === 'pass');
-    check('(g) the gate passes with --override', budgetGate({ attempts: 3, budget: 2, override: true }) === 'pass');
-    check('(g) no budget declared - no gate', budgetGate({ attempts: 9, budget: null, override: false }) === 'pass');
+    check('(g) the gate blocks at the budget', budgetGate({ attempts: 2, budget: 2 }) === 'block');
+    check('(g) the gate passes under the budget', budgetGate({ attempts: 1, budget: 2 }) === 'pass');
+    check('(g) no budget declared - no gate', budgetGate({ attempts: 9, budget: null }) === 'pass');
+    // (h) the gate hash: stable for one criterion, different for another, none without five fields
+    const gh = gateHashOf('901 · tooling | a probe | check: true | 2 | core');
+    const gh2 = gateHashOf('901 · tooling | a probe | check: false | 2 | core');
+    check('(h) the gate hash is recorded', !!gh && /^[a-f0-9]{16}$/.test(gh.hash));
+    check('(h) a changed criterion has another hash', !!gh && !!gh2 && gh.hash !== gh2.hash);
+    check('(h) no five fields - no gate hash', gateHashOf('901 · tooling | a probe') === null);
+    check('(h) the last recorded hash wins', lastGateHash('- `Kit`, ' + day + ': x (gate-hash: aaaaaaaa)\n- `Intent`, ' + day + ': y (gate-hash: bbbbbbbb)') === 'bbbbbbbb');
+    // (i) the pre-write gate: the prospective stage must fit the prospective status
+    const probeText = (status, st) => '---\nstatus: "' + status + '"\n---\n- `Intent`, ' + day + ': route route-2 (why: tooling).\n- `Intent`, ' + day + ': stage ' + st + '.';
+    check('(i) the pre-write gate catches a stage/status mismatch', routeStageProblems('probe.md', probeText('review', 'approve')).length === 1);
+    check('(i) the pre-write gate passes a matching stage', routeStageProblems('probe.md', probeText('review', 'accept')).length === 0);
     const failed = results.filter((r) => !r.ok);
     console.log((failed.length ? '✗ ' : '✓ ') + (failed.length
       ? 'mismatch: ' + failed.map((r) => r.name).join('; ')
-      : 'the gauges green, ' + results.length + ' probes: the exact sampling, the five-field approval over route-0…5, the attempt budget gate'));
+      : 'the gauges green, ' + results.length + ' probes: the exact sampling, the five-field approval over route-0…5, the executor-only attempt budget, the gate hash, the pre-write gate'));
     return failed.length === 0;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -280,9 +305,21 @@ function zoneText(src, key) {
   for (let k = at + 1; k < ls.length; k++) if (ls[k].startsWith('## ')) { end = k; break; }
   return ls.slice(at + 1, end).join('\n');
 }
-/** The attempt lines of a History zone: `- ` + "Node" + `, YYYY-MM-DD: attempt, ...` - one pass of a task each (§3). */
-function attemptsIn(hist) {
-  return String(hist).split('\n').filter((l) => /^-\s*`\w+`,\s*\d{4}-\d{2}-\d{2}:\s*attempt,/.test(l)).length;
+/** The executor by the route label (§2): route-4 - Kit, route-0/1 - Intent, the rest - Run. */
+function executorOf(labels) {
+  const l = Array.isArray(labels) ? labels : [];
+  if (l.includes('route-4')) return 'Kit';
+  if (l.includes('route-0') || l.includes('route-1')) return 'Intent';
+  return 'Run';
+}
+/** The attempt lines of a History zone: `- ` + "Node" + `, YYYY-MM-DD: attempt, ...` - one pass of a task each (§3).
+ *  With a node - only that executor's passes; Plumb readings and other nodes' lines are not the card's attempts. */
+function attemptsIn(hist, node = null) {
+  const re = /^-\s*`(\w+)`,\s*\d{4}-\d{2}-\d{2}:\s*attempt,/;
+  return String(hist).split('\n').filter((l) => {
+    const m = l.match(re);
+    return m && (!node || m[1] === node);
+  }).length;
 }
 /** The attempt budget: the 4th field of the Task row (`N · kind | what | criterion | budget | next`); no number - no gate. */
 function budgetOf(task) {
@@ -291,9 +328,37 @@ function budgetOf(task) {
   const f = row.split('|').map((s) => s.trim());
   return f.length >= 4 && /^\d+$/.test(f[3]) ? Number(f[3]) : null;
 }
-/** The gate: at the used-up budget a --to kit is refused, unless the caller carries --override. */
-function budgetGate({ attempts, budget, override }) {
-  return budget != null && attempts >= budget && !override ? 'block' : 'pass';
+/** The gate: at the used-up budget the pass is blocked; --override is the caller's decision, handled by the caller. */
+function budgetGate({ attempts, budget }) {
+  return budget != null && attempts >= budget ? 'block' : 'pass';
+}
+/** The hash of the readiness criterion (field 3 of the five-fields line); no five fields - null. */
+function gateHashOf(taskText) {
+  const line = String(taskText).split('\n').map((s) => s.trim()).find((l) => /^\d+\s*[·•]/.test(l));
+  if (!line) return null;
+  const parts = line.split('|').map((s) => s.trim());
+  if (parts.length < 5) return null;
+  return { criterion: parts[2], hash: crypto.createHash('sha256').update(parts[2]).digest('hex').slice(0, 16) };
+}
+/** The recorded gate hash: the last `gate-hash: <hex>` in History, or null. */
+function lastGateHash(hist) {
+  const matches = [...String(hist).matchAll(/gate-hash:\s*([a-f0-9]{8,64})/gi)];
+  return matches.length ? matches[matches.length - 1][1] : null;
+}
+/** --gate-hash: present - an 8-64 hex value, allowed only in the named scopes; absent - null. */
+function gateHashArg(allowed) {
+  const v = arg('gate-hash');
+  if (process.argv.includes('--gate-hash') && (v == null || v === '')) die(msg('board.card-move.gate_hash_need'));
+  if (v != null && !/^[a-f0-9]{8,64}$/i.test(v)) die(msg('board.card-move.gate_hash_bad', { v }));
+  if (v != null && !allowed) die(msg('board.card-move.gate_hash_scope'));
+  return v == null ? null : v.toLowerCase();
+}
+/** The pre-write gate: the route and stage of the prospective card, under the same rule date as the board check. */
+function preWriteStageProblems(name, text) {
+  const { ruleSince } = require('../dashboard/lib/rules.cjs');
+  const since = ruleSince(ROOT, 'route-stage');
+  if (!since || createdDay(text) < since) return [];
+  return routeStageProblems(name, text);
 }
 if (process.argv.includes('--selftest')) process.exit(selftest() ? 0 : 1);
 
@@ -327,7 +392,7 @@ if (to === 'core-close') {
   const ids = words.map(cardCode);
   if (!ids.length || ids.some((x) => !x)) die(msg('board.card-move.coreclose_need_ids'));
   if (!note || /[\n]/.test(note)) die(msg('board.card-move.need_note_reason'));
-  if (['kit', 'result', 'session-spend', 'tokens', 'duration-ms', 'agent-id', 'stage'].some((k) => process.argv.includes('--' + k))) die(msg('board.card-move.coreclose_no_other_flags'));
+  if (['kit', 'result', 'session-spend', 'tokens', 'duration-ms', 'agent-id', 'stage', 'gate-hash'].some((k) => process.argv.includes('--' + k))) die(msg('board.card-move.coreclose_no_other_flags'));
   const day0 = new Date().toISOString().slice(0, 10);
   const plan = [];
   for (const cid of ids) {
@@ -359,10 +424,20 @@ if (to === 'core-close') {
     if (gate.notes.length) console.error(gate.notes.map((n) => '· ' + n).join('\n'));
   }
   if (flag('dry')) { for (const p of plan) console.log(path.relative(ROOT, p.file).replace(/\\/g, '/') + '\n' + p.text); process.exit(0); }
-  for (const p of plan) fs.writeFileSync(p.file, p.text);
-  const bad = checkBoard(ROOT).filter((p) => plan.some((q) => p.includes(q.cid)));
+  const restore = () => { for (const p of plan) { try { fs.writeFileSync(p.file, p.before); } catch {} } };
+  try {
+    for (const p of plan) fs.writeFileSync(p.file, p.text);
+    const bad = checkBoard(ROOT).filter((p) => plan.some((q) => p.includes(q.cid)));
+    if (bad.length) {
+      restore();
+      console.error(msg('board.card-move.close_rolled_back', { problems: bad.join('\n') }));
+      process.exit(1);
+    }
+  } catch (e) {
+    restore();
+    throw e;
+  }
   for (const p of plan) console.log(msg('board.card-move.closed_ok', { cid: p.cid }));
-  if (bad.length) { console.error(bad.join('\n')); process.exit(1); }
   process.exit(0);
 }
 
@@ -379,7 +454,9 @@ if (stage != null && to != null) {
 // completedAt do not change; --node names whose line it is (the table §7 does not cover a no-move call);
 // the spend and section flags belong to the moves - not accepted; the text after the dash is mandatory.
 if (stage != null && !to) {
-  if (['kit', 'result', 'session-spend', 'tokens', 'duration-ms', 'agent-id'].some((k) => process.argv.includes('--' + k))) die(msg('board.card-move.stage_no_other_flags'));
+  const otherFlags = ['kit', 'result', 'session-spend', 'tokens', 'duration-ms', 'agent-id'].some((k) => process.argv.includes('--' + k));
+  if (otherFlags || (process.argv.includes('--gate-hash') && stage !== 'approve')) die(msg('board.card-move.stage_no_other_flags'));
+  const ghArg = gateHashArg(stage === 'approve');
   if (!id) die(msg('board.card-move.need_card_stage'));
   if (!note || /[\n]/.test(note)) die(msg('board.card-move.need_note'));
   const snode = arg('node');
@@ -392,6 +469,16 @@ if (stage != null && !to) {
   if (path.dirname(fileS) !== BOARD) die(msg('board.card-move.in_done', { id }));
   const cardIdS = path.basename(fileS, '.md');
   let textS = fs.readFileSync(fileS, 'utf8');
+  const originalTextS = textS;
+  if (stage === 'approve') {
+    const gh = gateHashOf(zoneText(textS, 'task'));
+    if (!gh) {
+      if (ghArg) die(msg('board.card-move.gate_hash_no_five', { id: cardIdS }));
+    } else {
+      if (ghArg && ghArg !== gh.hash) die(msg('board.card-move.gate_hash_mismatch', { id: cardIdS, got: ghArg, expected: gh.hash }));
+      if (!/gate-hash:/i.test(zoneText(textS, 'history')) && !/gate-hash:/i.test(note)) note = `${note} (gate-hash: ${gh.hash})`;
+    }
+  }
   const nowS = new Date().toISOString();
   textS = setField(textS, 'modified', `"${nowS}"`);
   const zoneHist = zoneHeadingIn(textS, 'history');
@@ -404,12 +491,25 @@ if (stage != null && !to) {
   const histEnd = resAt === -1 ? textS.length : resAt;
   const body = textS.slice(histAt, histEnd).replace(/\s*$/, '');
   textS = textS.slice(0, histAt) + body + '\n' + lineS + '\n' + (resAt === -1 ? '' : textS.slice(resAt));
+  const preS = preWriteStageProblems(cardIdS + '.md', textS);
+  if (preS.length) die(msg('board.card-move.prewrite_red', { id: cardIdS, problems: preS.join('\n') }));
   if (flag('dry')) { console.log(path.relative(ROOT, fileS).replace(/\\/g, '/') + '\n' + textS); process.exit(0); }
-  fs.writeFileSync(fileS, textS);
+  try {
+    fs.writeFileSync(fileS, textS);
+    const mine = checkBoard(ROOT).filter((p) => p.includes(cardIdS));
+    if (mine.length) {
+      fs.writeFileSync(fileS, originalTextS);
+      refreshDashboardCache();
+      console.error(msg('board.card-move.stage_rolled_back', { id: cardIdS, problems: mine.join('\n') }));
+      process.exit(1);
+    }
+  } catch (e) {
+    try { fs.writeFileSync(fileS, originalTextS); } catch {}
+    refreshDashboardCache();
+    throw e;
+  }
   console.log(path.relative(ROOT, fileS).replace(/\\/g, '/'));
   refreshDashboardCache();
-  const mine = checkBoard(ROOT).filter((p) => p.includes(cardIdS));
-  if (mine.length) { console.error(mine.join('\n')); process.exit(1); }
   console.log(`ok: ${cardIdS} · stage ${stage} (no move)`);
   process.exit(0);
 }
@@ -544,18 +644,24 @@ if (path.dirname(file) !== BOARD) die(msg('board.card-move.in_done', { id }));
 const cardId = path.basename(file, '.md');
 
 let text = fs.readFileSync(file, 'utf8');
+const originalText = text;
 const fm = parseFrontmatter(text);
 
-// 1b. The attempt budget (§3, prohibition 3): --to kit at the used-up budget is refused before any write;
-// an explicit --override unlocks this one pass and writes the bypass line into History below.
+// 1b. The attempt budget (§3, prohibition 3): only the executor's passes count; --to kit at the used-up budget
+// is refused before any write. An explicit --override unlocks this one pass and writes the bypass line below.
 const override = flag('override');
 let budgetBlocked = false;
 if (to === 'kit') {
-  const attempts = attemptsIn(zoneText(text, 'history'));
+  const executor = executorOf(labelsOf(text));
+  const attempts = attemptsIn(zoneText(text, 'history'), executor);
   const budget = budgetOf(zoneText(text, 'task'));
-  budgetBlocked = budgetGate({ attempts, budget, override }) === 'block';
-  if (budgetBlocked) die(msg('board.card-move.budget_exhausted', { id: cardId, budget, attempts }));
+  const exhausted = budgetGate({ attempts, budget }) === 'block';
+  if (exhausted && !override) die(msg('board.card-move.budget_exhausted', { id: cardId, budget, attempts, executor }));
+  budgetBlocked = exhausted && override;
 }
+
+// 1c. --gate-hash is scoped: the approval line or the first handover to execution.
+const ghArg = gateHashArg(to === 'run');
 
 // 2. Who holds `run` (§7): by the route-N label - the short route (route-4) is executed by Kit, route-0/1 - by Intent
 let assignee = t.assignee;
@@ -564,42 +670,30 @@ if (to === 'run') {
   if (labels.includes('route-4')) assignee = 'Kit';
   else if (labels.includes('route-0') || labels.includes('route-1')) assignee = 'Intent';
 
-  // Gate integrity: record sha256 of the readiness criterion if requested or on stage approve
-  const crypto = require('crypto');
-  const taskText = zoneText(text, 'task') || '';
-  const histText = zoneText(text, 'history') || '';
-  const taskLine = taskText.trim().split(/\r?\n/).find((l) => /^\d+\s*[·•]/.test(l));
-  if (taskLine && (arg('gate-hash') || stage === 'approve') && !/gate-hash:/i.test(histText) && !/gate-hash:/i.test(note)) {
-    const parts = taskLine.split('|').map((s) => s.trim());
-    if (parts.length >= 5) {
-      const crit = parts[2];
-      const curHash = crypto.createHash('sha256').update(crit).digest('hex').slice(0, 16);
-      note = `${note} (gate-hash: ${curHash})`;
-    }
+  // Gate integrity: the criterion's hash is recorded at the first handover to execution if approval did not.
+  const gh = gateHashOf(zoneText(text, 'task'));
+  if (!gh) {
+    if (ghArg) die(msg('board.card-move.gate_hash_no_five', { id: cardId }));
+  } else {
+    if (ghArg && ghArg !== gh.hash) die(msg('board.card-move.gate_hash_mismatch', { id: cardId, got: ghArg, expected: gh.hash }));
+    if (!lastGateHash(zoneText(text, 'history')) && !/gate-hash:/i.test(note)) note = `${note} (gate-hash: ${gh.hash})`;
   }
 }
 
-// Gate integrity check on close: criterion must match the recorded hash unless gate-amendment was recorded
+// Gate integrity check on close: criterion must match the recorded hash unless gate-amendment was recorded.
 if (to === 'close') {
-  const crypto = require('crypto');
-  const taskText = zoneText(text, 'task') || '';
+  const gh = gateHashOf(zoneText(text, 'task'));
   const histText = zoneText(text, 'history') || '';
-  const taskLine = taskText.trim().split(/\r?\n/).find((l) => /^\d+\s*[·•]/.test(l));
-  if (taskLine) {
-    const parts = taskLine.split('|').map((s) => s.trim());
-    if (parts.length >= 5) {
-      const crit = parts[2];
-      const curHash = crypto.createHash('sha256').update(crit).digest('hex').slice(0, 16);
-      const matches = [...histText.matchAll(/gate-hash:\s*([a-f0-9]{8,64})/gi)];
-      if (matches.length) {
-        const lastHash = matches[matches.length - 1][1];
-        if (!curHash.startsWith(lastHash) && !lastHash.startsWith(curHash)) {
-          const hasAmend = /gate-amendment/i.test(histText);
-          if (!hasAmend) {
-            die(`card gate was modified after hash recorded (${lastHash} → ${curHash}) without a gate-amendment event`);
-          }
-        }
+  if (gh) {
+    const lastHash = lastGateHash(histText);
+    if (lastHash && !gh.hash.startsWith(lastHash) && !lastHash.startsWith(gh.hash)) {
+      if (!/gate-amendment/i.test(histText)) {
+        die(msg('board.card-move.gate_hash_changed', { id: cardId, last: lastHash, current: gh.hash }));
       }
+    } else if (!lastHash && !/gate-amendment/i.test(histText)) {
+      // A legacy card may close without a hash; record the baseline and say so, never hide the gap.
+      console.error(msg('board.card-move.gate_hash_missing', { id: cardId }));
+      note = `${note} (gate-hash: ${gh.hash}, recorded at close)`;
     }
   }
 }
@@ -639,7 +733,7 @@ const resAt = zoneRes ? text.indexOf('\n## ' + zoneRes, histAt + 1) : -1;
 const histEnd = resAt === -1 ? text.length : resAt;
 const body = text.slice(histAt, histEnd).replace(/\s*$/, '');
 const n = note.replace(/\.?\s*$/, '.');
-const bypass = budgetBlocked && override ? `\n- \`${node}\`, ${day}: budget override — ${n}` : '';
+const bypass = budgetBlocked ? `\n- \`${node}\`, ${day}: budget override — ${n}` : '';
 const spend = !spendGiven ? '' : formatSpendLine({
   node, date: day,
   tokens: fromTr ? fromTr.input + fromTr.cacheCreate + fromTr.cacheRead + fromTr.output : (tokens != null ? Number(tokens) : null),
@@ -652,6 +746,10 @@ const sessionLines = sessionSpendArg == null ? '' : sessionSpendLines(sessionSpe
   .filter((l) => !text.includes(l.split(' — ')[0])).map((l) => l + '\n').join('');
 text = text.slice(0, histAt) + body + '\n' + spend + sessionLines + line + bypass + '\n' + (resAt === -1 ? '' : text.slice(resAt));
 
+// 5b. The pre-write gate: the prospective card's route and stage are judged before any mutation.
+const pre = preWriteStageProblems(cardId + '.md', text);
+if (pre.length) die(msg('board.card-move.prewrite_red', { id: cardId, problems: pre.join('\n') }));
+
 // 5c. The early spend-parity check - before the write and before --dry: a numeric drift of the line from the journal
 // stops the handover before the status mutation (the exit not after the write); "the journal does not cover" - a summary, not a barrier.
 {
@@ -663,19 +761,35 @@ text = text.slice(0, histAt) + body + '\n' + spend + sessionLines + line + bypas
   if (gate.notes.length) console.error(gate.notes.map((n) => '· ' + n).join('\n'));
 }
 
-// 6. The write; on close the file goes to done/ (the board extension does it itself, without it - we)
+// 6. The write; on close the file goes to done/ (the board extension does it itself, without it - we).
+// The move is committed only if the board check over the written card is green; otherwise the card is restored,
+// so a failed handover never leaves a broken state behind.
 const target = to === 'close' ? path.join(BOARD, 'done', cardId + '.md') : file;
+if (target !== file && fs.existsSync(target)) die(msg('board.card-move.target_exists', { target: path.relative(ROOT, target).replace(/\\/g, '/') }));
 if (flag('dry')) { console.log(path.relative(ROOT, target).replace(/\\/g, '/') + '\n' + text); process.exit(0); }
+const rollback = () => {
+  try { if (target !== file && fs.existsSync(target)) fs.rmSync(target, { force: true }); } catch {}
+  try { fs.writeFileSync(file, originalText); } catch {}
+  refreshDashboardCache();
+};
 if (target !== file) { fs.mkdirSync(path.dirname(target), { recursive: true }); fs.renameSync(file, target); }
-fs.writeFileSync(target, text);
+try {
+  fs.writeFileSync(target, text);
+  // 7. The check over this card - before the move is reported as done
+  const mine = checkBoard(ROOT).filter((p) => p.includes(cardId));
+  if (mine.length) {
+    rollback();
+    console.error(msg('board.card-move.move_rolled_back', { id: cardId, problems: mine.join('\n') }));
+    process.exit(1);
+  }
+} catch (e) {
+  rollback();
+  throw e;
+}
 console.log(path.relative(ROOT, target).replace(/\\/g, '/'));
 
 // 6b. The dashboard cache invalidation / recalculation at a card update
 refreshDashboardCache();
-
-// 7. The check over this card
-const mine = checkBoard(ROOT).filter((p) => p.includes(cardId));
-if (mine.length) { console.error(mine.join('\n')); process.exit(1); }
 console.log(`ok: ${cardId} → ${t.status}/${assignee} · stage ${t.stage}`);
 
 if (to === 'close') {
