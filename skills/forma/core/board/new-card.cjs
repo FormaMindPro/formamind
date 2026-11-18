@@ -271,6 +271,10 @@ ${history ? history + '\n' : ''}
     throw e;
   }
   try {
+    // The number is reserved before the file exists: a concurrent invocation that computed the same number
+    // may have written its card while this one waited for the claim - re-read the board under the claim.
+    const taken = cardFiles(ROOT, (n) => n === `card-${num}.md` || (n.startsWith(`card-${num}-`) && n.endsWith('.md')));
+    if (taken.length) { try { fs.unlinkSync(claim); } catch {} continue; }
     fs.writeFileSync(file, text, { flag: 'wx' });
     try { fs.unlinkSync(claim); } catch {}
     break;

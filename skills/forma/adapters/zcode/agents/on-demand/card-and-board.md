@@ -113,7 +113,7 @@ There is no separate file for history or result — the task's whole life is in 
 
 | Rule | What it means |
 |---|---|
-| Language | card language, headings and fields follow the project language (`project/config/PROJECT.md`) — the translation of the four zone headings is in `AGENTS.md` §6 |
+| Language | the texts — values and notes — follow the project language (`project/config/PROJECT.md`); zone headings, kind and keys stay English (`AGENTS.md` §6, `key-language`) |
 | Filename | a short, plain-language slug in the project's language — not a transliteration, not an encoded path: a word in the team's own language reads easier than `my-listing-seating` or `goal-NN-card-NN-seating.md`. Goal, cycle and card numbers live in the frontmatter (`id`/`goal`/`round`), not in the name |
 | Title of an entity card | human-facing name **plus** entity type and category, one line — in a growing series human names become indistinguishable without opening the card. Same for "what it delivers" |
 | A long field | not a table row: `\| Field \| Value \|` works while the value is short — a name, a number, a link. A seven-item criterion or a paragraph-long kit in one cell reads as unbroken text. Put it under a bold field heading (`**Readiness criterion**`) as a list, the way "History" already is |
@@ -125,7 +125,7 @@ There is no separate file for history or result — the task's whole life is in 
 
 **Material born of a card** — interview records, prototypes, evidence, an external model's output — lives in `project/cards/card-NNN/`, outside the board (the card moves into `done/`, the folder must not). The folder keeps the grounds, the card keeps the decision; project material is referenced, never copied there.
 
-**The card's language follows the project language** in `project/config/PROJECT.md`: for a non-English project the zone headings, fields, kind (`дело` / `оснастка` / `решение`) and notes are written in it (`## Задача`, `## Снаряжение`, `## История`, `## Результат`); the zones and mandatory fields don't change.
+**The card's texts follow the project language** in `project/config/PROJECT.md`: for a non-English project the values and notes are written in it; the four zone headings, the kind and the keys stay English (`AGENTS.md` §6 — `## Task`, `## Kit`, `## History`, `## Result`, `tooling`); the zones and mandatory fields don't change. A non-English key is a `key-language` finding, not a translation.
 
 ---
 

@@ -1065,6 +1065,8 @@
   "commit.push_dev_failed": "push protocol/ dev не прошёл:\n{out}",
   "commit.mark_failed": "! --mark не записал базу (движок и шаблон расходятся) — следующая сверка покажет ложные конфликты:\n{out}",
   "commit.linked_worktree_stop": "это связанное рабочее дерево: ветку и ссылки оно делит с основным клоном, поэтому коммит протокола, выпуск и push идут из {main}; здесь остаются --check, --sync-staged и --install-hook.",
+  "commit.card_paths_missing": "--card {card}: файлы карточки не найдены — для неё ничего не добавлено; назовите --files явно",
+  "commit.only_staged_hint": "без --files/--card коммитятся только уже добавленные пути и указатель протокола; для всего дерева — --all",
   "commit.pushed": "protocol/ отправлен: main и dev",
   "commit.gh_release_created": "GitHub Release v{v} создан через gh CLI",
   "commit.gh_release_failed": "! gh release create не удался, релиз подхватит GitHub Actions:\n{out}",

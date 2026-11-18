@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // The engine commit without drift: Claude -> Gemini/Codex -> the protocol source -> commits.
 // For the protocol author, in any project whose protocol/ is a git clone of FormaMindPro/formamind. Run from the project root.
-//   node .forma/protocol/scripts/forma-commit.cjs "message"          - sync, check, commit
+//   node .forma/protocol/scripts/forma-commit.cjs "message"          - sync, check, commit the staged paths + the protocol pointer
+//   ... --files <path...> | --card NNN                            - commit exactly these project paths (plus the pointer)
+//   ... --all                                                     - allow the whole project tree (git add -A)
 //   ... --check                                                   - check only, writes nothing (for pre-commit)
 //   ... --release [--to X.Y.Z]                                    - release now: dev -> main, version +1 (or the named one), push main and dev
 //   ... --push                                                    - push dev (version unchanged) and the project, if it has a remote
@@ -12,7 +14,7 @@
 //
 // Order: sync-engines --check (core + adapters by the conformance test; roles are not copied between engines) ->
 // engine-to-protocol --apply (core/, adapters/claude/, adapters/codex/, adapters/gemini/) ->
-// commit protocol/ into dev + --mark -> commit the project (git add -A, referencing the new protocol/ HEAD).
+// commit protocol/ into dev + --mark -> commit the project (the named or staged paths and the protocol pointer, never a blind tree).
 // Stop on a conflict or "only the template changed": the human decides that ("update the Forma protocol").
 'use strict';
 const fs = require('fs');
@@ -163,7 +165,7 @@ function release() {
     const pklj = fs.readFileSync(pkl, 'utf8');
     fs.writeFileSync(pkl, pklj.replace(new RegExp(`"version": "${v}"`, 'g'), `"version": "${nv}"`));
   }
-  pgit('add', '-A');
+  pgit('add', '--', '.claude-plugin/plugin.json', 'package.json', ...(fs.existsSync(pkl) ? ['package-lock.json'] : []));
   r = pgit('commit', '-q', '-m', `v${nv} — ${list.length} commit(s)\n\n${list.reverse().map((s) => '- ' + s).join('\n')}\n\n${CO}`);
   if (r.code) stop(tr('commit.merge_commit_failed', { out: r.out }));
   ok(tr('commit.released', { v, nv, n: list.length }));
@@ -327,7 +329,17 @@ if (fresh.length) console.log(tr('commit.fresh_files', { files: fresh.join(', ')
 // 3. the protocol commit into `dev` without a version; the version - only on a release
 if (pgit('status', '--porcelain').out.trim()) {
   onDev();
-  pgit('add', '-A');
+  if (has('--all')) {
+    pgit('add', '-A');
+  } else {
+    // The allowlist: tracked changes anywhere in the clone, new files only in the engine's own product dirs.
+    pgit('add', '-u');
+    if (fresh.length) {
+      for (const d of ['skills/forma', 'templates']) {
+        if (fs.existsSync(path.join(proto, d))) pgit('add', '--', d);
+      }
+    }
+  }
   const ft = scanTraces(proto), mt = scanMessages([protoMsg]);
   if (ft.length || mt.length) { pgit('reset', '-q'); stopTraces(ft, mt); }
   const c = pgit('commit', '-q', '-m', `${protoMsg}\n\nCarried over from the engine by forma-commit.cjs.\n\n${CO}`);
@@ -336,9 +348,13 @@ if (pgit('status', '--porcelain').out.trim()) {
   ok(tr('commit.proto_dev_status', { n: pending().length, total: RELEASE_N }));
 }
 
-// 4. the project commit - targeted card paths or full tree
+// 4. the project commit - exactly the named paths; the protocol pointer always follows its commit.
+// Without --files/--card only what is already staged is committed; --all is the explicit whole-tree opt-in.
+const pointer = '.forma/protocol';
+const stagePointer = () => { if (fs.existsSync(path.join(root, pointer))) git('add', '--', pointer); };
 if (filesList && filesList.length) {
   git('add', '--', ...filesList);
+  stagePointer();
 } else if (cardNum) {
   const normNum = String(cardNum).replace(/^card-/, '').padStart(3, '0');
   const cardFilesToStage = [];
@@ -352,13 +368,14 @@ if (filesList && filesList.length) {
   if (fs.existsSync(path.join(root, matDir))) {
     cardFilesToStage.push(matDir);
   }
-  if (cardFilesToStage.length) {
-    git('add', '--', ...cardFilesToStage);
-  } else {
-    git('add', '-A');
-  }
-} else {
+  if (!cardFilesToStage.length) stop(tr('commit.card_paths_missing', { card: normNum }));
+  git('add', '--', ...cardFilesToStage);
+  stagePointer();
+} else if (has('--all')) {
   git('add', '-A');
+} else {
+  stagePointer();
+  console.log(tr('commit.only_staged_hint'));
 }
 if (git('diff', '--cached', '--quiet').code) {
   const c = git('commit', '-q', '-m', `${msg}\n\n${CO}`);
