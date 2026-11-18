@@ -564,12 +564,12 @@ if (to === 'run') {
   if (labels.includes('route-4')) assignee = 'Kit';
   else if (labels.includes('route-0') || labels.includes('route-1')) assignee = 'Intent';
 
-  // Gate integrity: record sha256 of the readiness criterion on transition to run
+  // Gate integrity: record sha256 of the readiness criterion if requested or on stage approve
   const crypto = require('crypto');
   const taskText = zoneText(text, 'task') || '';
   const histText = zoneText(text, 'history') || '';
   const taskLine = taskText.trim().split(/\r?\n/).find((l) => /^\d+\s*[·•]/.test(l));
-  if (taskLine && !/gate-hash:/i.test(histText) && !/gate-hash:/i.test(note)) {
+  if (taskLine && (arg('gate-hash') || stage === 'approve') && !/gate-hash:/i.test(histText) && !/gate-hash:/i.test(note)) {
     const parts = taskLine.split('|').map((s) => s.trim());
     if (parts.length >= 5) {
       const crit = parts[2];
