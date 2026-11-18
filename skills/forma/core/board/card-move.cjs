@@ -299,7 +299,7 @@ if (process.argv.includes('--selftest')) process.exit(selftest() ? 0 : 1);
 
 const id = cardCode(cli.positional()[0]);
 const to = arg('to');
-const note = arg('note');
+let note = arg('note');
 const stage = arg('stage');
 
 /** The early spend-parity check (ledger-parity) over the named cards, before any write:
@@ -563,6 +563,45 @@ if (to === 'run') {
   const labels = labelsOf(text);
   if (labels.includes('route-4')) assignee = 'Kit';
   else if (labels.includes('route-0') || labels.includes('route-1')) assignee = 'Intent';
+
+  // Gate integrity: record sha256 of the readiness criterion on transition to run
+  const crypto = require('crypto');
+  const taskText = zoneText(text, 'task') || '';
+  const histText = zoneText(text, 'history') || '';
+  const taskLine = taskText.trim().split(/\r?\n/).find((l) => /^\d+\s*[·•]/.test(l));
+  if (taskLine && !/gate-hash:/i.test(histText) && !/gate-hash:/i.test(note)) {
+    const parts = taskLine.split('|').map((s) => s.trim());
+    if (parts.length >= 5) {
+      const crit = parts[2];
+      const curHash = crypto.createHash('sha256').update(crit).digest('hex').slice(0, 16);
+      note = `${note} (gate-hash: ${curHash})`;
+    }
+  }
+}
+
+// Gate integrity check on close: criterion must match the recorded hash unless gate-amendment was recorded
+if (to === 'close') {
+  const crypto = require('crypto');
+  const taskText = zoneText(text, 'task') || '';
+  const histText = zoneText(text, 'history') || '';
+  const taskLine = taskText.trim().split(/\r?\n/).find((l) => /^\d+\s*[·•]/.test(l));
+  if (taskLine) {
+    const parts = taskLine.split('|').map((s) => s.trim());
+    if (parts.length >= 5) {
+      const crit = parts[2];
+      const curHash = crypto.createHash('sha256').update(crit).digest('hex').slice(0, 16);
+      const matches = [...histText.matchAll(/gate-hash:\s*([a-f0-9]{8,64})/gi)];
+      if (matches.length) {
+        const lastHash = matches[matches.length - 1][1];
+        if (!curHash.startsWith(lastHash) && !lastHash.startsWith(curHash)) {
+          const hasAmend = /gate-amendment/i.test(histText);
+          if (!hasAmend) {
+            die(`card gate was modified after hash recorded (${lastHash} → ${curHash}) without a gate-amendment event`);
+          }
+        }
+      }
+    }
+  }
 }
 // 3. Whose line: for `intent` - the one who executed, otherwise the node by the table
 const node = arg('node') || (to === 'intent' && ['Run', 'Kit', 'Intent'].includes(fm.assignee) ? fm.assignee : t.by);

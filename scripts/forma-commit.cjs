@@ -29,7 +29,18 @@ const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
 const toAt = args.indexOf('--to'); // --release --to X.Y.Z: release with the named version instead of +1 to the patch
 const toVer = toAt >= 0 ? args[toAt + 1] : null;
-const msg = args.find((a, i) => !a.startsWith('--') && !(toAt >= 0 && i === toAt + 1));
+const cardAt = args.indexOf('--card');
+const cardNum = cardAt >= 0 ? args[cardAt + 1] : null;
+const filesAt = args.indexOf('--files');
+let filesList = null;
+if (filesAt >= 0) {
+  filesList = [];
+  for (let i = filesAt + 1; i < args.length; i++) {
+    if (args[i].startsWith('--')) break;
+    filesList.push(args[i]);
+  }
+}
+const msg = args.find((a, i) => !a.startsWith('--') && !(toAt >= 0 && i === toAt + 1) && !(cardAt >= 0 && i === cardAt + 1) && !(filesAt >= 0 && i > filesAt && (filesList && filesList.includes(a))));
 // The protocol receives a clean message: the leading project card marker ("Card NNN: ...") is dropped,
 // it stays in the project's commit. Any other trace in the message is a stop.
 const protoMsg = msg ? msg.replace(/^\s*(?:\u043a\u0430\u0440\u0442\u043e\u0447\u043a\p{L}*|card)[\s-]*\d{2,3}\s*[:—-]\s*/iu, '') : '';
@@ -295,8 +306,30 @@ if (pgit('status', '--porcelain').out.trim()) {
   ok(tr('commit.proto_dev_status', { n: pending().length, total: RELEASE_N }));
 }
 
-// 4. the project commit - everything, including the reference to protocol/
-git('add', '-A');
+// 4. the project commit - targeted card paths or full tree
+if (filesList && filesList.length) {
+  git('add', '--', ...filesList);
+} else if (cardNum) {
+  const normNum = String(cardNum).replace(/^card-/, '').padStart(3, '0');
+  const cardFilesToStage = [];
+  const featDir = path.join(root, '.devtool', 'features');
+  if (fs.existsSync(featDir)) {
+    for (const f of fs.readdirSync(featDir)) {
+      if (f.startsWith(`card-${normNum}`)) cardFilesToStage.push(path.join('.devtool', 'features', f));
+    }
+  }
+  const matDir = path.join('project', 'cards', `card-${normNum}`);
+  if (fs.existsSync(path.join(root, matDir))) {
+    cardFilesToStage.push(matDir);
+  }
+  if (cardFilesToStage.length) {
+    git('add', '--', ...cardFilesToStage);
+  } else {
+    git('add', '-A');
+  }
+} else {
+  git('add', '-A');
+}
 if (git('diff', '--cached', '--quiet').code) {
   const c = git('commit', '-q', '-m', `${msg}\n\n${CO}`);
   if (c.code) stop(tr('commit.project_commit_failed', { out: c.out }));
