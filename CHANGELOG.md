@@ -3,6 +3,13 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.34] - 2026-11-18
+### Changed
+- core role compression completed, claude, gemini and zcode adapters byte-identical: the prose moved into holders - the balance rules into `on-demand/core-balance.md`, the diagnosis rules into `on-demand/core-diagnosis.md`, the trend reading into the new `scripts/core-trend.cjs`, with `moved-from-law` pointers in place of the tail's blocks; the role body shrinks from 18743 to 11236 chars (-40.0%). The codex and minimax adapters keep the pre-package role (dormant engines).
+
+### Fixed
+- the core role's trend block (the seven numbers) kept its full normative weight through the compression - the numbers are read on demand via `core-trend.cjs`, not lost in the shrink; the audit-brief precedent line that shipped truncated in the pre-package role (`whose `.`) is restored to its full text in all three adapters.
+
 ## [0.0.33] - 2026-11-17
 ### Changed
 - run role compression completed, claude, gemini and zcode adapters byte-identical: the prose moved into holders - the handoff and result rules into `card-move.cjs --help` and `card-and-board.md` §6, the RAM-disk rules into the `vdisk-setup` skill, the entity-demo post rules into the new `on-demand/run-entity-demo.md` role, with `moved-from-law` pointers in place of the tail's blocks; the role body shrinks from 15193 to 10913 chars (-28.2%). The codex and minimax adapters keep the pre-package role (dormant engines).
