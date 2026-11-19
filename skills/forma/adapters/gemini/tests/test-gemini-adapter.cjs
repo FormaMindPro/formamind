@@ -66,12 +66,42 @@ it('the Gemini roles are in full parity with the reference', () => {
   assert.equal(drifted.length, 0, `A role drift found: ${drifted.map((d) => d.pair.name + ' (' + d.res.status + ')').join(', ')}`);
 });
 
+// 2a. The node roles' model and effort against the adapter's nodeModels
+it('the Gemini node roles carry the adapter nodeModels model and effort', () => {
+  const rolesDir = path.join(root, '.agents', 'plugins', 'forma', 'agents');
+  for (const node of ['Intent', 'Spec', 'Kit', 'Run', 'Core']) {
+    const file = path.join(rolesDir, node.toLowerCase() + '.md');
+    const fm = fs.readFileSync(file, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    assert.ok(fm, `${node}: frontmatter must exist`);
+    const field = (k) => (fm[1].match(new RegExp('^' + k + ':\\s*(.+)$', 'm')) || [])[1];
+    assert.equal(field('model'), adapter.nodeModels[node].model, `${node}: model must match nodeModels`);
+    assert.equal(field('effort'), adapter.nodeModels[node].effort, `${node}: effort must match nodeModels`);
+  }
+});
+
 // 3. No project profiles in .agents/
 it('.agents/plugins/forma/agents/run/ holds no Run profiles of the current product', () => {
   const runDir = path.join(root, '.agents', 'plugins', 'forma', 'agents', 'run');
   const files = fs.readdirSync(runDir);
   assert.ok(!files.includes('run-pillow-translate.md'), 'run-pillow-translate.md must not be in .agents/');
   assert.ok(!files.includes('run-site-upload.md'), 'run-site-upload.md must not be in .agents/');
+});
+
+it('the generator skips project-layer roles (frontmatter layer: project)', () => {
+  const gen = require(path.join(root, '.claude', 'scripts', 'checks', 'support', 'gen-gemini-roles.cjs'));
+  const refDir = path.join(root, '.claude', 'agents');
+  const rels = fs.readdirSync(refDir).filter((f) => f.endsWith('.md'));
+  const runDir = path.join(refDir, 'run');
+  if (fs.existsSync(runDir)) for (const f of fs.readdirSync(runDir)) if (f.endsWith('.md')) rels.push('run/' + f);
+  const projectRoles = rels.filter((rel) => {
+    const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(fs.readFileSync(path.join(refDir, ...rel.split('/')), 'utf8'));
+    return !!fm && /^layer:\s*project\s*$/m.test(fm[1]);
+  });
+  if (!projectRoles.length) return; // a stock install carries no project-layer roles
+  const planned = gen.planAll(root).map((e) => e.relFile.split(path.sep).join('/'));
+  for (const rel of projectRoles) {
+    assert.ok(!planned.includes(rel), `${rel} must not be planned by the generator (project layer)`);
+  }
 });
 
 // 3a. The Gemini platform roles and profiles
@@ -238,12 +268,28 @@ it('forma-adapter.cjs provides findSubagent and stepOf for the Gemini transcript
       input_tokens: 1500,
       output_tokens: 80,
       cache_read_tokens: 500,
-      cache_write_tokens: 0,
+      cache_write_tokens: null,
     },
     requestId: '5',
     model: 'gemini-3.8-flash',
     timestamp: '2026-01-01T10:00:00Z',
   });
+});
+
+it('an absent usage field stays null, never a measured zero', () => {
+  const step = adapter.stepOf({
+    step_index: 6,
+    type: 'PLANNER_RESPONSE',
+    created_at: '2026-01-01T10:01:00Z',
+    input_tokens: 120,
+  });
+  assert.equal(step.usage.input_tokens, 120, 'a present field is read');
+  assert.equal(step.usage.output_tokens, null, 'an absent output must not become 0');
+  assert.equal(step.usage.cache_read_tokens, null, 'an absent cache read must not become 0');
+  assert.equal(step.usage.cache_write_tokens, null, 'an absent cache write must not become 0');
+  const parsed = adapter.parseUsage(step);
+  assert.equal(parsed.tokens_out, null, 'parseUsage must not invent output tokens');
+  assert.equal(parsed.cache_read, null, 'parseUsage must not invent a cache read');
 });
 
 // 8. The lint of the Gemini zone's agent files' frontmatter keys

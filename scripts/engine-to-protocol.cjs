@@ -120,6 +120,7 @@ const MAP = [
   // the Claude adapter (the Claude transcript readers live in the project's .forma/dashboard but belong to the adapter)
   ['.claude/forma-adapter.cjs', 'adapters/claude/forma-adapter.cjs'],   // the core-adapter boundary: `dashboard/lib/engines.cjs`
   ['.claude/permission-levels.json', 'adapters/claude/permission-levels.json'],   // access levels: read by permissions-level.cjs
+  ['.claude/verify-profile.cjs', 'adapters/claude/verify-profile.cjs'],   // the install verify profile, found via the manifest
   ['.claude/agents', 'adapters/claude/agents'],
   ['.claude/hooks', 'adapters/claude/hooks'],
   ['.claude/rules', 'adapters/claude/rules'],
@@ -128,7 +129,11 @@ const MAP = [
   ['.forma/dashboard', 'adapters/claude/dashboard', { noFresh: true }],
   // "not ready" adapters - as is
   ['.agents/forma-adapter.cjs', 'adapters/gemini/forma-adapter.cjs'],   // the core-adapter boundary: `dashboard/lib/engines.cjs`
+  ['.agents/verify-profile.cjs', 'adapters/gemini/verify-profile.cjs'],
+  ['.agents/hooks.json', 'adapters/gemini/hooks.json'],                 // the hook wiring; merged, a project's own groups are kept
   ['.agents/plugins/forma/agents', 'adapters/gemini/agents'],
+  ['.agents/plugins/forma/plugin.json', 'adapters/gemini/plugin.json'],
+  ['.agents/plugins/forma/mcp_config.json', 'adapters/gemini/mcp_config.json'],
   ['.agents/rules', 'adapters/gemini/rules'],
   ['.agents/tests', 'adapters/gemini/tests'],                           // the adapter conformance test (wired in adapter-conformance.cjs)
   ['.agents/hooks', 'adapters/gemini/hooks'],
@@ -140,10 +145,23 @@ const MAP = [
   ['miniapps/minimax-engine', 'adapters/minimax/miniapps/minimax-engine'],
   // ZCode: flat subpaths, as gemini; the machine .state/ does not go into the template
   ['.zcode/forma-adapter.cjs', 'adapters/zcode/forma-adapter.cjs'],
+  ['.zcode/verify-profile.cjs', 'adapters/zcode/verify-profile.cjs'],
+  ['.zcode/config.json', 'adapters/zcode/config.json'],                 // the SessionStart config hook; merged like the gemini wiring
   ['.zcode/rules', 'adapters/zcode/rules'],
   ['.zcode/scripts', 'adapters/zcode/scripts'],
   ['.zcode/tests', 'adapters/zcode/tests'],
   ['.zcode/agents', 'adapters/zcode/agents'],
+  // Qoder: the adapter's own files only. The project's start passport, witnesses, checks, commands and
+  // settings stay project-owned (project/extensions/custom/qoder) and never travel into the protocol.
+  ['.qoder/forma-adapter.cjs', 'adapters/qoder/forma-adapter.cjs'],
+  ['.qoder/verify-profile.cjs', 'adapters/qoder/verify-profile.cjs'],
+  ['.qoder/engine/qoder-8.md', 'adapters/qoder/rules/qoder-8.md'],
+  ['.qoder/engine/hooks/guard-destructive.cjs', 'adapters/qoder/hooks/guard-destructive.cjs'],
+  ['.qoder/engine/hooks/guard-cards.cjs', 'adapters/qoder/hooks/guard-cards.cjs'],
+  ['.qoder/engine/hooks/unlock-delete.cjs', 'adapters/qoder/hooks/unlock-delete.cjs'],
+  ['.qoder/engine/scripts', 'adapters/qoder/scripts'],
+  ['.qoder/engine/agents', 'adapters/qoder/agents'],
+  ['.qoder/tests', 'adapters/qoder/tests'],
 ].filter(([p]) => !(CODEX_ASLEEP && p === '.codex'));
 // A project file already known to one of the mappings (e.g. dashboard/floor.cjs - the Claude adapter)
 // is not "new" for another mapping of the same directory.

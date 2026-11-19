@@ -13,8 +13,8 @@
  *    cache_read_input_tokens`
  *  - skillsDir `.forma/skills/` - ZCode opens them natively as the project's skills (the engine-neutral core canon)
  *  - nodeModels: the GLM family (Z.AI), the thinking levels low/high/max (no middle one)
- *  - the Forma nodes are not registered as the host's agent types - the route goes degraded,
- *    the stages in one context under the [STAGE] labels (`.zcode/rules/zcode-8.md`, Contract 2)
+ *  - the Forma nodes are registered as the host's agent types from `.zcode/agents/`; a fresh
+ *    environment without registration runs degraded under the [STAGE] labels (`.zcode/rules/zcode-8.md`, Contract 2)
  *
  * Printed labels come from the core dictionary: English key in code, ru value as data.
  */

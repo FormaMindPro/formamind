@@ -84,7 +84,9 @@ test('claude,zcode: the ZCode adapter installed, .state not shipped, the core ca
     '.zcode/rules/zcode-8.md', '.zcode/forma-adapter.cjs', '.zcode/scripts/gen-roles.cjs',
     '.zcode/tests/test-zcode-adapter.cjs', '.zcode/agents/intent.md',
   ]) assert.ok(fs.existsSync(path.join(dir, f)), f);
-  assert.ok(!fs.existsSync(path.join(dir, '.zcode', '.state')), 'the .state/ machine state is not shipped into someone else\'s project');
+  // The probe of the zone's capabilities is written at install; any other machine state would be someone else's.
+  assert.deepEqual(fs.existsSync(path.join(dir, '.zcode', '.state')) ? fs.readdirSync(path.join(dir, '.zcode', '.state')) : [],
+    ['capabilities.json'], 'the .state/ carries only the capability probe - no machine state is shipped into someone else\'s project');
   assert.match(r.stdout, /ZCode: .*— installed/);
   assert.ok(!fs.existsSync(path.join(dir, '.agents', 'skills')), 'the .agents/skills mirror is Codex\'s consumer path - zcode/gemini read the core canon .forma/skills');
   assert.match(r.stdout, /gen-roles: role mirror rebuilt/);
@@ -115,7 +117,8 @@ test('--engines zcode: claude is installed by the core automatically, the skills
     assert.ok(fs.existsSync(path.join(d4, '.claude', 'rules')), 'claude was not installed by the core');
     assert.ok(fs.existsSync(path.join(d4, '.forma', 'skills')), 'the core canon was not installed');
     assert.ok(!fs.existsSync(path.join(d4, '.agents', 'skills')), 'the mirror is Codex\'s consumer path - zcode reads the core canon');
-    assert.ok(!fs.existsSync(path.join(d4, '.zcode', '.state')), 'the machine state is not shipped');
+    assert.deepEqual(fs.existsSync(path.join(d4, '.zcode', '.state')) ? fs.readdirSync(path.join(d4, '.zcode', '.state')) : [],
+      ['capabilities.json'], 'the .state/ carries only the capability probe - no machine state is shipped');
   } finally { fs.rmSync(d4, { recursive: true, force: true }); }
 });
 

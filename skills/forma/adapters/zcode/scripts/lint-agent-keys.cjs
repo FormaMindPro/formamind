@@ -25,7 +25,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 
 /** The closed list of the keys. It grows only by editing this constant - together with the collation
  *  against the zone's real files; an "just in case" addition does not become a list. */
-const KEYS = ['name', 'description', 'model', 'effort', 'tier', 'uses', 'tools'];
+const KEYS = ['name', 'description', 'model', 'effort', 'tier', 'uses', 'tools', 'omitClaudeMd', 'layer'];
 const ALLOWED = new Set(KEYS);
 
 const KEY_LINE_RE = /^([A-Za-z][A-Za-z0-9_-]*):/;

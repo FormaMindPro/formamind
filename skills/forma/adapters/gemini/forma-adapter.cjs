@@ -151,12 +151,14 @@ function stepOf(line) {
                       Number.isFinite(Number(line.output_tokens)) ||
                       Number.isFinite(Number(line.cache_read_tokens));
     if (!hasTokens) return null;
+    // Only what the transcript carries: an absent field stays null (the line says unknown, never a zero).
+    const num = (v) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
     return {
       usage: {
-        input_tokens: Number(line.input_tokens) || 0,
-        output_tokens: Number(line.output_tokens) || 0,
-        cache_read_tokens: Number(line.cache_read_tokens) || 0,
-        cache_write_tokens: 0,
+        input_tokens: num(line.input_tokens),
+        output_tokens: num(line.output_tokens),
+        cache_read_tokens: num(line.cache_read_tokens),
+        cache_write_tokens: num(line.cache_write_tokens),
       },
       requestId: line.step_index != null ? String(line.step_index) : (line.created_at || null),
       model: line.model || 'gemini-3.8-flash',

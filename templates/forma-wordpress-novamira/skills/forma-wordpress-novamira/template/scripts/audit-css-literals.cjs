@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
-// Инвентаризация литералов в CSS-файлах: цвет (#hex, rgb/hsl), px, радиусы, высоты.
-// Только чтение. Использование: node audit-css-literals.cjs <css-dir> <out.json>
-// Выход (stdout, последняя строка): {"status":"ok|stop","files":N,"literals":M,"out":"..."}
+// Inventory of literals in CSS files: colors (#hex, rgb/hsl), px, radii, heights.
+// Read-only. Usage: node audit-css-literals.cjs <css-dir> <out.json>
+// Output (stdout, the last line): {"status":"ok|stop","files":N,"literals":M,"out":"..."}
 const fs = require('fs'), path = require('path');
 const [dir, out] = process.argv.slice(2);
 if (!dir || !out) { console.log(JSON.stringify({ status: 'stop', reason: 'usage: <css-dir> <out.json>' })); process.exit(0); }

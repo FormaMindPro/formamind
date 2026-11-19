@@ -4,9 +4,12 @@
 // rule in one line; this file holds it: the machine finds Cyrillic in executable code and paints the build.
 //
 // Scanned: executable extensions (*.cjs, *.js, *.mjs, *.ps1, *.sh, *.py) and skill bodies (files named
-// exactly SKILL.md) under skills/, scripts/, bin/, test/ of the repository root (nearest .git upward from
-// this file).
-// Never scanned: other *.md (the law, roles, notes), the core dictionary data (skills/forma/core/i18n/),
+// exactly SKILL.md) under the shipped trees of the repository root (nearest .git upward from this file):
+// the protocol source (skills/, scripts/, bin/, test/), the installed core (.forma/board, .forma/dashboard,
+// .forma/extensions, .forma/i18n), the protocol mirrors under .forma/protocol, and every engine zone
+// discovered by its adapter contract (<zone>/forma-adapter.cjs: scripts/, hooks/, tests/, skills/,
+// engine/scripts/, engine/hooks/).
+// Never scanned: other *.md (the law, roles, notes), the core dictionary data (any forma/core/i18n/),
 // fixture and golden paths (fixture text is data, not code), node_modules, .git, .github.
 //
 // Modes:
@@ -26,7 +29,26 @@ const path = require('path');
 const { walk, readJson } = require('../../dashboard/lib/fs.cjs');
 
 const ZONES_FILE = 'check-english-code.zones.json';
-const ROOTS = ['skills', 'scripts', 'bin', 'test'];
+const ROOTS = ['skills', 'scripts', 'bin', 'test',
+  '.forma/board', '.forma/dashboard', '.forma/extensions', '.forma/i18n',
+  '.forma/protocol/skills', '.forma/protocol/scripts', '.forma/protocol/bin', '.forma/protocol/templates'];
+// The per-engine subtrees of an installed zone; a zone is any dot-directory carrying the adapter contract.
+const ZONE_SUBTREES = ['scripts', 'hooks', 'tests', 'skills', 'engine/scripts', 'engine/hooks'];
+
+/** Engine zones installed in `root`, discovered by the adapter contract - no engine is named here. */
+function engineRoots(root) {
+  let entries;
+  try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { return []; }
+  const out = [];
+  for (const e of entries) {
+    if (!e.isDirectory() || !e.name.startsWith('.')) continue;
+    if (!fs.existsSync(path.join(root, e.name, 'forma-adapter.cjs'))) continue;
+    for (const sub of ZONE_SUBTREES) {
+      if (fs.existsSync(path.join(root, e.name, sub))) out.push(e.name + '/' + sub);
+    }
+  }
+  return out;
+}
 const EXT = /\.(?:cjs|js|mjs|ps1|sh|py)$/i;
 // Skill bodies: any file named exactly SKILL.md is scanned as text (zone "skill-md"), like code.
 const SKILL_MD = 'SKILL.md';
@@ -34,8 +56,10 @@ const SKILL_MD = 'SKILL.md';
 const CYRILLIC = /[\u0400-\u04FF\u0500-\u052F\u2DE0-\u2DFF\uA640-\uA69F\u1C80-\u1C8F]/;
 // Directories never entered: dependencies, git plumbing, CI definitions, fixture text.
 const SKIP_DIRS = new Set(['node_modules', '.git', '.github', 'fixture', 'fixtures', 'golden']);
-// Dictionary data of the core (ru labels) - data, not code.
+// Dictionary data of the core (ru labels) - data, not code. A directory at any depth of a scanned root.
 const I18N_DIR = 'forma/core/i18n';
+const isI18nDir = (relPath) => relPath === I18N_DIR || relPath.endsWith('/' + I18N_DIR)
+  || relPath.startsWith(I18N_DIR + '/') || relPath.includes('/' + I18N_DIR + '/');
 
 /** Nearest ancestor holding .git - the repository root; null when none. */
 function repoRoot(from) {
@@ -85,12 +109,12 @@ function scan(root, o = {}) {
   const allow = new Set(zones && zones.allowList ? zones.allowList : []);
   const files = [];
   let skipped = 0;
-  for (const top of ROOTS) {
+  for (const top of [...ROOTS, ...engineRoots(root)]) {
     const dir = path.join(root, top);
     if (!fs.existsSync(dir)) continue;
     const rels = walk(dir, {
       symlinks: true,
-      skip: (e, r) => e.isDirectory() && (SKIP_DIRS.has(e.name) || (top === 'skills' && r === I18N_DIR)),
+      skip: (e, r) => e.isDirectory() && (SKIP_DIRS.has(e.name) || isI18nDir(top + '/' + r)),
     });
     for (const rel of rels) {
       const relPath = top + '/' + rel;
@@ -180,6 +204,8 @@ function makeTree(dir) {
   put('bin/tool.sh', `echo "${WORD}"\n`);
   put('scripts/install.cjs', `// ${WORD}\n`);
   put('test/sample.test.cjs', `// ${WORD}\n`);
+  put('.fake/forma-adapter.cjs', 'module.exports = {};\n');
+  put('.fake/scripts/zone.cjs', `// ${WORD}\n`);
 }
 
 function scanAssertions(failures, dir) {
@@ -188,17 +214,17 @@ function scanAssertions(failures, dir) {
   // escape; a SKILL.md body counts as scanned text.
   let r = scan(dir, { zones: null });
   expect(r.skipped === 0, `no-zones run: skipped ${r.skipped}, expected 0`);
-  expect(r.scanned === 7, `no-zones run: scanned ${r.scanned}, expected 7`);
-  expect(r.findings.length === 6, `no-zones run: findings ${r.findings.length}, expected 6`);
+  expect(r.scanned === 8, `no-zones run: scanned ${r.scanned}, expected 8`);
+  expect(r.findings.length === 7, `no-zones run: findings ${r.findings.length}, expected 7`);
   const rels = r.findings.map((f) => f.rel).sort().join(',');
   expect(rels ===
-    'bin/tool.sh,scripts/bad.js,scripts/install.cjs,scripts/nested/deep.mjs,scripts/skills/inner/SKILL.md,test/sample.test.cjs',
+    '.fake/scripts/zone.cjs,bin/tool.sh,scripts/bad.js,scripts/install.cjs,scripts/nested/deep.mjs,scripts/skills/inner/SKILL.md,test/sample.test.cjs',
     `no-zones run: files ${rels}`);
   expect(r.findings.every((f) => f.line === 1 && f.text.length > 0), 'no-zones run: finding lacks line or text');
   // Allow-list as data: the "tests-fixtures" zone (test/) is skipped in the full run.
   const zones = { allowList: ['tests-fixtures'], zones: { 'tests-fixtures': { prefixes: ['test/'] } } };
   r = scan(dir, { zones });
-  expect(r.scanned === 6 && r.skipped === 1, `allow-list run: scanned ${r.scanned}, skipped ${r.skipped}`);
+  expect(r.scanned === 7 && r.skipped === 1, `allow-list run: scanned ${r.scanned}, skipped ${r.skipped}`);
   expect(!r.findings.some((f) => f.rel.startsWith('test/')), 'allow-list run: test/ still reported');
   // Zone matchers: basename patterns, prefixes, one-segment glob, exact files, catch-all rest. "skill-md"
   // sits first on purpose: its SKILL.md name must win over the adapter/installer prefixes.

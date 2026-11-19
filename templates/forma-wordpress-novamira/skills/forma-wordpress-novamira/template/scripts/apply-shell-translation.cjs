@@ -42,7 +42,7 @@ function runAbility(name, input) {
 }
 function readLive(p) { return runAbility('novamira/read-file', { path: p }); }
 function writeLive(p, content) { return runAbility('novamira/write-file', { path: p, content, mode: 'overwrite' }); }
-function hasCyrillic(s) { return /[А-Яа-яЁё]/.test(s); }
+function hasCyrillic(s) { return /[\u0400-\u04FF]/.test(s); }
 function runNode(scriptRel, args) {
   const r = spawnSync(process.execPath, [path.join(ROOT, scriptRel), ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   let out; try { out = JSON.parse(r.stdout); } catch { out = { ok: false, error: r.stdout + r.stderr }; }

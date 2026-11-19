@@ -175,8 +175,8 @@ test('rebuild: an environment without adapters - skip markers, code 0', () => {
   try {
     const r = swIn(d, 'rebuild');
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(r.stdout, ruRe('engine-switch.no_adapter_suffix', { list: 'codex, gemini, kimi, minimax, zcode' }));
-    for (const e of ['codex', 'gemini', 'kimi', 'minimax', 'zcode']) {
+    assert.match(r.stdout, ruRe('engine-switch.no_adapter_suffix', { list: 'codex, gemini, kimi, minimax, qoder, zcode' }));
+    for (const e of ['codex', 'gemini', 'kimi', 'minimax', 'qoder', 'zcode']) {
       assert.match(r.stdout, new RegExp('^' + ruSrc('engine-switch.skipped_no_adapter', { id: e }) + '$', 'm'));
     }
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
@@ -191,6 +191,8 @@ test('status: an engine without an adapter - "not installed", not "active"', () 
     assert.equal(r.status, 0);
     assert.match(r.stdout, new RegExp('zcode: ' + ruSrc('engine-switch.status_not_installed')));
     assert.doesNotMatch(r.stdout, new RegExp('zcode: ' + ruSrc('engine-switch.status_active')));
+    assert.match(r.stdout, new RegExp('qoder: ' + ruSrc('engine-switch.status_not_installed')));
+    assert.doesNotMatch(r.stdout, new RegExp('qoder: ' + ruSrc('engine-switch.status_active')));
     assert.match(r.stdout, new RegExp('claude: ' + ruSrc('engine-switch.status_active')));
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });

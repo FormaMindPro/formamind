@@ -47,11 +47,11 @@ module.exports = {
   },
   capabilities: { subagents: true, sendMessage: true, hooks: true, mcp: true },
   nodeModels: {
-    Intent: { model: 'claude-sonnet-5-5', effort: 'medium' },
-    Spec: { model: 'claude-sonnet-5-5', effort: 'medium' },
-    Kit: { model: 'claude-sonnet-5-5', effort: 'medium' },
-    Run: { model: 'claude-haiku-5-5', effort: 'medium' },
-    Core: { model: 'claude-sonnet-5-5', effort: 'medium' },
+    Intent: { model: 'claude-haiku-5-5', effort: 'max' },
+    Spec: { model: 'claude-haiku-5-5', effort: 'high' },
+    Kit: { model: 'claude-haiku-5-5', effort: 'high' },
+    Run: { model: 'claude-haiku-5-5', effort: 'low' },
+    Core: { model: 'claude-sonnet-5-5', effort: 'low' },
   },
   writeZones: ['.claude', '.devtool/features'],
 

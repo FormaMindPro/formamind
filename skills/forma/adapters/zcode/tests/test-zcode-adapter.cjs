@@ -107,6 +107,26 @@ it('the roles mirror is in sync with .claude/agents (gen-roles --check)', () => 
   assert.equal(r.status, 0, 'the mirror has drifted: ' + (r.stderr || r.stdout));
 });
 
+it('gen-roles --check names a leftover role with no source as stale', () => {
+  const probe = path.join(root, '.zcode', 'agents', 'run', 'zzz-stale-probe.md');
+  fs.writeFileSync(probe, '---\nname: zzz-stale-probe\n---\n');
+  try {
+    const r = spawnSync(process.execPath, [path.join(root, '.zcode', 'scripts', 'gen-roles.cjs'), '--check'], { encoding: 'utf8' });
+    assert.notEqual(r.status, 0, 'a stale role must fail --check');
+    assert.match(r.stderr || '', /zzz-stale-probe\.md/, 'the stale file must be named');
+  } finally {
+    fs.rmSync(probe, { force: true });
+  }
+});
+
+it('the mirror keeps omitClaudeMd and calls the zone model, not a foreign one', () => {
+  const extractor = fs.readFileSync(path.join(root, '.zcode', 'agents', 'extractor.md'), 'utf8');
+  assert.match(extractor, /^omitClaudeMd: true$/m, 'omitClaudeMd must survive the frontmatter rewrite');
+  const role = fs.readFileSync(path.join(root, '.zcode', 'agents', 'core.md'), 'utf8');
+  assert.match(role, /^model: glm-5\.3-flash$/m, 'the role must carry the zone model');
+  assert.doesNotMatch(role, /glm-4-flash/, 'a stale model name must not remain in the mirror');
+});
+
 // 4. The spend parse
 it('parseUsage reads a synthetic step and the host\u0027s real usage shape', () => {
   const a = adapter();

@@ -14,6 +14,7 @@ const i18n = require('../skills/forma/core/i18n/index.cjs')
 const { parseLong } = require('../skills/forma/core/dashboard/lib/cli.cjs')
 const verifyInstall = require('../skills/forma/core/verify/verify-install.cjs')
 const extensions = require('../skills/forma/core/extensions/extensions.cjs')
+const { writeProbes } = require('../skills/forma/core/dashboard/lib/capability-probe.cjs')
 const adoptExisting = require('../scripts/layout/adopt-existing.cjs')
 const { cleanEngineFiles } = require('../scripts/layout/clean-engine-files.cjs')
 const { findBash } = require('../skills/forma/adapters/claude/verify-profile.cjs')
@@ -34,6 +35,7 @@ const ENGINES = [
   { id: 'claude', label: 'Claude Code' },
   { id: 'gemini', label: 'Gemini (Antigravity)' },
   { id: 'zcode', label: 'ZCode' },
+  { id: 'qoder', label: 'Qoder' },
   { id: 'codex', label: 'Codex' },
   { id: 'minimax', label: 'MiniMax Code' },
 ]
@@ -54,7 +56,7 @@ const HELP = `forma ${VERSION} init — install/update the Forma protocol in the
 
   npx github:FormaMindPro/formamind init [flags]
 
-  --engines  claude[,gemini,zcode]   engines (claude is always core; codex and minimax are dormant: core/engines.json).
+  --engines  claude[,gemini,zcode,qoder] engines (claude is always core; codex and minimax are dormant: core/engines.json).
                                      On an update without the flag the recorded engines are reinstalled, not claude alone
   --all                              every component the project records, one run: the engines of its install manifest
                                      (no manifest yet — a first install: every active engine); --engines wins over --all
@@ -200,6 +202,7 @@ function installCore(root, protectedPaths, lang = 'en') {
   copyTree(path.join(CORE, 'manual'), path.join(forma, 'manual'))
   copyTree(path.join(CORE, 'board'), path.join(forma, 'board'))
   copyTree(path.join(CORE, 'verify'), path.join(forma, 'verify'))
+  copyTree(path.join(CORE, 'rules'), path.join(forma, 'rules')) // the guards' rulebook: .forma/rules/guard-delete.cjs + protected-paths.json
   copyTree(path.join(CORE, 'plumb'), path.join(forma, 'plumb')) // the Plumb driver the roles call: node .forma/plumb/plumb-run.cjs
   copyTree(path.join(CORE, 'i18n'), path.join(forma, 'i18n'))
   copyTree(path.join(CORE, 'extensions'), path.join(forma, 'extensions'), { skip: (d) => path.basename(d) === 'PROJECT-README.md' })
@@ -663,6 +666,84 @@ function installZCode(root) {
   return out
 }
 
+// Qoder: the adapter, its §8, the guard hooks and the role catalog; settings.json is merged, so a project's
+// own SessionStart or command hooks survive an update. The catalog is regenerated from .claude/agents when
+// that reference is installed, otherwise the shipped snapshot is kept.
+const QODER_HOOKS = {
+  PreToolUse: [{ matcher: 'Bash', hooks: ['guard-destructive.cjs'] }, { matcher: 'Write|Edit', hooks: ['guard-cards.cjs'] }],
+  UserPromptSubmit: [{ hooks: ['unlock-delete.cjs'] }],
+}
+function mergeQoderSettings(root) {
+  const file = path.join(root, '.qoder', 'settings.json')
+  let s = {}
+  if (fs.existsSync(file)) {
+    try { s = JSON.parse(fs.readFileSync(file, 'utf8')) } catch { throw new Error('.qoder/settings.json is not valid JSON — fix it by hand and rerun') }
+  }
+  s.hooks = s.hooks || {}
+  for (const [event, groups] of Object.entries(QODER_HOOKS)) {
+    s.hooks[event] = s.hooks[event] || []
+    for (const g of groups) {
+      let group = s.hooks[event].find((x) => (x.matcher || '') === (g.matcher || ''))
+      if (!group) { group = g.matcher ? { matcher: g.matcher, hooks: [] } : { hooks: [] }; s.hooks[event].push(group) }
+      group.hooks = group.hooks || []
+      for (const name of g.hooks) {
+        const command = `node .qoder/engine/hooks/${name}`
+        if (!group.hooks.some((x) => x.command === command)) group.hooks.push({ type: 'command', command })
+      }
+    }
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, JSON.stringify(s, null, 2) + '\n')
+  return 'settings.json: hooks wired (PreToolUse Bash, PreToolUse Write|Edit, UserPromptSubmit)'
+}
+function rebuildQoderRoles(root, why) {
+  const r = spawnSync(process.execPath, [path.join(root, '.qoder', 'engine', 'scripts', 'gen-roles.cjs')], { encoding: 'utf8' })
+  return r.status === 0
+    ? '  gen-roles: role catalog rebuilt from .claude/agents' + (why ? ` — ${why}` : '')
+    : '  ! gen-roles exited with code ' + r.status + ': ' + ((r.stdout || '') + (r.stderr || '')).trim().split(/\r?\n/).slice(-3).join(' | ')
+}
+function installQoder(root) {
+  const A = path.join(ADAPTERS, 'qoder')
+  const Q = path.join(root, '.qoder')
+  copyFile(path.join(A, 'forma-adapter.cjs'), path.join(Q, 'forma-adapter.cjs'))
+  copyFile(path.join(A, 'verify-profile.cjs'), path.join(Q, 'verify-profile.cjs')) // install verify profile: the core finds it via the manifest
+  copyTree(path.join(A, 'rules'), path.join(Q, 'engine'))
+  copyTree(path.join(A, 'hooks'), path.join(Q, 'engine', 'hooks'))
+  copyTree(path.join(A, 'scripts'), path.join(Q, 'engine', 'scripts'))
+  copyTree(path.join(A, 'tests'), path.join(Q, 'tests'))
+  copyTree(path.join(A, 'agents'), path.join(Q, 'engine', 'agents'))
+  const out = ['Qoder: .qoder/forma-adapter.cjs, .qoder/engine (section 8, guards, scripts, agents), .qoder/tests — installed', '  ' + mergeQoderSettings(root)]
+  if (fs.existsSync(path.join(root, '.claude', 'agents'))) out.push(rebuildQoderRoles(root))
+  else out.push('  ! .claude/agents not found — the shipped role catalog is kept; install Claude Code, then run: node .qoder/engine/scripts/gen-roles.cjs')
+  return out
+}
+
+// The gemini mirror generator lives in the claude adapter's tree (it reads .claude/agents as the reference);
+// it has no CLI, so it is called through require.
+function rebuildGeminiRoles(root, gen, why) {
+  const r = spawnSync(process.execPath, ['-e', 'require(process.argv[1]).applyAll(process.argv[2])', gen, root], { encoding: 'utf8' })
+  return r.status === 0
+    ? '  gemini roles: mirror rebuilt from .claude/agents' + (why ? ` — ${why}` : '')
+    : '  ! gemini roles exited with code ' + r.status + ': ' + ((r.stdout || '') + (r.stderr || '')).trim().split(/\r?\n/).slice(-3).join(' | ')
+}
+function rebuildCodexRoles(root, why) {
+  const r = spawnSync(process.execPath, [path.join(root, '.codex', 'scripts', 'sync-codex.cjs'), '--apply', '--root', root, '--plugin', SKILL], { encoding: 'utf8' })
+  return r.status === 0
+    ? '  codex roles: mirror rebuilt from .claude/agents' + (why ? ` — ${why}` : '')
+    : '  ! sync-codex exited with code ' + r.status + ': ' + ((r.stdout || '') + (r.stderr || '')).trim().split(/\r?\n/).slice(-3).join(' | ')
+}
+// Every installed role mirror reads .claude/agents; the template writes run roles into it after the engines
+// step, so each mirror needs rebuilding once more.
+function rebuildMirrors(root, why) {
+  const out = []
+  if (fs.existsSync(path.join(root, '.zcode', 'scripts', 'gen-roles.cjs'))) out.push(rebuildZcodeRoles(root, why))
+  if (fs.existsSync(path.join(root, '.qoder', 'engine', 'scripts', 'gen-roles.cjs'))) out.push(rebuildQoderRoles(root, why))
+  const ggen = path.join(root, '.claude', 'scripts', 'checks', 'support', 'gen-gemini-roles.cjs')
+  if (fs.existsSync(ggen) && fs.existsSync(path.join(root, '.agents', 'forma-adapter.cjs'))) out.push(rebuildGeminiRoles(root, ggen, why))
+  if (fs.existsSync(path.join(root, '.codex', 'scripts', 'sync-codex.cjs'))) out.push(rebuildCodexRoles(root, why))
+  return out
+}
+
 // Claude Code runs every hook as `bash .claude/hooks/<name>.sh`: without a working bash the delete guard, the card check
 // and the session start all stay silent - the protocol looks installed and enforces nothing.
 const NO_BASH = process.platform === 'win32'
@@ -691,9 +772,15 @@ function installEngines(root, choice, protectedPaths, report) {
       report.push(...installGemini(root))
     } else if (e === 'zcode') {
       report.push(...installZCode(root))
+    } else if (e === 'qoder') {
+      report.push(...installQoder(root))
     }
   }
   syncExtensions(root, report)
+  const probes = writeProbes(root)
+  report.push(probes.length
+    ? `capability probes: ${probes.length} zone(s) written (${probes.map((p) => p.zone).join(', ')})`
+    : 'capability probes: no adapter zone installed — nothing to probe')
 }
 
 // Returns the template result (or null when nothing was installed) so install() can react to what was written.
@@ -737,6 +824,31 @@ function zcodeExpect() {
     mirrorFrom: '.claude/agents',
   }
 }
+// Qoder: the installed adapter files, the guard wiring and where the role catalog is generated from.
+function qoderExpect() {
+  return {
+    files: [
+      '.qoder/forma-adapter.cjs',
+      '.qoder/verify-profile.cjs',
+      '.qoder/engine/qoder-8.md',
+      '.qoder/engine/hooks/guard-destructive.cjs',
+      '.qoder/engine/hooks/guard-cards.cjs',
+      '.qoder/engine/hooks/unlock-delete.cjs',
+      '.qoder/engine/scripts/gen-roles.cjs',
+      '.qoder/engine/agents/intent.md',
+      '.qoder/engine/agents/on-demand/intent-session-start.md',
+      '.qoder/tests/test-qoder-adapter.cjs',
+      '.qoder/tests/test-qoder-spend.cjs',
+      '.qoder/settings.json',
+    ],
+    mirrorFrom: '.claude/agents',
+    hooks: [
+      { event: 'PreToolUse', matcher: 'Bash', name: 'guard-destructive.cjs' },
+      { event: 'PreToolUse', matcher: 'Write|Edit', name: 'guard-cards.cjs' },
+      { event: 'UserPromptSubmit', matcher: '', name: 'unlock-delete.cjs' },
+    ],
+  }
+}
 function writeManifest(root, { engines, lang, template, projectCreated }) {
   let previous = null
   try { previous = verifyInstall.readManifest(root) } catch { /* a broken earlier manifest is recreated */ }
@@ -744,6 +856,7 @@ function writeManifest(root, { engines, lang, template, projectCreated }) {
     if (id === 'claude') return { id, profile: '.claude/verify-profile.cjs', expect: claudeExpect() }
     if (id === 'gemini') return { id, profile: '.agents/verify-profile.cjs', expect: geminiExpect() }
     if (id === 'zcode') return { id, profile: '.zcode/verify-profile.cjs', expect: zcodeExpect() }
+    if (id === 'qoder') return { id, profile: '.qoder/verify-profile.cjs', expect: qoderExpect() }
     return { id, note: 'not verified: no profile yet' }
   })
   const manifest = verifyInstall.buildManifest(root, { owned, projectCreated, previous, engines: rows, lang, version: VERSION, line: LINE, template })
@@ -801,8 +914,8 @@ function dashboardUrl(root) {
 function startDashboard(root) {
   const script = path.join(root, '.forma', 'dashboard', 'ensure-running.js')
   if (!fs.existsSync(script)) return null
-  spawnSync(process.execPath, [script], { cwd: root, stdio: 'ignore', timeout: 15000 })
-  for (let i = 0; i < 150; i++) { // up to ~15 s for the server to write its address
+  spawnSync(process.execPath, [script], { cwd: root, stdio: 'ignore', timeout: 30000 })
+  for (let i = 0; i < 300; i++) { // up to ~30 s for the server to write its address (a loaded machine boots slower)
     const url = dashboardUrl(root)
     if (url) return url
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100)
@@ -845,10 +958,10 @@ function install(root, choice) {
   report.push(`core: AGENTS.md, .forma/manual/, .forma/board/, .forma/skills/, .forma/dashboard/ synced; .forma/living/ — missing files added; board .devtool/features/ — ${core.boardState}; project/ — ${core.projectState}`)
   installEngines(root, choice, protectedPaths, report)
   const templateResult = installTemplateStep({ root, template: choice.template, existingTemplate }, core, report)
-  // Engines (and the zcode mirror rebuild) run before the template, so the run roles the template just
-  // wrote into .claude/agents/run/ are not in the mirror yet — rebuild again, the mirror must match.
-  if (templateResult && templateResult.runRoles.written.length && fs.existsSync(path.join(root, '.zcode', 'scripts', 'gen-roles.cjs')))
-    report.push(rebuildZcodeRoles(root, `the template wrote ${templateResult.runRoles.written.length} run roles after the first rebuild`))
+  // Engines (and their role mirrors) run before the template, so the run roles the template just wrote into
+  // .claude/agents/run/ are not in a mirror yet — rebuild every installed mirror, it must match.
+  if (templateResult && templateResult.runRoles.written.length)
+    report.push(...rebuildMirrors(root, `the template wrote ${templateResult.runRoles.written.length} run roles after the first rebuild`))
   // Foreign files in the engine folders: everything is written by now (engines, extensions, template, the zcode
   // mirror rebuilt last), so any file in the managed subfolders that this pass did not write, is not a project
   // extension copy, is not a file of the recorded template, is protected or is absent from the previous manifest
@@ -857,7 +970,8 @@ function install(root, choice) {
   // a mirror whose source was just archived follows it out.
   if (choice.archiveForeign !== false) {
     const extensionPaths = new Set(extensions.sources(root).map((s) => path.resolve(root, s.dst)))
-    const mirrors = [{ target: '.zcode/agents', genScript: '.zcode/scripts/gen-roles.cjs' }]
+    const mirrors = [{ target: '.zcode/agents', genScript: '.zcode/scripts/gen-roles.cjs' },
+                     { target: '.qoder/engine/agents', genScript: '.qoder/engine/scripts/gen-roles.cjs' }]
     const writtenOrKept = new Set([...owned, ...keptFiles]) // a kept live edit is not a stale forma file
     // the recorded template's files are forma's even when the template step did not run this pass (--yes keeps
     // the recorded template): the same set the engines are told not to overwrite, no scan zones of its own

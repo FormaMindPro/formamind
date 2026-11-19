@@ -123,6 +123,29 @@ try {
     assert.equal(out.decision, 'allow');
   });
 
+  // 5. The hook is fail-closed: without .forma/rules it denies, it does not allow
+  it('the hook denies a protected delete when the rulebook module is absent', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-hook-'));
+    try {
+      const hooksDir = path.join(dir, '.agents', 'hooks');
+      fs.mkdirSync(hooksDir, { recursive: true });
+      const hook = path.resolve(__dirname, '..', 'hooks', 'guard-delete.cjs');
+      const copy = path.join(hooksDir, 'guard-delete.cjs');
+      fs.copyFileSync(hook, copy);
+      const r = require('child_process').spawnSync(process.execPath, [copy], {
+        cwd: dir,
+        input: JSON.stringify({ toolCall: { name: 'run_command', args: { CommandLine: 'rm -rf .agents' } } }),
+        encoding: 'utf8',
+      });
+      assert.equal(r.status, 0, 'the hook crashed: ' + (r.stderr || ''));
+      const out = JSON.parse((r.stdout || '').trim());
+      assert.equal(out.decision, 'deny', 'the hook allowed a protected delete without its rulebook');
+      assert.match(String(out.reason || ''), /fail-closed/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   console.log(`\nAll ${passed} guard-delete checks passed.`);
 } finally {
   fs.rmSync(tmpDir, { recursive: true, force: true });

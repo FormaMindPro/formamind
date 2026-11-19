@@ -42,6 +42,9 @@ const DST = path.join(ROOT, '.zcode', 'agents');
  */
 const EXECUTOR_RENAME = { 'plumb-haiku': 'plumb-glmflash' };
 
+/** My model: one runtime; the "node / effort" distinction is expressed by the thinking level. */
+const MY_MODEL = 'glm-5.3-flash';
+
 const BODY_TRANSFORMS = [
   [/\bplumb-haiku\b/g, EXECUTOR_RENAME['plumb-haiku']],
   [/\.claude\/agents\/on-demand\//g, 'agents/on-demand/'],
@@ -51,8 +54,8 @@ const BODY_TRANSFORMS = [
   [/\.claude\/rules\/claude-8\.md/g, '.zcode/rules/zcode-8.md'],
   [/\bclaude-8\.md\b/g, 'zcode-8.md'],
   [/\bCLAUDE\.md\b/g, 'AGENTS.md'],
-  [/Plumb on `haiku` or OpenRouter `jev`/g, 'Plumb on `glm-4-flash` or OpenRouter `jev`'],
-  [/Plumb on `haiku`\/`jev`/g, 'Plumb on `glm-4-flash`\/`jev`'],
+  [/Plumb on `haiku` or OpenRouter `jev`/g, 'Plumb on `' + MY_MODEL + '` or OpenRouter `jev`'],
+  [/Plumb on `haiku`\/`jev`/g, 'Plumb on `' + MY_MODEL + '`\/`jev`'],
 ];
 
 /** The tools: the clone's name -> my runtime's name. The order matters: the long ones first. */
@@ -87,9 +90,6 @@ const WRITE_PATH_RULES = [
   [/puts it in `\.claude\/scripts\/`/g, 'puts it in `.zcode/scripts/`'],
   [/never to `\.claude\/scripts\/`/g, 'never to `.zcode/scripts/`'],
 ];
-
-/** My model: one runtime; the "node / effort" distinction is expressed by the thinking level. */
-const MY_MODEL = 'glm-5.3-flash';
 
 /** The default effort, and Run's: the host's levels - low | high | max (no middle one). */
 const MY_EFFORT = 'high';
@@ -139,6 +139,7 @@ function myFrontmatter(srcFm, rel) {
   lines.push(`effort: ${isRun ? RUN_EFFORT : MY_EFFORT}`);
   if (f.tools) lines.push(`tools: ${mapTools(f.tools)}`);
   if (f.uses) lines.push(`uses: ${f.uses}`);
+  if (f.omitClaudeMd) lines.push(`omitClaudeMd: ${f.omitClaudeMd}`);
   lines.push('---');
   return lines.join('\n') + '\n';
 }
@@ -165,9 +166,18 @@ function listRoleFiles(dir, base = '') {
   return out;
 }
 
+/** A project-layer role (frontmatter `layer: project`): the mirror must not carry it. */
+function isProjectRole(rel) {
+  const src = fs.readFileSync(path.join(SRC, ...rel.split('/')), 'utf8');
+  const { fm } = splitFrontmatter(src);
+  return /^layer:\s*project\s*$/m.test(fm || '');
+}
+
 function generate() {
   const printPaths = process.argv.includes('--print-paths');
-  const files = listRoleFiles(SRC);
+  const all = listRoleFiles(SRC);
+  const projectRels = all.filter(isProjectRole);
+  const files = all.filter((rel) => !projectRels.includes(rel));
   const written = [];
   const drift = [];
   const paths = [];
@@ -187,13 +197,36 @@ function generate() {
       written.push(rel);
     }
   }
-  return { files, written, drift, paths: printPaths ? [...new Set(paths)].sort() : null };
+  const expected = new Set(files.map((rel) => {
+    const stem = rel.replace(/\.md$/, '');
+    return (EXECUTOR_RENAME[stem] ? `${EXECUTOR_RENAME[stem]}.md` : rel);
+  }));
+  // A file the project owns arrives from project/extensions/<engine>/ and is not stale: only a file
+  // with neither a source role nor a project-extension source is a leftover of a removed role.
+  const owned = (rel) => ['template', 'custom', ''].some((layer) => {
+    const base = layer ? path.join(ROOT, 'project', 'extensions', layer, 'zcode', 'agents') : path.join(ROOT, 'project', 'extensions', 'zcode', 'agents');
+    return fs.existsSync(path.join(base, ...rel.split('/')));
+  });
+  const projectDsts = new Set(projectRels.map((rel) => {
+    const stem = rel.replace(/\.md$/, '');
+    return (EXECUTOR_RENAME[stem] ? `${EXECUTOR_RENAME[stem]}.md` : rel);
+  }));
+  const stale = printPaths ? [] : listRoleFiles(DST).filter((rel) => projectDsts.has(rel) || (!expected.has(rel) && !owned(rel)));
+  if (!printPaths && !process.argv.includes('--check')) {
+    for (const rel of stale) fs.rmSync(path.join(DST, ...rel.split('/')), { force: true });
+  }
+  return { files, written, drift, stale, paths: printPaths ? [...new Set(paths)].sort() : null };
 }
 
-const { files, written, drift, paths } = generate();
+const { files, written, drift, paths, stale } = generate();
 if (paths) {
   console.log(paths.join('\n'));
 } else if (process.argv.includes('--check')) {
+  if (stale.length) {
+    console.error(msg('zgen.stale') + stale.join(', '));
+    console.error(msg('zgen.rebuild'));
+    process.exit(1);
+  }
   if (drift.length) {
     console.error(msg('zgen.drift') + drift.join(', '));
     console.error(msg('zgen.rebuild'));

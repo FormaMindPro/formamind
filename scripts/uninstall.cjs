@@ -12,7 +12,7 @@ const extensions = require('../skills/forma/core/extensions/extensions.cjs')
 
 const SKILL = path.join(__dirname, '..', 'skills', 'forma')
 
-const TARGETS = ['.claude', '.codex', '.agents', '.forma', 'AGENTS.md', '.env.example']
+const TARGETS = ['.claude', '.codex', '.agents', '.zcode', '.qoder', '.forma', 'AGENTS.md', '.env.example']
 const KEPT = ['project', '.devtool', '.env', '.mcp.json', '.playwright-cli']
 const MANIFEST = path.join('.forma', 'install-manifest.json')
 // lines written by the installer into .gitignore (bin/forma.cjs): [line, comment]

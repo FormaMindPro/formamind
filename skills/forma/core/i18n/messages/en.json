@@ -694,6 +694,7 @@
   "engine-switch.status_not_installed": "adapter not installed",
   "engine-switch.skipped_no_adapter": "{id}: adapter not installed - skipped",
   "engine-switch.rebuilt": "✓ rebuilt: {built}{no_adapter}{skipped}",
+  "engine-switch.probes": "capability probes written: {zones}",
   "engine-switch.none": "none",
   "engine-switch.no_adapter_suffix": "; adapter not installed, skipped: {list}",
   "engine-switch.skipped_suffix": "; sleeping, untouched: {list}",
@@ -1035,8 +1036,7 @@
   "mhook.deny_reason_tail": "» lifts the ban for one action.",
   "mhook.session_start": "The project runs on the Forma protocol. The main session is the `Intent` node. First read the role file ",
   "mhook.session_role_mid": " and the session start file ",
-  "mhook.session_start_tail": ", then speak with the human as `Intent`. The law rules are in AGENTS.md, §1–§7."
-,
+  "mhook.session_start_tail": ", then speak with the human as `Intent`. The law rules are in AGENTS.md, §1–§7.",
   "commit.stop_prefix": "STOP: ",
   "commit.no_git": "protocol/.git missing - this is not a FormaMindPro/formamind clone.",
   "commit.no_checkout_dev": "protocol/: could not switch to dev:\n{out}",
@@ -1127,10 +1127,8 @@
   "rel.label_tests": "tests",
   "rel.label_lint": "linter",
   "rel.checks_red": "STOP: {label} red:{head}\n{tail}",
-  "rel.checks_green": "✓ {label} green"
-,
-  "rel.tests_head": "\nFailed ({n}):\n{names}\n{summary}"
-,
+  "rel.checks_green": "✓ {label} green",
+  "rel.tests_head": "\nFailed ({n}):\n{names}\n{summary}",
   "trun.tmp_dead": "[test-runner] FORMA_TEST_TMP is set but the path is unreachable ({custom}) - falling back to autodetection",
   "trun.ramdisk_win": "RAM disk (R:)",
   "trun.ramdisk_shm": "RAM disk (/dev/shm)",
@@ -1162,15 +1160,13 @@
   "tp.to_write": "\nTo write: {n}. Write: --apply.",
   "tp.nothing_to_write": "\nNothing to write.",
   "tp.written": "\nWritten: {n}. Template version {old} -> {new}; CHANGELOG.md and the README \"Contents\" rebuilt. Next: a commit in protocol/, check-release, pull --rebase, --before-push, push - on the human's command.",
-  "tp.no_markers": "STOP: the template README lacks the markers {start} / {end}"
-,
+  "tp.no_markers": "STOP: the template README lacks the markers {start} / {end}",
   "guard.code_phrase": "Disable sensory",
   "guard.reason_path": "Prohibition 1: deleting or moving the protected path \"{tok}\" is blocked (AGENTS.md §2). For a one-time unlock, say the code phrase \"Disable sensory\".",
   "guard.reason_recursive": "Prohibition 1: a recursive wipe of the mask \"{tok}\" touches protected paths (AGENTS.md §2). For a one-time unlock, say the code phrase \"Disable sensory\".",
   "guard.reason_git_clean": "Prohibition 1: git clean can delete protected untracked files and directories (AGENTS.md §2). For a one-time unlock, say the code phrase \"Disable sensory\".",
   "gate.core_cycle_deny": "Refusal: the epic has accumulated {accepted}/{volume} cards. The Core call is postponed until the circle is filled (or an early-closing command).",
-  "gate.core_cycle_ok": "ok: {accepted}/{volume} cards accumulated"
-,
+  "gate.core_cycle_ok": "ok: {accepted}/{volume} cards accumulated",
   "plumb.thresholds_unread": "PROJECT.md thresholds unreadable",
   "plumb.miss_leader": "leader {v} < {t}",
   "plumb.miss_gap": "gap {v} < {t}",
@@ -1182,8 +1178,7 @@
   "plumb.history_line": "- `Plumb`, {date}: {executor} ({spend}) - role {role}, confidence {lead}, gap {gap}, clarity {clarity}/4, noul {noul}; {outcome}. The line was written by the driver (--write).",
   "plumb.no_history_zone": "card has no ## History / ## История zone",
   "plumb.no_task_zone": "card has no ## Task / ## Задача zone",
-  "plumb.no_value": "none"
-,
+  "plumb.no_value": "none",
   "serve.rebuilt": "[{time}] rebuilt ({reason}): cards {cards}, tokens by engine {tokens}",
   "serve.rebuild_failed": "Rebuild failed:",
   "serve.upload_absorbed": "[interview] file attached: {file}",
@@ -1205,8 +1200,7 @@
   "serve.port_busy": "Port {port} is busy - trying a free ephemeral port from the OS...",
   "serve.server_error": "Server error:",
   "serve.started": "Dashboard: {url}",
-  "serve.built_at_start": "Built at start: cards {cards}, tokens by engine {tokens}"
-,
+  "serve.built_at_start": "Built at start: cards {cards}, tokens by engine {tokens}",
   "watch.child_exited": "[watch] serve.js exited (code {code}, signal {signal}), lifetime {sec}s",
   "watch.restart_scheduled": "[watch] restart in {delay} ms (consecutive attempt: {attempt})",
   "watch.spawn_failed": "[watch] could not start serve.js: {reason}",
@@ -1215,8 +1209,7 @@
   "ensure.already_running": "Dashboard already running: http://localhost:{port}/",
   "ensure.not_responding": "Dashboard not responding - starting the supervisor in the background...",
   "ensure.supervisor_up": "Supervisor up (pid {pid}); log - {log}",
-  "ensure.eta": "In a couple of seconds: usually http://localhost:{port}/ - see the exact address in .forma/dashboard/.cache/server.json if the port was busy."
-,
+  "ensure.eta": "In a couple of seconds: usually http://localhost:{port}/ - see the exact address in .forma/dashboard/.cache/server.json if the port was busy.",
   "engines.mode_full": "full",
   "engines.mode_degraded": "degraded",
   "engines.not_object": "the adapter is not an object",
@@ -1253,20 +1246,16 @@
   "checks.id_twice": "{id}: the id occurs twice",
   "checks.since_key": "{id}: since - a rule key or null",
   "checks.run_fn": "{id}: run - not a function",
-  "checks.test_failed": "{file}: the test failed (code {code}) - {tail}"
-,
-  "structure.mixed_marker": "[mixed]"
-,
+  "checks.test_failed": "{file}: the test failed (code {code}) - {tail}",
+  "structure.mixed_marker": "[mixed]",
   "cycle_metrics.header": "Cycle metrics (over the board's cards, zero model calls):",
   "cycle_metrics.attempts": "  attempts/task:        average {average}, maximum {max} ({with} of {total} cards with attempts)",
   "cycle_metrics.returns": "  returns by node:     {list}; route lengthenings: {n}",
   "cycle_metrics.none": "none",
   "cycle_metrics.unknown_share": "  unknown share:          {v}",
-  "cycle_metrics.metacycle_share": "  metacycle share:       {v}"
-,
+  "cycle_metrics.metacycle_share": "  metacycle share:       {v}",
   "graphify_trigger.bad_config": "graphify-trigger: broken {file} ({reason})",
-  "graphify_trigger.pending_marked": "graphify-trigger: {count} events accumulated (threshold {threshold}) - the graph is marked as \"due for a rebuild\" ({file}), run node .claude/scripts/build-kit-graphs.cjs."
-,
+  "graphify_trigger.pending_marked": "graphify-trigger: {count} events accumulated (threshold {threshold}) - the graph is marked as \"due for a rebuild\" ({file}), run node .claude/scripts/build-kit-graphs.cjs.",
   "locale_parity.dict_unreadable": ".forma/dashboard/locales/{lang}.json: unreadable - {reason}",
   "locale_parity.key_missing_ru": "locales: the key \"{key}\" is absent from ru.json (present in en.json)",
   "locale_parity.key_missing_en": "locales: the key \"{key}\" is absent from en.json (present in ru.json)",
@@ -1280,8 +1269,7 @@
   "core_integrity.prefix": "core: ",
   "manual_languages.no_ru_copy": ".forma/manual/en/{file}: no russian copy in .forma/manual/ru/",
   "manual_languages.no_en_copy": ".forma/manual/ru/{file}: no english original in .forma/manual/en/",
-  "manual_languages.headings_drift": ".forma/manual/{en,ru}/{file}: headings {a} against {b} - the copy has drifted from the original"
-,
+  "manual_languages.headings_drift": ".forma/manual/{en,ru}/{file}: headings {a} against {b} - the copy has drifted from the original",
   "tally.routes.no_route": "no route",
   "tally.routes.title": "Spend by routes (labels route-N / over-N / seg-N / wave-N)",
   "tally.routes.th_label": "label",
@@ -1380,5 +1368,7 @@
   "board.cycle-report.total": "total",
   "board.cycle-report.unknown": "unknown-token lines: {n}",
   "board.new-card.bad_node": "--node \"{node}\" — not a node name",
-  "plumb.miss_noul": "noul {v} < {t}"
+  "plumb.miss_noul": "noul {v} < {t}",
+  "board.new-card.isolation_unknown": "the isolation gate is closed: zone {zone} has no capability probe (.state/capabilities.json) — a missing probe reads as a refusal, not a permission. Write the probe (node .forma/dashboard/lib/capability-probe.cjs) or pass --force.",
+  "board.new-card.force_line": "- `{node}`, {day}: --force — the capability probe of zone {zone} is missing or the isolation is closed; a channels card was allowed explicitly."
 }

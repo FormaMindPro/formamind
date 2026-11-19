@@ -4,6 +4,7 @@ description: Extractor — text-in/text-out extraction, no routing decisions, no
 model: glm-5.3-flash
 effort: high
 tools: Read, Glob, Grep, Write
+omitClaudeMd: true
 ---
 
 # `extractor`

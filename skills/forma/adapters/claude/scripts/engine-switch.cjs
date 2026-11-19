@@ -20,9 +20,9 @@ const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const ROOT = process.cwd();
 const REGISTRY = path.join(ROOT, '.forma', 'engines.json');
-const ENGINES = ['claude', 'codex', 'gemini', 'kimi', 'minimax', 'zcode'];
+const ENGINES = ['claude', 'codex', 'gemini', 'kimi', 'minimax', 'qoder', 'zcode'];
 // The adapter's zone - the sign of "the engine is installed"; claude - the base, lives in .claude/ and has no zone.
-const ZONE = { gemini: '.agents/plugins/forma', kimi: '.kimi', codex: '.codex', minimax: '.minimax', zcode: '.zcode' };
+const ZONE = { gemini: '.agents/plugins/forma', kimi: '.kimi', codex: '.codex', minimax: '.minimax', qoder: '.qoder', zcode: '.zcode' };
 const installed = (id) => !ZONE[id] || fs.existsSync(path.join(ROOT, ZONE[id]));
 const REBUILD = {
   gemini: [
@@ -47,12 +47,26 @@ const REBUILD = {
     ['.zcode/scripts/gen-roles.cjs'],        // the roles mirror .zcode/agents/ anew from .claude/agents/
     ['.zcode/tests/test-zcode-adapter.cjs'],
   ],
+  qoder: [
+    ['.qoder/engine/scripts/gen-roles.cjs'],  // the role catalog .qoder/engine/agents/ anew from .claude/agents/
+    ['.qoder/tests/test-qoder-adapter.cjs'],
+  ],
 };
 
 const read = () => { try { const l = JSON.parse(fs.readFileSync(REGISTRY, 'utf8')).dormant; return Array.isArray(l) ? l : []; } catch { return []; } };
 const write = (list) => fs.writeFileSync(REGISTRY, JSON.stringify({ dormant: list }, null, 2) + '\n');
 const node = (args) => spawnSync(process.execPath, args, { cwd: ROOT, encoding: 'utf8' });
 const fail = (m) => { console.error(msg('engine-switch.stop', { m })); process.exit(1); };
+
+// The capability probes are rewritten on every switch: install and a wake are the two moments the zones' mounts and
+// their declared capabilities can change. Missing probes read fail-closed at the board's channels gate.
+function writeProbes() {
+  const file = [path.resolve(__dirname, '../../.forma/dashboard/lib/capability-probe.cjs'), path.resolve(__dirname, '../../core/dashboard/lib/capability-probe.cjs')].find((p) => fs.existsSync(p));
+  if (!file) return [];
+  const zones = require(file).writeProbes(ROOT);
+  if (zones.length) console.log(msg('engine-switch.probes', { zones: zones.map((z) => z.zone).join(', ') }));
+  return zones;
+}
 
 // The rebuild steps of one engine by the REBUILD table: the shared path for wake and rebuild.
 function rebuildEngine(id) {
@@ -80,6 +94,7 @@ if (cmd === 'rebuild') {
     built.push(e);
   }
   const skipped = ENGINES.filter((e) => e !== 'claude' && dormantList.includes(e));
+  writeProbes();
   console.log(msg('engine-switch.rebuilt', {
     built: built.join(', ') || msg('engine-switch.none'),
     no_adapter: noAdapter.length ? msg('engine-switch.no_adapter_suffix', { list: noAdapter.join(', ') }) : '',
@@ -98,6 +113,7 @@ if (cmd === 'sleep') {
   write(list.filter((e) => e !== id));
   console.log(msg('engine-switch.wake_done', { id }));
   rebuildEngine(id);
+  writeProbes();
 }
 const chk = node(['.claude/scripts/sync-engines.cjs', '--check']);
 // A red for the engine - the reconciliation lines about the adapters and about this engine; other findings

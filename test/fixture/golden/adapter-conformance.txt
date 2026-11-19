@@ -5,6 +5,7 @@ exit 1
 ======================================================================
 
 Корневые правила: ✗ нарушена конструкция
+    — .claude/scripts/claude-economy.test.cjs:1: console.error('сломан нарочно'); process.exit(1);
     — адаптер Claude Code: .claude/scripts/claude-economy.test.cjs: тест не прошёл (код 1) — сломан нарочно
 
 Ядро и адаптеры:

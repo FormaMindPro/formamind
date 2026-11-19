@@ -48,6 +48,18 @@ it("the adapter's paths - from the project root, and they exist", () => {
   for (const r of a.usageRefresh) assert.ok(fs.existsSync(engines.resolveRel(ROOT, r.script)), `usageRefresh: ${r.script}`);
 });
 
+it('the five node roles carry the declared nodeModels model and effort', () => {
+  const a = adapter();
+  for (const node of ['Intent', 'Spec', 'Kit', 'Run', 'Core']) {
+    const file = path.join(ROOT, '.claude', 'agents', node.toLowerCase() + '.md');
+    const fm = fs.readFileSync(file, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    assert.ok(fm, `${node}: frontmatter must exist`);
+    const field = (k) => (fm[1].match(new RegExp('^' + k + ':\\s*(.+)$', 'm')) || [])[1];
+    assert.equal(field('model'), a.nodeModels[node].model, `${node}: model must match nodeModels`);
+    assert.equal(field('effort'), a.nodeModels[node].effort, `${node}: effort must match nodeModels`);
+  }
+});
+
 it("the template's skill list: matches what lies in the template (where the .forma/protocol/ clone is)", () => {
   const a = adapter();
   assert.ok(Array.isArray(a.templateSkills) && a.templateSkills.length > 0);

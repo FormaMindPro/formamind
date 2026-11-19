@@ -91,12 +91,18 @@ function transformBody(body, transforms, addTitleSuffix, literals) {
   return out;
 }
 
-/** The list of role files (relative to the source's roles directory): the root six + `run/*.md`. */
+/** A project-layer role (frontmatter `layer: project`): it belongs to the project, not to the shipped canon. */
+function isProjectRole(base, rel) {
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(fs.readFileSync(path.join(base, ...rel.split('/')), 'utf8'));
+  return !!fm && /^layer:\s*project\s*$/m.test(fm[1]);
+}
+
+/** The list of role files (relative to the source's roles directory): the root six + `run/*.md`, without project-layer roles. */
 function listRoleFiles(root, ctx) {
   const base = path.join(root, ctx.from.src.rolesDir);
-  const top = fs.readdirSync(base).filter((f) => f.endsWith('.md'));
+  const top = fs.readdirSync(base).filter((f) => f.endsWith('.md') && !isProjectRole(base, f));
   const runDir = path.join(base, 'run');
-  const run = fs.existsSync(runDir) ? fs.readdirSync(runDir).filter((f) => f.endsWith('.md')).map((f) => path.join('run', f)) : [];
+  const run = fs.existsSync(runDir) ? fs.readdirSync(runDir).filter((f) => f.endsWith('.md')).map((f) => path.join('run', f)).filter((rel) => !isProjectRole(base, rel)) : [];
   // A role the mirror carries under another name (equivalence table) has no pair by design: skipped.
   const skip = new Set(ROLE_EQUIVALENCE.map(([src]) => src + '.md'));
   const topPaired = top.filter((f) => !skip.has(f));
@@ -152,6 +158,18 @@ function planAll(root) {
   return plan;
 }
 
+/** The mirror paths of the project-layer roles: the mirror must not carry them, so apply removes leftovers. */
+function projectRoleDestRels(root) {
+  const ctx = ctxOf(root);
+  if (!ctx) return [];
+  const base = path.join(root, ctx.from.src.rolesDir);
+  const rels = [];
+  for (const f of fs.readdirSync(base)) if (f.endsWith('.md')) rels.push(f);
+  const runDir = path.join(base, 'run');
+  if (fs.existsSync(runDir)) for (const f of fs.readdirSync(runDir)) if (f.endsWith('.md')) rels.push(path.join('run', f));
+  return rels.filter((rel) => isProjectRole(base, rel)).map((rel) => path.join(ctx.to.src.rolesDir, rel));
+}
+
 /** The status of one plan entry against disk: synced|drift|would_create|problem. */
 function statusOf(root, entry) {
   if (!entry.gen.ok) return { status: 'problem', detail: entry.gen.reason };
@@ -182,6 +200,13 @@ function applyAll(root, { dryRun = false } = {}) {
   const written = [];
   const unchanged = [];
   const problems = [];
+  const removed = [];
+  for (const destRel of projectRoleDestRels(root)) {
+    const abs = path.join(root, destRel);
+    if (!fs.existsSync(abs)) continue;
+    if (!dryRun) fs.rmSync(abs);
+    removed.push(destRel);
+  }
   for (const entry of plan) {
     const res = statusOf(root, entry);
     if (res.status === 'problem') { problems.push({ relFile: entry.relFile, reason: res.detail }); continue; }
@@ -192,7 +217,7 @@ function applyAll(root, { dryRun = false } = {}) {
     }
     written.push({ relFile: entry.relFile, was: res.status });
   }
-  return { written, unchanged, problems };
+  return { written, unchanged, problems, removed };
 }
 
-module.exports = { planAll, checkAll, applyAll, renderRole, renderOnDemand, ctxOf };
+module.exports = { planAll, checkAll, applyAll, renderRole, renderOnDemand, ctxOf, isProjectRole, projectRoleDestRels };

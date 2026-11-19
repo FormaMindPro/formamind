@@ -694,6 +694,7 @@
   "engine-switch.status_not_installed": "адаптер не установлен",
   "engine-switch.skipped_no_adapter": "{id}: адаптер не установлен — пропущен",
   "engine-switch.rebuilt": "✓ пересобраны: {built}{no_adapter}{skipped}",
+  "engine-switch.probes": "пробы возможностей записаны: {zones}",
   "engine-switch.none": "нет",
   "engine-switch.no_adapter_suffix": "; адаптер не установлен, пропущены: {list}",
   "engine-switch.skipped_suffix": "; спят, не тронуты: {list}",
@@ -1367,5 +1368,7 @@
   "board.cycle-report.total": "итого",
   "board.cycle-report.unknown": "строк с unknown-токенами: {n}",
   "board.new-card.bad_node": "--node \"{node}\" — не имя узла",
-  "plumb.miss_noul": "noul {v} < {t}"
+  "plumb.miss_noul": "noul {v} < {t}",
+  "board.new-card.isolation_unknown": "гейт изоляции закрыт: у зоны {zone} нет пробы возможностей (.state/capabilities.json) — отсутствие пробы читается как отказ, не как разрешение. Запишите пробу (node .forma/dashboard/lib/capability-probe.cjs) либо передайте --force.",
+  "board.new-card.force_line": "- `{node}`, {day}: --force — проба возможностей зоны {zone} отсутствует или изоляция закрыта; создание карточки канала разрешено явно."
 }

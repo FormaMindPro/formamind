@@ -132,17 +132,27 @@ if (!flag('no-dup-check')) {
   }
 }
 
-// 1b. The isolation gate (AGENTS.md §2, prohibitions 1 and 7)
+// 1b. The isolation gate (AGENTS.md §2, prohibitions 1 and 7) - fail-closed.
 // The probes file - every adapter has it in its folder (`<folder>/.state/capabilities.json`); the core walks the adapters, knowing no names.
-const capFiles = require('../dashboard/lib/engines.cjs').loadAdapters(ROOT).map((a) => path.join(ROOT, a.dir, '.state', 'capabilities.json'));
-for (const capFile of capFiles) {
-  if (!fs.existsSync(capFile)) continue;
-  try {
-    const caps = JSON.parse(fs.readFileSync(capFile, 'utf8'));
-    if (caps.isolation && caps.isolation.available === false && kind === 'channels' && !flag('force')) {
-      die(msg('board.new-card.isolation_closed'));
+// A missing or unreadable probe of a zone that promised channels (subagents + sendMessage) closes the gate
+// exactly as a probe saying the isolation is unavailable: absence never reads as permission.
+const { readProbe, promisedChannels } = require('../dashboard/lib/capability-probe.cjs');
+let forcedZone = null;
+if (kind === 'channels') {
+  for (const a of require('../dashboard/lib/engines.cjs').loadAdapters(ROOT)) {
+    const probe = readProbe(ROOT, a.dir);
+    if (!probe) {
+      if (promisedChannels(a)) {
+        if (!flag('force')) die(msg('board.new-card.isolation_unknown', { zone: a.dir }));
+        forcedZone = forcedZone || a.dir;
+      }
+      continue;
     }
-  } catch {}
+    if (probe.isolation && probe.isolation.available === false) {
+      if (!flag('force')) die(msg('board.new-card.isolation_closed'));
+      forcedZone = forcedZone || a.dir;
+    }
+  }
 }
 
 // 2. The goal label
@@ -220,6 +230,7 @@ const detail = arg('why-detail', quick ? 'quick incubator without project scanni
 const history = [
   why !== undefined ? `- \`${node}\`, ${day}: route ${routeLabel} (why: ${why})${detail ? ' — ' + detail.replace(/\.?$/, '.') : '.'}` : '',
   stage !== undefined ? '- `' + node + '`, ' + day + ': stage ' + stage + msg('board.new-card.stage_created') : '',
+  forcedZone ? msg('board.new-card.force_line', { node, day, zone: forcedZone }) : '',
 ].filter(Boolean).join('\n');
 
 let num, id, file, text;

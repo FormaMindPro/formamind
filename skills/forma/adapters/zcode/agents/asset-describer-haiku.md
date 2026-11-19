@@ -4,6 +4,7 @@ description: Describes prepared images (one asset per item) from a batch manifes
 model: glm-5.3-flash
 effort: high
 tools: Read
+omitClaudeMd: true
 ---
 
 # `asset-describer-haiku`
