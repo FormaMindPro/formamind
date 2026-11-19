@@ -103,8 +103,15 @@ if [ "$FORCE" != 1 ] && [ "$STAMP_DAY" = "$TODAY" ]; then
   exit 0
 fi
 
+# Installed: the project's install manifest, else the highest version directory of the plugin cache
+# (the original entry's fallback - a source project answers from the manifest, an installed plugin
+# without one answers from the cache).
 HAVE=''
 [ -f .forma/install-manifest.json ] && HAVE=$(version_of < .forma/install-manifest.json)
+if [ -z "$HAVE" ]; then
+  CACHE="$HOME/.claude/plugins/cache/forma/forma"
+  HAVE=$(ls "$CACHE" 2>/dev/null | grep -xE '[0-9]+(\.[0-9]+)*(-[0-9A-Za-z.]+)?' | sort -V | tail -1)
+fi
 
 PUBLISHED=$(fetch_published_version)
 HEAD_ANSWER=$(fetch_head_commit)
@@ -117,9 +124,10 @@ HEAD_SUBJ=$(printf '%s' "$HEAD_ANSWER" | sed -n '2p')
 # message nor the state sees it.
 printf '%s' "$HEAD_SHA" | grep -Eq '^[0-9a-fA-F]{6,40}$' || { HEAD_SHA=''; HEAD_SUBJ=''; }
 
-# Nothing is recorded on a failed or half answer: the stamp stays unset, the check simply happens on
-# a later, fully answered run.
-if [ -z "$PUBLISHED" ] || [ -z "$HEAD_SHA" ]; then
+# The version answer alone feeds the release signal and the daily stamp; the HEAD answer feeds only the
+# commit base. A missing HEAD leaves the base empty (the state still records the day), so a run that
+# heard the version still speaks, and the commit signal waits for a later, fuller run.
+if [ -z "$PUBLISHED" ]; then
   exit 0
 fi
 
@@ -156,7 +164,8 @@ if [ "$BASE_SHA" != "$HEAD_SHA" ]; then
   case $COUNT in
     ''|*[!0-9]*) COUNT='?' ;;
   esac
-  SHORT=$(printf '%s\n' "$HEAD_SHA" | cut -b1-7)
+  # awk, not cut: the test contract runs hooks on a tool-restricted PATH (no cut, no dirname).
+  SHORT=$(awk -v s="$HEAD_SHA" 'BEGIN { print substr(s, 1, 7) }')
   if command -v node >/dev/null 2>&1 && [ -f .forma/i18n/cli.cjs ]; then
     node .forma/i18n/cli.cjs msg hook.repo_update_commits n="$COUNT" sha="$SHORT" subj="$HEAD_SUBJ"
   else
