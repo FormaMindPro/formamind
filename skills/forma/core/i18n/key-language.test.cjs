@@ -47,6 +47,7 @@ const EXCEPTIONS = {
   '.forma/i18n/project-checks.cjs': 'a value of the language field (documentation language), not a key',
   '.forma/dashboard/schema.cjs': 'free verbs of a role text (who calls whom), not keys',
   '.claude/hooks/unlock-delete.sh': 'the human code phrase is a password, literal',
+  '.claude/scripts/translate-blocks-pipeline.cjs': 'markers of the site glossary table format («\u041f\u0435\u0440\u0435\u0432\u043e\u0434» column, «(\u0441\u043b\u0443\u0436\u0435\u0431\u043d\u0430\u044f)» service-term mark) — data words of the project glossary, not card keys',
 };
 
 const walk = (d) => (fs.existsSync(d) ? fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => {

@@ -67,6 +67,7 @@ function discover(root) {
 function isExcluded(p) {
   const parts = p.split('/');
   if (parts[0] === '.forma' && parts[1] === 'protocol') return true; // the protocol template
+  if (parts[0] === 'project' && parts[1] === 'reference') return true; // reference material: not executable project code
   const base = parts[parts.length - 1];
   if (/\.(test|spec)\./.test(base)) return true; // test files
   if (parts.slice(0, -1).some((s) => s === 'test' || s === 'tests')) return true;

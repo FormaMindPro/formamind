@@ -2,6 +2,10 @@
 
 Newest first. The version is `.claude-plugin/plugin.json`; no dates (clean zone).
 
+## 0.0.3
+
+build-core-html-payload: the Cyrillic letter class via the Unicode script property (key-language).
+
 ## 0.0.2
 
 - `Run` profiles: `run-theme-local`, `run-css-audit`.

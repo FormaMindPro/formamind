@@ -1089,6 +1089,7 @@
   "commit.fresh_files": "! новые файлы движка не переносятся сами (решение — --add): {files}",
   "commit.proto_commit_failed": "коммит protocol/ не прошёл:\n{out}",
   "commit.proto_dev_status": "protocol/ dev: в выпуске {n}/{total}",
+  "commit.manifest_refreshed": "манифест установки обновлён: {version}, хешей перезаписано {changed}, отсутствующие оставлены как есть {missing}",
   "commit.project_commit_failed": "коммит проекта не прошёл:\n{out}",
   "commit.project_committed": "проект: {line}",
   "commit.project_clean": "проект: изменений нет",

@@ -103,3 +103,38 @@ test('a reinstall on a live project: the check green, the skeleton not recalcula
   const v = verify(dir);
   assert.equal(v.status, 0, v.out);
 });
+
+test('the dev cycle: a manifest older than the clone is a named finding, refreshManifest re-records it', () => {
+  const VI = require('../skills/forma/core/verify/verify-install.cjs');
+  const { dir } = install('en');
+  // no clone - a consumer project: no staleness finding
+  let v = verify(dir);
+  assert.equal(v.status, 0, v.out);
+  // the dev clone appears, its version is ahead: the finding names the address, the expected and the remedy
+  fs.mkdirSync(path.join(dir, '.forma', 'protocol'), { recursive: true });
+  write(dir, '.forma/protocol/package.json', JSON.stringify({ version: '9.9.9', line: 2 }));
+  v = verify(dir);
+  assert.equal(v.status, 1);
+  assert.match(v.out, /install-manifest\.json — version — expected: the dev clone .* 9\.9\.9 — found: 0\.0\.\d+ .* forma-commit .* installer/s);
+  // the engine's file drifted since the install: the refresh re-records the hashes and picks the clone's version
+  write(dir, '.claude/hooks/intent-start.sh', read(dir, '.claude/hooks/intent-start.sh') + '\n# a dev edit\n');
+  const m0 = JSON.parse(read(dir, '.forma/install-manifest.json'));
+  const ref = VI.refreshManifest(dir, { version: '9.9.9', line: 2 });
+  assert.equal(ref.version, '9.9.9');
+  assert.equal(ref.line, 2);
+  assert.ok(ref.changed >= 1, 'at least the drifted file re-recorded');
+  assert.deepEqual(ref.missing, []);
+  const m1 = JSON.parse(read(dir, '.forma/install-manifest.json'));
+  assert.equal(m1.version, '9.9.9');
+  assert.notEqual(m1.files['.claude/hooks/intent-start.sh'], m0.files['.claude/hooks/intent-start.sh']);
+  v = verify(dir);
+  assert.equal(v.status, 0, v.out); // the drift and the lag are both gone
+  assert.equal(m1.version, VI.refreshManifest(dir, {}).version); // a call without arguments keeps the version
+  // a file gone from the disk keeps its entry: a refresh never blesses a deletion
+  fs.rmSync(path.join(dir, '.claude/hooks/intent-start.sh'));
+  const ref2 = VI.refreshManifest(dir, {});
+  assert.deepEqual(ref2.missing, ['.claude/hooks/intent-start.sh']);
+  v = verify(dir);
+  assert.equal(v.status, 1);
+  assert.match(v.out, /\.claude\/hooks\/intent-start\.sh — expected: installer file — found: file missing/);
+});

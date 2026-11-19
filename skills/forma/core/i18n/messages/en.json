@@ -1090,6 +1090,7 @@
   "commit.fresh_files": "! new engine files are not carried over on their own (the answer is --add): {files}",
   "commit.proto_commit_failed": "the protocol/ commit failed:\n{out}",
   "commit.proto_dev_status": "protocol/ dev: {n}/{total} in the release",
+  "commit.manifest_refreshed": "install manifest refreshed: {version}, hashes re-recorded {changed}, missing left as they are {missing}",
   "commit.project_commit_failed": "the project commit failed:\n{out}",
   "commit.project_committed": "project: {line}",
   "commit.project_clean": "project: no changes",

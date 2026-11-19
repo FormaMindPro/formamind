@@ -18,7 +18,7 @@ The third — `forma-wordpress-novamira` — is not a ready recipe but an instal
 The version lives in `.claude-plugin/plugin.json`; every change is a line in [CHANGELOG.md](CHANGELOG.md). The installer writes the installed version into the project (`project/config/PROJECT.md`, «Project template» → source: `forma-wordpress-novamira@<version>`), so a project always shows which template version it stands on. The block below is rebuilt from the real file tree by `scripts/template-push.cjs --apply` — never edited by hand.
 
 <!-- inventory:start -->
-Template version **0.0.1**, assembled against protocol **0.0.1**. History — [CHANGELOG.md](CHANGELOG.md).
+Template version **0.0.3**, assembled against protocol **0.0.36**. History — [CHANGELOG.md](CHANGELOG.md).
 
 ### Skills (3)
 
