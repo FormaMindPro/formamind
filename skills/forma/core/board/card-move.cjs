@@ -676,7 +676,7 @@ if (to === 'run') {
     if (ghArg) die(msg('board.card-move.gate_hash_no_five', { id: cardId }));
   } else {
     if (ghArg && ghArg !== gh.hash) die(msg('board.card-move.gate_hash_mismatch', { id: cardId, got: ghArg, expected: gh.hash }));
-    if (!lastGateHash(zoneText(text, 'history')) && !/gate-hash:/i.test(note)) note = `${note} (gate-hash: ${gh.hash})`;
+    if (ghArg && !lastGateHash(zoneText(text, 'history')) && !/gate-hash:/i.test(note)) note = `${note} (gate-hash: ${gh.hash})`;
   }
 }
 
