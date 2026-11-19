@@ -13,6 +13,12 @@ Every engine must systematically declare for each of the nine contracts whether 
 
 ### 2. Context Isolation (`isolation`)
 - **What it guarantees:** Physical separation of agent contexts between `Intent`, `Spec`, `Kit`, `Run`, and `Core` to satisfy Prohibitions 1 (independent confirmation) and 7 (clean context). By default, tasks are dispatched to isolated subagents (in parallel waves when independent) unless the human explicitly commands single-session execution ("Действуй сам").
+- **Parallel Worktree Isolation:**
+  1. Each concurrent agent executes in an isolated git worktree on its own branch branched from `dev`, preventing dirtying a shared working tree.
+  2. Agent commits stage only explicit card paths (`--card` or `--files`), avoiding blanket `git add -A`.
+  3. Shared protocol state — the board (`.devtool/features/`), `JOURNAL.md`, and spend ledgers — remains unified and is written to the primary repository root via `--root`.
+  4. Merging agent worktrees into `dev` is serialized (one agent branch at a time) with the protocol submodule pointer updated upon merge.
+  5. Card numbering is never re-opened: atomic `.claim-card-NNN` reservation coordinates card number allocation.
 - **Proof:** Mode 2 (subagent execution via separate conversations) with gate in `new-card.cjs` preventing production card creation in degraded Mode 1 without isolation; recorded in `.state/capabilities.json`.
 
 ### 3. Role Delivery (`role-delivery`)

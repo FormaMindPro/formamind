@@ -11,7 +11,7 @@ Split in two: you **gather and present**, `Core` **judges**. You don't compare t
 
 - lay `GOAL.md` and this cycle's cards in front of `Core` — numbers compiled from their histories, the result fact from each one's "Result" zone;
 - don't name discrepancies and don't give assessments: that's `Core`'s;
-- update the frontmatter: `assignee: "Core"` (status stays `review` — same column, only who holds it changes).
+- move each card to the closure state with the one call: `status: "done"`, `assignee: "Core"` (`card-move.cjs --to close`), the file goes to `done/` — a card in `review` has not reached the human's acceptance and is not presented to `Core`.
 
 ## After the verdict
 

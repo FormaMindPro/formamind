@@ -112,7 +112,7 @@ There is no separate file for history or result — the task's whole life is in 
 
 **Material born of a card** — interview records, prototypes, evidence, an external model's output — lives in `project/cards/card-NNN/`, outside the board (the card moves into `done/`, the folder must not). The folder keeps the grounds, the card keeps the decision; project material is referenced, never copied there.
 
-**The card's language follows the project language** in `project/config/PROJECT.md`: for a non-English project the zone headings, fields, kind (`дело` / `оснастка` / `решение`) and notes are written in it (`## Задача`, `## Снаряжение`, `## История`, `## Результат`); the zones and mandatory fields don't change.
+**The card's texts follow the project language** in `project/config/PROJECT.md`: for a non-English project the values and notes are written in it; the four zone headings, the kind and the keys stay English (`AGENTS.md` §6 — `## Task`, `## Kit`, `## History`, `## Result`, `tooling`); the zones and mandatory fields don't change. A non-English key is a `key-language` finding, not a translation.
 
 ---
 

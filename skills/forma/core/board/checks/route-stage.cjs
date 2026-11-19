@@ -40,4 +40,4 @@ function run({ root, since }) {
   return problems;
 }
 
-module.exports = { id: 'route-stage', since: 'route-stage', run };
+module.exports = { id: 'route-stage', since: 'route-stage', run, cardProblems };

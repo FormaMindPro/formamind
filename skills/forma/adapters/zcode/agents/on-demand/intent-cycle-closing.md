@@ -10,9 +10,11 @@ Split in two: you **gather and present**, `Core` **judges**. You don't compare t
 
 ## Presentation
 
+- **before presenting, verify execution by the record, not by stage lines** (precedent — the source card, see `PROJECT.md`, "Node tooling"): every card of the cycle must show a trace of execution — a `Run` attempt line in History, or an explicit `exception:` line; a card whose gates are red pending a human decision ("publish after the human's yes") is **not done** — it stays open or carries an `exception:` line naming the pending decision; a pending step is never written into a closing line as an accomplished fact;
+- a package umbrella closes only after every subtask is verified this way — an untaken subtask is a frozen wave, not an accepted card;
 - lay `GOAL.md` and this cycle's cards in front of `Core` — numbers compiled from their histories, the result fact from each one's "Result" zone;
 - don't name discrepancies and don't give assessments: that's `Core`'s;
-- update the frontmatter: `assignee: "Core"` (status stays `review` — same column, only who holds it changes).
+- move each card to the closure state with the one call: `status: "done"`, `assignee: "Core"` (`card-move.cjs --to close`), the file goes to `done/` — a card in `review` has not reached the human's acceptance and is not presented to `Core`.
 
 ## After the verdict
 

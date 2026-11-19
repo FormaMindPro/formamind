@@ -255,8 +255,34 @@ ${history ? history + '\n' : ''}
 `;
   if (flag('dry')) break;
   fs.mkdirSync(BOARD, { recursive: true });
-  try { fs.writeFileSync(file, text, { flag: 'wx' }); break; }
-  catch (e) { if (e.code !== 'EEXIST') throw e; } // the number was taken in flight - re-scan
+  const claim = path.join(BOARD, `.claim-card-${num}`);
+  try {
+    fs.writeFileSync(claim, id, { flag: 'wx' });
+  } catch (e) {
+    if (e.code === 'EEXIST') {
+      try {
+        const stat = fs.statSync(claim);
+        if (Date.now() - stat.mtimeMs > 30000) {
+          try { fs.unlinkSync(claim); } catch {}
+        }
+      } catch {}
+      continue;
+    }
+    throw e;
+  }
+  try {
+    // The number is reserved before the file exists: a concurrent invocation that computed the same number
+    // may have written its card while this one waited for the claim - re-read the board under the claim.
+    const taken = cardFiles(ROOT, (n) => n === `card-${num}.md` || (n.startsWith(`card-${num}-`) && n.endsWith('.md')));
+    if (taken.length) { try { fs.unlinkSync(claim); } catch {} continue; }
+    fs.writeFileSync(file, text, { flag: 'wx' });
+    try { fs.unlinkSync(claim); } catch {}
+    break;
+  } catch (e) {
+    try { fs.unlinkSync(claim); } catch {}
+    if (e.code === 'EEXIST') continue;
+    throw e;
+  }
 }
 if (flag('dry')) { console.log(file + '\n' + text); process.exit(0); }
 console.log(path.relative(ROOT, file).replace(/\\/g, '/'));

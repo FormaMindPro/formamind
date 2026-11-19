@@ -3,6 +3,19 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.36] - 2026-11-19
+### Added
+- parallel-agent isolation: each agent executes its card in a separate git worktree on its own branch off `dev` and commits only the card's explicit paths (`forma-commit --card NNN` or `--files`); the board (`.devtool/features/`), `JOURNAL.md` and the ledgers stay unified in the primary root (`--root`); merging into `dev` is serialized. The rule lands in the engine contract (`manual/…/03-protocol/ENGINE-CONTRACT.md`) and in the claude, gemini and zcode §8 rules.
+- atomic card-number reservation in `new-card.cjs`: `.claim-card-NNN` is taken first and the board is re-scanned under the claim, so two parallel closers cannot mint the same number; three board checks join the suite - `duplicate-number`, `queue-digest` (human vs Core queues with the waiting age) and `changelog-sync`.
+- pre-close control in `intent-cycle-closing.md`: a cycle is presented only when every card shows a trace of execution - a `Run` attempt line or an explicit `exception:` - never on stage lines alone; a package umbrella closes after every subtask is verified this way.
+### Changed
+- `forma-commit.cjs` stages explicit paths instead of the whole tree: `--files` / `--card` name the card's paths, `--all` is the explicit whole-tree opt-in; the protocol clone takes tracked changes plus new files only in `skills/forma` and `templates`; the project commit always carries the `.forma/protocol` pointer. The default no longer implies `git add -A`.
+- `forma-commit.cjs` resolves the real git directories and works from a linked worktree where `.git` is a file, the hooks live in the common dir and the submodule may be uninitialized; the fixture test covers 16 linked-worktree cases.
+### Fixed
+- `card-move.cjs`: the attempt budget counts only the executor's `attempt,` lines (Plumb readings and other nodes do not consume it); the gate hash is recorded on explicit request or approval and verified at close, with a named `gate-amendment` path; a pre-write route/stage gate rejects a move before any mutation; a board check that goes red after the write rolls the move back; `--gate-hash` is accepted only with `--to run`.
+- `changelog-sync.cjs` stays silent when the protocol git dir is absent (a linked worktree without the submodule).
+- card documents keep keys English in any project language: the four zone headings, the kind and the fields stay English; only values and notes follow the project language (`AGENTS.md` §6, `key-language`).
+
 ## [0.0.35] - 2026-11-18
 ### Fixed
 - card-session-spend.cjs stream-reads the session transcript (createReadStream + readline over the JSONL lines): a session with a transcript above Node's string limit crashed the read with ERR_STRING_TOO_LONG (~512 MB and larger), which broke `card-move --to close --session-spend` on long sessions; memory now holds only the normalized rows, not the file. Behavior on short transcripts is unchanged (byte-identical output parity against the previous version, the script's self-test passes).

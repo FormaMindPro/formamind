@@ -202,23 +202,28 @@ function scanFile(abs, root) {
   return { findings: scanText(text).map((f) => ({ ...f, file: rel })), note: null };
 }
 
-/** The --repo mode: a scan of the tracked files; returns { findings, checked, notes }. */
+/** The --repo mode: a scan of the tracked and untracked (non-ignored) files; returns { findings, checked, notes }. */
 function runRepo(root) {
-  let out;
+  let outTracked, outUntracked;
   try {
-    out = require('child_process').execFileSync('git', ['-C', root, 'ls-files', '-z'], { maxBuffer: 64 * 1024 * 1024 });
+    outTracked = require('child_process').execFileSync('git', ['-C', root, 'ls-files', '-z'], { maxBuffer: 64 * 1024 * 1024 });
+    outUntracked = require('child_process').execFileSync('git', ['-C', root, 'ls-files', '-z', '--others', '--exclude-standard'], { maxBuffer: 64 * 1024 * 1024 });
   } catch (e) {
     const err = new Error(msg('board.credentials-zone.err_lsfiles', { why: e.message }));
     err.exitCode = 2;
     throw err;
   }
-  const files = out.toString('utf8').split('\0').filter(Boolean);
+  const files = Array.from(new Set([
+    ...outTracked.toString('utf8').split('\0').filter(Boolean),
+    ...outUntracked.toString('utf8').split('\0').filter(Boolean)
+  ]));
   const findings = [];
   const notes = [];
   let checked = 0;
   for (const rel of files) {
     if (rel.startsWith('node_modules/') || rel === 'node_modules') continue;
     if (rel.startsWith('.forma/protocol/') || rel === '.forma/protocol') continue;
+    if (rel.endsWith('credentials-zone.cjs')) continue;
     if (rel.startsWith('.git/')) continue;
     let r;
     try {
