@@ -301,6 +301,13 @@ if (has('--sync-staged')) {
   if (bad.length) { console.error(tr('commit.core_mismatch_staged', { list: bad.join('\n  ') })); process.exit(1); }
   const tdiff = templateDrift();
   if (tdiff.length) console.log(tr('commit.template_behind', { files: tdiff.join(', ') }));
+  // The project's template (extensions): its own layer, shown beside the protocol-source drift so the
+  // two are never confused - drift above is the protocol source lagging, this line is the project's own.
+  try {
+    const ext = run('node', [path.join(root, '.forma', 'extensions', 'extensions.cjs'), 'check']);
+    const lines = (ext.out || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length) console.log(lines[lines.length - 1]);
+  } catch { /* no extensions module - the project runs without one */ }
   process.exit(0);
 }
 

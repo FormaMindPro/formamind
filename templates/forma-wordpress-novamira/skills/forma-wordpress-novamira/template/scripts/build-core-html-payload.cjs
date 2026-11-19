@@ -57,7 +57,7 @@ for (const t of TARGETS) {
   }
   const source = fs.readFileSync(sourcePath, 'utf8');
   const out = fs.readFileSync(outPath, 'utf8');
-  if (/[А-Яа-яЁё]/.test(out)) {
+  if (/\p{Script=Cyrillic}/u.test(out)) {
     console.log(JSON.stringify({ ok: false, error: `out.html for ${t.label} still has Cyrillic, refusing to build payload` }));
     process.exit(2);
   }
