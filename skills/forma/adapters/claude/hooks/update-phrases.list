@@ -1,0 +1,25 @@
+# Trigger registry of the repository-update request hook (check-updates-request.sh reads this file on
+# every invocation): one line - one case-insensitive regex trigger, tested against the chat prompt.
+# Blank lines and lines starting with # are skipped. A new language is a new line here, never a code
+# change; the hook carries no trigger phrases at all.
+#
+# Line syntax. A line is consumed as the body of a string literal by both matcher branches (jq embeds
+# it into a JSON string, node into a JavaScript string - the escape rules are the same), so write it
+# like a string literal body: Cyrillic and other non-ASCII letters as \uXXXX escapes, whitespace as
+# \\s, and no raw double quotes (a line that does not compile is skipped, never fatal). Keep a word
+# boundary before the verb - (^|[^<letters>]) with the letters of that language - so no letter of a
+# word stands right before it.
+#
+# Pattern shape, for every language. Do NOT write a flat alternation group (A|B|C) that is followed by
+# more pattern: both regex engines behind the hook (jq/oniguruma and node/V8) stop matching a
+# case-folded multi-byte prefix in that shape. Nest the alternatives instead, with the shared tail
+# inside one branch (X(AB)?|C spells the same language as X(A|B|C) when B extends A), or split the
+# phrase forms into several whole lines of their own - flat, group-free lines are the most portable
+# form.
+#
+# Russian: "check the Form update" - verb word forms, singular/plural of the object, word boundary.
+(^|[^\u0410-\u044f\u0401\u0451A-Za-z])\u043F\u0440\u043E\u0432\u0435\u0440(\u044C(\u0442\u0435)?|\u0438\u0442\u044C)\\s+\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438(\u0435|\u044F)\\s+\u0444\u043E\u0440\u043C(\u044B|\u0443)
+# English: "check (the|for) forma update(s)" - spelled out as whole lines, no alternation groups.
+^(^|[^A-Za-z])check the forma updates?($|[^A-Za-z])
+^(^|[^A-Za-z])check for forma updates?($|[^A-Za-z])
+^(^|[^A-Za-z])check forma updates?($|[^A-Za-z])
