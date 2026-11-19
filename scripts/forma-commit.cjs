@@ -132,6 +132,17 @@ function syncPlugin(expected) {
   if (good) console.log(tr('commit.restart_plugin'));
   return good;
 }
+let manifestRefreshed = false; // the project's install manifest was rewritten in this run - stage it beside the pointer
+// The install manifest follows the dev clone (the source project): version and line from the clone's
+// package.json, hashes from the disk - the dev tree is the release content. Returns the refresh summary.
+function refreshProjectManifest(version) {
+  const VI = require(path.join(proto, 'skills', 'forma', 'core', 'verify', 'verify-install.cjs')); // the clone's copy, fresh after the carry-over
+  if (typeof VI.refreshManifest !== 'function') return null; // an older clone: nothing to call yet
+  let pj = null; try { pj = JSON.parse(fs.readFileSync(path.join(proto, 'package.json'), 'utf8')); } catch { /* no clone package */ }
+  const ref = VI.refreshManifest(root, { version: version != null ? version : pj && pj.version, line: pj && pj.line });
+  if (ref) { ok(tr('commit.manifest_refreshed', { version: ref.version, changed: ref.changed, missing: ref.missing.length })); manifestRefreshed = true; }
+  return ref;
+}
 function release() {
   const list = pending();
   const dirty = scanMessages(list);
@@ -169,6 +180,7 @@ function release() {
   r = pgit('commit', '-q', '-m', `v${nv} — ${list.length} commit(s)\n\n${list.reverse().map((s) => '- ' + s).join('\n')}\n\n${CO}`);
   if (r.code) stop(tr('commit.merge_commit_failed', { out: r.out }));
   ok(tr('commit.released', { v, nv, n: list.length }));
+  refreshProjectManifest(nv); // the manifest carries the version just shipped
   const bp = node(E2P, '--before-push');
   if (bp.code) stop(bp.out);
   r = pgit('push', '-q', 'origin', 'main');
@@ -194,6 +206,7 @@ function release() {
   }
   if (!has('--no-plugin')) syncPlugin(nv);
   git('add', '.forma/protocol');
+  if (manifestRefreshed) git('add', '.forma/install-manifest.json');
   if (git('diff', '--cached', '--quiet').code) git('commit', '-q', '-m', `Protocol release v${nv}: ${list.length} commit(s)\n\n${CO}`);
 }
 const ENG = '.claude/scripts/sync-engines.cjs';
@@ -345,13 +358,17 @@ if (pgit('status', '--porcelain').out.trim()) {
   const c = pgit('commit', '-q', '-m', `${protoMsg}\n\nCarried over from the engine by forma-commit.cjs.\n\n${CO}`);
   if (c.code) stop(tr('commit.proto_commit_failed', { out: c.out }));
   node(E2P, '--mark');
+  refreshProjectManifest(null); // the carry-over changed the engine's files - the manifest re-records them
   ok(tr('commit.proto_dev_status', { n: pending().length, total: RELEASE_N }));
 }
 
 // 4. the project commit - exactly the named paths; the protocol pointer always follows its commit.
 // Without --files/--card only what is already staged is committed; --all is the explicit whole-tree opt-in.
 const pointer = '.forma/protocol';
-const stagePointer = () => { if (fs.existsSync(path.join(root, pointer))) git('add', '--', pointer); };
+const stagePointer = () => {
+  if (fs.existsSync(path.join(root, pointer))) git('add', '--', pointer);
+  if (manifestRefreshed) git('add', '--', '.forma/install-manifest.json');
+};
 if (filesList && filesList.length) {
   git('add', '--', ...filesList);
   stagePointer();

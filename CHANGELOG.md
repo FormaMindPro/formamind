@@ -3,6 +3,10 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.37] - 2026-11-19
+### Added
+- the install manifest follows the dev cycle: `forma-commit.cjs` re-records `.forma/install-manifest.json` after carrying the engine into the protocol clone (version and line from the clone's package.json, hashes from the disk) and right after the release version bump, staging it with the project commit beside the clone pointer; until now only an installer rerun wrote the manifest, so a source project stayed frozen at its last install (version behind the clone, verify red on every engine change). `verify-install.cjs` names a manifest older than the dev clone as a finding with the remedy (`refreshManifest` export, the same release comparison as the installer's downgrade guard); a file gone from the disk keeps its entry - a refresh never blesses a deletion.
+
 ## [0.0.36] - 2026-11-19
 ### Added
 - parallel-agent isolation: each agent executes its card in a separate git worktree on its own branch off `dev` and commits only the card's explicit paths (`forma-commit --card NNN` or `--files`); the board (`.devtool/features/`), `JOURNAL.md` and the ledgers stay unified in the primary root (`--root`); merging into `dev` is serialized. The rule lands in the engine contract (`manual/…/03-protocol/ENGINE-CONTRACT.md`) and in the claude, gemini and zcode §8 rules.

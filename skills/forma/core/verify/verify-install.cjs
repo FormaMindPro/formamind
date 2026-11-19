@@ -80,6 +80,46 @@ function readManifest(root) {
   return JSON.parse(fs.readFileSync(f, 'utf8'));
 }
 
+// Release comparison, the same semantics as the installer's downgrade guard (bin/forma.cjs): the line
+// first (the numbering was reset once, semver alone cannot tell newer from older), then semver within
+// one line; a suffix (-alpha) ranks below its own release.
+function parseRelease(version, line) {
+  const m = /^(\d+)\.(\d+)\.(\d+)(-.+)?$/.exec(String(version || '').trim());
+  return { line: Number(line) || 1, nums: m ? [m[1], m[2], m[3]].map(Number) : [0, 0, 0], pre: m && m[4] ? 1 : 0 };
+}
+function compareRelease(a, b) {
+  if (a.line !== b.line) return a.line < b.line ? -1 : 1;
+  for (let i = 0; i < 3; i++) if (a.nums[i] !== b.nums[i]) return a.nums[i] < b.nums[i] ? -1 : 1;
+  return a.pre === b.pre ? 0 : (a.pre ? -1 : 1);
+}
+
+/**
+ * The dev cycle's manifest refresh (the source project, PROTOCOL-DEVELOPMENT: engine -> clone -> release).
+ * The disk is the truth: every file hash is re-recorded from the file as it is now; the version and line
+ * come from the dev clone (the caller reads them). A file gone from the disk keeps its old entry — a
+ * refresh never blesses a deletion, the check keeps naming it. Returns a summary, null when no manifest.
+ */
+function refreshManifest(root, { version, line } = {}) {
+  const manifest = readManifest(root);
+  if (!manifest || !manifest.files) return null;
+  const files = {}; const missing = []; let changed = 0;
+  for (const [r, want] of Object.entries(manifest.files)) {
+    const f = path.join(root, r);
+    if (!fs.existsSync(f)) { missing.push(r); files[r] = want; continue; }
+    const got = sha256(f);
+    if (got !== want) changed++;
+    files[r] = got;
+  }
+  const next = {
+    ...manifest,
+    version: version != null ? version : manifest.version,
+    ...(line != null ? { line } : {}),
+    files: Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b))),
+  };
+  fs.writeFileSync(path.join(root, MANIFEST), JSON.stringify(next, null, 2) + '\n');
+  return { version: next.version, line: next.line == null ? null : next.line, changed, total: Object.keys(files).length, missing };
+}
+
 /** .cjs syntax without running it: the body is wrapped the way the CommonJS loader does. */
 function syntaxError(file) {
   const src = fs.readFileSync(file, 'utf8').replace(/^#!.*/, '');
@@ -145,6 +185,16 @@ function verify(root, { behavior = true } = {}) {
   }
   result.manifest = { version: manifest.version, lang: manifest.lang, template: manifest.template };
   result.core = checkCore(root, manifest);
+  // The dev clone (the source project): a manifest older than the clone means the dev cycle did not
+  // refresh the install state. Named by address with the remedy (prohibition 13); a consumer project
+  // has no clone and is never touched by this.
+  let clone = null;
+  try { clone = JSON.parse(fs.readFileSync(path.join(root, '.forma', 'protocol', 'package.json'), 'utf8')); } catch { /* no clone */ }
+  if (clone && clone.version && manifest.version
+      && compareRelease(parseRelease(manifest.version, manifest.line), parseRelease(clone.version, clone.line)) < 0) {
+    result.core.push(finding('install-manifest.json — version', 'the dev clone protocol/package.json: ' + clone.version,
+      manifest.version + ' — the manifest lags the clone; refresh it: forma-commit (the dev cycle) or rerun the installer'));
+  }
   if (result.core.length) result.ok = false;
 
   const asleepIds = dormantIds(root);
@@ -200,5 +250,5 @@ function main(argv) {
   process.exit(result.ok ? 0 : 1);
 }
 
-module.exports = { MANIFEST, sha256, skeletonOf, buildManifest, readManifest, verify, format, syntaxError, colorMark };
+module.exports = { MANIFEST, sha256, skeletonOf, buildManifest, readManifest, refreshManifest, parseRelease, compareRelease, verify, format, syntaxError, colorMark };
 if (require.main === module) main(process.argv.slice(2));
