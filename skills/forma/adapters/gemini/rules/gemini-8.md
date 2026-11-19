@@ -24,6 +24,7 @@ Antigravity operates in two distinct session modes depending on platform startup
      - `extractor`: `model: gemini-3.8-flash`, read/write tools only — registered only when a graph build needs model extraction (`kit.md`, "Graphs");
      - `asset-describer`: `model: gemini-flash-lite`, read-only tools, no project context, returns JSON only.
    * **Execution & Default Routing:** By default in Mode 2, `Intent` delegates all tasks along the route to isolated subagents via `invoke_subagent`. Independent tasks run in parallel waves to prevent main session stall. Prohibitions 1 (independent confirmation) and 7 (clean context) are physically guaranteed.
+   * **Parallel Worktree Isolation:** When parallel agents execute separate cards, each runs in an isolated git worktree on its own branch off `dev`. Commits stage only explicit card paths (`forma-commit --card <number>`). The board (`.devtool/features/`), `JOURNAL.md` and spend ledgers remain unified in the primary working tree (`--root`). Merging into `dev` is serialized.
    * **Single-Session Override («Действуй сам»):** When the human explicitly commands «Действуй сам», «делай в сессии», or directly approves short-route execution (`route-1` / `route-4`), `Intent` is authorized to carry out the task directly within the main session context without subagent dispatch.
 
 2. **Mode 1: Single-Agent Session / Fallback (`invoke_subagent` absent in toolbox)**
