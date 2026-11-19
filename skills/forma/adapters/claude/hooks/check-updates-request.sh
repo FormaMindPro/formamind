@@ -36,5 +36,9 @@ while IFS= read -r LINE || [ -n "$LINE" ]; do
 done < "$LIST"
 
 [ "$HIT" = "true" ] || exit 0
-sh "$(dirname "$0")/check-repo-update.sh" --force
+# ${0%/*} is pure POSIX - the tool-restricted PATH contract forbids external commands here (dirname).
+case $0 in
+  */*) sh "${0%/*}/check-repo-update.sh" --force ;;
+  *)   sh "./check-repo-update.sh" --force ;;
+esac
 exit 0
