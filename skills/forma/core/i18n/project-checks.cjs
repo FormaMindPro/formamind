@@ -38,7 +38,7 @@ function readyNotes(root) {
     const reader = i18n.reader(project);
     if (thresholdsIncomplete(reader)) add('ready.thresholds_incomplete');
     const lang = reader.inline('language');
-    if (!lang || /^(Documentation|Документация)/i.test(lang)) add('ready.language_unset');
+    if (!lang || /^(Documentation|\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430\u0446\u0438\u044f)/i.test(lang)) add('ready.language_unset');
   }
 
   const roadmap = ['ROADMAP.md', 'project/ops/ROADMAP.md', 'project/ROADMAP.md'].find((p) => exists(root, p)) || 'ROADMAP.md';

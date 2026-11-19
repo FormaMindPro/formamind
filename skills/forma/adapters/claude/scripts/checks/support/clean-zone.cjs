@@ -15,7 +15,11 @@ const msg = (code, params) => i18n.message(code, params, 'ru');
 
 const CLEAN_ROOTS = ['AGENTS.md', '.claude/agents', '.claude/rules', '.claude/scripts', '.claude/hooks',
   '.claude/skills', '.forma/manual', '.forma/dashboard', '.forma/living/dictionary',
-  '.forma/protocol/docs', '.forma/protocol/templates', '.forma/protocol/skills'];
+  '.forma/protocol/docs', '.forma/protocol/templates', '.forma/protocol/skills',
+  '.agents/rules', '.agents/plugins', '.agents/scripts', '.agents/hooks', '.agents/tests',
+  '.zcode/rules', '.zcode/agents', '.zcode/scripts', '.zcode/tests',
+  '.qoder/engine/agents', '.qoder/engine/hooks', '.qoder/engine/scripts', '.qoder/engine/qoder-8.md',
+  '.qoder/tests', '.qoder/commands'];
 const CLEAN_SKIP = new Set(['.cache', 'node_modules', 'graphify-out', 'data']);
 // Assembled from parts, so the check does not find itself. The human-decision phrase is a Cyrillic
 // scan pattern, held as \u escapes (ASCII file by construction).
@@ -40,7 +44,7 @@ function isOwn(rel, own) {
 /** `rel` - a path from the root with "/". Outside the clean zones or in layer 4 - `false` (not checked). */
 function inCleanZone(rel, own) {
   if (isOwn(rel, own) || !/\.(md|cjs|js|mjs|sh|py|html)$/.test(rel)) return false;
-  if (rel.split('/').some((p) => CLEAN_SKIP.has(p) || (p.startsWith('.') && !['.claude', '.forma'].includes(p)))) return false;
+  if (rel.split('/').some((p) => CLEAN_SKIP.has(p) || (p.startsWith('.') && !['.claude', '.forma', '.agents', '.zcode', '.qoder'].includes(p)))) return false;
   if (/^protocol\/README[^/]*\.md$/.test(rel)) return true;
   return CLEAN_ROOTS.some((r) => rel === r || rel.startsWith(r + '/'));
 }

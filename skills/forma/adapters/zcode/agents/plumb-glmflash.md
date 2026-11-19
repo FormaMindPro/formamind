@@ -4,6 +4,7 @@ description: Plumb, built-in executor — measures role fit for a cleaned task (
 model: glm-5.3-flash
 effort: high
 tools: Read
+omitClaudeMd: true
 ---
 
 # `plumb-glmflash`

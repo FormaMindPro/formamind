@@ -218,11 +218,11 @@ function foreign(root, release, engines = ['claude']) {
   return out
 }
 
-// settings and caches the engines write themselves: not the project's work, never moved
-// settings, hooks state and caches the engines write themselves: not the project's work, never moved. Names are generic;
+// settings, hooks state and caches the engines write themselves: not the project's work, never moved - nor the
+// isolation probes in `<engine>/.state/`. Names are generic;
 // the folder prefix is every engine folder of the project.
 const RUNTIME_TAILS = ['hooks/\\.[^/]+$', 'settings(\\.local)?\\.json$', 'permission-level\\.state\\.json$', '\\.mcp\\.json$', 'projects/',
-  'config\\.toml$', '(sessions|cache)/', 'plugins/forma/mcp_config\\.json$']
+  'config\\.toml$', '(sessions|cache)/', 'plugins/forma/mcp_config\\.json$', '\\.state/']
 const escapeRe = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 function runtimePatterns(dirs) { return dirs.flatMap((d) => RUNTIME_TAILS.map((t) => new RegExp('^' + escapeRe(d) + '/' + t))) }
 function isRuntime(key, patterns) { return patterns.some((r) => r.test(key)) }

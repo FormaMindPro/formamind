@@ -29,6 +29,7 @@ function fixture() {
   w(dir, '.claude/scripts/old-forma.sh', 'echo old')
   w(dir, '.claude/agents/ext-role.md', '# extension')
   w(dir, '.claude/hooks/project-layer.txt', 'layer')
+  w(dir, '.claude/hooks/.repo-check-state', '2025-01-15 abc v0.0.1')
   w(dir, '.claude/settings.json', JSON.stringify({
     hooks: {
       SessionStart: [
@@ -74,6 +75,7 @@ test('the foreign file is archived, the stale forma file removed, the hook clean
   assert.ok(fs.existsSync(abs(dir, '.claude', 'agents', 'ext-role.md')))
   assert.ok(fs.existsSync(abs(dir, '.claude', 'scripts', 'check-ready.sh')))
   assert.ok(fs.existsSync(abs(dir, '.claude', 'hooks', 'project-layer.txt')), 'protected name kept')
+  assert.ok(fs.existsSync(abs(dir, '.claude', 'hooks', '.repo-check-state')), 'run-time dot-file kept')
   // the journal: every action, the rollback command inside
   const j = JSON.parse(fs.readFileSync(abs(dir, r.journal), 'utf8'))
   const kinds = j.actions.map((a) => a.action).sort()
@@ -118,6 +120,57 @@ test('the zcode mirror zone follows the regeneration: foreign mirrors archive, f
   assert.ok(fs.existsSync(abs(dir, '.zcode', 'scripts', 'gen-roles.cjs')), 'not a managed zone - the generator itself stays')
   const arc = abs(dir, r.archiveDir)
   assert.equal(fs.readFileSync(abs(arc, '.zcode', 'agents', 'gsd-mirror.md'), 'utf8'), 'mirror of a gone foreign source')
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
+// Every engine keeps its own wiring shape: claude, qoder and zcode hold groups with a `hooks` array
+// (zcode's script sits in args), gemini a map of named groups where an event may hold groups or the bare
+// command. The cleanup reaches all four.
+test('the hook cleanup reaches every zone wiring file; the rollback re-inserts each entry where it was', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'forma-clean-hooks-'))
+  const foreign = { '.claude': ['gsd-claude.js'], '.qoder': ['gsd-qoder.js'], '.agents': ['gsd-gemini.js', 'gsd-gemini-bare.js'], '.zcode': ['gsd-zcode.js'] }
+  for (const [zone, files] of Object.entries(foreign)) {
+    w(dir, `${zone}/hooks/owned.sh`, 'echo ok')
+    for (const f of files) w(dir, `${zone}/hooks/${f}`, 'module.exports = 1')
+  }
+  w(dir, '.claude/settings.json', JSON.stringify({ hooks: { SessionStart: [{ matcher: 'startup', hooks: [
+    { type: 'command', command: 'node .claude/hooks/gsd-claude.js' },
+    { type: 'command', command: 'bash .claude/hooks/owned.sh' }] }] } }, null, 2))
+  w(dir, '.qoder/settings.json', JSON.stringify({ hooks: { Stop: [{ hooks: [
+    { type: 'command', command: 'node .qoder/hooks/gsd-qoder.js' },
+    { type: 'command', command: 'bash .qoder/hooks/owned.sh' }] }] } }, null, 2))
+  w(dir, '.agents/hooks.json', JSON.stringify({ forma: { enabled: true, SessionStart: [{ hooks: [
+    { type: 'command', command: 'node .agents/hooks/gsd-gemini.js' }] }], PreInvocation: [
+    { type: 'command', command: 'node .agents/hooks/gsd-gemini-bare.js' },
+    { type: 'command', command: 'bash .agents/hooks/owned.sh' }] } }, null, 2))
+  w(dir, '.zcode/config.json', JSON.stringify({ hooks: { events: { SessionEnd: [
+    { matcher: 'end', hooks: [
+      { type: 'process', command: 'node', args: ['.zcode/hooks/gsd-zcode.js'] },
+      { type: 'process', command: 'bash', args: ['.zcode/hooks/owned.sh'] }] }] } } }, null, 2))
+  const owned = new Set(Object.keys(foreign).map((zone) => abs(dir, zone, 'hooks', 'owned.sh')))
+  const r = cleanEngineFiles(dir, { owned })
+  assert.equal(r.archived, 5)
+  assert.equal(r.unhooked, 5, r.report)
+  const read = (rel) => fs.readFileSync(abs(dir, rel), 'utf8')
+  const wiring = (zone) => zone === '.claude' || zone === '.qoder' ? zone + '/settings.json' : zone === '.agents' ? '.agents/hooks.json' : '.zcode/config.json'
+  for (const [zone, files] of Object.entries(foreign)) {
+    for (const f of files) assert.ok(!read(wiring(zone)).includes(f), 'unhooked from ' + zone + ': ' + f)
+    assert.ok(read(wiring(zone)).includes('owned.sh'), 'the forma hook stays in ' + zone)
+  }
+  const j = JSON.parse(read(r.journal))
+  const unhooks = j.actions.filter((a) => a.action === 'unhook')
+  assert.deepEqual(unhooks.map((a) => a.file).sort(), ['.agents/hooks.json', '.agents/hooks.json', '.claude/settings.json', '.qoder/settings.json', '.zcode/config.json'])
+  const b = rollback(dir, r.journal)
+  assert.equal(b.rehooked, 5)
+  for (const [zone, files] of Object.entries(foreign)) {
+    for (const f of files) assert.ok(read(wiring(zone)).includes(f), 're-inserted into ' + wiring(zone) + ': ' + f)
+  }
+  const q = JSON.parse(read('.qoder/settings.json'))
+  assert.equal(q.hooks.Stop[0].hooks.length, 2)
+  const z = JSON.parse(read('.zcode/config.json'))
+  assert.equal(z.hooks.events.SessionEnd[0].hooks.length, 2)
+  const g = JSON.parse(read('.agents/hooks.json'))
+  assert.equal(g.forma.PreInvocation.length, 2)
   fs.rmSync(dir, { recursive: true, force: true })
 })
 

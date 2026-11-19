@@ -1,7 +1,7 @@
 ---
 name: core
 description: Core — thresholds, cycle verdict, node diagnosis, balance trend
-model: claude-sonnet-5-5
+model: gemini-3.8-flash
 tier: standard
 effort: low
 tools: Read, Grep, Glob, Write, Edit, AskUserQuestion, Bash(node .forma/dashboard/tally.cjs *), Bash(node .forma/board/card-move.cjs *), Bash(node .claude/scripts/graph-query.cjs *)

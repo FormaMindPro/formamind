@@ -22,6 +22,10 @@ exit 1
       card-001-nastroit-sborku-primera.md: Kit 2031-01-05
     — `0 tokens` числом в 1 строках захода с 2030-01-01 (ECONOMY.md, «`Intent` in the shared session»: расход — из журнала сессии, card-session-spend.cjs; не найден — `unknown tokens (cache-read unknown)` с причиной; событие без работы — без `attempt`):
       card-001-nastroit-sborku-primera.md: Intent 2031-01-05
+    — .forma/dashboard/economy.test.cjs:1: console.error('сломан нарочно'); process.exit(1);
+    — .forma/dashboard/probe.cjs:1: // см. card-007
+    — .claude/scripts/claude-economy.test.cjs:1: console.error('сломан нарочно'); process.exit(1);
+    — .claude/skills/grilling/SKILL.md:72: правка в копии
 # check-board card-001
 exit 1
     — card-001-nastroit-sborku-primera.md: метка route-9 — нет такого маршрута (route-0…route-8)
@@ -75,6 +79,10 @@ exit 1
       card-001-nastroit-sborku-primera.md: Kit 2031-01-05
     — `0 tokens` числом в 1 строках захода с 2030-01-01 (ECONOMY.md, «`Intent` in the shared session»: расход — из журнала сессии, card-session-spend.cjs; не найден — `unknown tokens (cache-read unknown)` с причиной; событие без работы — без `attempt`):
       card-001-nastroit-sborku-primera.md: Intent 2031-01-05
+    — .forma/dashboard/economy.test.cjs:1: console.error('сломан нарочно'); process.exit(1);
+    — .forma/dashboard/probe.cjs:1: // см. card-007
+    — .claude/scripts/claude-economy.test.cjs:1: console.error('сломан нарочно'); process.exit(1);
+    — .claude/skills/grilling/SKILL.md:72: правка в копии
     — .forma/dashboard/probe.cjs:1: след проекта в чистой зоне — «card-007»; запрет 16: ссылка — в карточке, дата — в .forma/living/checks.json
     — ядро: .forma/board/DATA-MODEL.md привязан к движку — «Claude Code»
     — ядро: .forma/dashboard/economy.test.cjs: тест не прошёл (код 1) — сломан нарочно

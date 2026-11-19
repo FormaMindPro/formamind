@@ -61,7 +61,7 @@ def ask(client, model, items, nplurals):
         "Translate the items to Russian. Items may carry 'context' (msgctxt) and 'note' (developer comment) — use them, do not translate them.\n"
         "For 'singular' items return {\"id\": <id>, \"translation\": \"...\"}.\n"
         f"For 'plural' items return {{\"id\": <id>, \"translation_plural\": [ ... ]}} with EXACTLY {nplurals} strings by Russian plural rules: "
-        "0 — ends in 1 except 11 (1 файл), 1 — ends in 2–4 except 12–14 (2 файла), 2 — the rest (5 файлов).\n"
+        "0 — ends in 1 except 11 (1 file), 1 — ends in 2–4 except 12–14 (2 files), 2 — the rest (5 files).\n"
         "Respond with {\"translations\": [...]}, one object per input id.\n\n"
         f"Input:\n{json.dumps(items, ensure_ascii=False)}"
     )

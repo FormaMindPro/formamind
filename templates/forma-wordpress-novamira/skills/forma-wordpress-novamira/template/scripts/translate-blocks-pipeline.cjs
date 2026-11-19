@@ -1,22 +1,22 @@
 #!/usr/bin/env node
 'use strict';
 /*
- * Конвейер перевода текстовых узлов блоков Gutenberg: пачка -> перевод -> подстановка.
+ * Translation pipeline for the text nodes of Gutenberg blocks: batch -> translation -> substitution.
  *
  *   extract --in <html> --work <dir> --glossary <md>
- *     пишет в <dir>: source.html (копия входа), skel.html (текст заменён маркерами ⟦T001⟧),
- *     src.json ([{id, text, protect:[{term, keep}]}]), log.jsonl (строки stage "sent").
+ *     writes into <dir>: source.html (a copy of the input), skel.html (the text replaced by ⟦T001⟧ markers),
+ *     src.json ([{id, text, protect:[{term, keep}]}]), log.jsonl (stage "sent" lines).
  *
  *   apply --work <dir> [--tr <json>]
- *     читает: source.html, skel.html, src.json, tr.json ([{id, text}]) — по умолчанию <dir>/tr.json.
- *     Атрибуты alt, title, aria-label — отдельные строки (поле attr в src.json); в теге переводятся только их значения.
- *     сверяет: ids и порядок, число строк, защищённые термины, побайтно комментарии и теги,
- *     структуру токенов. Пишет out.html только при exit 0. Дописывает в log.jsonl строки stage "received"
- *     (исходная и подставленная строка, флаг кириллицы). Всегда пишет report.json.
+ *     reads: source.html, skel.html, src.json, tr.json ([{id, text}]) — <dir>/tr.json by default.
+ *     The alt, title and aria-label attributes are separate lines (the attr field in src.json); inside a tag only their values are translated.
+ *     verifies: ids and order, line counts, protected terms, comments and tags byte for byte,
+ *     the token structure. Writes out.html only on exit 0. Appends stage "received" lines to log.jsonl
+ *     (the source and the substituted line, the Cyrillic flag). Always writes report.json.
  *
- * stdout: только summary-JSON {ok, exit, counts:{blocks, lines_before, lines_after}, path}; path — report.json.
- * exit: 0 — успех; 1 — сверка не совпала; 2 — стоп (вход не читается, контракт нарушен, исключение).
- * Внешние модели и API не вызываются.
+ * stdout: only the summary JSON {ok, exit, counts:{blocks, lines_before, lines_after}, path}; path — report.json.
+ * exit: 0 — success; 1 — the comparison mismatched; 2 — stop (the input is unreadable, the contract is broken, an exception).
+ * No external models or APIs are called.
  */
 
 const fs = require('fs');
@@ -69,7 +69,7 @@ function readJson(file, label) {
   }
 }
 
-// Токены: комментарии <!-- -->, теги <...>, между ними — текст.
+// Tokens: comments <!-- -->, tags <...>, and the text between them.
 function tokenize(html) {
   const re = /<!--[\s\S]*?-->|<[^>]*>/g;
   const out = [];
@@ -89,24 +89,24 @@ function splitWs(s) {
   return { lead: m[1], core: m[2], trail: m[3] };
 }
 
-// Атрибуты с человекочитаемым текстом: alt, title, aria-label, placeholder, value, content, data-*-label
-// (data-label и т.п.; только после пробела — не часть другого атрибута).
+// Attributes carrying human-readable text: alt, title, aria-label, placeholder, value, content, data-*-label
+// (data-label and the like; only after a space - not a part of another attribute).
 const ATTR_RE = /(\s)(alt|title|aria-label|placeholder|value|content|data-[\w-]*label)(\s*=\s*)(?:"([^"]*)"|'([^']*)')/g;
-// Для сверки тегов: значения этих атрибутов не сравниваются (они переведены), всё остальное — побайтно.
+// For the tag comparison: the values of these attributes are not compared (they are translated); everything else byte for byte.
 const maskAttrs = (tag) => tag.replace(ATTR_RE, (m, sp, name, eq) => `${sp}${name}${eq}""`);
 
-// JSON-атрибуты блоков Gutenberg внутри комментариев <!-- wp:... {...} /-->: только человекочитаемые ключи.
+// The JSON attributes of Gutenberg blocks inside <!-- wp:... {...} /--> comments: only the human-readable keys.
 const BLOCK_JSON_KEYS = ['label', 'placeholder', 'buttonText', 'eyebrow', 'lead', 'note', 'suffix', 'prefix'];
 const BLOCK_JSON_RE = new RegExp('"(' + BLOCK_JSON_KEYS.join('|') + ')":"((?:[^"\\\\]|\\\\.)*)"', 'g');
 const isWpComment = (c) => /^<!--\s*wp:/.test(c);
-// Для сверки комментариев: значения этих ключей не сравниваются (они переведены), всё остальное — побайтно.
+// For the comment comparison: the values of these keys are not compared (they are translated); everything else byte for byte.
 const maskComment = (c) => (isWpComment(c) ? c.replace(BLOCK_JSON_RE, (m, key) => `"${key}":""`) : c);
 
 const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const termRe = (t) => new RegExp(`(?<![\\p{L}\\p{N}])${escRe(t)}(?![\\p{L}\\p{N}])`, 'iu');
 const hasCyrillic = (s) => /\p{Script=Cyrillic}/u.test(s);
 
-// Формы для поиска: полное название и название без скобок ("Forma (протокол)" -> "Forma").
+// The search forms: the full term and the term without its parenthetical ("Forma (protocol)" -> "Forma").
 function matchForms(src) {
   const forms = [src];
   const m = /^(.*?)\s*\(.*\)$/u.exec(src);
@@ -114,7 +114,7 @@ function matchForms(src) {
   return forms;
 }
 
-// Глоссарий: первая колонка таблицы — «Источник»; колонка «Перевод» — если заполнена, это форма, которую надо сохранить.
+// The glossary: the first column is the source term; the translation column, when filled, is the form to keep.
 function loadGlossary(file) {
   const text = readText(file, 'glossary');
   const terms = [];
@@ -125,9 +125,9 @@ function loadGlossary(file) {
     const cells = line.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
     if (cells.every((c) => /^:?-{3,}:?$/.test(c))) continue;
     if (!header) { header = cells; continue; }
-    const src = cells[0].replace(/^\(служебная\)\s*/u, '').trim();
+    const src = cells[0].replace(/^\(\u0441\u043b\u0443\u0436\u0435\u0431\u043d\u0430\u044f\)\s*/u, '').trim();
     if (!src) continue;
-    const ti = header.indexOf('Перевод');
+    const ti = header.indexOf('\u041f\u0435\u0440\u0435\u0432\u043e\u0434');
     const tr = ti >= 0 ? (cells[ti] || '').trim() : '';
     terms.push({ src, keep: tr || src });
   }
@@ -145,7 +145,7 @@ function protectedIn(text, terms) {
   return found;
 }
 
-// Значения alt/title/aria-label в теге -> отдельные строки Txxx; кавычки и имя атрибута остаются.
+// The alt/title/aria-label values inside a tag -> separate Txxx lines; the quotes and the attribute name stay.
 function markAttrs(tag, items, terms) {
   return tag.replace(ATTR_RE, (m, sp, name, eq, dq, sq) => {
     const q = dq !== undefined ? '"' : "'";
@@ -157,7 +157,7 @@ function markAttrs(tag, items, terms) {
   });
 }
 
-// Значения разрешённых ключей в JSON-атрибутах блока (внутри комментария <!-- wp:... -->), только если есть кириллица.
+// The values of the allowed keys in a block JSON attribute (inside a <!-- wp:... --> comment), only when Cyrillic is present.
 function markBlockJson(comment, items, terms) {
   if (!isWpComment(comment)) return comment;
   return comment.replace(BLOCK_JSON_RE, (m, key, raw) => {
@@ -265,8 +265,8 @@ function apply(args) {
     if (s.attr && !isJsonAttr && /["'<>]/.test(t)) problems.push(`${s.id}: quote or angle bracket in ${s.attr} value`);
     for (const p of s.protect || []) {
       if (termRe(p.keep).test(t)) continue;
-      // Вложенный protect-термин: p.term целиком входит в более специфичный термин q той же
-      // строки, и перевод использует именно q.keep — общий термин поглощён специфичным оборотом.
+      // A nested protect term: p.term lies entirely inside a more specific term q of the same
+      // line, and the translation uses q.keep - the general term is subsumed by the specific phrase.
       const subsumed = (s.protect || []).some((q) => q !== p && q.term !== p.term
         && termRe(p.term).test(q.term) && termRe(q.keep).test(t));
       if (!subsumed) problems.push(`${s.id}: protected term missing: "${p.keep}"`);
