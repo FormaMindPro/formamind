@@ -143,6 +143,20 @@ function refreshProjectManifest(version) {
   if (ref) { ok(tr('commit.manifest_refreshed', { version: ref.version, changed: ref.changed, missing: ref.missing.length })); manifestRefreshed = true; }
   return ref;
 }
+// The release body is the CHANGELOG section of the version: a locally created release must not be a
+// placeholder, because the repository's release workflow skips an existing release and its notes stay empty.
+function changelogNotes(version, previous) {
+  let text;
+  try { text = fs.readFileSync(path.join(proto, 'CHANGELOG.md'), 'utf8').replace(/\r\n/g, '\n'); } catch { return null; }
+  const lines = text.split('\n');
+  const start = lines.findIndex((l) => l.trim() === `## [${version}]` || l.startsWith(`## [${version}] `));
+  if (start < 0) return null;
+  const out = [];
+  for (let i = start + 1; i < lines.length && !/^## \[/.test(lines[i]); i++) out.push(lines[i]);
+  const section = out.join('\n').trim();
+  if (!section) return null;
+  return `${section}\n\n**Full Changelog**: https://github.com/FormaMindPro/formamind/compare/v${previous}...v${version}`;
+}
 function release() {
   const list = pending();
   const dirty = scanMessages(list);
@@ -195,7 +209,9 @@ function release() {
   ok(tr('commit.pushed'));
   try {
     if (run('gh', ['auth', 'status']).code === 0) {
-      const rel = run('gh', ['release', 'create', `v${nv}`, '--title', nv, '--notes', `Release v${nv}`, '--latest', '-R', 'FormaMindPro/formamind']);
+      // The body comes from CHANGELOG.md; the workflow's own release would be skipped once this one exists.
+      const notes = changelogNotes(nv, v) || `Release v${nv}`;
+      const rel = run('gh', ['release', 'create', `v${nv}`, '--title', nv, '--notes', notes, '--latest', '-R', 'FormaMindPro/formamind']);
       if (rel.code === 0) ok(tr('commit.gh_release_created', { v: nv }));
       else console.log(tr('commit.gh_release_failed', { out: rel.out }));
     } else {
