@@ -16,6 +16,7 @@ import re
 import shutil
 import sys
 import time
+from pathlib import Path
 
 import polib
 from dotenv import load_dotenv
@@ -164,7 +165,8 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="only count the empty strings")
     args = ap.parse_args()
 
-    new, done = os.path.join(args.dir, "new"), os.path.join(args.dir, "completed")
+    base = os.path.realpath(args.dir)
+    new, done = os.path.join(base, "new"), os.path.join(base, "completed")
     os.makedirs(new, exist_ok=True)
     os.makedirs(done, exist_ok=True)
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
@@ -185,8 +187,10 @@ def main():
     usage["seconds"] = round(usage["seconds"])
     usage["model"] = args.model
     if not args.dry_run:
-        with open(os.path.join(args.dir, "usage.json"), "w", encoding="utf-8") as fh:
-            json.dump(usage, fh, ensure_ascii=False, indent=2)
+        usage_path = Path(base) / "usage.json"
+        if ".." in Path(args.dir.replace("\\", "/")).parts or usage_path.parent != Path(base):
+            raise SystemExit(f"Refusing to write outside the chosen directory: {args.dir}")
+        usage_path.write_text(json.dumps(usage, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\nSpend: {usage}")
     if incomplete:
         print("Not finished:", ", ".join(incomplete))

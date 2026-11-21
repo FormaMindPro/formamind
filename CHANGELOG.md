@@ -3,6 +3,12 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.42] - 2026-11-21
+### Changed
+- the qoder engine sleeps out of the box: `core/engines.json` ships it dormant (no subagents, degraded mode), so a fresh install neither offers nor installs it; the installer's `--engines` help names codex, minimax and qoder as dormant and drops qoder from the choices. A project that wants it wakes it in its own registry (`engine-switch wake qoder`); the adapter itself still ships and its tests run.
+### Fixed
+- the project template's report writers (`po_shift_check.py`, `tokenator_translator.py`) resolve the chosen output directory and reject `..` before writing the report or the spend file; the template ships 0.0.4.
+
 ## [0.0.41] - 2026-11-21
 ### Added
 - the names reminder reaches every engine natively: `UserPromptSubmit` (`PreInvocation` in Gemini - already shipped) resolves the protocol codes in the human's prompt through the core `.forma/i18n/names.cjs` and appends their human names as context. Claude gets `.claude/hooks/names-context.cjs` (a node hook, fail-open, silent without codes), wired by the installer and accepted by the verify profile (`.cjs` hooks run via `node`); Codex gets the `names-context` branch in `.codex/scripts/codex-hooks.cjs` with the PowerShell wrapper `.codex/hooks/names-context.ps1` and a `hooks.json` entry (`additionalContext`); MiniMax gets the branch in the package hook (`handleUserPromptSubmit` emits `additionalContext` through `.forma/i18n/names.cjs`, English fallback when the core module is absent). Each adapter test pins the wiring, §8 mention, the `human-register` skill mirror against the core canon, the role's `uses:` line and the behavior (names printed, silence without codes, fail-open on broken input).

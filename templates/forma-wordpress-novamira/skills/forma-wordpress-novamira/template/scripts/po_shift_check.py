@@ -17,6 +17,7 @@ import json
 import os
 import re
 import sys
+from pathlib import Path
 
 import polib
 
@@ -160,9 +161,12 @@ def main():
         os.path.join(args.path, f) for f in os.listdir(args.path) if f.endswith(".po"))
     report = [check(f, args) for f in files]
     out_dir = args.path if os.path.isdir(args.path) else os.path.dirname(os.path.abspath(args.path))
-    with open(os.path.join(out_dir, "shift-report.json"), "w", encoding="utf-8") as fh:
-        json.dump(report, fh, ensure_ascii=False, indent=2)
-    print(f"\nReport: {os.path.join(out_dir, 'shift-report.json')}")
+    base = Path(out_dir).resolve()
+    report_path = base / "shift-report.json"
+    if ".." in Path(out_dir.replace("\\", "/")).parts or report_path.parent != base:
+        sys.exit(f"Refusing to write outside the chosen directory: {out_dir}")
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\nReport: {report_path}")
 
 
 if __name__ == "__main__":
