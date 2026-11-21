@@ -16,7 +16,7 @@
 
 ## Main session = `Intent` (§1) (Contract 3: constructive)
 
-Главная сессия читает `agents/intent.md` первым действием. Ворота старта (§3) доставляются конфиг-хуком workspace-конфигурации `.zcode/config.json` (`hooks.enabled`, событие `SessionStart`, matcher `startup|resume|clear|compact`): хост запускает `node .forma/i18n/cli.cjs gate --json`, ответ строгим JSON хост вкладывает в контекст сессии (`additionalContext`); ворота конструктивны — ничего не блокируют, при ненастроенном проекте сами открывают карточку настройки и просят у человека решений. Вторая группа того же события доставляет дайджест локального беклога: `node .forma/i18n/cli.cjs backlog --json` (тот же matcher; незакарточенные наблюдения — backlog-дорожка доски, метки follow-up в Result закрытых карт, строки JOURNAL без ссылки на карту); хук конструктивен — ничего не блокирует, пустой беклог молчит. Шаблон хука — в каноне адаптера (`config.json` рядом с `rules/`). Роль `Intent` хуком не доставляется — по-прежнему читается вручную, расхождение названо; появление доставки роли будет записано в пробу как наблюдение, не как обещание.
+Главная сессия читает `agents/intent.md` первым действием. Ворота старта (§3) и дайджест беклога **задуманы** конфиг-хуками workspace-конфигурации `.zcode/config.json` (`hooks.enabled`, событие `SessionStart`, matcher `startup|resume|clear|compact`): `node .forma/i18n/cli.cjs gate --json` и `node .forma/i18n/cli.cjs backlog --json`, ответ строгим JSON хост вкладывает в контекст сессии; ворота конструктивны — ничего не блокируют, при ненастроенном проекте сами открывают карточку настройки и просят у человека решений, пустой беклог молчит. **Факт текущей версии ZCode** (документация хоста, раздел Hooks): проектные хуки не исполняются — любая секция `hooks` в `<workspace>/.zcode/config.json` или `<workspace>/zcode.json` игнорируется целиком и пишется в `~/.zcode/cli/log/zcode-<date>.jsonl` как `config_project_hooks_ignored`. Значит, эти две доставки сейчас до модели не доходят — названное расхождение, не обещание; поддерживаемый путь для проекта — плагин `hooks/hooks.json` (Contract 10), миграция ворот и беклога в плагин остаётся отдельной работой. Роль `Intent` хуком не доставляется — по-прежнему читается вручную, расхождение названо; появление доставки роли будет записано в пробу как наблюдение, не как обещание.
 
 ## Continuation of the same `Run` (Contract 4: constructive in mechanism and in the record)
 
@@ -43,6 +43,12 @@
 ## Preflight verification (Contract 9: constructive)
 
 Перед работой в зоне: `node .forma/dashboard/lib/engines.cjs check zcode` (код 0), `node .zcode/tests/test-zcode-adapter.cjs`, `node .claude/scripts/sync-engines.cjs --check` (сверка без нарушений по зоне). Тест соответствия — единственная точка, где зона сверяется с контрактом экономики (ECONOMY.md); сверка движков находит адаптер сама по файлу §8.
+
+## Names reminder (§1, prohibition 20) (Contract 10: constructive)
+
+Локальный плагин `.zcode/plugins/forma-hooks` (marketplace `.zcode/plugins/marketplace.json`) регистрирует `UserPromptSubmit` → `hooks/names-context.cjs`: хук читает `prompt`, при протокольных кодах отдаёт `hookSpecificOutput.additionalContext` с именами из `.forma/i18n/names.cjs` — карточка по заголовку доски (включая `done/`), цель по `GOAL.md`, маршруты, надстройки, разделы и запреты по `keys.json`; fail-open — пустой stdout и код 0.
+
+Хук — напоминание контекста, не проверка ответа. Плагин вступает в силу после того, как человек добавит `.zcode/plugins` как локальный marketplace (Settings → Plugins → Create → Add marketplace), установит и включит `forma-hooks`, затем начнёт новую сессию. Живая доставка из Qoder не наблюдалась; машинно проверены манифест, регистрация `UserPromptSubmit`, форма вывода и fail-open — `test-zcode-adapter.cjs`.
 
 ## Models per node
 

@@ -683,7 +683,8 @@ function installZCode(root) {
   copyTree(path.join(A, 'tests'), path.join(Z, 'tests'))
   copyTree(path.join(A, 'scripts'), path.join(Z, 'scripts'))
   copyTree(path.join(A, 'agents'), path.join(Z, 'agents'))
-  const out = ['ZCode: .zcode/rules, .zcode/tests, .zcode/scripts, .zcode/agents — installed (skills are read from the core .forma/skills)']
+  copyTree(path.join(A, 'plugins'), path.join(Z, 'plugins')) // a local marketplace: current ZCode ignores project-level hooks
+  const out = ['ZCode: .zcode/rules, .zcode/tests, .zcode/scripts, .zcode/agents, .zcode/plugins (forma-hooks) — installed (skills are read from the core .forma/skills)']
   if (fs.existsSync(path.join(root, '.claude', 'agents'))) out.push(rebuildZcodeRoles(root))
   else out.push('  ! .claude/agents not found — roles ship as installed; install Claude Code, then run: node .zcode/scripts/gen-roles.cjs')
   return out
@@ -844,7 +845,7 @@ function geminiExpect() {
 // mirror against that reference (a regeneration is the only check that sees the mirror lag behind it).
 function zcodeExpect() {
   return {
-    files: ['.zcode/forma-adapter.cjs', '.zcode/config.json', '.zcode/rules/zcode-8.md', '.zcode/scripts/gen-roles.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs'],
+    files: ['.zcode/forma-adapter.cjs', '.zcode/config.json', '.zcode/rules/zcode-8.md', '.zcode/scripts/gen-roles.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs', '.zcode/plugins/marketplace.json', '.zcode/plugins/forma-hooks/.zcode-plugin/plugin.json', '.zcode/plugins/forma-hooks/hooks/hooks.json', '.zcode/plugins/forma-hooks/hooks/names-context.cjs'],
     mirrorFrom: '.claude/agents',
   }
 }

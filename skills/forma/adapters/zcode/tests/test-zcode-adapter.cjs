@@ -5,10 +5,12 @@
  * test-zcode-adapter.cjs - the ZCode adapter's fit test.
  * It checks:
  *  1. The presence and the content of .zcode/rules/zcode-8.md (nine contracts, the zcode: tag, the degradation divergence);
- *  1b. The start-gate config hook: .zcode/config.json is valid JSON, hooks.enabled is true, the gate --json command is wired
- *      on the matcher startup|resume|clear|compact (the gate is constructive, it blocks nothing - it opens the setup card);
- *  1c. The backlog digest hook: a second SessionStart group on the same matcher wires backlog --json (the local
- *      backlog's summary at session start; constructive, silent when the backlog is empty);
+ *  1b. The legacy start-gate template: .zcode/config.json is valid JSON, hooks.enabled is true, the gate --json command
+ *      is wired on startup|resume|clear|compact; section 8 states the current host ignores project-level hooks
+ *      (config_project_hooks_ignored), so this template is not a delivery promise;
+ *  1c. The backlog digest template: a second SessionStart group on the same matcher wires backlog --json;
+ *  1d. The supported delivery: .zcode/plugins ships a local marketplace and the forma-hooks plugin whose
+ *      UserPromptSubmit hook returns human names in additionalContext, fail-open;
  *  2. The adapter's shape: the core finds it by the file name, the engines.cjs contract items - all passed;
  *  3. The zone's roles parity with the canonical roles - by a regeneration (gen-roles --check);
  *  4. The spend line parse: a synthetic step and the host's real usage shape; the zcode: tag - in the core's tag wall;
@@ -41,9 +43,9 @@ const it = (name, fn) => { fn(); passed += 1; console.log('ok  ' + name); };
 const adapter = () => engines.loadAdapters(root).find((a) => a.dir === '.zcode');
 
 // 1. The engine's section 8
-it('.zcode/rules/zcode-8.md declares the nine contracts and the engine tag', () => {
+it('.zcode/rules/zcode-8.md declares the ten contracts and the engine tag', () => {
   const text = fs.readFileSync(path.join(root, '.zcode', 'rules', 'zcode-8.md'), 'utf8');
-  for (const c of ['Contract 1', 'Contract 2', 'Contract 3', 'Contract 4', 'Contract 5', 'Contract 6', 'Contract 7', 'Contract 8', 'Contract 9']) {
+  for (const c of ['Contract 1', 'Contract 2', 'Contract 3', 'Contract 4', 'Contract 5', 'Contract 6', 'Contract 7', 'Contract 8', 'Contract 9', 'Contract 10']) {
     assert.ok(text.includes(c), `section 8 lacks ${c}`);
   }
   assert.ok(text.includes('zcode:'), 'section 8 lacks the zcode: engine tag');
@@ -51,8 +53,8 @@ it('.zcode/rules/zcode-8.md declares the nine contracts and the engine tag', () 
   assert.ok(text.includes('[STAGE:'), 'section 8 does not name the stage labels');
 });
 
-// 1b. The start gate hook: the host's workspace config delivers it on all four session events
-it('.zcode/config.json wires the gate hook (gate --json) on startup|resume|clear|compact', () => {
+// 1b. The workspace config stays a legacy template; the current host ignores project-level hooks
+it('.zcode/config.json keeps the gate template, and section 8 names the host fact', () => {
   const file = path.join(root, '.zcode', 'config.json');
   assert.ok(fs.existsSync(file), '.zcode/config.json is missing');
   let cfg;
@@ -67,10 +69,13 @@ it('.zcode/config.json wires the gate hook (gate --json) on startup|resume|clear
   assert.ok(entry, 'no process hook with command node');
   assert.ok((entry.args || []).some((a) => a.includes('${ZCODE_PROJECT_DIR}/.forma/i18n/cli.cjs')), 'the project cli.cjs is not in the hook args');
   assert.deepEqual((entry.args || []).slice(1), ['gate', '--json'], 'the gate --json invocation is not in the hook args');
+  const eight = fs.readFileSync(path.join(root, '.zcode', 'rules', 'zcode-8.md'), 'utf8');
+  assert.ok(eight.includes('config_project_hooks_ignored'), 'section 8 does not name the ignored project hooks');
+  assert.ok(/\u043f\u0440\u043e\u0435\u043a\u0442\u043d\u044b\u0435 \u0445\u0443\u043a\u0438 \u043d\u0435 \u0438\u0441\u043f\u043e\u043b\u043d\u044f\u044e\u0442\u0441\u044f/i.test(eight), 'section 8 does not state that project hooks are not executed'); // the ru phrase pinned (data)
 });
 
-// 1c. The local backlog hook: a second SessionStart group delivers the digest on the same four events
-it('.zcode/config.json wires the backlog hook (backlog --json) as the second SessionStart group', () => {
+// 1c. The legacy backlog group stays in the template; the plugin is the supported delivery (Contract 10)
+it('.zcode/config.json keeps the backlog template as the second SessionStart group', () => {
   const file = path.join(root, '.zcode', 'config.json');
   let cfg;
   try { cfg = JSON.parse(fs.readFileSync(file, 'utf8')); }
@@ -83,6 +88,55 @@ it('.zcode/config.json wires the backlog hook (backlog --json) as the second Ses
   assert.ok(entry, 'the backlog hook is not a process hook with command node');
   assert.ok((entry.args || []).some((a) => a.includes('${ZCODE_PROJECT_DIR}/.forma/i18n/cli.cjs')), 'the project cli.cjs is not in the backlog hook args');
   assert.deepEqual((entry.args || []).slice(1), ['backlog', '--json'], 'the backlog --json invocation is not in the hook args');
+});
+
+// 1d. The supported delivery: a local plugin with a UserPromptSubmit names hook
+it('.zcode/plugins ships a valid local marketplace and the forma-hooks manifest', () => {
+  const market = JSON.parse(fs.readFileSync(path.join(root, '.zcode', 'plugins', 'marketplace.json'), 'utf8'));
+  assert.equal(market.name, 'forma-local');
+  const entry = (market.plugins || []).find((p) => p.name === 'forma-hooks');
+  assert.ok(entry, 'the marketplace does not list forma-hooks');
+  assert.equal(entry.source, './forma-hooks');
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, '.zcode', 'plugins', 'forma-hooks', '.zcode-plugin', 'plugin.json'), 'utf8'));
+  assert.equal(manifest.name, 'forma-hooks');
+});
+
+it('forma-hooks registers names-context.cjs on UserPromptSubmit', () => {
+  const spec = JSON.parse(fs.readFileSync(path.join(root, '.zcode', 'plugins', 'forma-hooks', 'hooks', 'hooks.json'), 'utf8'));
+  const groups = (spec.hooks && spec.hooks.UserPromptSubmit) || [];
+  const entry = groups.flatMap((g) => g.hooks || []).find((h) => h.type === 'process' && h.command === 'node');
+  assert.ok(entry, 'no process hook on UserPromptSubmit');
+  assert.ok((entry.args || []).some((a) => a.includes('${ZCODE_PLUGIN_ROOT}/hooks/names-context.cjs')), 'the plugin hook path is not in the args');
+  assert.ok(fs.existsSync(path.join(root, '.zcode', 'plugins', 'forma-hooks', 'hooks', 'names-context.cjs')), 'the hook file is missing');
+});
+
+it('names-context resolves prompt codes into additionalContext and stays fail-open', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'names-zcode-'));
+  try {
+    fs.cpSync(path.join(root, '.forma', 'i18n'), path.join(dir, '.forma', 'i18n'), { recursive: true });
+    fs.mkdirSync(path.join(dir, '.devtool', 'features', 'done'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.devtool', 'features', 'card-7-probe.md'),
+      '---\nid: "card-7-probe"\n---\n# card-7 \u00b7 Probe title\n\n## Task\n');
+    fs.writeFileSync(path.join(dir, '.devtool', 'features', 'done', 'card-9-closed.md'),
+      '---\nid: "card-9-closed"\n---\n# card-9 \u00b7 Closed title\n\n## Task\n');
+    const hook = path.join(root, '.zcode', 'plugins', 'forma-hooks', 'hooks', 'names-context.cjs');
+    const run = (input) => spawnSync(process.execPath, [hook], { input, encoding: 'utf8', env: { ...process.env, FORMA_LANG: 'en' } });
+
+    const hit = run(JSON.stringify({ cwd: dir, prompt: 'card-7 card-9 route-8' }));
+    assert.equal(hit.status, 0, hit.stderr);
+    const out = JSON.parse(hit.stdout).hookSpecificOutput;
+    assert.equal(out.hookEventName, 'UserPromptSubmit');
+    assert.match(out.additionalContext, /Probe title/);
+    assert.match(out.additionalContext, /Closed title/);
+    assert.match(out.additionalContext, /route-8/);
+
+    const none = run(JSON.stringify({ cwd: dir, prompt: 'no codes here' }));
+    assert.equal(none.status, 0);
+    assert.equal(none.stdout, '', 'no codes must produce no stdout');
+    const broken = run('{not json');
+    assert.equal(broken.status, 0, 'bad input must be fail-open');
+    assert.equal(broken.stdout, '');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 // 2. The adapter's shape: all the core contract items
