@@ -37,8 +37,9 @@ test('--all on a project without a manifest: every active engine, dormant ones e
     const r = run(dir, '--all');
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /--all: no install manifest — every active engine/);
-    assert.deepEqual(engineIds(dir), ['claude', 'gemini', 'zcode', 'qoder']);
+    assert.deepEqual(engineIds(dir), ['claude', 'gemini', 'zcode']);
     assert.ok(!fs.existsSync(path.join(dir, '.codex')), 'codex sleeps');
+    assert.ok(!fs.existsSync(path.join(dir, '.qoder')), 'qoder sleeps');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

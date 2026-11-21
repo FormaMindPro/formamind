@@ -2,6 +2,10 @@
 
 Newest first. The version is `.claude-plugin/plugin.json`; no dates (clean zone).
 
+## 0.0.4
+
+- `po_shift_check.py`, `tokenator_translator.py`: the chosen output directory is resolved and `..` is rejected before the report or the spend file is written.
+
 ## 0.0.3
 
 build-core-html-payload: the Cyrillic letter class via the Unicode script property (key-language).

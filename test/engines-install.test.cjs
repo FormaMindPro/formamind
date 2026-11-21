@@ -59,11 +59,12 @@ test('--engines minimax: a dormant engine is rejected with code 2, nothing is in
   } finally { fs.rmSync(d2, { recursive: true, force: true }); }
 });
 
-test('the --engines help does not offer minimax as a choice', () => {
+test('the --engines help does not offer the dormant engines as a choice', () => {
   const r = spawnSync(process.execPath, [FORMA, 'init', '--help'], { encoding: 'utf8' });
   const line = r.stdout.split(String.fromCharCode(10)).find((l) => l.includes('--engines'));
-  assert.match(line, /minimax are dormant/);
+  assert.match(line, /codex, minimax and qoder are dormant/);
   assert.ok(!line.includes('claude[,minimax'));
+  assert.ok(!line.includes('claude[,gemini,zcode,qoder]'));
 });
 
 test('the default install: neither .minimax/ nor miniapps/minimax-engine/', () => {
@@ -73,7 +74,7 @@ test('the default install: neither .minimax/ nor miniapps/minimax-engine/', () =
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.ok(!fs.existsSync(path.join(d3, '.minimax')));
     assert.ok(!fs.existsSync(path.join(d3, 'miniapps', 'minimax-engine')));
-    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(d3, '.forma', 'engines.json'), 'utf8')).dormant, ['codex', 'minimax']);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(d3, '.forma', 'engines.json'), 'utf8')).dormant, ['codex', 'minimax', 'qoder']);
   } finally { fs.rmSync(d3, { recursive: true, force: true }); }
 });
 
