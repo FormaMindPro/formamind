@@ -349,9 +349,40 @@ function accDetails(title, body, open){
   return `<details class="e-acc"${open ? ' open' : ''}><summary>${esc(title)}</summary><div class="e-acc-body">${body}</div></details>`;
 }
 
+// The provider's cost report (the adapter's `cost` source): the official allowance and the
+// per-model money estimate. Absent or unavailable - not built; the estimate is marked, and
+// an unknown cost is the word `unknown`, never zero.
+function costHtml(c){
+  if (!c || !c.available) return '';
+  const money = n => (n == null || !Number.isFinite(n)) ? t('econ.cost.unknown') : (n < 0.01 ? '$' + n.toFixed(4) : '$' + n.toFixed(3));
+  const pct = w => (w && Number.isFinite(Number(w.percent)) ? Math.round(Number(w.percent)) + '%' : '—');
+  const at = iso => { const d = new Date(iso); return Number.isFinite(d.getTime()) ? d.toLocaleString() : '—'; };
+  const win = (label, w) => `<div class="card-row" style="grid-template-columns:1fr auto; gap:8px">
+    <span class="dim">${esc(label)}</span>
+    <span class="mono">${pct(w)} · ${t('econ.cost.resets', {at: at(w && w.resetsAt)})}</span>
+  </div>`;
+  const limits = c.limits
+    ? `<div class="epic-list" style="margin:4px 0 8px">${win(t('econ.cost.window_5h'), c.limits.rolling)}${win(t('econ.cost.window_week'), c.limits.weekly)}${win(t('econ.cost.window_month'), c.limits.monthly)}</div>`
+    : '';
+  const rows = (c.models || []).map(m => `<tr>
+    <td class="mono">${esc(m.model)}</td>
+    <td>${fmt(m.requests)}</td>
+    <td class="mono">${m.costKnown ? money(m.cost) : t('econ.cost.unknown')}</td>
+    <td>${m.cap != null ? '$' + fmt(m.cap) : '—'}</td>
+    <td>${m.costKnown && m.cap ? (m.cost / m.cap * 100).toFixed(2) + '%' : '—'}</td>
+  </tr>`).join('');
+  const table = rows
+    ? `<div class="etable-scroll"><table class="etable"><thead><tr><th>${t('econ.cost.model')}</th><th>${t('econ.cost.req')}</th><th>${t('econ.cost.cost')}</th><th>${t('econ.cost.cap')}</th><th>${t('econ.cost.share')}</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : `<div class="nodata">${t('econ.cost.empty')}</div>`;
+  const note = c.stale ? t('econ.cost.stale') : t('econ.cost.note');
+  return `<div class="e-sub-lbl">${esc(c.label || t('econ.cost.title'))}</div>
+    ${limits}${table}
+    <p class="dim">${esc(note)}</p>`;
+}
+
 function level4Html(d, view){
   const blocks = [
-    [t('econ.l4.services'), servicesHtml(view.economy, true) + moneyHtml(d.totals, d.byNode, true)],
+    [t('econ.l4.services'), servicesHtml(view.economy, true) + moneyHtml(d.totals, d.byNode, true) + costHtml(view.cost)],
     [t('econ.l4.engines'), engineTableHtml(d.economy.byEngine, true)],
     [t('econ.subagents'), subagentsHtml(d.subagents, true)],
   ];

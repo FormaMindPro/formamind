@@ -845,7 +845,7 @@ function geminiExpect() {
 // mirror against that reference (a regeneration is the only check that sees the mirror lag behind it).
 function zcodeExpect() {
   return {
-    files: ['.zcode/forma-adapter.cjs', '.zcode/config.json', '.zcode/rules/zcode-8.md', '.zcode/scripts/gen-roles.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs', '.zcode/plugins/marketplace.json', '.zcode/plugins/forma-hooks/.zcode-plugin/plugin.json', '.zcode/plugins/forma-hooks/hooks/hooks.json', '.zcode/plugins/forma-hooks/hooks/names-context.cjs'],
+    files: ['.zcode/forma-adapter.cjs', '.zcode/config.json', '.zcode/rules/zcode-8.md', '.zcode/scripts/gen-roles.cjs', '.zcode/scripts/go-cost.cjs', '.zcode/tests/test-go-cost.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs', '.zcode/plugins/marketplace.json', '.zcode/plugins/forma-hooks/.zcode-plugin/plugin.json', '.zcode/plugins/forma-hooks/hooks/hooks.json', '.zcode/plugins/forma-hooks/hooks/names-context.cjs'],
     mirrorFrom: '.claude/agents',
   }
 }

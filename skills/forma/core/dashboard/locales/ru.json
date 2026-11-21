@@ -966,5 +966,19 @@
   "board.rn.over1": "склад",
   "board.rn.over2": "подряд",
   "board.rn.over3": "тираж",
-  "board.rn.over4": "партия"
+  "board.rn.over4": "партия",
+  "econ.cost.title": "OpenCode Go",
+  "econ.cost.window_5h": "5 ч",
+  "econ.cost.window_week": "неделя",
+  "econ.cost.window_month": "месяц",
+  "econ.cost.resets": "сброс {at}",
+  "econ.cost.model": "модель",
+  "econ.cost.req": "запросов",
+  "econ.cost.cost": "расход",
+  "econ.cost.cap": "потолок",
+  "econ.cost.share": "доля",
+  "econ.cost.unknown": "unknown",
+  "econ.cost.empty": "за период запросов через провайдера нет",
+  "econ.cost.note": "Расход — оценка: токены × прайс провайдера. Неизвестный расход — не ноль.",
+  "econ.cost.stale": "Отчёт из кэша; API провайдера не ответил."
 }
