@@ -323,6 +323,11 @@ module.exports = {
   id: 'zcode',
   spendTag: 'zcode',
 
+  // The provider's cost report: the script prints JSON (the official allowance, the prices and the
+  // per-model spend estimate); the core runs it only when this adapter is present, and the block is
+  // built only when the report says it is available.
+  cost: { script: '.zcode/scripts/go-cost.cjs', label: 'OpenCode Go', currency: 'USD', ttlMs: 300000 },
+
   // The engine contract (ENGINE-CONTRACT.md): the sources, the capabilities, the node -> model table, the write zones.
   sources: {
     rolesDir: '.zcode/agents',

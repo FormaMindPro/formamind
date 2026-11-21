@@ -29,6 +29,7 @@ const { readNodeConfig } = require('./data/nodes.cjs');
 const { readFormaCatalog } = require('./data/forma.cjs');
 const { buildGraphify, graphsBuilt } = require('./data/graphify.cjs');
 const { readSessionEconomy, readDialog } = require('./data/dialog.cjs');
+const { readCost } = require('./data/cost.cjs');
 const { readSubagentsRegistry } = require('./data/subagents.cjs');
 const { buildBort } = require('./data/bort.cjs');
 const { buildChain } = require('./data/chain.cjs');
@@ -60,6 +61,8 @@ function buildData(projectRoot) {
     byNode,
     // The cut by route labels - by the engine tag, in economy.engines[tag].byRoute.
     economy,
+    // The provider's allowance and the per-model money estimate - by the adapter's `cost` source, when one is declared.
+    cost: readCost(projectRoot),
     sessionEconomy: readSessionEconomy(projectRoot),
     dialog: readDialog(projectRoot),
     bort: buildBort(projectRoot),
