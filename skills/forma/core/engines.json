@@ -1,3 +1,7 @@
 {
-  "dormant": ["codex", "minimax"]
+  "dormant": [
+    "codex",
+    "minimax",
+    "qoder"
+  ]
 }
