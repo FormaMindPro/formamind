@@ -22,6 +22,8 @@ The five are **one body**. Five passed checks judge the parts; they say nothing 
 
 **Who speaks outward to the human**: `Intent` always; `Core` only on a breached threshold or a stop; `Kit` only when a decision or resource requires human authority; `Spec` and `Run` never.
 
+**The human hears names, not codes.** Every functional key in speech to the human carries its human name in the chat language, with the address beside it: a card by its board headline (`Card-12 "Title"`), a route or overlay by its name from the registry `03-protocol/NAMES.md` (`route-8` — "the build"), a goal by its `GOAL.md` name, a law section, prohibition or named key by its registry name. A code alone is a defect of speech, not precision; the test is that the human understands the mention without opening the law.
+
 **The main session is `Intent`.** The session that talks with the human runs as `Intent`, whatever engine carries it; the other four are called from it — `intent.md`.
 
 **`Plumb` is not a sixth node.** It is a measure that gives the five one language: it takes no card of its own, decides nothing and confirms nothing (prohibition 1 stands). It returns readings between slicing and execution; `Spec` decides on them, `Core` reads them (§2, "The Plumb").
@@ -150,6 +152,8 @@ Phrased affirmatively — what must hold, not what's forbidden. Numbering is fix
 18. Commit messages of the protocol repository are English only; the project repository keeps its own language — Cyrillic is a stop in `forma-commit.cjs` and the pre-push check, never a warning.
 
 19. Executable code — scripts, hooks, tests, templates' code — is ASCII: no Cyrillic, neither in identifiers nor in comments; a data literal in the project language is written as `\u` escapes (`check-english-code.cjs`).
+
+20. A code travels with its name — in speech to the human the address never goes alone.
 
 **Narrow exception to prohibition 1 — a short mechanical task:** `Intent` may execute a change of literally named values across an explicitly listed set of files within epics "3. Project protocol" or "8. Competence segments", without `Kit` and without a separate confirming node; a card is still opened and names the exception — `intent-housekeeping.md`.
 

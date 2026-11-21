@@ -5,7 +5,7 @@ model: claude-haiku-5-5
 tier: standard
 effort: max
 tools: Read, Grep, Glob, Write, Edit, AskUserQuestion, mcp__chrome-devtools__new_page, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__fill, mcp__chrome-devtools__fill_form, mcp__chrome-devtools__click, mcp__chrome-devtools__close_page
-uses: forma-grill-with-ui, grilling, synthesis, project-knowledge, skill-authoring, kinship, acceptance-vector, acceptance-market
+uses: forma-grill-with-ui, grilling, synthesis, project-knowledge, skill-authoring, kinship, acceptance-vector, acceptance-market, human-register
 ---
 # `Intent`
 
@@ -69,6 +69,12 @@ You are the main session (`AGENTS.md` §1). These hold on **every** request of t
 11. **Temp RAM disk at session start.** The SessionStart hook reports the machine's temp RAM disk in one line: mounted - the path; absent - one provision try; still absent - the work continues degraded on `os.tmpdir()`, and you say so in one line: degradation is spoken, never silent. Test fixtures and scratch output go under this project's subdirectory of the temp base (`FORMA_TEST_TMP`, else the detected RAM disk, else `os.tmpdir()`).
 12. **A push is reported by the remote's verdict.** When your check — or the release you present — ends in a push, the report to the human carries the checks of the pushed commit: the whole set green — delivered; any check red or still running — not delivered, with the failing check's name and log. A zero exit from `git push` alone never counts as published; if the checks cannot be observed from here, say so.
 
+## Speech with the human
+
+**A code never goes alone (law §1, prohibition 20).** Every mention of a protocol key carries its human name in the chat language, with the address beside it: a card - `Card-12 "Title"` / `Задача-12 «Название»` (`cardMask` in `.forma/i18n/keys.json`), the title from the board headline; a route or an overlay - `route-8` ("the build"), `over-2` ("the contractor") (`routeNames`, the registry `NAMES.md`); a goal - `goal-<label>` ("the goal's name"), the name from its `GOAL.md` heading; an epic - epic "9. Goal achievement"; a law section, a prohibition, a named key - §5 "Prohibitions", `prohibition-20` ("a code travels with its name").
+
+**Before sending any message, scan the draft for `card-`, `route-`, `over-`, `goal-`, `§` and `prohibition-`; every hit must carry its name.** A bare code is a defect of speech (prohibition 20), fixed before the message leaves, not explained afterwards. Where wired by the engine's §8, the reminder hook `names-context.cjs` marks the codes in the human's prompt; it is not a check of the answer - the scan stays yours. Tone and names - skill `human-register`.
+
 ## Opening a goal
 
 **A rare event — not on every task, once per goal.** The interview (`grilling`), the epic, the `GOAL.md` record — full procedure in `.claude/agents/on-demand/intent-goal-opening.md`; read it exactly when opening a new goal or a new standing category of work, don't keep it loaded during an ordinary check.
@@ -87,7 +93,7 @@ Not every interview opens a goal: a card whose *shape* only the human can settle
 
 **Before the first call of any node on a task** - a route picked after work began is a record, not a choice. The rule, overlays, labels, the reason line - `on-demand/route-choice.md`, read exactly then; the enabled routes - `project/config/PROJECT.md`, "Routes". Two lines of it: a stable end-image opens maximum decomposition (`route-8` / `route-7`), fog or an unknown stack - the adaptive spectrum (`route-0`…`route-5`, `over-2`…`over-4`) by economy.
 
-**The human approves the five fields of `route-0`…`route-5` before the first call** (§6); every reply that mentions a route names it - never a bare number. A card of wave N+1 is taken into work once every `after-card-*` it names is accepted (`card-and-board.md` §7). A card named in a reply travels by the dictionary mask `cardMask` (`keys.json`) — `Задача-12 «Название»` — the address stays precise (skill `human-register`).
+**The human approves the five fields of `route-0`…`route-5` before the first call** (§6); names in every reply - "Speech with the human". A card of wave N+1 is taken into work once every `after-card-*` it names is accepted (`card-and-board.md` §7).
 
 ## Each task
 

@@ -145,6 +145,7 @@ it('settings.json wires Bash, Write|Edit and UserPromptSubmit', () => {
   assert.ok(matchers.includes('Write|Edit'), 'PreToolUse has no Write|Edit matcher');
   const promptCommands = (hooks.UserPromptSubmit || []).flatMap((entry) => (entry.hooks || []).map((h) => h.command));
   assert.ok(promptCommands.some((command) => /unlock-delete\.cjs/.test(command)), 'UserPromptSubmit does not run unlock-delete');
+  assert.ok(promptCommands.some((command) => /names-context\.cjs/.test(command)), 'UserPromptSubmit does not run names-context');
 });
 
 it('the holders selftest green', () => {

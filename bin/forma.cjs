@@ -608,6 +608,29 @@ function installCodex(root, protectedPaths) {
   return out
 }
 
+function mergeGeminiHooks(root, src) {
+  const dst = path.join(root, '.agents', 'hooks.json')
+  if (!fs.existsSync(src)) return
+  if (!fs.existsSync(dst)) {
+    copyFile(src, dst, { overwrite: false })
+    return
+  }
+  let s = {}, d = {}
+  try { s = JSON.parse(fs.readFileSync(src, 'utf8')) } catch { return }
+  try { d = JSON.parse(fs.readFileSync(dst, 'utf8')) } catch { return }
+  let changed = false
+  for (const [hookId, spec] of Object.entries(s)) {
+    if (!d[hookId]) {
+      d[hookId] = spec
+      changed = true
+    }
+  }
+  if (changed) {
+    fs.mkdirSync(path.dirname(dst), { recursive: true })
+    fs.writeFileSync(dst, JSON.stringify(d, null, 2) + '\n', 'utf8')
+  }
+}
+
 // Gemini (beta, Antigravity): §8 wrapper, plugin, node roles; mcp_config.json is an empty stub, an existing one is not touched.
 // Skills are not laid here: the adapter declares the core canon .forma/skills, which the core step lays on every install.
 function installGemini(root) {
@@ -624,7 +647,7 @@ function installGemini(root) {
     copyTree(path.join(A, 'hooks'), path.join(root, '.agents', 'hooks'))
   }
   if (fs.existsSync(path.join(A, 'hooks.json'))) {
-    copyFile(path.join(A, 'hooks.json'), path.join(root, '.agents', 'hooks.json'), { overwrite: false })
+    mergeGeminiHooks(root, path.join(A, 'hooks.json'))
   }
   copyFile(path.join(A, 'plugin.json'), path.join(P, 'plugin.json'))
   copyTree(path.join(A, 'agents'), path.join(P, 'agents'))
@@ -671,7 +694,7 @@ function installZCode(root) {
 // that reference is installed, otherwise the shipped snapshot is kept.
 const QODER_HOOKS = {
   PreToolUse: [{ matcher: 'Bash', hooks: ['guard-destructive.cjs'] }, { matcher: 'Write|Edit', hooks: ['guard-cards.cjs'] }],
-  UserPromptSubmit: [{ hooks: ['unlock-delete.cjs'] }],
+  UserPromptSubmit: [{ hooks: ['unlock-delete.cjs', 'names-context.cjs'] }],
 }
 function mergeQoderSettings(root) {
   const file = path.join(root, '.qoder', 'settings.json')
@@ -712,7 +735,8 @@ function installQoder(root) {
   copyTree(path.join(A, 'scripts'), path.join(Q, 'engine', 'scripts'))
   copyTree(path.join(A, 'tests'), path.join(Q, 'tests'))
   copyTree(path.join(A, 'agents'), path.join(Q, 'engine', 'agents'))
-  const out = ['Qoder: .qoder/forma-adapter.cjs, .qoder/engine (section 8, guards, scripts, agents), .qoder/tests — installed', '  ' + mergeQoderSettings(root)]
+  copyTree(path.join(A, 'skills'), path.join(Q, 'skills'))
+  const out = ['Qoder: .qoder/forma-adapter.cjs, .qoder/engine (section 8, guards, scripts, agents), .qoder/skills, .qoder/tests — installed', '  ' + mergeQoderSettings(root)]
   if (fs.existsSync(path.join(root, '.claude', 'agents'))) out.push(rebuildQoderRoles(root))
   else out.push('  ! .claude/agents not found — the shipped role catalog is kept; install Claude Code, then run: node .qoder/engine/scripts/gen-roles.cjs')
   return out
@@ -834,10 +858,13 @@ function qoderExpect() {
       '.qoder/engine/hooks/guard-destructive.cjs',
       '.qoder/engine/hooks/guard-cards.cjs',
       '.qoder/engine/hooks/unlock-delete.cjs',
+      '.qoder/engine/hooks/names-context.cjs',
       '.qoder/engine/scripts/gen-roles.cjs',
       '.qoder/engine/agents/intent.md',
       '.qoder/engine/agents/on-demand/intent-session-start.md',
+      '.qoder/skills/human-register/SKILL.md',
       '.qoder/tests/test-qoder-adapter.cjs',
+      '.qoder/tests/test-qoder-skills.cjs',
       '.qoder/tests/test-qoder-spend.cjs',
       '.qoder/settings.json',
     ],
@@ -846,6 +873,7 @@ function qoderExpect() {
       { event: 'PreToolUse', matcher: 'Bash', name: 'guard-destructive.cjs' },
       { event: 'PreToolUse', matcher: 'Write|Edit', name: 'guard-cards.cjs' },
       { event: 'UserPromptSubmit', matcher: '', name: 'unlock-delete.cjs' },
+      { event: 'UserPromptSubmit', matcher: '', name: 'names-context.cjs' },
     ],
   }
 }

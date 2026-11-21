@@ -1370,5 +1370,18 @@
   "board.new-card.bad_node": "--node \"{node}\" — не имя узла",
   "plumb.miss_noul": "noul {v} < {t}",
   "board.new-card.isolation_unknown": "гейт изоляции закрыт: у зоны {zone} нет пробы возможностей (.state/capabilities.json) — отсутствие пробы читается как отказ, не как разрешение. Запишите пробу (node .forma/dashboard/lib/capability-probe.cjs) либо передайте --force.",
-  "board.new-card.force_line": "- `{node}`, {day}: --force — проба возможностей зоны {zone} отсутствует или изоляция закрыта; создание карточки канала разрешено явно."
+  "board.new-card.force_line": "- `{node}`, {day}: --force — проба возможностей зоны {zone} отсутствует или изоляция закрыта; создание карточки канала разрешено явно.",
+  "names.header": "Код не идёт один: рядом имя.",
+  "names.tag": "[имена]",
+  "names.route": "маршрут «{name}» ({code})",
+  "names.overlay": "надстройка «{name}» ({code})",
+  "names.goal": "цель «{name}» ({code})",
+  "names.section": "§{n} «{name}»",
+  "names.prohibition": "запрет {n} «{name}»",
+  "board.names.card": "{file}: в заголовке нет имени после среднего знака",
+  "board.names.goal": "цель {code}: нет имени в project/goals/*/GOAL.md (часть после среднего знака)",
+  "board.names.route": "метка {label}: нет имени в keys.json routeNames",
+  "board.names.dict": "запрет {n} есть в AGENTS.md §5, но не назван в keys.json prohibitionNames",
+  "board.names.law": "запрет {n} есть в keys.json, но отсутствует в AGENTS.md §5",
+  "board.names.registry": "{rel}: запрет {key} отсутствует в реестре"
 }

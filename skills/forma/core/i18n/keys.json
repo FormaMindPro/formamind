@@ -984,6 +984,14 @@
     "prohibition-18": {
       "en": "commit in English",
       "ru": "коммит по-английски"
+    },
+    "prohibition-19": {
+      "en": "code is ASCII",
+      "ru": "код — ASCII"
+    },
+    "prohibition-20": {
+      "en": "a code travels with its name",
+      "ru": "код с именем"
     }
   },
   "namedKeys": {

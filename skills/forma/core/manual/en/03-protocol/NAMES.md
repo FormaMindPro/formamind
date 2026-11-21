@@ -37,7 +37,7 @@ Every code carries a human name beside it; the code is the address, the name rid
 | §6 | `law-6` | Card and form check | The card as five fields and four zones; the readiness criterion as a machine gate and a judged verdict; English keys; card material inside the card's folder. |
 | §7 | `law-7` | Board | The board lives in `.devtool/features/`; a node taking a card syncs both `status` and `assignee` by `card-move.cjs`. |
 
-## Prohibitions 1–18
+## Prohibitions 1–20
 
 | № | Registry key | Name | Description |
 |---|---|---|---|
@@ -59,6 +59,8 @@ Every code carries a human name beside it; the code is the address, the name rid
 | 16 | `prohibition-16` | clean zones | Files that ship to other projects carry no trace of a project; the history lives in cards, `.forma/living/` and `JOURNAL.md`. |
 | 17 | `prohibition-17` | exit through the scrub | Whatever leaves for an external model or service passes a scrubbing script first; a refusal is fail-closed. |
 | 18 | `prohibition-18` | commit in English | Commit messages of the protocol repository are English only; the project repository keeps its own language. |
+| 19 | `prohibition-19` | code is ASCII | Executable code is ASCII: no Cyrillic in identifiers or comments; project-language data literals use `\u` escapes. |
+| 20 | `prohibition-20` | a code travels with its name | In speech to the human the address never goes alone; the human name rides beside it. |
 
 ## Named keys
 
@@ -73,4 +75,5 @@ The Plumb: role-fit measure between slicing and execution (`PLUMB.md`). The ru m
 - chat — skill `human-register`, "Names in the chat language";
 - machine dictionary — `.forma/i18n/keys.json` (`routeNames` for routes and overlays, `lawSections` for law sections, `prohibitionNames` for prohibitions, `namedKeys` for named keys);
 - law sections and prohibitions — this registry;
-- cards — the board's card headlines; the chat form rides the dictionary mask `cardMask` (`.forma/i18n/keys.json`): Card-NNN "Title".
+- cards — the board's card headlines; the chat form rides the dictionary mask `cardMask` (`.forma/i18n/keys.json`): Card-NNN "Title";
+- goals and epics — project data, never the machine dictionary (prohibition 16): a goal's name is the part after `·` in its `GOAL.md` heading, an epic's name is the second column of `PROJECT.md`, "Project epics".

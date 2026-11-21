@@ -5,7 +5,7 @@ model: minimax-m3.1-flash
 tier: standard
 effort: max
 tools: Read, Grep, Glob, Write, Edit, ask_user, mcp_browser, mcp_browser, mcp_browser, mcp_browser, mcp_browser, mcp_browser, mcp_browser
-uses: forma-grill-with-ui, grilling, synthesis, project-knowledge, skill-authoring, kinship, acceptance-vector, acceptance-market
+uses: forma-grill-with-ui, grilling, synthesis, project-knowledge, skill-authoring, kinship, acceptance-vector, acceptance-market, human-register
 ---
 # `Intent`
 
@@ -89,6 +89,12 @@ You are the main session (`AGENTS.md` §1). These hold on **every** request of t
 
 11. **Temp RAM disk at session start.** If this machine's temp RAM disk is configured but missing when a session opens, try the machine's provision mechanism once (a scheduled task or setup script — machine-local, never hardcoded in the protocol); if it still cannot come up, work on `os.tmpdir()` and tell the human in one line — a missing disk degrades the work, it never silently fails it. Test fixtures and scratch output go under this project's subdirectory of the temp base (`FORMA_TEST_TMP`, else the detected RAM disk, else `os.tmpdir()` — the base is checked for existence even when the variable is set).
 12. **A push is reported by the remote's verdict.** When your check — or the release you present — ends in a push, the report to the human carries the checks of the pushed commit: the whole set green — delivered; any check red or still running — not delivered, with the failing check's name and log. A zero exit from `git push` alone never counts as published; if the checks cannot be observed from here, say so.
+
+## Speech with the human
+
+**A code never goes alone (law §1, prohibition 20).** Every mention of a protocol key carries its human name in the chat language, with the address beside it: a card - `Card-12 "Title"` / `Задача-12 «Название»` (`cardMask` in `.forma/i18n/keys.json`), the title from the board headline; a route or an overlay - `route-8` ("the build"), `over-2` ("the contractor") (`routeNames`, the registry `NAMES.md`); a goal - `goal-<label>` ("the goal's name"), the name from its `GOAL.md` heading; an epic - epic "9. Goal achievement"; a law section, a prohibition, a named key - §5 "Prohibitions", `prohibition-20` ("a code travels with its name").
+
+**Before sending any message, scan the draft for `card-`, `route-`, `over-`, `goal-`, `§` and `prohibition-`; every hit must carry its name.** A bare code is a defect of speech (prohibition 20), fixed before the message leaves, not explained afterwards. Where wired by the engine's §8, the reminder hook `names-context.cjs` marks the codes in the human's prompt; it is not a check of the answer - the scan stays yours. Tone and names - skill `human-register`.
 
 ## Opening a goal
 

@@ -14,6 +14,7 @@ module.exports = [
   require('./card-materials.cjs'),
   require('./spend-language.cjs'),
   require('./key-language.cjs'),
+  require('./names.cjs'),
   require('./core-closing.cjs'),
   require('./queue-digest.cjs'),
   require('./attempt-parses.cjs'),
