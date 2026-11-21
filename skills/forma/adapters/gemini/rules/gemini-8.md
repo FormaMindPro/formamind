@@ -99,8 +99,17 @@ The main Antigravity session runs as `Intent`: before its first reply it reads `
 ## Preflight Verification (Contract 9: constructive)
 
 The installation and wiring of the Gemini adapter is verified **by construction**:
-* Registered in `.forma/install-manifest.json` with profile `.agents/verify-profile.cjs` and expected hooks (`guard-delete.cjs`, `unlock-delete.cjs`, `post-invocation.cjs`).
-* Verified by running `node .forma/verify/verify-install.cjs`.
+* Registered in `.forma/install-manifest.json` with profile `.agents/verify-profile.cjs` and expected hooks (`guard-delete.cjs`, `guard-core-cycle.cjs`, `guard-subagent-card.cjs`, `unlock-delete.cjs`, `names-context.cjs`, `post-invocation.cjs`).
+* The installer (`bin/forma.cjs`, `installGemini`) merges `.agents/hooks.json` on install/update (`mergeGeminiHooks`), so existing projects receive `forma-names-context` and future hooks without overwriting custom project hook definitions.
+* Verified by running `node .forma/verify/verify-install.cjs` and `node .agents/tests/test-gemini-adapter.cjs`.
+
+## Contract 10 — напоминание имён (§1, запрет 20) (constructive)
+
+Хук `PreInvocation` `names-context.cjs` (зарегистрирован как `forma-names-context` в `.agents/hooks.json`) перехватывает текст сообщения человека (`payload.prompt`, `payload.userPrompt` или последние пользовательские реплики `USER_EXPLICIT`/`USER_INPUT` из `payload.transcriptPath`); если в нём упоминаются протокольные коды (`card-`, `route-`, `over-`, `goal-`, `§N`, `prohibition-`), хук возвращает `{ injectSteps: [ { systemMessage: "<блок имён>" } ] }` с человеческими именами из резолвера ядра `.forma/i18n/names.cjs` (карточка — по заголовку доски, цель — по `GOAL.md`, маршруты, надстройки, разделы и запреты — по `keys.json`). Имена целей никогда не заносятся в `keys.json` (чистая зона, запрет 16).
+
+Хук — напоминание контекста, не проверка ответа: финального хука у хоста нет, скан исходящего ответа остаётся делом говорящего. Хук fail-open: при нечитаемом входе, битом JSON, отсутствии резолвера или любой ошибке возвращается `{ injectSteps: [] }` и процесс завершается с кодом 0.
+
+Проверено машинно: регистрация `forma-names-context` в `.agents/hooks.json` (слияние установщиком), форма вывода хука на фикстуре и fail-open — `test-gemini-adapter.cjs`. Живая доставка `systemMessage` хостом Antigravity из Qoder не наблюдалась: это остаётся проверить в самом Antigravity.
 
 ## Credentials guard (§5, prohibition 15: held by discipline)
 
