@@ -56,7 +56,7 @@ const HELP = `forma ${VERSION} init — install/update the Forma protocol in the
 
   npx github:FormaMindPro/formamind init [flags]
 
-  --engines  claude[,gemini,zcode,qoder] engines (claude is always core; codex and minimax are dormant: core/engines.json).
+  --engines  claude[,gemini,zcode] engines (claude is always core; codex, minimax and qoder are dormant: core/engines.json).
                                      On an update without the flag the recorded engines are reinstalled, not claude alone
   --all                              every component the project records, one run: the engines of its install manifest
                                      (no manifest yet — a first install: every active engine); --engines wins over --all
