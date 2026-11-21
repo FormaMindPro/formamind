@@ -1,0 +1,13 @@
+{
+  "name": "forma-local",
+  "description": "Forma protocol plugins for this project",
+  "plugins": [
+    {
+      "name": "forma-hooks",
+      "source": "./forma-hooks",
+      "description": "Forma hooks: human names for protocol codes in the human prompt",
+      "category": "forma",
+      "tags": ["forma", "hooks", "names"]
+    }
+  ]
+}

@@ -63,5 +63,9 @@ foreach ($script in 'check-ready.ps1', 'check-dashboard.ps1', 'check-plugin-upda
     if ($startupCommands -notmatch [regex]::Escape($script)) { throw "SessionStart is missing $script." }
     if (-not (Test-Path -LiteralPath (Join-Path $codexRoot "hooks\$script"))) { throw "Missing hook script: $script" }
 }
+if ($hooks.UserPromptSubmit.Count -lt 1) { throw 'No UserPromptSubmit hook.' }
+$promptCommands = @($hooks.UserPromptSubmit | ForEach-Object { $_.hooks } | ForEach-Object { $_.command }) -join "`n"
+if ($promptCommands -notmatch [regex]::Escape('names-context.ps1')) { throw 'UserPromptSubmit is missing names-context.ps1.' }
+if (-not (Test-Path -LiteralPath (Join-Path $codexRoot 'hooks\names-context.ps1'))) { throw 'Missing hook script: names-context.ps1' }
 
 Write-Output 'Codex-to-Claude configuration parity verified.'

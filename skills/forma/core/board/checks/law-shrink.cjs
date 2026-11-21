@@ -7,7 +7,7 @@
  *   1) the size of AGENTS.md is strictly less than the baseline; the baseline is read from .forma/living/checks.json
  *      (the key lawShrink.baselineBytes) - the checker's body carries no project facts (prohibition 16),
  *      the baseline is measured before the edits and written once;
- *   2) all the prohibition numbers 1-18 are present in §5 - the addresses the role files reference;
+ *   2) all the prohibition numbers 1-20 are present in §5 - the addresses the role files reference;
  *   3) the headings of §1-§7 are present;
  *   4) every file/script named by AGENTS.md in backticks (a name without a path, .md/.cjs/.sh/.json)
  *      exists on disk - a light recheck of the law-pointers logic: the index of names is built over
@@ -31,7 +31,7 @@ const msg = (key, params) => i18n.message(key, params, 'ru');
 
 const LAW = 'AGENTS.md';
 const BASELINE_KEY = 'lawShrink.baselineBytes';
-const PROHIBITIONS = 18;
+const PROHIBITIONS = 20;
 const SECTIONS = 7;
 
 // Not pointer files: the root files of the protocol and the project (the law does not check itself

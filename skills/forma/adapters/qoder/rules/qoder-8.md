@@ -4,7 +4,7 @@
 
 ## Contract 1 — корневые правила (constructive)
 
-Qoder читает `AGENTS.md` нативно; обёртки в корне нет. Нативные поверхности зоны — `.qoder/settings.json` и `.qoder/commands/`; внутренние держатели — `.qoder/engine/` (закон-мера, хуки, проверки, свидетели, этот §8). Скиллы проект читает из канона ядра `.forma/skills/`; собственной копии зона не держит. Запрещены `.qoder/rules`, `.qoder/agents`, `.qoder/home.md`: их присутствие — находка `selftest`.
+Qoder читает `AGENTS.md` нативно; обёртки в корне нет. Нативные поверхности зоны — `.qoder/settings.json`, `.qoder/commands/` и `.qoder/skills/`; внутренние держатели — `.qoder/engine/` (закон-мера, хуки, проверки, свидетели, этот §8). Канон скиллов — ядро `.forma/skills/`; `.qoder/skills/` держит его копию, которую кладёт установщик, совпадение хешей проверяет `test-qoder-skills.cjs` (skill `human-register` доставляется этой поверхностью). Запрещены `.qoder/rules`, `.qoder/agents`, `.qoder/home.md`: их присутствие — находка `selftest`.
 
 ## Contract 2 — изоляция узлов (discipline; режим деградированный)
 
@@ -37,6 +37,10 @@ Qoder читает `AGENTS.md` нативно; обёртки в корне не
 ## Contract 9 — префлайт и верификация установки (constructive)
 
 Перед работой в зоне: `node .forma/dashboard/lib/engines.cjs check qoder` (код 0), `node .qoder/tests/test-qoder-adapter.cjs`, `node .claude/scripts/sync-engines.cjs --check`. Адаптер находится ядром по имени файла, тест соответствия — в `.qoder/tests/`; профиль верификации установки объявляется установщиком, когда зона ставится в проект.
+
+## Contract 10 — напоминание имён (§1, запрет 20) (constructive)
+
+Хук `UserPromptSubmit` `names-context.cjs` получает текст человека в главной сессии; если в нём есть коды (`card-`, `route-`, `over-`, `goal-`, `§N`, `prohibition-`), хук добавляет к контексту их человеческие имена из резолвера ядра `.forma/i18n/names.cjs` — карточка по заголовку доски, цель по `GOAL.md`, маршрут и запрет по `keys.json`. Хук — напоминание контекста, не проверка ответа: финального хука у хоста нет, скан исходящего ответа остаётся делом говорящего. Хук fail-open: нечитаемый вход или сбой резолвера печатают пусто и дают код 0; подагенты события не получают.
 
 ## Models per node
 

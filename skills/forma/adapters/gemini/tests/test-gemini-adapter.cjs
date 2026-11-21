@@ -59,6 +59,48 @@ it('.agents/rules/gemini-8.md exists and holds the Plumb rules and the engine ru
   assert.match(txt, /gemini:/, 'the engine tag must be named');
 });
 
+// 1a. The names reminder wiring (section 1, prohibition 20)
+it('.agents/hooks.json registers forma-names-context on PreInvocation, and the hook is installed', () => {
+  const hooksFile = path.join(root, '.agents', 'hooks.json');
+  assert.ok(fs.existsSync(hooksFile), 'hooks.json must exist');
+  const spec = JSON.parse(fs.readFileSync(hooksFile, 'utf8'))['forma-names-context'];
+  assert.ok(spec, 'forma-names-context must be registered');
+  assert.equal(spec.enabled, true, 'the hook must be enabled');
+  const commands = (spec.PreInvocation || []).flatMap((g) => (Array.isArray(g.hooks) ? g.hooks : (g.command ? [g] : []))).map((h) => h.command);
+  assert.ok(commands.some((c) => c && c.endsWith('names-context.cjs')), 'PreInvocation must run names-context.cjs');
+  assert.ok(fs.existsSync(path.join(root, '.agents', 'hooks', 'names-context.cjs')), 'the hook file must be installed');
+});
+
+it('names-context resolves prompt codes into names and stays fail-open', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'names-gemini-'));
+  try {
+    fs.cpSync(path.join(root, '.forma', 'i18n'), path.join(dir, '.forma', 'i18n'), { recursive: true });
+    fs.mkdirSync(path.join(dir, '.devtool', 'features'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.devtool', 'features', 'card-7-probe.md'),
+      '---\nid: "card-7-probe"\n---\n# card-7 \u00b7 Probe title\n\n## Task\n');
+    const hook = path.join(root, '.agents', 'hooks', 'names-context.cjs');
+    const run = (input) => spawnSync(process.execPath, [hook], { input, encoding: 'utf8', env: { ...process.env, FORMA_LANG: 'en' } });
+
+    const hit = run(JSON.stringify({ workspacePaths: [dir], prompt: 'card-7 route-8' }));
+    assert.equal(hit.status, 0, hit.stderr);
+    const steps = JSON.parse(hit.stdout).injectSteps;
+    assert.equal(steps.length, 1, 'one injection step expected');
+    assert.match(steps[0].systemMessage, /Probe title/);
+    assert.match(steps[0].systemMessage, /route-8/);
+
+    const transcript = path.join(dir, 'transcript.jsonl');
+    fs.writeFileSync(transcript, JSON.stringify({ source: 'USER_EXPLICIT', content: 'card-7' }) + '\n');
+    const fromTranscript = run(JSON.stringify({ workspacePaths: [dir], transcriptPath: transcript }));
+    assert.match(JSON.parse(fromTranscript.stdout).injectSteps[0].systemMessage, /Probe title/);
+
+    const none = run(JSON.stringify({ workspacePaths: [dir], prompt: 'no codes here' }));
+    assert.deepEqual(JSON.parse(none.stdout).injectSteps, []);
+    const broken = run('{not json');
+    assert.equal(broken.status, 0, 'bad input must be fail-open');
+    assert.deepEqual(JSON.parse(broken.stdout).injectSteps, []);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 // 2. The roles parity
 it('the Gemini roles are in full parity with the reference', () => {
   const results = parity.compareRoles(root, { only: 'gemini' });

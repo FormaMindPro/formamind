@@ -242,7 +242,7 @@ function installCore(root, protectedPaths, lang = 'en') {
 // ---------- Claude adapter ----------
 const CLAUDE_HOOKS = {
   PreToolUse: [{ hooks: ['guard-delete.sh', 'tool-usage.sh'] }, { matcher: 'Write|Edit', hooks: ['guard-cards.sh'] }],
-  UserPromptSubmit: [{ hooks: ['unlock-delete.sh'] }],
+  UserPromptSubmit: [{ hooks: ['unlock-delete.sh', 'names-context.cjs'] }],
   SessionStart: [{ matcher: 'startup', hooks: ['check-ready.sh', ['check-plugin-update.sh', 15], 'check-dashboard.sh', 'intent-start.sh', 'check-thresholds-gate.sh', ['ram-disk-status.sh', 30]] },
                  { matcher: 'resume|clear|compact', hooks: ['check-ready.sh'] }],
   PostToolUse: [{ matcher: 'Write|Edit', hooks: ['check-card.sh', 'sync-extensions.sh', 'auto-graphs.sh'] }],
@@ -300,7 +300,7 @@ function mergeClaudeSettings(root, compact) {
       group.hooks = group.hooks || []
       for (const h of g.hooks) {
         const [name, timeout] = Array.isArray(h) ? h : [h]
-        const command = `bash .claude/hooks/${name}`
+        const command = name.endsWith('.cjs') ? `node .claude/hooks/${name}` : `bash .claude/hooks/${name}`
         if (group.hooks.some((x) => x.command === command)) continue
         const entry = { type: 'command', command }
         if (timeout) entry.timeout = timeout
@@ -608,6 +608,29 @@ function installCodex(root, protectedPaths) {
   return out
 }
 
+function mergeGeminiHooks(root, src) {
+  const dst = path.join(root, '.agents', 'hooks.json')
+  if (!fs.existsSync(src)) return
+  if (!fs.existsSync(dst)) {
+    copyFile(src, dst, { overwrite: false })
+    return
+  }
+  let s = {}, d = {}
+  try { s = JSON.parse(fs.readFileSync(src, 'utf8')) } catch { return }
+  try { d = JSON.parse(fs.readFileSync(dst, 'utf8')) } catch { return }
+  let changed = false
+  for (const [hookId, spec] of Object.entries(s)) {
+    if (!d[hookId]) {
+      d[hookId] = spec
+      changed = true
+    }
+  }
+  if (changed) {
+    fs.mkdirSync(path.dirname(dst), { recursive: true })
+    fs.writeFileSync(dst, JSON.stringify(d, null, 2) + '\n', 'utf8')
+  }
+}
+
 // Gemini (beta, Antigravity): §8 wrapper, plugin, node roles; mcp_config.json is an empty stub, an existing one is not touched.
 // Skills are not laid here: the adapter declares the core canon .forma/skills, which the core step lays on every install.
 function installGemini(root) {
@@ -624,7 +647,7 @@ function installGemini(root) {
     copyTree(path.join(A, 'hooks'), path.join(root, '.agents', 'hooks'))
   }
   if (fs.existsSync(path.join(A, 'hooks.json'))) {
-    copyFile(path.join(A, 'hooks.json'), path.join(root, '.agents', 'hooks.json'), { overwrite: false })
+    mergeGeminiHooks(root, path.join(A, 'hooks.json'))
   }
   copyFile(path.join(A, 'plugin.json'), path.join(P, 'plugin.json'))
   copyTree(path.join(A, 'agents'), path.join(P, 'agents'))
@@ -660,7 +683,8 @@ function installZCode(root) {
   copyTree(path.join(A, 'tests'), path.join(Z, 'tests'))
   copyTree(path.join(A, 'scripts'), path.join(Z, 'scripts'))
   copyTree(path.join(A, 'agents'), path.join(Z, 'agents'))
-  const out = ['ZCode: .zcode/rules, .zcode/tests, .zcode/scripts, .zcode/agents — installed (skills are read from the core .forma/skills)']
+  copyTree(path.join(A, 'plugins'), path.join(Z, 'plugins')) // a local marketplace: current ZCode ignores project-level hooks
+  const out = ['ZCode: .zcode/rules, .zcode/tests, .zcode/scripts, .zcode/agents, .zcode/plugins (forma-hooks) — installed (skills are read from the core .forma/skills)']
   if (fs.existsSync(path.join(root, '.claude', 'agents'))) out.push(rebuildZcodeRoles(root))
   else out.push('  ! .claude/agents not found — roles ship as installed; install Claude Code, then run: node .zcode/scripts/gen-roles.cjs')
   return out
@@ -671,7 +695,7 @@ function installZCode(root) {
 // that reference is installed, otherwise the shipped snapshot is kept.
 const QODER_HOOKS = {
   PreToolUse: [{ matcher: 'Bash', hooks: ['guard-destructive.cjs'] }, { matcher: 'Write|Edit', hooks: ['guard-cards.cjs'] }],
-  UserPromptSubmit: [{ hooks: ['unlock-delete.cjs'] }],
+  UserPromptSubmit: [{ hooks: ['unlock-delete.cjs', 'names-context.cjs'] }],
 }
 function mergeQoderSettings(root) {
   const file = path.join(root, '.qoder', 'settings.json')
@@ -712,7 +736,8 @@ function installQoder(root) {
   copyTree(path.join(A, 'scripts'), path.join(Q, 'engine', 'scripts'))
   copyTree(path.join(A, 'tests'), path.join(Q, 'tests'))
   copyTree(path.join(A, 'agents'), path.join(Q, 'engine', 'agents'))
-  const out = ['Qoder: .qoder/forma-adapter.cjs, .qoder/engine (section 8, guards, scripts, agents), .qoder/tests — installed', '  ' + mergeQoderSettings(root)]
+  copyTree(path.join(A, 'skills'), path.join(Q, 'skills'))
+  const out = ['Qoder: .qoder/forma-adapter.cjs, .qoder/engine (section 8, guards, scripts, agents), .qoder/skills, .qoder/tests — installed', '  ' + mergeQoderSettings(root)]
   if (fs.existsSync(path.join(root, '.claude', 'agents'))) out.push(rebuildQoderRoles(root))
   else out.push('  ! .claude/agents not found — the shipped role catalog is kept; install Claude Code, then run: node .qoder/engine/scripts/gen-roles.cjs')
   return out
@@ -820,7 +845,7 @@ function geminiExpect() {
 // mirror against that reference (a regeneration is the only check that sees the mirror lag behind it).
 function zcodeExpect() {
   return {
-    files: ['.zcode/forma-adapter.cjs', '.zcode/config.json', '.zcode/rules/zcode-8.md', '.zcode/scripts/gen-roles.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs'],
+    files: ['.zcode/forma-adapter.cjs', '.zcode/config.json', '.zcode/rules/zcode-8.md', '.zcode/scripts/gen-roles.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs', '.zcode/plugins/marketplace.json', '.zcode/plugins/forma-hooks/.zcode-plugin/plugin.json', '.zcode/plugins/forma-hooks/hooks/hooks.json', '.zcode/plugins/forma-hooks/hooks/names-context.cjs'],
     mirrorFrom: '.claude/agents',
   }
 }
@@ -834,10 +859,13 @@ function qoderExpect() {
       '.qoder/engine/hooks/guard-destructive.cjs',
       '.qoder/engine/hooks/guard-cards.cjs',
       '.qoder/engine/hooks/unlock-delete.cjs',
+      '.qoder/engine/hooks/names-context.cjs',
       '.qoder/engine/scripts/gen-roles.cjs',
       '.qoder/engine/agents/intent.md',
       '.qoder/engine/agents/on-demand/intent-session-start.md',
+      '.qoder/skills/human-register/SKILL.md',
       '.qoder/tests/test-qoder-adapter.cjs',
+      '.qoder/tests/test-qoder-skills.cjs',
       '.qoder/tests/test-qoder-spend.cjs',
       '.qoder/settings.json',
     ],
@@ -846,6 +874,7 @@ function qoderExpect() {
       { event: 'PreToolUse', matcher: 'Bash', name: 'guard-destructive.cjs' },
       { event: 'PreToolUse', matcher: 'Write|Edit', name: 'guard-cards.cjs' },
       { event: 'UserPromptSubmit', matcher: '', name: 'unlock-delete.cjs' },
+      { event: 'UserPromptSubmit', matcher: '', name: 'names-context.cjs' },
     ],
   }
 }

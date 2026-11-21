@@ -22,7 +22,7 @@ Judgment rules - what no script carries and no script could carry: prohibitions 
 
 1. **Baseline.** The law's volume before shrinking is recorded in `.forma/living/checks.json` (key `lawShrink.baselineBytes`) if not recorded yet: the gate judges "strictly less than the baseline".
 2. **Shrinking.** Only what is already constructive: prohibitions with script-holders and the countable rules of §3. Every leaving piece of prose leaves behind the holder's address.
-3. **The gate.** `node .forma/board/checks/law-shrink.cjs` - green is obligatory: the volume below the baseline, the prohibition numbers 1-18 and the §1-§7 headings in place, every backtick-named file on disk.
+3. **The gate.** `node .forma/board/checks/law-shrink.cjs` - green is obligatory: the volume below the baseline, the prohibition numbers 1-20 and the §1-§7 headings in place, every backtick-named file on disk.
 4. **The mirror reconciliation.** `node .claude/scripts/sync-engines.cjs --check` - the law travels across the engines; a red reconciliation = the edit is not finished.
 
 ## The bounds of honesty

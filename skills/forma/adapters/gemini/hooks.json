@@ -54,6 +54,16 @@
       }
     ]
   },
+  "forma-names-context": {
+    "enabled": true,
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node hooks/names-context.cjs",
+        "timeout": 10
+      }
+    ]
+  },
   "forma-ledger-recorder": {
     "enabled": true,
     "PostInvocation": [

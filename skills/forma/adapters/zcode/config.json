@@ -9,7 +9,11 @@
             {
               "type": "process",
               "command": "node",
-              "args": ["${ZCODE_PROJECT_DIR}/.forma/i18n/cli.cjs", "gate", "--json"],
+              "args": [
+                "${ZCODE_PROJECT_DIR}/.forma/i18n/cli.cjs",
+                "gate",
+                "--json"
+              ],
               "timeoutMs": 15000
             }
           ]
@@ -20,12 +24,22 @@
             {
               "type": "process",
               "command": "node",
-              "args": ["${ZCODE_PROJECT_DIR}/.forma/i18n/cli.cjs", "backlog", "--json"],
+              "args": [
+                "${ZCODE_PROJECT_DIR}/.forma/i18n/cli.cjs",
+                "backlog",
+                "--json"
+              ],
               "timeoutMs": 15000
             }
           ]
         }
       ]
+    }
+  },
+  "plugins": {
+    "enabledPlugins": {
+      "spreadsheets@zcode-plugins-official": true,
+      "forma-hooks@forma-local": true
     }
   }
 }

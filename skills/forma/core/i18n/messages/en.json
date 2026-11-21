@@ -1370,5 +1370,18 @@
   "board.new-card.bad_node": "--node \"{node}\" — not a node name",
   "plumb.miss_noul": "noul {v} < {t}",
   "board.new-card.isolation_unknown": "the isolation gate is closed: zone {zone} has no capability probe (.state/capabilities.json) — a missing probe reads as a refusal, not a permission. Write the probe (node .forma/dashboard/lib/capability-probe.cjs) or pass --force.",
-  "board.new-card.force_line": "- `{node}`, {day}: --force — the capability probe of zone {zone} is missing or the isolation is closed; a channels card was allowed explicitly."
+  "board.new-card.force_line": "- `{node}`, {day}: --force — the capability probe of zone {zone} is missing or the isolation is closed; a channels card was allowed explicitly.",
+  "names.header": "A code never goes alone: the name rides beside it.",
+  "names.tag": "[names]",
+  "names.route": "route \"{name}\" ({code})",
+  "names.overlay": "overlay \"{name}\" ({code})",
+  "names.goal": "goal \"{name}\" ({code})",
+  "names.section": "section {n} \"{name}\"",
+  "names.prohibition": "prohibition {n} \"{name}\"",
+  "board.names.card": "{file}: the headline has no name after the middle dot",
+  "board.names.goal": "goal {code}: no name in project/goals/*/GOAL.md (the part after the middle dot)",
+  "board.names.route": "label {label}: no name in keys.json routeNames",
+  "board.names.dict": "prohibition {n} is in AGENTS.md section 5 but has no name in keys.json prohibitionNames",
+  "board.names.law": "prohibition {n} is in keys.json but missing from AGENTS.md section 5",
+  "board.names.registry": "{rel}: prohibition {key} is missing from the registry"
 }

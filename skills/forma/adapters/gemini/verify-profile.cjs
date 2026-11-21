@@ -62,7 +62,8 @@ function checkWiring(ctx, expect, out) {
           for (const [event, groups] of Object.entries(spec)) {
             if (!Array.isArray(groups)) continue;
             for (const group of groups) {
-              for (const h of (group.hooks || [])) {
+              const hookList = Array.isArray(group.hooks) ? group.hooks : (group.command ? [group] : []);
+              for (const h of hookList) {
                 if (h && typeof h.command === 'string') {
                   const parts = h.command.trim().split(/\s+/);
                   const scriptArg = parts.find((p) => p.endsWith('.cjs') || p.endsWith('.sh') || p.includes('/')) || (parts.length > 1 ? parts[1] : parts[0]);
