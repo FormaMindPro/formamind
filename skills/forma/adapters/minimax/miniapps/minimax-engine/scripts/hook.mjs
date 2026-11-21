@@ -5,7 +5,9 @@
  *
  * Five duties, one per event:
  *   UserPromptSubmit - catches the human code phrase and lays a one-shot
- *                      unlock marker (the phrase is a password, not a description; one action).
+ *                      unlock marker (the phrase is a password, not a description; one action),
+ *                      and reminds the main session of human names for protocol codes
+ *                      in the human's prompt (AGENTS.md section 1, prohibition 20).
  *   PreToolUse       - the deletion guard: a destructive command against the protected set -> deny.
  *   SessionStart     - the main session (`Intent`) role delivery through additionalContext.
  *   SubagentStart    - remember when a node call started.
@@ -70,6 +72,8 @@ const EN_FALLBACK = {
   'mhook.session_role_mid': ' and the session start file ',
   'mhook.session_start_tail':
     ', then speak with the human as `Intent`. The law rules are in AGENTS.md, §1–§7.',
+  'names.tag': '[names]',
+  'names.header': 'protocol codes in the human\'s prompt:',
 };
 const msg = (code) => (i18n ? i18n.message(code, null, 'ru') : EN_FALLBACK[code] || code);
 
@@ -178,14 +182,40 @@ function emit(obj) {
   process.exit(0);
 }
 
+/** The reminder block for protocol codes in the human's prompt; empty when there is nothing to name. */
+function namesBlock(text) {
+  let names = null;
+  try {
+    names = require(path.join(PROJECT, '.forma', 'i18n', 'names.cjs'));
+  } catch {
+    return '';
+  }
+  const lang = i18n ? i18n.projectLang(PROJECT) : 'ru';
+  const hits = names.scan(PROJECT, text, lang);
+  if (!hits.length) return '';
+  const tag = i18n ? i18n.message('names.tag', {}, lang) : EN_FALLBACK['names.tag'];
+  const header = i18n ? i18n.message('names.header', {}, lang) : EN_FALLBACK['names.header'];
+  return tag + ' ' + header + '\n' + hits.slice(0, 8).map((h) => '- ' + h.render).join('\n');
+}
+
 function handleUserPromptSubmit(payload) {
   const prompt = String((payload && payload.prompt) || '');
-  if (!prompt.includes(PHRASE)) return;
+  if (!prompt) return;
   if (!isFormaProject()) return;
-  ensureDir(path.dirname(UNLOCK));
-  fs.writeFileSync(UNLOCK, new Date().toISOString(), 'utf8');
-  // The source event: the phrase is about permission - not a prompt block, but a side action.
-  process.exit(0);
+  if (prompt.includes(PHRASE)) {
+    ensureDir(path.dirname(UNLOCK));
+    fs.writeFileSync(UNLOCK, new Date().toISOString(), 'utf8');
+    // The source event: the phrase is about permission - not a prompt block, but a side action.
+  }
+  const names = namesBlock(prompt);
+  if (names) {
+    emit({
+      hookSpecificOutput: {
+        hookEventName: 'UserPromptSubmit',
+        additionalContext: names,
+      },
+    });
+  }
 }
 
 function handlePreToolUse(payload) {

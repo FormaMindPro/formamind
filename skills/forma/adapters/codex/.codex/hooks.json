@@ -48,6 +48,17 @@
       ]
     }
   ],
+  "UserPromptSubmit": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File .codex/hooks/names-context.ps1",
+          "timeout": 30
+        }
+      ]
+    }
+  ],
   "PostToolUse": [
     {
       "matcher": "^apply_patch$",

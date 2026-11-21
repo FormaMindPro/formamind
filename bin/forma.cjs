@@ -242,7 +242,7 @@ function installCore(root, protectedPaths, lang = 'en') {
 // ---------- Claude adapter ----------
 const CLAUDE_HOOKS = {
   PreToolUse: [{ hooks: ['guard-delete.sh', 'tool-usage.sh'] }, { matcher: 'Write|Edit', hooks: ['guard-cards.sh'] }],
-  UserPromptSubmit: [{ hooks: ['unlock-delete.sh'] }],
+  UserPromptSubmit: [{ hooks: ['unlock-delete.sh', 'names-context.cjs'] }],
   SessionStart: [{ matcher: 'startup', hooks: ['check-ready.sh', ['check-plugin-update.sh', 15], 'check-dashboard.sh', 'intent-start.sh', 'check-thresholds-gate.sh', ['ram-disk-status.sh', 30]] },
                  { matcher: 'resume|clear|compact', hooks: ['check-ready.sh'] }],
   PostToolUse: [{ matcher: 'Write|Edit', hooks: ['check-card.sh', 'sync-extensions.sh', 'auto-graphs.sh'] }],
@@ -300,7 +300,7 @@ function mergeClaudeSettings(root, compact) {
       group.hooks = group.hooks || []
       for (const h of g.hooks) {
         const [name, timeout] = Array.isArray(h) ? h : [h]
-        const command = `bash .claude/hooks/${name}`
+        const command = name.endsWith('.cjs') ? `node .claude/hooks/${name}` : `bash .claude/hooks/${name}`
         if (group.hooks.some((x) => x.command === command)) continue
         const entry = { type: 'command', command }
         if (timeout) entry.timeout = timeout

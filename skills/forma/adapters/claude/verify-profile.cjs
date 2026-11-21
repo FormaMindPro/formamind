@@ -52,9 +52,10 @@ function checkHooks(ctx, expect, out) {
     if (!fs.existsSync(path.join(root, file))) out.push(finding(file, `hook ${h.event}${h.matcher ? ' [' + h.matcher + ']' : ''}`, 'file missing'));
     const groups = (settings.hooks && settings.hooks[h.event]) || [];
     const group = groups.find((g) => (g.matcher || '') === (h.matcher || ''));
-    const entry = group && (group.hooks || []).find((x) => x.command === `bash ${file}`);
+    const command = h.name.endsWith('.cjs') ? `node ${file}` : `bash ${file}`;
+    const entry = group && (group.hooks || []).find((x) => x.command === command);
     const addr = `.claude/settings.json → hooks.${h.event}${h.matcher ? '[' + h.matcher + ']' : ''}`;
-    if (!entry) out.push(finding(addr, `command «bash ${file}»`, group ? 'command not in the group' : 'event group missing'));
+    if (!entry) out.push(finding(addr, `command «${command}»`, group ? 'command not in the group' : 'event group missing'));
     else if (h.timeout && entry.timeout !== h.timeout) out.push(finding(addr + ' → ' + h.name + ' → timeout', String(h.timeout), String(entry.timeout)));
   }
   const bash = findBash();
@@ -63,6 +64,10 @@ function checkHooks(ctx, expect, out) {
     const r = spawnSync(bash, ['-n', f], { encoding: 'utf8' });
     if (r.error) { out.push(finding('bash', 'bash available to check hooks', r.error.message)); break; }
     if (r.status !== 0) out.push(finding(path.relative(root, f).split(path.sep).join('/'), 'bash -n: hook syntax', (r.stderr || '').trim().split('\n')[0]));
+  }
+  for (const f of walkFiles(path.join(root, '.claude', 'hooks')).filter((x) => x.endsWith('.cjs'))) {
+    const r = spawnSync(process.execPath, ['--check', f], { encoding: 'utf8' });
+    if (r.status !== 0) out.push(finding(path.relative(root, f).split(path.sep).join('/'), 'node --check: hook syntax', (r.stderr || '').trim().split('\n')[0]));
   }
 }
 

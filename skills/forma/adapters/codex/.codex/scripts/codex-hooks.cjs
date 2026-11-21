@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 // The Codex hooks shared by the PowerShell wrappers (.codex/hooks/*.ps1). They never block: exit 0.
-//   intent-start - SessionStart: the main session = Intent (AGENTS.md section 1): the role and the start into the context, a link to the dashboard.
-//   check-card   - PostToolUse (apply_patch): a board card is checked by sync-engines --check at the moment of writing.
+//   intent-start   - SessionStart: the main session = Intent (AGENTS.md section 1): the role and the start into the context, a link to the dashboard.
+//   names-context  - UserPromptSubmit: the reminder of human names for protocol codes in the human's prompt (prohibition 20).
+//   check-card     - PostToolUse (apply_patch): a board card is checked by sync-engines --check at the moment of writing.
 //
 // Printed labels come from the core dictionary: English key in code, ru value as data.
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+
+const ROOT = path.resolve(__dirname, '..', '..');
 const i18n = require(path.join(ROOT, '.forma', 'i18n', 'index.cjs'));
 const msg = (code, params) => i18n.message(code, params, 'ru');
 
-const ROOT = path.resolve(__dirname, '..', '..');
 const { readIfExists, projectFile } = require(path.join(ROOT, '.forma', 'dashboard', 'lib', 'fs.cjs'));
 const projectChecks = require(path.join(ROOT, '.forma', 'i18n', 'project-checks.cjs'));
 const read = p => { try { return fs.readFileSync(path.join(ROOT, p), 'utf8'); } catch { return ''; } };
@@ -32,6 +34,22 @@ function intentStart() {
   try { cycle = execFileSync(process.execPath, [path.join(ROOT, '.claude', 'scripts', 'cycle-status.cjs')], { cwd: ROOT, encoding: 'utf8' }); } catch {}
   const ctx = startGate() + (cycle ? cycle + '\n' : '') + msg('codexhooks.main_session', { url }) + '\n\n' + role + '\n\n' + start;
   out({ systemMessage: msg('codexhooks.dashboard', { url }), hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: ctx } });
+}
+
+function namesContext() {
+  let input = '';
+  try { input = fs.readFileSync(0, 'utf8'); } catch { return; }
+  let j; try { j = JSON.parse(input); } catch { return; }
+  const text = String(j.prompt || j.userPrompt || '');
+  if (!text) return;
+  const names = require(path.join(ROOT, '.forma', 'i18n', 'names.cjs'));
+  const lang = i18n.projectLang(ROOT);
+  const hits = names.scan(ROOT, text, lang);
+  if (!hits.length) return;
+  const tag = i18n.message('names.tag', {}, lang);
+  const header = i18n.message('names.header', {}, lang);
+  const ctx = tag + ' ' + header + '\n' + hits.slice(0, 8).map((h) => '- ' + h.render).join('\n');
+  out({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: ctx } });
 }
 
 function checkCard() {
@@ -56,6 +74,6 @@ function checkCard() {
   });
 }
 
-try { ({ 'intent-start': intentStart, 'check-card': checkCard })[process.argv[2]]?.(); } catch {}
+try { ({ 'intent-start': intentStart, 'names-context': namesContext, 'check-card': checkCard })[process.argv[2]]?.(); } catch {}
 process.exit(0);
 // The protocol's template: .forma/protocol/skills/forma/templates-codex/.codex/scripts/codex-hooks.cjs - carries forma-commit.cjs.

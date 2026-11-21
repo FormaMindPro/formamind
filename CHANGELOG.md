@@ -3,6 +3,12 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.41] - 2026-11-21
+### Added
+- the names reminder reaches every engine natively: `UserPromptSubmit` (`PreInvocation` in Gemini - already shipped) resolves the protocol codes in the human's prompt through the core `.forma/i18n/names.cjs` and appends their human names as context. Claude gets `.claude/hooks/names-context.cjs` (a node hook, fail-open, silent without codes), wired by the installer and accepted by the verify profile (`.cjs` hooks run via `node`); Codex gets the `names-context` branch in `.codex/scripts/codex-hooks.cjs` with the PowerShell wrapper `.codex/hooks/names-context.ps1` and a `hooks.json` entry (`additionalContext`); MiniMax gets the branch in the package hook (`handleUserPromptSubmit` emits `additionalContext` through `.forma/i18n/names.cjs`, English fallback when the core module is absent). Each adapter test pins the wiring, §8 mention, the `human-register` skill mirror against the core canon, the role's `uses:` line and the behavior (names printed, silence without codes, fail-open on broken input).
+### Fixed
+- the Codex dispatcher used `ROOT` in a module require before its `const` declaration - a load-time `ReferenceError` on every hook event; the declaration now precedes the core imports.
+
 ## [0.0.40] - 2026-11-19
 ### Added
 - the Qoder engine joins the adapter family: `skills/forma/adapters/qoder/` ships the adapter (`spendTag: qoder`, `capabilities.subagents: false` - the route runs degraded until Forma roles are registered), §8 (nine contracts), the install verify profile (files, hook wiring in `.qoder/settings.json`, the role catalog's parity with `.claude/agents`, §8 references, the adapter test), the role catalog generator (`gen-roles --check`), the guard hooks (destructive-command guard with the one-time phrase unlock, card-form guard on Write and Edit) and the tests (adapter, roles, guard, spend, lifecycle). `forma init --engines qoder` merges the hook entries into the project's `settings.json`, preserves project entries and rebuilds the role catalog from `.claude/agents`; the manifest row carries the profile, the expected files, the mirror source and the hook wiring - `verify-install` checks them. The SessionStart passport and the role delivery stay a project extension, not shipped.

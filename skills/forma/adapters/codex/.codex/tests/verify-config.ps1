@@ -60,6 +60,10 @@ foreach ($script in 'guard-delete.ps1', 'tool-usage.ps1') {
     if ($preToolCommands -notmatch [regex]::Escape($script)) { throw "PreToolUse is missing $script." }
     if (-not (Test-Path -LiteralPath (Join-Path $codexRoot "hooks\$script"))) { throw "Missing hook script: $script" }
 }
+if ($hooks.UserPromptSubmit.Count -lt 1) { throw 'No UserPromptSubmit hook is configured.' }
+$promptCommands = @($hooks.UserPromptSubmit | ForEach-Object { $_.hooks } | ForEach-Object { $_.command }) -join "`n"
+if ($promptCommands -notmatch [regex]::Escape('names-context.ps1')) { throw 'UserPromptSubmit is missing names-context.ps1.' }
+if (-not (Test-Path -LiteralPath (Join-Path $codexRoot 'hooks\names-context.ps1'))) { throw 'Missing hook script: names-context.ps1' }
 $guard = Join-Path $codexRoot 'hooks\guard-delete.ps1'
 
 $denyPayload = '{"tool_name":"Bash","tool_input":{"command":"Remove-Item .codex -Recurse -Force"}}'

@@ -168,6 +168,13 @@ exists, and otherwise the package's own `scripts/protected-paths.json`.
 and passes; the one after it is refused again and needs the phrase anew. The marker lives in this
 zone, so a phrase given in one project cannot unlock a deletion in another.
 
+**The names reminder.** The same `UserPromptSubmit` event appends a names block when the human's
+prompt carries protocol codes: the hook reads `.forma/i18n/names.cjs`, resolves cards, routes,
+goals, law sections and prohibitions, and returns `hookSpecificOutput.additionalContext`
+(§1, prohibition 20). It is a context reminder, not a check of the answer; without codes it stays
+silent, and an unreadable prompt never blocks. The live delivery was not observed in this project;
+the mechanical branch is covered by the adapter test.
+
 **The guard is silent where there is nothing to guard:** the hook recognises a protocol project by
 `AGENTS.md` and the `.minimax/` zone, and does nothing in any other project — the package is
 installed in the profile and serves every project of the machine.
