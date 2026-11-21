@@ -265,6 +265,34 @@ it('transcriptsDir points at the host\u0027s rollout', () => {
   assert.ok(fs.existsSync(dir), 'the transcripts directory was not found');
 });
 
+it('a workflow actor is found by its dwfrun id; a bare run id with several actors is refused, not picked', () => {
+  const a = adapter();
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'rollout-'));
+  const dir = path.join(home, 'cli', 'rollout');
+  fs.mkdirSync(dir, { recursive: true });
+  const run = 'dwfrun-0a0a-1b1b';
+  const fileOf = (n, m) => path.join(dir, `model-io-sess_dwf-${run}-actor_${n}_${m}.jsonl`);
+  fs.writeFileSync(fileOf(1, 1), '{}\n');
+  const outerHome = process.env.ZCODE_HOME;
+  process.env.ZCODE_HOME = home;
+  try {
+    const one = a.findSubagent(run, root);
+    assert.ok(one && one.file === fileOf(1, 1), 'the single actor was not found by the bare run id');
+    fs.writeFileSync(fileOf(2, 1), '{}\n');
+    assert.equal(a.findSubagent(run, root), null, 'a bare run id with several actors must not pick one silently');
+    const named = a.findSubagent(`${run}-actor_2`, root);
+    assert.ok(named && named.file === fileOf(2, 1), 'the named actor was not found');
+    const visit = a.findSubagent(`${run}-actor_1_1`, root);
+    assert.ok(visit && visit.file === fileOf(1, 1), 'the actor and visit named exactly was not found');
+    assert.equal(a.findSubagent(`${run}-actor_9`, root), null, 'an actor that does not exist must stay unknown');
+    const foreign = fs.readdirSync(dir).filter((f) => f.includes('actor_3'));
+    assert.deepEqual(foreign, [], 'no transcript for a third actor was expected');
+  } finally {
+    if (outerHome === undefined) delete process.env.ZCODE_HOME; else process.env.ZCODE_HOME = outerHome;
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
 // 5b. The core's tabs read the adapter
 it('formaRoles and engineSettings give the zone\u0027s data', () => {
   const a = adapter();

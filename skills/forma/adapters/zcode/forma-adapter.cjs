@@ -10,7 +10,8 @@
  *  - transcriptsDir/parseUsage: the model-IO transcripts are written by the host itself - ~/.zcode/cli/rollout,
  *    `model-io-sess_<id>.jsonl`, the step carries `usage: { inputTokens, outputTokens, totalTokens,
  *    cacheReadTokens, cacheWriteTokens }` or the provider ones `input_tokens/output_tokens/
- *    cache_read_input_tokens`
+ *    cache_read_input_tokens`; a dynamic-workflow actor's transcript is `model-io-sess_dwf-<run>-actor_<N>_<M>.jsonl`
+ *    by the `dwfrun-*` run id (findSubagent/workflowActor)
  *  - skillsDir `.forma/skills/` - ZCode opens them natively as the project's skills (the engine-neutral core canon)
  *  - nodeModels: the GLM family (Z.AI), the thinking levels low/high/max (no middle one)
  *  - the Forma nodes are registered as the host's agent types from `.zcode/agents/`; a fresh
@@ -147,11 +148,44 @@ function parseUsage(step) {
 /**
 // A subagent's visit transcript by id: the host puts it into rollout next to the sessions - a flat file
 // `model-io-sess_subagent_agent_<id>.jsonl` (the host's id may come with the `agent_` prefix - both forms are accepted).
+// A dynamic-workflow actor is a different shape: one file per actor per visit,
+// `model-io-sess_dwf-<run>-actor_<N>_<M>.jsonl`, where `<run>` is the `dwfrun-*` id a workflow run returns.
+// A bare run id is accepted only while one file matches; several actors (or several visits of one actor) -
+// the candidates are printed and the answer is null: the caller names the actor, the locator never picks silently.
  */
+function workflowActor(dir, raw) {
+  const m = /^(dwfrun-[A-Za-z0-9-]+?)(?:-actor_(\d+)(?:_(\d+))?)?$/.exec(String(raw || ''));
+  if (!m) return null;
+  const runId = m[1];
+  const actor = m[2] || null;
+  const visit = m[3] || null;
+  let files;
+  try { files = fs.readdirSync(dir); } catch { return null; }
+  const prefix = 'model-io-sess_dwf-' + runId + '-actor_';
+  const hits = [];
+  for (const f of files) {
+    if (!f.startsWith(prefix) || !f.endsWith('.jsonl')) continue;
+    const mm = /^(\d+)_(\d+)$/.exec(f.slice(prefix.length, -'.jsonl'.length));
+    if (!mm) continue;
+    if (actor != null && Number(mm[1]) !== Number(actor)) continue;
+    if (visit != null && Number(mm[2]) !== Number(visit)) continue;
+    const file = path.join(dir, f);
+    let st;
+    try { st = fs.statSync(file); } catch { continue; }
+    if (st.isFile()) hits.push({ file, mtimeMs: st.mtimeMs, sessionId: null });
+  }
+  if (hits.length === 1) return hits[0];
+  if (!hits.length) return null;
+  const names = hits.map((h) => path.basename(h.file)).sort();
+  process.stderr.write('[workflow actor] ' + raw + ' matches ' + names.length + ' transcripts; name one: ' + names.join(', ') + '\n');
+  return null;
+}
+
 function findSubagent(agentId, root = process.cwd()) {
   const dir = transcriptsDir(root);
   const raw = String(agentId || '');
   if (!dir || !/^[A-Za-z0-9_-]+$/.test(raw)) return null;
+  if (/^dwfrun-/.test(raw)) return workflowActor(dir, raw);
   const bare = raw.replace(/^agent_/, '');
   const names = bare === raw
     ? [`model-io-sess_subagent_agent_${bare}.jsonl`]
