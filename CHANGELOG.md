@@ -3,6 +3,19 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.43] - 2026-11-22
+### Added
+- `forma-grill-with-ui` gains voice input through VibeForma, a local Windows
+  speech app. The page records a 16 kHz mono WAV, the interview server proxies
+  it to `POST /transcribe` on loopback, and the token never reaches the page.
+  The browser microphone stays the fallback when VibeForma is absent.
+- VibeForma discovery reads `%LOCALAPPDATA%\VibeForma\location.json`: the
+  actual API port and state (`on`, `off`, `error`) come from that file, the
+  token from `config.json`. A busy port or a foreign service on the port is
+  reported as `port-busy` / `not-vibeforma` instead of being mistaken for the
+  engine. The page header shows a status chip with the live endpoint
+  (`VibeForma · :port`), version and model in its tooltip.
+
 ## [0.0.42] - 2026-11-21
 ### Changed
 - the qoder engine sleeps out of the box: `core/engines.json` ships it dormant (no subagents, degraded mode), so a fresh install neither offers nor installs it; the installer's `--engines` help names codex, minimax and qoder as dormant and drops qoder from the choices. A project that wants it wakes it in its own registry (`engine-switch wake qoder`); the adapter itself still ships and its tests run.

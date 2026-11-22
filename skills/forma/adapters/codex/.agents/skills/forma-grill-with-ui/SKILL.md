@@ -16,6 +16,27 @@ Nobody writes the other's file. The page polls `state.json`; how you receive eve
 on the listening mode below.
 A third file, `visual.html`, is also yours (see [Visualize](#visualize) for drawing).
 
+## Voice input
+
+The page can dictate through VibeForma, a local Windows speech app. It is optional: without
+it the page falls back to the browser's speech recognition, and without that the microphone
+is disabled with a reason. The server discovers VibeForma on the same computer:
+
+- `%LOCALAPPDATA%\VibeForma\location.json` names the config, the actual API port and the API
+  state (`on`, `off`, `error`); `%LOCALAPPDATA%\VibeForma\config.json` is the fallback for a
+  default install.
+- The token is read from that config and stays on the server: the page never sees it.
+- `GET /voice/status` probes `GET /health` on loopback. A busy port or a foreign service is
+  reported as `port-busy` / `not-vibeforma`, never mistaken for VibeForma.
+- The page header shows a small status chip with the actual port when connected. It polls
+  the status every five seconds, so starting VibeForma later turns the chip green without a
+  reload.
+
+If VibeForma is installed but its local API is off, the user enables **Settings → Voice for
+external forms → Allow the local API for forms** in VibeForma; the key is minted there.
+Nothing in VibeForma needs to be configured for the page to find it: the port comes from the
+discovery file.
+
 ## Listening mode and turn boundaries
 
 Choose the mode from the tools actually available, not the agent's model name:
