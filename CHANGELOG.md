@@ -3,6 +3,27 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.45] - 2026-11-22
+### Fixed
+- the dashboard serve tests hold under the full parallel suite on a loaded Windows
+  host: the request timeout is 90 s and the watcher reaction window is 60 s, so a
+  slow page build or a late file event is waited out instead of failing the release
+  gate. Assertions are unchanged.
+- the external-exits gate reads a body-less `fetch()` GET as "no data": the JS side
+  of the "GET without a request body" rule now matches curl, so the ZCode `go-cost`
+  reading (models and usage GETs with an auth header, no request body) is covered
+  without a scrub or an exclusion. The self-test gains a body-less fetch fixture and
+  an `https.get` refusal fixture.
+### Added
+- the ZCode adapter declares a `run-protocol-dispatch` run profile: the protocol
+  dispatcher role is delivered by card, like the other node roles.
+- the Gemini `core` agent names its engine in the title, matching the other Gemini
+  agent files.
+### Security
+- the dashboard's non-loopback network mode requires a project token; the static
+  allowlist is closed, and a directory escape is a forbidden request (403) checked
+  before the allowlist, so a path probe is refused rather than reported missing.
+
 ## [0.0.44] - 2026-11-22
 ### Added
 - the dashboard reads an optional provider cost source: an adapter declares a cost

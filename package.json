@@ -1,6 +1,6 @@
 {
   "name": "forma",
-  "version": "0.0.44",
+  "version": "0.0.45",
   "line": 2,
   "description": "Установщик протокола «Форма»: npx github:FormaMindPro/formamind init",
   "license": "MIT",

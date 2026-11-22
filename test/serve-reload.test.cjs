@@ -16,7 +16,7 @@ const DATA = {
 };
 
 const POLL_MS = 100;
-const REACT_MS = 30000;   // how long to wait for the server's reaction to an edit (watching + a 300 ms delay + a rebuild); a loaded Windows host needs the wider window
+const REACT_MS = 60000;   // how long to wait for the server's reaction to an edit (watching + a 300 ms delay + a rebuild); a loaded Windows host under the full parallel suite needs the wider window
 let fx;
 let server;
 

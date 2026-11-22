@@ -16,7 +16,8 @@
  *   internal      - network calls without a single external host: only relative paths
  *                   and localhost/127.0.0.1 (the internal contour, no scrub needed);
  *   no data       - a narrow benign pattern: GET without a request body (no -d/--data/
- *                   -F/-T/-X POST/stdin substitution), no project material leaves outward;
+ *                   -F/-T/-X POST/stdin substitution for curl, no body/upload or non-GET method
+ *                   for fetch), no project material leaves outward;
  *   RED           - everything else: a network call is not covered.
  *
  *   node .forma/board/checks/external-exits.cjs               (a full run over the tree)
@@ -51,6 +52,10 @@ const CURL_BODY_RE = /(^|\s)(-d\b|--data\b|--data-raw\b|--data-binary\b|--data-u
 const CURL_METHOD_RE = /(^|\s)(-X|--request)\s*(POST|PUT|PATCH|DELETE)\b/i;
 // A body from stdin/file in a curl line.
 const CURL_STDIN_RE = /\s<\s?\S/;
+// A body or a non-GET method of a JS call (fetch options): a GET without a body sends no project material.
+const JS_BODY_RE = /\bbody\s*:|\bmethod\s*:\s*['"`]\s*(?:POST|PUT|PATCH|DELETE)\b|\bnew\s+(?:FormData|URLSearchParams|Blob)\b/i;
+// A JS network call that is not a plain fetch: a body-less GET is provable only for fetch.
+const JS_OTHER_RE = /https\.(?:request|get)\b|\baxios\b/;
 
 /** The list of tracked scripts with network patterns, outside the exceptions. */
 function discover(root) {
@@ -95,6 +100,31 @@ function codeText(text) {
     .join('\n');
 }
 
+/** The text of every `fetch(...)` call with its balanced parentheses - the span a body may sit in. */
+function fetchCalls(text) {
+  const out = [];
+  const re = /\bfetch\s*\(/g;
+  let m;
+  while ((m = re.exec(text))) {
+    let i = m.index + m[0].length;
+    let depth = 1;
+    let quote = null;
+    for (; i < text.length && depth > 0; i++) {
+      const ch = text[i];
+      if (quote) {
+        if (ch === '\\') i++;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')') depth--;
+    }
+    out.push(text.slice(m.index, i));
+  }
+  return out;
+}
+
 function classify(text) {
   if (!NET_RE.test(text)) return { status: 'none' };
   // 1. through-scrub: the scrub module + the residue check + an explicit refusal (exit(2)/"scrub-refused").
@@ -104,11 +134,12 @@ function classify(text) {
   }
   // 2. internal: not a single absolute external host in the code (only localhost/relative).
   if (!EXTERNAL_URL_RE.test(codeText(text))) return { status: 'internal' };
-  // 3. no project data: every curl is a GET without a body/upload/non-header stdin.
+  // 3. no project data: every network call is a GET without a body/upload.
   const curlLines = text.split(/\r?\n/).filter((l) => /\bcurl\s/.test(l));
-  if (curlLines.length && curlLines.every((l) => !CURL_BODY_RE.test(l) && !CURL_METHOD_RE.test(l) && !CURL_STDIN_RE.test(l))) {
-    return { status: 'benign' };
-  }
+  const curlBenign = !curlLines.length || curlLines.every((l) => !CURL_BODY_RE.test(l) && !CURL_METHOD_RE.test(l) && !CURL_STDIN_RE.test(l));
+  const code = codeText(text);
+  const jsBenign = !JS_OTHER_RE.test(code) && fetchCalls(code).every((c) => !JS_BODY_RE.test(c));
+  if (curlBenign && jsBenign) return { status: 'benign' };
   return { status: 'red' };
 }
 
@@ -163,6 +194,8 @@ function selftest() {
       { name: 'bare-fetch.cjs', expect: 'red', code: "const r = await fetch('https://api.example.test/v1', { method: 'POST', body: draft });\n" },
       { name: 'local-only.js', expect: 'internal', code: "const r = await fetch('http://127.0.0.1:3000/data.json');\nconst s = await fetch('./next.json');\n" },
       { name: 'benign-get.sh', expect: 'benign', code: "#!/bin/sh\nVER=$(curl -fsSL --max-time 5 \"https://example.test/pub/plugin.json\" 2>/dev/null | version_of)\n" },
+      { name: 'fetch-get.cjs', expect: 'benign', code: "const r = await fetch('https://api.example.test/v1/models', { headers: { authorization: 'Bearer ' + key } });\n" },
+      { name: 'https-get.cjs', expect: 'red', code: "https.get('https://api.example.test/v1', (res) => res.resume());\n" },
       { name: 'body-curl.sh', expect: 'red', code: "#!/bin/sh\ncurl -fsSL -d @draft.txt \"https://example.test/publish\"\n" },
     ];
     for (const f of fixtures) fs.writeFileSync(path.join(dir, f.name), f.code);
