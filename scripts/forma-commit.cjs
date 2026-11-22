@@ -143,6 +143,20 @@ function refreshProjectManifest(version) {
   if (ref) { ok(tr('commit.manifest_refreshed', { version: ref.version, changed: ref.changed, missing: ref.missing.length })); manifestRefreshed = true; }
   return ref;
 }
+// The release body is the CHANGELOG section of the version: a locally created release must not be a
+// placeholder, because the repository's release workflow skips an existing release and its notes stay empty.
+function changelogNotes(version, previous) {
+  let text;
+  try { text = fs.readFileSync(path.join(proto, 'CHANGELOG.md'), 'utf8').replace(/\r\n/g, '\n'); } catch { return null; }
+  const lines = text.split('\n');
+  const start = lines.findIndex((l) => l.trim() === `## [${version}]` || l.startsWith(`## [${version}] `));
+  if (start < 0) return null;
+  const out = [];
+  for (let i = start + 1; i < lines.length && !/^## \[/.test(lines[i]); i++) out.push(lines[i]);
+  const section = out.join('\n').trim();
+  if (!section) return null;
+  return `${section}\n\n**Full Changelog**: https://github.com/FormaMindPro/formamind/compare/v${previous}...v${version}`;
+}
 function release() {
   const list = pending();
   const dirty = scanMessages(list);
@@ -173,8 +187,12 @@ function release() {
   fs.writeFileSync(pk, pkj.replace(/"version": "[^"]*"/, `"version": "${nv}"`));
   const pkl = path.join(proto, 'package-lock.json');
   if (fs.existsSync(pkl)) {
-    const pklj = fs.readFileSync(pkl, 'utf8');
-    fs.writeFileSync(pkl, pklj.replace(new RegExp(`"version": "${v}"`, 'g'), `"version": "${nv}"`));
+    // The lock carries its own version: a release that skipped it (a manual cut) must not leave the
+    // three version files disagreeing. Lift the lock from whatever it says to the new version.
+    const lock = JSON.parse(fs.readFileSync(pkl, 'utf8'));
+    lock.version = nv;
+    if (lock.packages && lock.packages['']) lock.packages[''].version = nv;
+    fs.writeFileSync(pkl, JSON.stringify(lock, null, 2) + '\n');
   }
   pgit('add', '--', '.claude-plugin/plugin.json', 'package.json', ...(fs.existsSync(pkl) ? ['package-lock.json'] : []));
   r = pgit('commit', '-q', '-m', `v${nv} — ${list.length} commit(s)\n\n${list.reverse().map((s) => '- ' + s).join('\n')}\n\n${CO}`);
@@ -195,7 +213,9 @@ function release() {
   ok(tr('commit.pushed'));
   try {
     if (run('gh', ['auth', 'status']).code === 0) {
-      const rel = run('gh', ['release', 'create', `v${nv}`, '--title', nv, '--notes', `Release v${nv}`, '--latest', '-R', 'FormaMindPro/formamind']);
+      // The body comes from CHANGELOG.md; the workflow's own release would be skipped once this one exists.
+      const notes = changelogNotes(nv, v) || `Release v${nv}`;
+      const rel = run('gh', ['release', 'create', `v${nv}`, '--title', nv, '--notes', notes, '--latest', '-R', 'FormaMindPro/formamind']);
       if (rel.code === 0) ok(tr('commit.gh_release_created', { v: nv }));
       else console.log(tr('commit.gh_release_failed', { out: rel.out }));
     } else {

@@ -66,7 +66,9 @@ it('shape: every declared field is there and of its type, no extras', () => {
   const a = adapter();
   assert.deepEqual(engines.validateAdapter(a), []);
   // The transcript reading fields (TRANSCRIPT_FIELDS) - by the engine's platform: the core has a fallback for each.
-  const missing = Object.keys(engines.SHAPE).filter((f) => a[f] == null && !engines.TRANSCRIPT_FIELDS.includes(f));
+  // The optional fields (OPTIONAL_FIELDS) - a field the adapter may leave out (the provider cost report).
+  const missing = Object.keys(engines.SHAPE).filter((f) => a[f] == null
+    && !engines.TRANSCRIPT_FIELDS.includes(f) && !engines.OPTIONAL_FIELDS.includes(f));
   assert.deepEqual(missing, []);
 });
 

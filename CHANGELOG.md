@@ -3,6 +3,25 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.44] - 2026-11-22
+### Added
+- the dashboard reads an optional provider cost source: an adapter declares a cost
+  hook (script, label, currency, ttl) and the core renders its report in the Economy
+  tab, caching it for five minutes with a stale fallback. The ZCode adapter declares
+  OpenCode Go - the official allowance, prices and a per-model estimate (`go-cost`);
+  locales en/ru; the installer expects the two new files.
+### Fixed
+- `forma-commit.cjs --release` lifts `package-lock.json` from its own version to the
+  new one, so a lock left behind by a manual cut no longer desynchronizes the release;
+  the local release takes its body from the `## [X.Y.Z]` changelog section instead of a
+  placeholder.
+- `package-lock.json` is aligned with the 0.0.43 release, and the 0.0.37 and 0.0.41
+  changelog sections are backfilled from their release commits.
+- the adapter conformance check treats `cost` as an optional shape field
+  (`OPTIONAL_FIELDS`), so an engine without a provider report stays conformant.
+- the dashboard watcher and Codex-hook tests hold on a loaded Windows host: a wider
+  reaction window, a retrying temp cleanup and a retried external PowerShell start.
+
 ## [0.0.43] - 2026-11-22
 ### Added
 - `forma-grill-with-ui` gains voice input through VibeForma, a local Windows
@@ -24,7 +43,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [0.0.41] - 2026-11-21
 ### Added
-- the names reminder reaches every engine natively: `UserPromptSubmit` (`PreInvocation` in Gemini - already shipped) resolves the protocol codes in the human's prompt through the core `.forma/i18n/names.cjs` and appends their human names as context. Claude gets `.claude/hooks/names-context.cjs` (a node hook, fail-open, silent without codes), wired by the installer and accepted by the verify profile (`.cjs` hooks run via `node`); Codex gets the `names-context` branch in `.codex/scripts/codex-hooks.cjs` with the PowerShell wrapper `.codex/hooks/names-context.ps1` and a `hooks.json` entry (`additionalContext`); MiniMax gets the branch in the package hook (`handleUserPromptSubmit` emits `additionalContext` through `.forma/i18n/names.cjs`, English fallback when the core module is absent). Each adapter test pins the wiring, §8 mention, the `human-register` skill mirror against the core canon, the role's `uses:` line and the behavior (names printed, silence without codes, fail-open on broken input).
+- the names layer ships in the core: `.forma/i18n/names.cjs` is the canon of human names (board, routes, overlays, goals, law sections, prohibitions, keys) and the resolver of protocol codes in free text; the board check `names.cjs` flags a code without its human name; the `human-register` skill (the tone and vocabulary of the five nodes) is delivered to every adapter from one canon, and the Intent role plus the session-start on-demand skill carry the address line.
+- the names reminder reaches every engine natively: `UserPromptSubmit` (Gemini `PreInvocation`) resolves the protocol codes in the human's prompt through the core module and appends their human names as context. Claude gets `.claude/hooks/names-context.cjs` (a node hook, fail-open, silent without codes), wired by the installer and accepted by the verify profile (`.cjs` hooks run via `node`); Codex gets the `names-context` branch in `.codex/scripts/codex-hooks.cjs` with the PowerShell wrapper `.codex/hooks/names-context.ps1` and a `hooks.json` entry (`additionalContext`); MiniMax gets the branch in the package hook (`handleUserPromptSubmit` emits `additionalContext` through `.forma/i18n/names.cjs`, English fallback when the core module is absent); ZCode gets the local plugin `forma-hooks` (marketplace `forma-local`, `UserPromptSubmit`, enabled in the adapter config); Gemini gets the `PreInvocation` hook `hooks/names-context.cjs`; Qoder gets the names-context hook and the `human-register` skill. Each adapter test pins the wiring, §8 mention, the skill mirror against the core canon, the role's `uses:` line and the behavior (names printed, silence without codes, fail-open on broken input).
 ### Fixed
 - the Codex dispatcher used `ROOT` in a module require before its `const` declaration - a load-time `ReferenceError` on every hook event; the declaration now precedes the core imports.
 
@@ -50,7 +70,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - the repository-update check speaks in chat: a new core hook (`check-repo-update.sh`) reads two signals in one run - a newer published release (`.claude-plugin/plugin.json` on GitHub vs the project's install manifest) and a moved HEAD of main (the state file remembers the last observation; the first one records the base silently, the count comes from the compare API or `?`). The daily session-start entry (`check-plugin-update.sh`) is reduced to calling the core; a `UserPromptSubmit` entry fires the forced check on a spoken request - the trigger phrases live in a data registry (`update-phrases.list`, one regex per line, ru and en now: "проверь обновление формы", "check (the|for) forma update(s)"), so a new language is a registry line, not a code change. Fetcher answers are validated at the point of acceptance (a full-hex sha, an integer count, `?` otherwise) - an error body can no longer ride into a message. The hook state file (`.repo-check-state`) joins the transfer exceptions as project runtime state.
 ## [0.0.37] - 2026-11-19
 ### Added
+- the project template ships its own release 0.0.3: the `build-core-html-payload` letter-class fix lands in the template with its own `plugin.json` version, `CHANGELOG` line and a fresh inventory block; `forma-commit --sync-staged` names the project's extensions line beside the protocol-source drift.
 - the install manifest follows the dev cycle: `forma-commit.cjs` re-records `.forma/install-manifest.json` after carrying the engine into the protocol clone (version and line from the clone's package.json, hashes from the disk) and right after the release version bump, staging it with the project commit beside the clone pointer; until now only an installer rerun wrote the manifest, so a source project stayed frozen at its last install (version behind the clone, verify red on every engine change). `verify-install.cjs` names a manifest older than the dev clone as a finding with the remedy (`refreshManifest` export, the same release comparison as the installer's downgrade guard); a file gone from the disk keeps its entry - a refresh never blesses a deletion.
+### Fixed
+- the network-exit registry (`external-exits.cjs`) skips `project/reference/**`: third-party site reference material is not an outbound call of the project and no longer raises a false exit.
+- `key-language` drops the Cyrillic letter spelling from engine patterns: the letter class comes from the Unicode script property, and the site glossary markers join the check's exceptions; the test pins both.
 
 ## [0.0.36] - 2026-11-19
 ### Added

@@ -35,6 +35,10 @@
  *   syncScript             the engines' sync script; called with --check   the sync is not run
  *   usageRefresh           [{ script, args, cache }] - scripts that         the spend caches are not
  *                          refresh the dialog spend cache in .forma/dashboard/.cache  refreshed by the core
+ *   cost                   { script, label, currency, ttlMs } - the call    no cost block
+ *                          cost report: a script printing JSON with the    is built
+ *                          provider's allowance and the per-model spend,
+ *                          called as `<node> <script> --json --project`
  *   mcpConfigs(root)       [{ rel, file, level }] - MCP server files       no servers, an empty list
  *   engineSettings(root)   { present, env, hooks, nodes, skills, mcp,      present: false, empty lists
  *                          check } - the "Engine" tab
@@ -76,6 +80,13 @@ const UNKNOWN = 'unknown';
  */
 const TRANSCRIPT_FIELDS = ['findSubagent', 'stepOf', 'mainSessions', 'mainStepOf'];
 
+/**
+ * The shape fields an adapter may leave out without breaking conformance: `cost` is an optional
+ * provider report, and a project whose provider has none simply gets no cost block. The strict
+ * "the whole shape is declared" check (the adapters' tests) skips this group as well.
+ */
+const OPTIONAL_FIELDS = ['cost'];
+
 /** The type of every shape field; `validateAdapter` checks it. */
 const SHAPE = {
   engine: 'string',
@@ -95,6 +106,7 @@ const SHAPE = {
   templateSkills: 'array',
   syncScript: 'string',
   usageRefresh: 'array',
+  cost: 'object',
   mcpConfigs: 'function',
   engineSettings: 'function',
   formaRoles: 'function',
@@ -387,7 +399,7 @@ function firstPath(root, field) {
 
 module.exports = {
   loadAdapters, first, all, collect, firstPath, engineTags, canonicalTag, spendTags, transcriptDirs, nodeModelTables, resolveRel, validateAdapter, SHAPE, UNKNOWN,
-  idOf, sourcesOf, modeOf, checkAdapter, MODE_FULL, MODE_DEGRADED, TRANSCRIPT_FIELDS, mainSessions,
+  idOf, sourcesOf, modeOf, checkAdapter, MODE_FULL, MODE_DEGRADED, TRANSCRIPT_FIELDS, OPTIONAL_FIELDS, mainSessions,
 };
 
 /**

@@ -950,5 +950,19 @@
   "board.rn.over1": "the warehouse",
   "board.rn.over2": "the contractor",
   "board.rn.over3": "the print run",
-  "board.rn.over4": "the lot"
+  "board.rn.over4": "the lot",
+  "econ.cost.title": "OpenCode Go",
+  "econ.cost.window_5h": "5h",
+  "econ.cost.window_week": "week",
+  "econ.cost.window_month": "month",
+  "econ.cost.resets": "resets {at}",
+  "econ.cost.model": "model",
+  "econ.cost.req": "requests",
+  "econ.cost.cost": "cost",
+  "econ.cost.cap": "cap",
+  "econ.cost.share": "share",
+  "econ.cost.unknown": "unknown",
+  "econ.cost.empty": "no requests through the provider for the period",
+  "econ.cost.note": "The cost is an estimate: tokens times the provider's price list. An unknown cost is not zero.",
+  "econ.cost.stale": "The report is from the cache; the provider API did not answer."
 }

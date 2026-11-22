@@ -60,6 +60,10 @@ const runNode = (dir, input) => spawnSync(process.execPath, [path.join(dir, '.co
   cwd: dir, input, encoding: 'utf8', env: { ...process.env, FORMA_LANG: 'en' },
 });
 
+// Windows may hold a just-spawned child's files for a moment: retry the temp tree removal instead of
+// failing the test from its own cleanup.
+const cleanup = (dir) => { try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch { /* the lock passes, the runner reaps the temp tree */ } };
+
 it('the dispatcher prints additionalContext names and stays fail-open', () => {
   const dir = fixture();
   try {
@@ -79,7 +83,7 @@ it('the dispatcher prints additionalContext names and stays fail-open', () => {
     assert.equal(broken.status, 0, 'unreadable input must not block the prompt');
     assert.equal(broken.stdout.trim(), '', 'the hook printed on unreadable input');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    cleanup(dir);
   }
 });
 
@@ -87,15 +91,23 @@ it('the PowerShell wrapper delivers the same context', () => {
   if (process.platform !== 'win32') return;
   const dir = fixture();
   try {
-    const r = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(dir, '.codex', 'hooks', 'names-context.ps1')], {
+    // The wrapper is fail-open: a transient PowerShell or node start prints nothing and exits 0.
+    // Give the external process three attempts before the delivery check fails.
+    const call = () => spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(dir, '.codex', 'hooks', 'names-context.ps1')], {
       cwd: dir, input: JSON.stringify({ prompt: 'card-7 route-8' }), encoding: 'utf8', env: { ...process.env, FORMA_LANG: 'en' },
     });
+    let r = call();
+    for (let i = 1; i < 3 && !r.stdout.trim(); i++) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
+      r = call();
+    }
     assert.equal(r.status, 0, r.stderr);
+    assert.ok(r.stdout.trim(), 'the wrapper printed nothing' + (r.stderr ? ': ' + r.stderr : ''));
     const ctx = JSON.parse(r.stdout).hookSpecificOutput;
     assert.match(ctx.additionalContext, /Card-7 "Probe title"/);
     assert.match(ctx.additionalContext, /route-8/);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    cleanup(dir);
   }
 });
 
