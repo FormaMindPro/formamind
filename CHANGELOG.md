@@ -3,6 +3,21 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.44] - 2026-11-22
+### Added
+- the dashboard reads an optional provider cost source: an adapter declares a cost
+  hook (script, label, currency, ttl) and the core renders its report in the Economy
+  tab, caching it for five minutes with a stale fallback. The ZCode adapter declares
+  OpenCode Go - the official allowance, prices and a per-model estimate (`go-cost`);
+  locales en/ru; the installer expects the two new files.
+### Fixed
+- `forma-commit.cjs --release` lifts `package-lock.json` from its own version to the
+  new one, so a lock left behind by a manual cut no longer desynchronizes the release;
+  the local release takes its body from the `## [X.Y.Z]` changelog section instead of a
+  placeholder.
+- `package-lock.json` is aligned with the 0.0.43 release, and the 0.0.37 and 0.0.41
+  changelog sections are backfilled from their release commits.
+
 ## [0.0.43] - 2026-11-22
 ### Added
 - `forma-grill-with-ui` gains voice input through VibeForma, a local Windows
