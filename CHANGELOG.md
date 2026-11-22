@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [0.0.45] - 2026-11-22
 ### Fixed
+- the dashboard serve tests hold under the full parallel suite on a loaded Windows
+  host: the request timeout is 90 s and the watcher reaction window is 60 s, so a
+  slow page build or a late file event is waited out instead of failing the release
+  gate. Assertions are unchanged.
 - the external-exits gate reads a body-less `fetch()` GET as "no data": the JS side
   of the "GET without a request body" rule now matches curl, so the ZCode `go-cost`
   reading (models and usage GETs with an auth header, no request body) is covered

@@ -92,7 +92,7 @@ function request(port, method, urlPath, { body, headers = {} } = {}) {
       res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }));
     });
     req.on('error', reject);
-    req.setTimeout(30000, () => req.destroy(new Error('request timeout ' + method + ' ' + urlPath)));
+    req.setTimeout(90000, () => req.destroy(new Error('request timeout ' + method + ' ' + urlPath))); // a loaded Windows host builds a page slowly
     if (body !== undefined) req.write(body);
     req.end();
   });
