@@ -80,6 +80,13 @@ const UNKNOWN = 'unknown';
  */
 const TRANSCRIPT_FIELDS = ['findSubagent', 'stepOf', 'mainSessions', 'mainStepOf'];
 
+/**
+ * The shape fields an adapter may leave out without breaking conformance: `cost` is an optional
+ * provider report, and a project whose provider has none simply gets no cost block. The strict
+ * "the whole shape is declared" check (the adapters' tests) skips this group as well.
+ */
+const OPTIONAL_FIELDS = ['cost'];
+
 /** The type of every shape field; `validateAdapter` checks it. */
 const SHAPE = {
   engine: 'string',
@@ -392,7 +399,7 @@ function firstPath(root, field) {
 
 module.exports = {
   loadAdapters, first, all, collect, firstPath, engineTags, canonicalTag, spendTags, transcriptDirs, nodeModelTables, resolveRel, validateAdapter, SHAPE, UNKNOWN,
-  idOf, sourcesOf, modeOf, checkAdapter, MODE_FULL, MODE_DEGRADED, TRANSCRIPT_FIELDS, mainSessions,
+  idOf, sourcesOf, modeOf, checkAdapter, MODE_FULL, MODE_DEGRADED, TRANSCRIPT_FIELDS, OPTIONAL_FIELDS, mainSessions,
 };
 
 /**
