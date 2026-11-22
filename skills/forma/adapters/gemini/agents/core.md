@@ -7,7 +7,7 @@ effort: low
 tools: Read, Grep, Glob, Write, Edit, AskUserQuestion, Bash(node .forma/dashboard/tally.cjs *), Bash(node .forma/board/card-move.cjs *), Bash(node .claude/scripts/graph-query.cjs *)
 ---
 
-# `Core`
+# `Core` (Gemini Engine)
 
 **One intent · Many · Agents**
 

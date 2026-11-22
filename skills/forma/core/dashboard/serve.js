@@ -17,6 +17,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { execFileSync, spawn } = require('child_process');
 const { writeJsonAtomic } = require('./lib/fs.cjs');
 const guards = require('./lib/http-guards.cjs');
@@ -42,8 +43,16 @@ const DEBOUNCE_MS = 300;
 const GRILL_WAIT_MS = 8000;              // how long to wait for the interview page to come up
 const MAX_ANSWER_BYTES = 256 * 1024;     // a human answer, not a file
 // Loopback only: the dashboard serves this machine's human, never a network (the grill server made
-// the same choice). FORMA_DASH_HOST is the escape hatch for an unusual setup.
+// the same choice). FORMA_DASH_HOST is the escape hatch for an unusual setup - and it is not free:
+// anything beyond loopback mints a 128-bit token (FORMA_DASH_TOKEN overrides it), the token is
+// required on every request from a non-loopback socket and travels in the printed URL (?t=...),
+// from which `GET /` turns it into an HttpOnly same-site cookie. Untokened network mode is gone.
 const HOST = process.env.FORMA_DASH_HOST || '127.0.0.1';
+const EXPOSED = !guards.isLoopbackHost(HOST);
+const DASH_TOKEN = EXPOSED
+  ? (process.env.FORMA_DASH_TOKEN || crypto.randomBytes(16).toString('hex'))
+  : null;
+const TOKEN_COOKIE = 'forma_dash';
 
 fs.mkdirSync(CACHE_DIR, { recursive: true });
 
@@ -625,10 +634,20 @@ function handleAnswer(req, res) {
 }
 
 // The rest - files. The graphs live in .forma/living/graphs/ (the dynamic - apart from the dashboard code), the /graphs/ address is the old one.
+// A closed list of what the page needs: the dashboard's own source, .cache and logs are not a site.
+const STATIC_PREFIXES = ['/web/', '/locales/'];
+function staticAllowed(urlPath) {
+  return urlPath === '/' || urlPath === '/index.html'
+    || STATIC_PREFIXES.some((prefix) => urlPath.startsWith(prefix))
+    || urlPath.startsWith('/graphs/');
+}
+
 function handleStatic(req, res, urlPath) {
   const base = urlPath.startsWith('/graphs/') ? path.join(PROJECT_ROOT, '.forma/living') : ROOT;
   const filePath = path.join(base, urlPath === '/' ? 'index.html' : urlPath);
+  // A directory escape is a forbidden request, not a missing page: it is refused before the allowlist.
   if (!guards.pathUnder(base, filePath)) { res.writeHead(403); res.end('forbidden'); return; }
+  if (!staticAllowed(urlPath)) { res.writeHead(404); res.end('not found: ' + urlPath); return; }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); res.end('not found: ' + urlPath); return; }
     // The board is live, and its page is never cached. Without this the browser is free to show
@@ -677,15 +696,37 @@ let serverPort = null;
 function handleRequest(req, res) {
   const urlPath = decodePath(req.url);
   if (urlPath === null) return sendJson(res, 400, { ok: false, error: 'bad address' });
+  const local = guards.isLoopbackAddr(req.socket.remoteAddress);
+  // Network mode: a non-loopback socket must present the token, and the token is the
+  // authentication - it is what the printed LAN URL carries. Loopback keeps today's behavior.
+  const hasToken = EXPOSED && !local && guards.tokenOk(
+    guards.tokenOf(req, TOKEN_COOKIE), DASH_TOKEN);
+  if (EXPOSED && !local && !hasToken) {
+    return sendJson(res, 403, { ok: false, error: 'token required' });
+  }
   // The Host guard is against DNS rebinding: a page whose hostname re-points at 127.0.0.1 becomes
   // "same-origin" in the browser's eyes, but it still must say its own name in Host - and a Host
   // this server never printed (`localhost:<port>` is all it ever says) is refused.
-  if (!guards.hostAllowed(req.headers.host, serverPort)) return sendJson(res, 403, { ok: false, error: 'foreign host' });
+  if (!guards.hostAllowed(req.headers.host, serverPort) && !hasToken) {
+    return sendJson(res, 403, { ok: false, error: 'foreign host' });
+  }
+  // `GET /?t=...` turns the token into a cookie and takes it out of the address bar; the page's
+  // own fetches and EventSource then carry it without any client-side change.
+  if (EXPOSED && urlPath === '/' && hasToken
+      && new URL(req.url, 'http://x').searchParams.get('t')) {
+    res.writeHead(302, {
+      'Set-Cookie': `${TOKEN_COOKIE}=${encodeURIComponent(DASH_TOKEN)}; Path=/; HttpOnly; SameSite=Strict`,
+      Location: '/',
+      'Cache-Control': 'no-store',
+    });
+    return res.end();
+  }
   const route = findRoute(req.method, urlPath);
   if (route) {
     // State rows carry the Origin guard: a browser sets Origin on every cross-site POST, so a
     // foreign page driving this machine's state through the human's browser is stopped here.
-    if (route.state && !guards.originAllowed(req.headers.origin, serverPort))
+    // In network mode the token already proves the caller; the page's own origin differs then.
+    if (route.state && !hasToken && !guards.originAllowed(req.headers.origin, serverPort))
       return sendJson(res, 403, { ok: false, error: 'cross-origin request rejected' });
     return route.handle(req, res);
   }
@@ -722,6 +763,11 @@ function onListening() {
   const url = `http://localhost:${port}/`;
   writeJsonAtomic(SERVER_FILE, { url, port, pid: process.pid, started: new Date().toISOString() });
   console.log(logMsg('serve.started', { url }));
+  if (EXPOSED) {
+    // Loopback stays token-free; another device needs the printed token once, then a cookie.
+    console.log(`[dashboard] beyond loopback (${HOST}): a token is required. ` +
+      `Open http://<this-machine-ip>:${port}/?t=${DASH_TOKEN}`);
+  }
   console.log(logMsg('serve.built_at_start', { cards: latestData.totals.cardCount, tokens: JSON.stringify(latestData.totals.tokensByEngine) }));
   watchFeatures();
   watchGraphifyLog();
