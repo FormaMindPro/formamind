@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   changelog sections are backfilled from their release commits.
 - the adapter conformance check treats `cost` as an optional shape field
   (`OPTIONAL_FIELDS`), so an engine without a provider report stays conformant.
+- the dashboard watcher and Codex-hook tests hold on a loaded Windows host: a wider
+  reaction window, a retrying temp cleanup and a retried external PowerShell start.
 
 ## [0.0.43] - 2026-11-22
 ### Added
