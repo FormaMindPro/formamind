@@ -187,8 +187,12 @@ function release() {
   fs.writeFileSync(pk, pkj.replace(/"version": "[^"]*"/, `"version": "${nv}"`));
   const pkl = path.join(proto, 'package-lock.json');
   if (fs.existsSync(pkl)) {
-    const pklj = fs.readFileSync(pkl, 'utf8');
-    fs.writeFileSync(pkl, pklj.replace(new RegExp(`"version": "${v}"`, 'g'), `"version": "${nv}"`));
+    // The lock carries its own version: a release that skipped it (a manual cut) must not leave the
+    // three version files disagreeing. Lift the lock from whatever it says to the new version.
+    const lock = JSON.parse(fs.readFileSync(pkl, 'utf8'));
+    lock.version = nv;
+    if (lock.packages && lock.packages['']) lock.packages[''].version = nv;
+    fs.writeFileSync(pkl, JSON.stringify(lock, null, 2) + '\n');
   }
   pgit('add', '--', '.claude-plugin/plugin.json', 'package.json', ...(fs.existsSync(pkl) ? ['package-lock.json'] : []));
   r = pgit('commit', '-q', '-m', `v${nv} — ${list.length} commit(s)\n\n${list.reverse().map((s) => '- ' + s).join('\n')}\n\n${CO}`);
