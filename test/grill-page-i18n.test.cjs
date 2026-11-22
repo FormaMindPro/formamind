@@ -113,6 +113,9 @@ function sandbox(lang, store, stateText) {
     navigator: { language: lang },
     localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; } },
     setTimeout: () => 0,
+    clearTimeout: () => {},
+    setInterval: () => 0,
+    clearInterval: () => {},
     fetch: () => Promise.resolve(stateText === null
       ? { ok: false, text: () => Promise.resolve('') }
       : { ok: true, text: () => Promise.resolve(stateText) }),

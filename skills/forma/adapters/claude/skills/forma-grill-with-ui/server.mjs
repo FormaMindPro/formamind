@@ -269,6 +269,147 @@ const readBytes = (req) => new Promise((resolve, reject) => {
   req.on("end", () => resolve(Buffer.concat(chunks)));
   req.on("error", reject);
 });
+// ---- voice input: the page records, this server asks the desktop app, the app recognizes ----
+// The page never sees the token: it calls this server on its own origin, and this server calls
+// VibeForma on loopback. A source install is found through location.json in
+// %LOCALAPPDATA%\VibeForma; a packed one through config.json in the same folder. The token lives
+// in config.json alone - nothing is copied next to it.
+const VIBE_PORT = 8787;
+const VIBE_PROBE_MS = 1500;
+const VIBE_TRANSCRIBE_MS = 90 * 1000;
+
+/** Resolve `parts` under `base`; null when the result would leave its base. */
+function underBase(base, ...parts) {
+  const root = path.resolve(base);
+  const target = path.resolve(root, ...parts);
+  const rel = path.relative(root, target);
+  if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) return null;
+  return target;
+}
+
+/** Parse `location.json` when it names an existing config: the runtime truth
+ *  about the actual port and the API state. A malformed file is ignored, and
+ *  the caller falls back to the config path. */
+function vibeLocation() {
+  const base = process.env.LOCALAPPDATA || process.env.APPDATA;
+  if (!base) return null;
+  const dir = underBase(base, "VibeForma");
+  if (!dir) return null;
+  const file = path.join(dir, "location.json");
+  let loc;
+  try { loc = JSON.parse(fs.readFileSync(file, "utf8")); }
+  catch { return null; }
+  if (!loc || typeof loc !== "object") return null;
+  if (loc.schema !== undefined && loc.schema !== 1) return null;
+  if (typeof loc.config !== "string" || !path.isAbsolute(loc.config)
+      || !fs.existsSync(loc.config)) return null;
+  const port = Number(loc.port);
+  return {
+    config: loc.config,
+    port: Number.isInteger(port) && port > 0 && port <= 65535 ? port : null,
+    api: loc.api === "on" || loc.api === "off" || loc.api === "error" ? loc.api : null,
+    version: typeof loc.version === "string" ? loc.version : "",
+  };
+}
+
+function vibeSettings() {
+  const explicit = process.env.VIBEFORMA_CONFIG;
+  let file = null, loc = null;
+  if (explicit && fs.existsSync(explicit)) file = explicit;
+  else {
+    loc = vibeLocation();
+    if (loc) file = loc.config;
+    else {
+      const base = process.env.LOCALAPPDATA || process.env.APPDATA;
+      const dir = base ? underBase(base, "VibeForma") : null;
+      const direct = dir ? path.join(dir, "config.json") : null;
+      if (direct && fs.existsSync(direct)) file = direct;
+    }
+  }
+  if (!file) return { ok: false, reason: "not-installed" };
+  let cfg;
+  try { cfg = JSON.parse(fs.readFileSync(file, "utf8")); }
+  catch { return { ok: false, reason: "bad-config" }; }
+  const cfgPort = Number(cfg.http_port);
+  const port = (loc && loc.port) || (Number.isInteger(cfgPort) && cfgPort > 0
+    ? cfgPort : VIBE_PORT);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return { ok: false, reason: "bad-config" };
+  const api = loc && loc.api ? loc.api : (cfg.http_api === true ? "on" : "off");
+  return {
+    ok: true,
+    port,
+    token: String(cfg.http_token || "").trim(),
+    enabled: api !== "off",
+    api,
+    version: loc && loc.version ? loc.version : "",
+  };
+}
+
+/** One request to the loopback app; the host is fixed, the port comes from
+ *  its discovery file or config. */
+function vibeRequest(method, urlPath, s, opt = {}) {
+  const { body, timeoutMs } = opt;
+  return new Promise((resolve, reject) => {
+    const headers = { "X-VibeForma-Token": s.token };
+    if (body) { headers["Content-Type"] = "audio/wav"; headers["Content-Length"] = body.length; }
+    const req = http.request({ host: "127.0.0.1", port: s.port, path: urlPath, method, headers, timeout: timeoutMs }, (res) => {
+      const chunks = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
+    });
+    req.on("timeout", () => {
+      const error = new Error("timeout");
+      error.code = "ETIMEDOUT";
+      req.destroy(error);
+    });
+    req.on("error", reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+/** What the page needs to know before it draws the microphone. */
+async function voiceStatus() {
+  const s = vibeSettings();
+  if (!s.ok) return { available: false, reason: s.reason };
+  if (!s.enabled) return { available: false, reason: "off", port: s.port };
+  if (s.api === "error") return { available: false, reason: "port-busy", port: s.port };
+  if (!s.token) return { available: false, reason: "no-token", port: s.port };
+  try {
+    const r = await vibeRequest("GET", "/health", s, { timeoutMs: VIBE_PROBE_MS });
+    if (r.status === 401) return { available: false, reason: "token", port: s.port };
+    if (r.status !== 200) return { available: false, reason: "error", code: r.status, port: s.port };
+    let h;
+    try { h = JSON.parse(r.body); }
+    catch { return { available: false, reason: "not-vibeforma", port: s.port }; }
+    if (!h || h.ok !== true) return { available: false, reason: "not-vibeforma", port: s.port };
+    // New builds name themselves. An older build (0.2.4 before the identity
+    // field) is accepted only when the full health shape is present, so a
+    // random local service returning {ok:true} is not mistaken for the engine.
+    const identified = h.app === "vibeforma";
+    const legacy = h.app === undefined && typeof h.version === "string"
+      && /^\d+\.\d+\.\d+$/.test(h.version)
+      && typeof h.model === "string" && typeof h.state === "string";
+    if (!identified && !legacy)
+      return { available: false, reason: "not-vibeforma", port: s.port };
+    return {
+      available: true,
+      engine: "vibeforma",
+      port: s.port,
+      version: typeof h.version === "string" ? h.version : s.version,
+      model: h.model || "",
+      language: h.language || "",
+      state: h.state || "",
+    };
+  } catch (e) {
+    const code = e && e.code;
+    const reason = code === "ECONNREFUSED" ? "not-running"
+      : (code === "ETIMEDOUT" || code === "ECONNRESET" || code === "EPIPE")
+        ? "port-busy" : "error";
+    return { available: false, reason, port: s.port };
+  }
+}
+
 // The name comes from a human and goes into the file system: everything that could lead out of
 // the session folder is cut off. The extension is kept - by it one later sees what this is.
 const safeName = (name) => {
@@ -394,6 +535,9 @@ function cmdServe(o) {
       return send(res, 200, lastGoodState, "application/json");
     }
     if (req.method === "GET" && pathname === "/listener") return json(res, 200, listenerOf(session, selfListening));
+    // The page asks about the voice engine on every render pass; a small timeout keeps a
+    // closed app from stalling the answer.
+    if (req.method === "GET" && pathname === "/voice/status") return json(res, 200, await voiceStatus());
     if (req.method === "GET" && pathname === "/events") return send(res, 200, fs.existsSync(events) ? fs.readFileSync(events) : "", "application/x-ndjson");
     if (req.method === "GET" && pathname === "/visual") {
       const visual = path.join(session, "visual.html"); // written only by the agent; shown by the page in a sandboxed iframe
@@ -429,6 +573,22 @@ function cmdServe(o) {
       fs.appendFileSync(events, line + "\n");
       process.stdout.write(line + "\n"); // an upload wakes the agent the same way an answer does
       return json(res, 200, { ok: true, seq, file: name });
+    }
+    if (req.method === "POST" && pathname === "/voice/transcribe") {
+      if (!originOk(req, u)) return json(res, 403, { error: "cross-origin request rejected" });
+      const s = vibeSettings();
+      if (!s.ok || !s.enabled || !s.token) return json(res, 503, { error: "voice engine is not enabled" });
+      let audio;
+      try { audio = await readBytes(req); } catch (e) { return json(res, 413, { error: e.message }); }
+      if (!audio.length) return json(res, 400, { error: "empty audio" });
+      try {
+        const r = await vibeRequest("POST", "/transcribe", s, { body: audio, timeoutMs: VIBE_TRANSCRIBE_MS });
+        if (r.status === 200) return send(res, 200, r.body, "application/json");
+        const known = { 401: "token", 409: "busy", 413: "too-large", 415: "format", 429: "rate" };
+        return json(res, r.status, { error: known[r.status] || "engine-error" });
+      } catch {
+        return json(res, 503, { error: "not-running" });
+      }
     }
     if (req.method === "POST" && pathname === "/theme") {
       if (!originOk(req, u)) return json(res, 403, { error: "cross-origin request rejected" });
