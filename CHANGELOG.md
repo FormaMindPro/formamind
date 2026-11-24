@@ -26,7 +26,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - ZCode section 8 states the observed host facts instead of the "project hooks are ignored" claim:
   the hook events, the payload and exit-code contract, and the persistent trust bound to the bundle
   digest (`~/.zcode/security/workspace-hook-trust-v1.json`) that a project hook needs and a plugin
-  hook does not.
+  hook does not. The journal facts are the ones observed live in this project: `hook.run.allowed` is
+  written for `PreToolUse` only, `SessionStart` leaves `hook.session_start_context.resolved`,
+  `UserPromptSubmit` leaves no `hook.run` record, and `config_project_hooks.pending_trust` appears
+  even when the hooks are trusted and executing.
 
 ## [0.0.45] - 2026-11-22
 ### Fixed
