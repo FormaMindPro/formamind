@@ -6,9 +6,9 @@
 # (a Cyrillic literal, held there as \u escapes) in the human's message - and only then. This hook lets the next destructive call through
 # and removes the marker in the same pass: the next deletion is blocked again by default, the permission never lingers.
 #
-# Protected paths: .claude/, .agents/, .codex/, .devtool/, .forma/manual/, .forma/living/, VARS/, AGENTS.md,
+# Protected paths: .claude/, .agents/, .codex/, .zcode/, .devtool/, .forma/manual/, .forma/living/, VARS/, AGENTS.md,
 # CLAUDE.md (if it returns), PROJECT.md, any GOAL.md. The engine wrappers (.agents/rules/gemini-8.md,
-# .codex/CODEX-8.md) are covered by their directories. The list is agreed with the human and edited right here.
+# .codex/CODEX-8.md, .zcode/rules/zcode-8.md) are covered by their directories. The list is agreed with the human and edited right here.
 
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 
@@ -85,7 +85,7 @@ END{ emit() }')
 
 # Moves: the source arguments (all but the last, flags dropped) must not be protected. `mv -t dir src` and the like
 # are not parsed - the last argument is taken as the target.
-PROTRE='\.(claude|agents|codex|devtool)([^A-Za-z0-9_-]|$)|\.forma/?([^A-Za-z0-9_./-]|$)|(^|[^A-Za-z0-9_-])manual([^A-Za-z0-9_-]|$)|(^|[^A-Za-z0-9_-])living([^A-Za-z0-9_-]|$)|(^|[^A-Za-z0-9_-])VARS([^A-Za-z0-9_-]|$)|AGENTS\.md|CLAUDE\.md|gemini-8\.md|CODEX-8\.md|PROJECT\.md|GOAL\.md'
+PROTRE='\.(claude|agents|codex|zcode|devtool)([^A-Za-z0-9_-]|$)|\.forma/?([^A-Za-z0-9_./-]|$)|(^|[^A-Za-z0-9_-])manual([^A-Za-z0-9_-]|$)|(^|[^A-Za-z0-9_-])living([^A-Za-z0-9_-]|$)|(^|[^A-Za-z0-9_-])VARS([^A-Za-z0-9_-]|$)|AGENTS\.md|CLAUDE\.md|gemini-8\.md|CODEX-8\.md|PROJECT\.md|GOAL\.md'
 MV_HIT=
 MVSRC=$(printf '%s\n' "$CAND" | grep '^MV:' | while IFS= read -r l; do
   printf '%s\n' "$l" | sed 's/^MV://' | tr -d '"\047' | awk '{ n=0; for(i=1;i<=NF;i++) if($i !~ /^-/) a[++n]=$i
@@ -102,7 +102,7 @@ CAND=$(printf '%s\n' "$CAND" | grep -v '^MV:')
 # Recursion: with -r/-R/-rf/--recursive/-Recurse the argument's directory (for a pattern, its non-glob part:
 # `project/*` -> project) is checked for a GOAL.md inside; found - block. `rm -rf build/*` without GOAL.md passes.
 set -f
-PROT=".claude .agents .codex .devtool manual living vars agents.md claude.md project.md"
+PROT=".claude .agents .codex .zcode .devtool manual living vars agents.md claude.md project.md"
 TOKS=$(printf '%s' "$CAND" | tr ' \t;|&()"<>'"'" '\n\n\n\n\n\n\n\n\n\n\n')
 REC=
 printf '%s' "$CAND" | grep -qiE '(^|[[:space:]])(-[a-z]*r[a-z]*|--recursive|-recurse)([[:space:]]|$)' && REC=1
@@ -118,7 +118,7 @@ for t in $TOKS; do
     d=${t%%[\*\?\[]*}; d=${d%/}; [ -z "$d" ] && d=.
     if [ -d "$d" ] && [ -n "$(find "$d" -iname GOAL.md 2>/dev/null | head -1)" ]; then GLOB_HIT=1; fi
     # the directory holds a protected root itself (`rm -rf .`, `find . -delete`, `git clean -fdx`)
-    for r in .claude .agents .codex .devtool .forma AGENTS.md; do [ -e "$d/$r" ] && GLOB_HIT=1; done
+    for r in .claude .agents .codex .zcode .devtool .forma AGENTS.md; do [ -e "$d/$r" ] && GLOB_HIT=1; done
   fi
   case "$t" in *[\*\?\[]*) ;; *) continue ;; esac
   t=$(printf '%s' "${t#./}" | tr '[:upper:]' '[:lower:]')

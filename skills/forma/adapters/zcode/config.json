@@ -33,6 +33,35 @@
             }
           ]
         }
+      ],
+      "PreToolUse": [
+        {
+          "matcher": "Bash",
+          "hooks": [
+            {
+              "type": "process",
+              "command": "node",
+              "args": [
+                "${ZCODE_PROJECT_DIR}/.zcode/hooks/guard-destructive.cjs"
+              ],
+              "timeoutMs": 10000
+            }
+          ]
+        }
+      ],
+      "UserPromptSubmit": [
+        {
+          "hooks": [
+            {
+              "type": "process",
+              "command": "node",
+              "args": [
+                "${ZCODE_PROJECT_DIR}/.zcode/hooks/unlock-delete.cjs"
+              ],
+              "timeoutMs": 10000
+            }
+          ]
+        }
       ]
     }
   },

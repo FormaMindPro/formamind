@@ -275,8 +275,9 @@ function readNodes(agentsDir) {
 }
 
 /** The zone's hooks from the host's workspace config (.zcode/config.json), the Claude tab's shape:
- *  `{ event, matcher, commands }`. The start gate (§3) lives here; the deletion guard (Contract 6)
- *  is still discipline - no hook event for it, the divergence stays named in zcode-8.md. */
+ *  `{ event, matcher, commands }`. The start gate (§3), the deletion guard and the phrase listener
+ *  (Contract 6) live here. A project hook fires only after the human granted it persistent trust:
+ *  the state is read by `.zcode/scripts/hooks-trust.cjs`, the host facts are in zcode-8.md. */
 function readHooks(root) {
   const file = path.join(root, '.zcode', 'config.json');
   if (!fs.existsSync(file)) return [];

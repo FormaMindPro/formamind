@@ -43,6 +43,10 @@ skip ^\.claude/scripts/tokenator_translator\.py$
 # подключается плагином (kit.md); без строки e2p предлагал бы вернуть копии
 skip ^\.(claude|agents)/skills/skill-creator(/|$)
 
+# локали интервью доставляет ядро (core/skills/forma-grill-with-ui/locales/), а не копия адаптера:
+# .claude/skills/forma-grill-with-ui/locales/ — производная копия, владелец — core/skills
+skip ^\.claude/skills/forma-grill-with-ui/locales(/|$)
+
 # MiniMax: runtime of a running engine (call ledger, observed state, transcripts) is the project's, never the template's
 skip ^\.minimax/\.(ledger|state|transcripts)/
 

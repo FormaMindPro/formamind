@@ -5,6 +5,7 @@
     ".claude",
     ".agents",
     ".codex",
+    ".zcode",
     ".devtool",
     ".forma",
     "manual",
@@ -18,12 +19,14 @@
     "GOAL.md",
     "gemini-8.md",
     "CODEX-8.md",
-    "claude-8.md"
+    "claude-8.md",
+    "zcode-8.md"
   ],
   "protectedPatterns": [
     "^\\.claude(/|\\\\|$)",
     "^\\.agents(/|\\\\|$)",
     "^\\.codex(/|\\\\|$)",
+    "^\\.zcode(/|\\\\|$)",
     "^\\.devtool(/|\\\\|$)",
     "^\\.forma(/|\\\\|$)",
     "(^|/|\\\\)VARS(/|\\\\|$)",
@@ -33,6 +36,7 @@
     "(^|/|\\\\)GOAL\\.md$",
     "(^|/|\\\\)gemini-8\\.md$",
     "(^|/|\\\\)CODEX-8\\.md$",
-    "(^|/|\\\\)claude-8\\.md$"
+    "(^|/|\\\\)claude-8\\.md$",
+    "(^|/|\\\\)zcode-8\\.md$"
   ]
 }

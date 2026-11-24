@@ -678,13 +678,14 @@ function installZCode(root) {
   const Z = path.join(root, '.zcode')
   copyFile(path.join(A, 'forma-adapter.cjs'), path.join(Z, 'forma-adapter.cjs'))
   copyFile(path.join(A, 'verify-profile.cjs'), path.join(Z, 'verify-profile.cjs')) // install verify profile: the core finds it via the manifest
-  copyFile(path.join(A, 'config.json'), path.join(Z, 'config.json')) // the SessionStart config hook (gate --json on startup, resume, clear, compact)
+  copyFile(path.join(A, 'config.json'), path.join(Z, 'config.json')) // workspace hooks: SessionStart (gate, backlog), PreToolUse/Bash (guard), UserPromptSubmit (phrase listener)
   copyTree(path.join(A, 'rules'), path.join(Z, 'rules'))
   copyTree(path.join(A, 'tests'), path.join(Z, 'tests'))
   copyTree(path.join(A, 'scripts'), path.join(Z, 'scripts'))
   copyTree(path.join(A, 'agents'), path.join(Z, 'agents'))
-  copyTree(path.join(A, 'plugins'), path.join(Z, 'plugins')) // a local marketplace: current ZCode ignores project-level hooks
-  const out = ['ZCode: .zcode/rules, .zcode/tests, .zcode/scripts, .zcode/agents, .zcode/plugins (forma-hooks) — installed (skills are read from the core .forma/skills)']
+  copyTree(path.join(A, 'plugins'), path.join(Z, 'plugins')) // a local marketplace: plugin hooks need no workspace trust
+  copyTree(path.join(A, 'hooks'), path.join(Z, 'hooks')) // the deletion guard and the phrase listener (project hooks: the human grants trust)
+  const out = ['ZCode: .zcode/rules, .zcode/tests, .zcode/scripts, .zcode/agents, .zcode/hooks, .zcode/plugins (forma-hooks) — installed (skills are read from the core .forma/skills)']
   if (fs.existsSync(path.join(root, '.claude', 'agents'))) out.push(rebuildZcodeRoles(root))
   else out.push('  ! .claude/agents not found — roles ship as installed; install Claude Code, then run: node .zcode/scripts/gen-roles.cjs')
   return out
@@ -845,7 +846,7 @@ function geminiExpect() {
 // mirror against that reference (a regeneration is the only check that sees the mirror lag behind it).
 function zcodeExpect() {
   return {
-    files: ['.zcode/forma-adapter.cjs', '.zcode/config.json', '.zcode/rules/zcode-8.md', '.zcode/scripts/gen-roles.cjs', '.zcode/scripts/go-cost.cjs', '.zcode/tests/test-go-cost.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs', '.zcode/plugins/marketplace.json', '.zcode/plugins/forma-hooks/.zcode-plugin/plugin.json', '.zcode/plugins/forma-hooks/hooks/hooks.json', '.zcode/plugins/forma-hooks/hooks/names-context.cjs'],
+    files: ['.zcode/forma-adapter.cjs', '.zcode/config.json', '.zcode/rules/zcode-8.md', '.zcode/hooks/guard-destructive.cjs', '.zcode/hooks/unlock-delete.cjs', '.zcode/scripts/gen-roles.cjs', '.zcode/scripts/go-cost.cjs', '.zcode/scripts/hooks-trust.cjs', '.zcode/tests/test-go-cost.cjs', '.zcode/tests/test-zcode-adapter.cjs', '.zcode/verify-profile.cjs', '.zcode/plugins/marketplace.json', '.zcode/plugins/forma-hooks/.zcode-plugin/plugin.json', '.zcode/plugins/forma-hooks/hooks/hooks.json', '.zcode/plugins/forma-hooks/hooks/names-context.cjs'],
     mirrorFrom: '.claude/agents',
   }
 }

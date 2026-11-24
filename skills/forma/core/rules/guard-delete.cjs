@@ -7,7 +7,8 @@
  * and direct file references against .forma/rules/protected-paths.json.
  *
  * A one-time unlock by the code phrase ("Disable sensory", named in AGENTS.md §2):
- * the .delete-unlock marker in .forma/ or .agents/.state/ is consumed on the first hit.
+ * the .delete-unlock marker in .forma/, .agents/.state/, .claude/hooks/ or an engine's own
+ * .state/ is consumed on the first hit.
  */
 
 const fs = require('fs');
@@ -76,6 +77,7 @@ function getUnlockMarkerPaths(root) {
     path.join(r, '.forma', '.delete-unlock'),
     path.join(r, '.agents', '.state', '.delete-unlock'),
     path.join(r, '.claude', 'hooks', '.delete-unlock'),
+    path.join(r, '.zcode', '.state', '.delete-unlock'),
   ];
 }
 
@@ -83,8 +85,10 @@ function isUnlockActive(root) {
   return getUnlockMarkerPaths(root).some((p) => fs.existsSync(p));
 }
 
-function unlockDeletion(root) {
-  const p = path.join(root || process.cwd(), '.forma', '.delete-unlock');
+/** `marker` - a project-relative path of the engine's own marker; the default is the core's .forma one. */
+function unlockDeletion(root, marker) {
+  const r = root || process.cwd();
+  const p = marker ? path.join(r, marker) : path.join(r, '.forma', '.delete-unlock');
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, 'unlocked by phrase: ' + tr('guard.code_phrase') + '\n' + new Date().toISOString());
   return p;
@@ -151,8 +155,14 @@ function checkCommand(commandLine, root) {
     }
   }
 
-  // git clean without paths wipes the whole repository
-  if (/\bgit\s+clean\b/i.test(cmd) && /\b(-[a-z]*x|-f|-d)\b/i.test(cmd)) {
+  // git clean without paths wipes the whole repository. The force and directory flags may stand together
+  // (-fd, -fdx, -dfx): a short token is dangerous when it carries f or d and is not a dry run (n).
+  const cleanDangerous = /\bgit\s+clean\b/i.test(cmd) && cmd.split(/[\s;|&]+/).some((t) => {
+    if (/^--/.test(t)) return /^--(force|directories)$/i.test(t);
+    if (!/^-[a-z]+$/i.test(t)) return false;
+    return !/n/i.test(t) && /[fd]/i.test(t);
+  });
+  if (cleanDangerous) {
     if (consumeUnlock(root)) {
       return { blocked: false, unblockedByPhrase: true, target: 'git clean' };
     }

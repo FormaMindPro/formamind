@@ -53,8 +53,8 @@ it('.zcode/rules/zcode-8.md declares the ten contracts and the engine tag', () =
   assert.ok(text.includes('[STAGE:'), 'section 8 does not name the stage labels');
 });
 
-// 1b. The workspace config stays a legacy template; the current host ignores project-level hooks
-it('.zcode/config.json keeps the gate template, and section 8 names the host fact', () => {
+// 1b. The workspace config carries the start gate; a project hook needs the human's persistent trust
+it('.zcode/config.json keeps the gate template, and section 8 names the trust facts', () => {
   const file = path.join(root, '.zcode', 'config.json');
   assert.ok(fs.existsSync(file), '.zcode/config.json is missing');
   let cfg;
@@ -70,8 +70,10 @@ it('.zcode/config.json keeps the gate template, and section 8 names the host fac
   assert.ok((entry.args || []).some((a) => a.includes('${ZCODE_PROJECT_DIR}/.forma/i18n/cli.cjs')), 'the project cli.cjs is not in the hook args');
   assert.deepEqual((entry.args || []).slice(1), ['gate', '--json'], 'the gate --json invocation is not in the hook args');
   const eight = fs.readFileSync(path.join(root, '.zcode', 'rules', 'zcode-8.md'), 'utf8');
-  assert.ok(eight.includes('config_project_hooks_ignored'), 'section 8 does not name the ignored project hooks');
-  assert.ok(/\u043f\u0440\u043e\u0435\u043a\u0442\u043d\u044b\u0435 \u0445\u0443\u043a\u0438 \u043d\u0435 \u0438\u0441\u043f\u043e\u043b\u043d\u044f\u044e\u0442\u0441\u044f/i.test(eight), 'section 8 does not state that project hooks are not executed'); // the ru phrase pinned (data)
+  assert.ok(eight.includes('workspace_hooks_pending_trust'), 'section 8 does not name the pending-trust state');
+  assert.ok(eight.includes('workspace_hooks_trusted_persistent'), 'section 8 does not name the trusted state');
+  assert.ok(eight.includes('workspace-hook-trust-v1.json'), 'section 8 does not name the trust store');
+  assert.ok(!eight.includes('config_project_hooks_ignored'), 'section 8 still claims the project hooks are ignored');
 });
 
 // 1c. The legacy backlog group stays in the template; the plugin is the supported delivery (Contract 10)
@@ -136,6 +138,61 @@ it('names-context resolves prompt codes into additionalContext and stays fail-op
     const broken = run('{not json');
     assert.equal(broken.status, 0, 'bad input must be fail-open');
     assert.equal(broken.stdout, '');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+// 1e. The deletion guard and the phrase listener: wired, their selftests green, the zone marker reachable by the core
+it('.zcode/config.json wires PreToolUse/Bash to the guard and UserPromptSubmit to the listener', () => {
+  const cfg = JSON.parse(fs.readFileSync(path.join(root, '.zcode', 'config.json'), 'utf8'));
+  const events = (cfg.hooks && cfg.hooks.events) || {};
+  const wired = (event, matcher, file) => (events[event] || []).some((g) => String(g.matcher || '') === matcher
+    && (g.hooks || []).some((h) => h.type === 'process' && h.command === 'node'
+      && (h.args || []).some((a) => a === '${ZCODE_PROJECT_DIR}/' + file)));
+  assert.ok(wired('PreToolUse', 'Bash', '.zcode/hooks/guard-destructive.cjs'), 'the guard is not wired on PreToolUse / Bash');
+  assert.ok(wired('UserPromptSubmit', '', '.zcode/hooks/unlock-delete.cjs'), 'the phrase listener is not wired on UserPromptSubmit');
+  for (const f of ['.zcode/hooks/guard-destructive.cjs', '.zcode/hooks/unlock-delete.cjs']) {
+    assert.ok(fs.existsSync(path.join(root, f)), f + ' is missing');
+  }
+});
+
+it('guard-destructive and unlock-delete pass their own selftests', () => {
+  for (const f of ['.zcode/hooks/guard-destructive.cjs', '.zcode/hooks/unlock-delete.cjs']) {
+    const r = spawnSync(process.execPath, [path.join(root, f), '--selftest'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, f + ' --selftest: ' + (r.stderr || r.stdout));
+  }
+});
+
+it('the core registry protects the zone and the core consumes the zone marker', () => {
+  const core = require(path.join(root, '.forma', 'rules', 'guard-delete.cjs'));
+  assert.ok(core.isProtectedPath('.zcode/rules/zcode-8.md', root), 'the registry does not protect .zcode');
+  assert.ok(core.isProtectedPath('zcode-8.md', root), 'the registry does not protect zcode-8.md');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zcode-marker-'));
+  try {
+    const marker = core.unlockDeletion(tmp, '.zcode/.state/.delete-unlock');
+    assert.equal(marker, path.join(tmp, '.zcode', '.state', '.delete-unlock'), 'the marker must land in the zone');
+    const first = core.checkCommand('rm -rf .claude/x', tmp);
+    assert.equal(first.blocked, false, 'the marker must lift one protected hit');
+    assert.equal(first.unblockedByPhrase, true, 'the lift must be reported as the phrase');
+    assert.equal(fs.existsSync(marker), false, 'the marker must be consumed by that hit');
+    assert.equal(core.checkCommand('rm -rf .claude/x', tmp).blocked, true, 'the next hit must be blocked again');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+it('hooks-trust names an untrusted hook in red and passes a fully trusted set', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zcode-trust-'));
+  try {
+    const stub = path.join(dir, 'host-stub.cjs');
+    const write = (state) => fs.writeFileSync(stub, 'process.stdout.write(JSON.stringify({bundleDigest:"b1",reasonCode:"r",'
+      + 'items:[{event:"PreToolUse",matcher:"Bash",displayCommand:"node guard",trustState:"' + state + '"}]}));\n');
+    const run = () => spawnSync(process.execPath, [path.join(root, '.zcode', 'scripts', 'hooks-trust.cjs'), '--cli', stub, '--root', root, '--json'], { encoding: 'utf8' });
+    write('pending_trust');
+    const red = run();
+    assert.equal(red.status, 1, 'a pending hook must fail the preflight: ' + red.stdout + red.stderr);
+    assert.match(red.stdout, /pending_trust/);
+    write('trusted_persistent');
+    const ok = run();
+    assert.equal(ok.status, 0, 'a trusted set must pass: ' + ok.stdout + ok.stderr);
+    assert.match(ok.stdout, /trusted_persistent/);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -309,7 +366,7 @@ it('formaRoles and engineSettings give the zone\u0027s data', () => {
 
 // 6. The zone\u0027s cleanliness (prohibition 16)
 it('the zone\u0027s texts carry no project traces', () => {
-  const scanDirs = ['.zcode/agents', '.zcode/rules', '.zcode/scripts'];
+  const scanDirs = ['.zcode/agents', '.zcode/rules', '.zcode/scripts', '.zcode/hooks'];
   const scanRoots = ['.zcode/forma-adapter.cjs'];
   const traces = [];
   const patterns = [/\bcard-\d{3}\b/, /\b\d{4}-\d{2}-\d{2}\b/, /github\.com/i];

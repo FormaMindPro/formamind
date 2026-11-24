@@ -116,6 +116,7 @@ const MAP = [
   ['.forma/board', 'core/board'],
   ['.forma/i18n', 'core/i18n'],   // the key dictionary (§6) and the installer texts
   ['.forma/plumb', 'core/plumb'],   // the Plumb: plumb-run.cjs and neighbours
+  ['.forma/rules', 'core/rules'],   // the guards' rulebook: guard-delete.cjs and the protected-paths registry
   ['.forma/engines.json', 'core/engines.json'],   // the registry of sleeping engines
   // the Claude adapter (the Claude transcript readers live in the project's .forma/dashboard but belong to the adapter)
   ['.claude/forma-adapter.cjs', 'adapters/claude/forma-adapter.cjs'],   // the core-adapter boundary: `dashboard/lib/engines.cjs`
@@ -146,7 +147,8 @@ const MAP = [
   // ZCode: flat subpaths, as gemini; the machine .state/ does not go into the template
   ['.zcode/forma-adapter.cjs', 'adapters/zcode/forma-adapter.cjs'],
   ['.zcode/verify-profile.cjs', 'adapters/zcode/verify-profile.cjs'],
-  ['.zcode/config.json', 'adapters/zcode/config.json'],                 // the SessionStart config hook; merged like the gemini wiring
+  ['.zcode/config.json', 'adapters/zcode/config.json'],                 // the workspace hooks (SessionStart, PreToolUse, UserPromptSubmit); merged like the gemini wiring
+  ['.zcode/hooks', 'adapters/zcode/hooks'],                             // the deletion guard and the phrase listener
   ['.zcode/rules', 'adapters/zcode/rules'],
   ['.zcode/scripts', 'adapters/zcode/scripts'],
   ['.zcode/tests', 'adapters/zcode/tests'],

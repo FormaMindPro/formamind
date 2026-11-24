@@ -3,6 +3,31 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.46] - 2026-11-24
+### Added
+- ZCode: the deletion guard is constructive. `PreToolUse` with the `Bash` matcher calls
+  `.zcode/hooks/guard-destructive.cjs`, which asks the shared core (`.forma/rules/guard-delete.cjs`)
+  instead of copying its logic; the denial is exit code 2, which the host turns into
+  `permissionDecision: "deny"`.
+- ZCode: `UserPromptSubmit` calls `.zcode/hooks/unlock-delete.cjs`, the listener of the human's code
+  phrase. It writes the one-time marker `.zcode/.state/.delete-unlock` inside its own zone, and the
+  core consumes it on the first protected action - the marker never lands in `.claude/hooks/`.
+- ZCode: `.zcode/scripts/hooks-trust.cjs` is the zone's preflight. It asks the host for the trust
+  state and names every hook that is not `trusted_persistent` on one red line, exiting non-zero,
+  instead of leaving a silently dead hook installed.
+- the ZCode zone and `zcode-8.md` are protected paths in `.forma/rules/protected-paths.json` and in
+  the Claude `guard-delete.sh` list.
+- the installer lays `.zcode/hooks/` and records the three new adapter files in the install verify
+  profile; `engine-to-protocol.cjs` learns `.zcode/hooks` and `.forma/rules`.
+### Fixed
+- the core's `git clean` rule reads combined short flags (`-fd`, `-fdx`, `-dfx`) and still passes a
+  dry run (`-n`); before, `git clean -fd` slipped through the shared rulebook.
+### Changed
+- ZCode section 8 states the observed host facts instead of the "project hooks are ignored" claim:
+  the hook events, the payload and exit-code contract, and the persistent trust bound to the bundle
+  digest (`~/.zcode/security/workspace-hook-trust-v1.json`) that a project hook needs and a plugin
+  hook does not.
+
 ## [0.0.45] - 2026-11-22
 ### Fixed
 - the dashboard serve tests hold under the full parallel suite on a loaded Windows

@@ -16,7 +16,15 @@
 
 ## Main session = `Intent` (§1) (Contract 3: constructive)
 
-Главная сессия читает `agents/intent.md` первым действием. Ворота старта (§3) и дайджест беклога **задуманы** конфиг-хуками workspace-конфигурации `.zcode/config.json` (`hooks.enabled`, событие `SessionStart`, matcher `startup|resume|clear|compact`): `node .forma/i18n/cli.cjs gate --json` и `node .forma/i18n/cli.cjs backlog --json`, ответ строгим JSON хост вкладывает в контекст сессии; ворота конструктивны — ничего не блокируют, при ненастроенном проекте сами открывают карточку настройки и просят у человека решений, пустой беклог молчит. **Факт текущей версии ZCode** (документация хоста, раздел Hooks): проектные хуки не исполняются — любая секция `hooks` в `<workspace>/.zcode/config.json` или `<workspace>/zcode.json` игнорируется целиком и пишется в `~/.zcode/cli/log/zcode-<date>.jsonl` как `config_project_hooks_ignored`. Значит, эти две доставки сейчас до модели не доходят — названное расхождение, не обещание; поддерживаемый путь для проекта — плагин `hooks/hooks.json` (Contract 10), миграция ворот и беклога в плагин остаётся отдельной работой. Роль `Intent` хуком не доставляется — по-прежнему читается вручную, расхождение названо; появление доставки роли будет записано в пробу как наблюдение, не как обещание.
+Главная сессия читает `agents/intent.md` первым действием. Ворота старта (§3) и дайджест беклога доставляют конфиг-хуки workspace-конфигурации `.zcode/config.json` (`hooks.enabled`, событие `SessionStart`, matcher `startup|resume|clear|compact`): `node .forma/i18n/cli.cjs gate --json` и `node .forma/i18n/cli.cjs backlog --json`, ответ строгим JSON хост вкладывает в контекст сессии; ворота конструктивны — ничего не блокируют, при ненастроенном проекте сами открывают карточку настройки и просят у человека решений, пустой беклог молчит. Доставка держится доверием человека проекту: недоверенный хук молча не исполняется (ниже, «Host facts»). Роль `Intent` хуком не доставляется — читается вручную; это не расхождение, а форма доставки роли.
+
+## Host facts (observed on ZCode 0.18.0)
+
+- **События хуков**, которые хост знает: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `Stop`, `SubagentStop`.
+- **Объявление** — `.zcode/config.json`, `hooks.events.<Event>` = список групп `{ "matcher"?, "hooks": [{ "type": "process", "command", "args", "timeoutMs" }] }`. `matcher` сверяется с именем инструмента (`Bash`, `Write|Edit`) на событиях инструмента и с причиной старта (`startup|resume|clear|compact`) на `SessionStart`; группа без `matcher` срабатывает на всё событие.
+- **Вход хука** — JSON на stdin: `hook_event_name`, `session_id`, `cwd`, `transcript_path`, `permission_mode`; на событиях инструмента ещё `tool_name`, `tool_input`, `tool_use_id`; на `UserPromptSubmit` — `prompt`. Подстановки в объявлении: `${ZCODE_PROJECT_DIR}`, `${ZCODE_PLUGIN_ROOT}`.
+- **Выход:** код 0 — stdout разбирается как JSON (`hookSpecificOutput.additionalContext` дописывает контекст модели); код 2 на `PreToolUse` — отказ вызова (`permissionDecision: "deny"`, причина — stderr); код 2 на других событиях останавливает ход; прочий код — сбой хука.
+- **Доверие.** Проектный хук (`.zcode/config.json`) исполняется только после того, как человек выдал ему постоянное доверие для этого workspace: до этого хук стоит в `workspace_hooks_pending_trust`, в журнале хоста — `config_project_hooks.pending_trust`, и молча не срабатывает. Выдача: `node "<каталог ZCode>/resources/glm/zcode.cjs" hooks trust grant --workspace "<корень>" --all-current --bundle-digest <дайджест>`; дайджест и состояние печатает `hooks trust status --workspace "<корень>" --json`, ответ доверия — `workspace_hooks_trusted_persistent`. Доверие привязано к дайджесту связки объявлений и к дайджесту каждого объявления, поэтому **после любой правки `.zcode/config.json` выдаётся заново**. Хранилище — `~/.zcode/security/workspace-hook-trust-v1.json` (`workspaceIdentity`, `hookDeclarationDigest`, `bundleDigestAtGrant`). Хук плагина (`plugins/forma-hooks/hooks/hooks.json`) доверия workspace-а не требует — этот путь остаётся для напоминаний (Contract 10).
 
 ## Continuation of the same `Run` (Contract 4: constructive in mechanism and in the record)
 
@@ -32,7 +40,7 @@
 
 ## Deletion guard (§1, §2) (Contract 6: constructive)
 
-Проектного хука охраны удаления у движка нет. Охрана держится правилом и подтверждением человека; расхождение с ядром, где охрана конструктивна, названо здесь. Кодовая фраза человека снимает охрану на одно действие по закону §2 — механика та же, держит её дисциплина до появления пакета хуков.
+Охрана конструктивна: `PreToolUse` с матчером `Bash` зовёт `.zcode/hooks/guard-destructive.cjs`, который решение не дублирует, а спрашивает общее ядро `.forma/rules/guard-delete.cjs` — реестр `protected-paths.json` (зона `.zcode` и `zcode-8.md` в нём), рекурсивные маски и разовый маркер. Отказ — код 2 и текст в stderr, хост превращает его в `permissionDecision: "deny"`. Кодовую фразу человека ловит слушатель `UserPromptSubmit` `.zcode/hooks/unlock-delete.cjs` и ставит разовый маркер `.zcode/.state/.delete-unlock` в своей зоне (не в `.claude/hooks/` — чужая зона); ядро гасит маркер на первом охраняемом действии, следующее снова отклоняется. Оба файла несут `--selftest`. Недоверенный хостом хук молча не срабатывает — состояние называется командой `node .zcode/scripts/hooks-trust.cjs` (красная строка и ненулевой код на недоверенном).
 
 ## The board and the card path (Contract 7: constructive)
 
@@ -44,7 +52,7 @@
 
 ## Preflight verification (Contract 9: constructive)
 
-Перед работой в зоне: `node .forma/dashboard/lib/engines.cjs check zcode` (код 0), `node .zcode/tests/test-zcode-adapter.cjs`, `node .claude/scripts/sync-engines.cjs --check` (сверка без нарушений по зоне). Тест соответствия — единственная точка, где зона сверяется с контрактом экономики (ECONOMY.md); сверка движков находит адаптер сама по файлу §8.
+Перед работой в зоне: `node .forma/dashboard/lib/engines.cjs check zcode` (код 0), `node .zcode/tests/test-zcode-adapter.cjs`, `node .zcode/scripts/hooks-trust.cjs` (все проектные хуки `trusted_persistent`, либо явное «skip» без хоста), `node .claude/scripts/sync-engines.cjs --check` (сверка без нарушений по зоне). Тест соответствия — единственная точка, где зона сверяется с контрактом экономики (ECONOMY.md); сверка движков находит адаптер сама по файлу §8.
 
 ## Names reminder (§1, prohibition 20) (Contract 10: constructive)
 
