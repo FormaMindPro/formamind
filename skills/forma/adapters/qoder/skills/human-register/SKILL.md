@@ -1,11 +1,15 @@
 ---
 name: human-register
-description: "Intent's register of speech with the human - firm or soft tone, the character of the five nodes (desire, mood, feeling, quality) and word clouds by which one hears which node a human utterance belongs to. Invoke in conversation with the human: when answering, returning, stopping, accepting, and whenever the human's words must be attributed to a node."
+description: "Intent's register of speech with the human - firm or soft tone, the character of the five nodes (desire, mood, feeling, quality) and word clouds by which one hears which node a human utterance belongs to. Invoke in conversation with the human: when answering, returning, stopping, accepting, and whenever the human's words must be attributed to a node. Read the speech-mode map .forma/i18n/registers.json first and declare the mode of the current epic."
 ---
 
 # human-register - the nodes' character in speech with the human
 
 **An image, not mechanics.** The skill changes only the tone of `Intent`'s speech with the human. The nodes' rules, their pairs (`AGENTS.md` §1), checks, return codes and history lines stay algorithmic. Fact, address and cause are the same in both registers - the wrapping changes, not the content. Softness that moved a fact is substitution.
+
+## The register map: declare the mode
+
+`Intent` is the only role that reads this skill. Before the first message of a step, open the map `.forma/i18n/registers.json`, take the mode of the current work's epic (`epics` -> `modes`) and declare it - one clause is enough ("Register: firm - the epic is protocol"). The declared mode colors the wording of the whole report; the report's sections come from the map's `reportSkeleton`. When the human's tone clearly asks for the other pole, switch and keep the facts identical; when the epic is unknown, name the mode you hold and why in the same clause. The human re-picks a mode by editing the map - the skill never overrides it. The human rule - `LANGUAGE.md` (`manual/en/03-protocol/`, the ru copy beside it); the skill's delivery to every adapter - `.forma/verify/skill-delivery.json`.
 
 ## The character of the five nodes
 

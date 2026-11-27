@@ -32,4 +32,5 @@ module.exports = [
   require('./law-thresholds-declared.cjs'),
   require('./law-external-exits.cjs'),
   require('./law-push-verify-rule.cjs'),
+  require('./check-register.cjs'),
 ];
