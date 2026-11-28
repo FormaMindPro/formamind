@@ -1,0 +1,61 @@
+{
+  "registry": {
+    "name": "models",
+    "title": "Model registry - the machine source",
+    "version": 1,
+    "owner": "human - values; Kit - keeping and reconciliation; script - mechanical check"
+  },
+  "engines": [
+    {
+      "id": "zcode",
+      "status": "active",
+      "default_model": "zai/GLM-5.3-Flash"
+    }
+  ],
+  "models": [
+    {
+      "address": "zai/GLM-5.3-Flash",
+      "engine": "zcode",
+      "kind": "text",
+      "tier": "standard",
+      "status": "available"
+    }
+  ],
+  "bindings": [
+    {
+      "role": "intent",
+      "engine": "zcode",
+      "candidates": [
+        "zai/GLM-5.3-Flash"
+      ]
+    },
+    {
+      "role": "spec",
+      "engine": "zcode",
+      "candidates": [
+        "zai/GLM-5.3-Flash"
+      ]
+    },
+    {
+      "role": "kit",
+      "engine": "zcode",
+      "candidates": [
+        "zai/GLM-5.3-Flash"
+      ]
+    },
+    {
+      "role": "run",
+      "engine": "zcode",
+      "candidates": [
+        "zai/GLM-5.3-Flash"
+      ]
+    },
+    {
+      "role": "core",
+      "engine": "zcode",
+      "candidates": [
+        "zai/GLM-5.3-Flash"
+      ]
+    }
+  ]
+}

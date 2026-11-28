@@ -5,7 +5,7 @@ model: gemini-3.8-flash
 tier: standard
 effort: low
 tools: Read, Grep, Glob, Write, Edit, Bash(claude plugin *), Bash(node .claude/scripts/build-kit-graphs.cjs *), Bash(node .claude/scripts/build-tendons.cjs *), Bash(node .claude/scripts/external-model-bridge.cjs *), mcp__chrome-devtools__new_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__close_page, AskUserQuestion, Bash(python .claude/scripts/*), Bash(node .claude/scripts/*), Bash(node .claude/scripts/site.cjs *), mcp__site__mcp-adapter-discover-abilities, mcp__site__mcp-adapter-get-ability-info, mcp__site__mcp-adapter-execute-ability, Bash(node .forma/board/*), Bash(node .forma/dashboard/*), Bash(npm --prefix .forma/protocol *), Bash(node .forma/protocol/scripts/engine-to-protocol.cjs *)
-uses: skill-authoring, skill-creator, run-scripts, graphify
+uses: skill-authoring, skill-creator, graphify
 
 ---
 
@@ -68,7 +68,7 @@ Every `Run` step re-reads its whole context: steps × context is the cache-read 
    - Before writing, look in `.claude/scripts/` and `agents/run/` for one that already does it; the layer split is checked by `node .forma/extensions/extensions.cjs` (check).
 5. **Step budget in the kit:** "≈N tool calls"; twice that — `Run` stops and reports.
 6. **Short kit:** commands, paths, boundaries; no "why".
-7. **Executor by mechanics:** a purely mechanical run goes to `haiku` or the external model, not `sonnet`.
+7. **Executor by mechanics:** a purely mechanical run goes to the `light` tier or the external model, not `standard`.
 8. **Review after the task:** compare `Run`'s steps with the estimate (`node .claude/scripts/tool-usage.cjs`, `agent_id` from the attempt line); a loop done by hand is a script candidate.
 
 ## Task kitting
@@ -91,7 +91,7 @@ In the card's `## Kit` the unit keys are the English words of this table — `Ro
 | Choice | By what | Rule |
 |---|---|---|
 | Kind | the task's subject: text, image, sound, video, vector | you don't make an image with a strong text model — that's not a matter of strength |
-| Tier | how much judgment is needed | assign by task type, not preference: three classes in frontmatter `tier:` beside `model:` — `strong` (opus), `standard` (sonnet), `light` (haiku); the tier matches the model actually set, not an aspiration |
+| Tier | how much judgment is needed | assign by task type, not preference: three classes in frontmatter `tier:` beside `model:` — `strong`, `standard`, `light`; the class and its level come from its registry row, and the tier matches the model actually set, not an aspiration |
 | Channel | internal model (Agent tool) or external (the bridge, `external-model-bridge.cjs`) | external **only** for pure text with no live environment access (MCP, site files): a draft, a wording pass, an analysis; anything needing live access — internal only |
 
 Nodes carry their skill list in frontmatter `uses:` (reference only, no behavior change); Run roles carry it in `skills:` — loaded into the role's context at start, so only what the role needs belongs there. `tier` is form bookkeeping — Claude Code doesn't read it.
@@ -100,9 +100,9 @@ Write the channel explicitly into the kit — `Run` doesn't choose it.
 
 **When the doer is `Run`, the role comes from the role files themselves** — `node .claude/scripts/run-catalog.cjs` prints one line per profile across both zones (`agents/run/` and `project/extensions/*/agents/run/`); pick by the task's subject. Product-only profiles: `PROJECT.md`, "Run profiles" section — read it as part of the catalog and pick by subject.
 
-**Role** is the catalog file's `name`, picked by the task's subject — never bare `run.md` (base template); **Model and Tool are inherited** from the role's own frontmatter — not re-chosen per task. No catalog role fits the subject — create it inline, same call, by the four-step procedure: `agents/on-demand/kit-catalog-growth.md`.
+**Role** is the catalog file's `name`, picked by the task's subject — never bare `run.md` (base template). **Model comes from the registry binding** — the role × engine row of `project/config/models.json`, its first candidate; a replacement is taken from the card's candidate list, with its reason in one line. **Tool is inherited** from the role's own frontmatter — not re-chosen per task. **`Kit` is called only when no role exists** — no catalog role fits the subject: create it inline, same call, by the four-step procedure: `agents/on-demand/kit-catalog-growth.md`.
 
-- **`Run` is `haiku` by default; you only kit.** **Override** (a different model/tool than the role carries) — a history line with the reason; the kit block then shows the override, not the inherited default. No reason — no override.
+- **`Run` runs on the model the card's `Model` unit names; an empty unit — the «Дефолты узлов» row of `project/config/PROJECT.md` (`k:routes.node_defaults`); you only kit.** **Override** (a different model/tool than the role carries) — a history line with the reason; the kit block then shows the override, not the inherited default. No reason — no override.
 - **Batch: up to 4 cards per call**, same or related subjects, none dependent (`after-card-*`); each card gets its own kit and history line. More, different subjects or dependent cards — separate calls.
 - **A card whose `## Kit` already holds a ready profile** (written by `Spec`, `route-choice.md`) — check it against the catalog and leave it; kit anew only when it doesn't fit.
 - **One asset or a light edit → `run-image`; a series or a package (several assets, one style) → `run-image-series`.**

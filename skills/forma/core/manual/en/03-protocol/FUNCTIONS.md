@@ -77,7 +77,7 @@ Initial setup of a fresh project in the Forma protocol is automated via the `pro
 ```mermaid
 flowchart LR
     S1["1. RAM disk<br/>(vdisk-setup)"] --> S2["2. Thresholds<br/>(volume=25, attempts=3)"]
-    S2 --> S3["3. Plumb<br/>(jev / 80-40-0.75-3/4)"]
+    S2 --> S3["3. Plumb<br/>(executor and thresholds in PROJECT.md)"]
     S3 --> S4["4. Localization<br/>(ru/en or translation)"]
     S4 --> S5["5. Gate cleared<br/>(proceed to brief)"]
 ```
@@ -86,6 +86,6 @@ flowchart LR
 
 1. **Virtual RAM Disk (`vdisk-setup`):** Checks `R:\forma-tmp` availability and offers to provision the disk, ensuring all subsequent tests and builds run in high-speed RAM from day one.
 2. **Protocol Thresholds:** Sets canonical baseline values — 25 cards per cycle (`volume`) and at most 3 attempts per task (`attempts`). Token spend and elapsed time remain metrics and are never capped in advance.
-3. **Plumb Decision Model:** Configures the decision model (recommended external `typesafe/jev-1.14` via OpenRouter Decisions API or the in-family fallback of the engine: `haiku` / `gemini-3.8-flash` / `gpt-5.6-luna` / `minimax-flash` / `glm-flash`), calibrates thresholds (leader ≥ 80%, margin ≥ 40%, noul ≥ 0.75, clarity ≥ 3/4, 100 calls per cycle), and verifies `.env` secret availability safely (prohibition 15).
+3. **Plumb Decision Model:** The external executor is named in the project layer — `project/config/PROJECT.md` (`k:routes.plumb_model`) — and called via OpenRouter Decisions API; the built-in fallback is the engine zone's weakest and cheapest executor. Calibration thresholds live in `project/config/PROJECT.md`, the limit is 100 calls per cycle; `.env` secret availability is verified safely (prohibition 15).
 4. **Localization (i18n):** Checks the project document language. If a non-bundled language is chosen (beyond built-in `ru` and `en`), creates `.forma/translation-pending.json` and launches scaffold translation.
 5. **Start Gate Clearance:** Runs `check-ready.cjs`, confirms the removal of "STOP START", and hands off cleanly to the goal briefing interview (`grilling` / `forma-grill-with-ui`).

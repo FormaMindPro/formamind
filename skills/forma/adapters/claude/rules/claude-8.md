@@ -17,4 +17,16 @@ The protocol itself is `AGENTS.md`, read natively by Claude Code when no `CLAUDE
 * **Main session = `Intent` (§1):** the main Claude Code session is `Intent`. The `SessionStart` hook `.claude/hooks/intent-start.sh` delivers `.claude/agents/intent.md` and `.claude/agents/on-demand/intent-session-start.md` into its context and shows the human the dashboard link (`systemMessage`). Cards are created with `node .forma/board/new-card.cjs` (core).
 * **Zone of edits:** Claude Code edits its own files (`.claude/`) and the shared `AGENTS.md`; `.codex/` is Codex's, `.agents/` and `GEMINI.md` are Gemini's — a divergence there is named to the human as a fact, never fixed by hand (full rule, and the commit check against the full cross-engine check — `intent-housekeeping.md`).
 
+## Models per node
+
+The five nodes' defaults are declared by the zone — `nodeModels` of `.claude/forma-adapter.cjs`; the declaration is what a default change edits, and this table is its declared view. `node .claude/scripts/check-node-defaults.cjs` reconciles the declaration, this table and the five node roles' headers; a divergence is red. `project/config/PROJECT.md`, "Node defaults" — an aggregate summary of the zones, never the owner of a zone's default. <!-- k:claude.node_defaults -->
+
+| Node | Model | Effort |
+| --- | --- | --- |
+| `Intent` | `claude-haiku-5-5` | `max` |
+| `Spec` | `claude-haiku-5-5` | `high` |
+| `Kit` | `claude-haiku-5-5` | `high` |
+| `Run` | `claude-haiku-5-5` | `low` |
+| `Core` | `claude-sonnet-5-5` | `low` |
+
 **Delivery.** Claude Code reads `AGENTS.md` (§1–7) and this file itself: with no `CLAUDE.md` in the root, both arrive as project instructions; a root `CLAUDE.md` would shadow that reading, and `sync-engines --check` reports it as a breach. Where native reading fails (older than v2.1.277, Bedrock, telemetry disabled), register the fallback `.claude/hooks/load-engine-section.sh` (`startup|resume|clear`) in `.claude/settings.json`; registered while native reading works, it delivers §8 twice.

@@ -14,6 +14,9 @@
  *    by the `dwfrun-*` run id (findSubagent/workflowActor)
  *  - skillsDir `.forma/skills/` - ZCode opens them natively as the project's skills (the engine-neutral core canon)
  *  - nodeModels: the GLM family (Z.AI), the thinking levels low/high/max (no middle one)
+ *  - the role models in instructionWeight/readNodes: resolved by the same sources as the zone's role
+ *    generator - the project's model registry (the "role x engine" binding) and PROJECT.md's node defaults -
+ *    never a constant; an unreadable source is a loud refusal naming the file
  *  - the Forma nodes are registered as the host's agent types from `.zcode/agents/`; a fresh
  *    environment without registration runs degraded under the [STAGE] labels (`.zcode/rules/zcode-8.md`, Contract 2)
  *
@@ -60,8 +63,71 @@ function weighFile(root, rel) {
   return { file: rel, bytes: Buffer.byteLength(text, 'utf8'), tokens: estimateTokens(text) };
 }
 
+function bareModelId(address) {
+  return String(address).split('/').pop().toLowerCase();
+}
+
+/** The node defaults table of PROJECT.md: rows "| Node | `Model`, effort X | ... |" under the marker line. */
+function parseNodeDefaults(projectText) {
+  const lines = projectText.split(/\r?\n/);
+  const marker = lines.findIndex((l) => l.includes('k:routes.node_defaults'));
+  if (marker === -1) throw new Error('forma-adapter: PROJECT.md has no k:routes.node_defaults marker');
+  let i = marker + 1;
+  while (i < lines.length && !/^\|/.test(lines[i])) i++;
+  const defaults = {};
+  for (; i < lines.length && /^\|/.test(lines[i]); i++) {
+    const m = lines[i].match(/^\|\s*(Intent|Spec|Kit|Run|Core)\s*\|/);
+    if (!m) continue;
+    const model = (lines[i].split('|')[2] || '').match(/`([^`]+)`/);
+    if (model) defaults[m[1].toLowerCase()] = bareModelId(model[1]);
+  }
+  return defaults;
+}
+
+/**
+ * A role's model - by the same sources as the zone's role generator, never a constant:
+ *   1. the registry binding "role x engine zcode" (project/config/models.json, the first candidate);
+ *   2. a node role without a binding - the node's default from PROJECT.md ("Node defaults",
+ *      found by the k:routes.node_defaults marker);
+ *   3. a role outside the five nodes - the zcode engine row's default_model of the same registry.
+ * The value is the bare id (the last path segment of the address, lower case).
+ * An unreadable registry or PROJECT.md is a loud refusal naming the file: no memorized value.
+ */
+function resolveModels(root = process.cwd()) {
+  const registryPath = path.join(root, 'project', 'config', 'models.json');
+  let registry;
+  try {
+    registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+  } catch (e) {
+    throw new Error('forma-adapter: the model registry is unreadable: ' + registryPath);
+  }
+  if (!Array.isArray(registry.engines)) throw new Error('forma-adapter: the model registry carries no engines list: ' + registryPath);
+  const engine = registry.engines.find((e) => e.id === 'zcode');
+  if (!engine || !engine.default_model) {
+    throw new Error('forma-adapter: the registry has no zcode engine row with default_model: ' + registryPath);
+  }
+  const engineDefault = bareModelId(engine.default_model);
+  if (registry.bindings != null && !Array.isArray(registry.bindings)) {
+    throw new Error('forma-adapter: the registry bindings are not a list: ' + registryPath);
+  }
+  const bound = {};
+  for (const b of registry.bindings || []) {
+    const role = b && typeof b.role === 'string' ? b.role.toLowerCase() : null;
+    if (!role || b.engine !== 'zcode' || !Array.isArray(b.candidates) || !b.candidates[0] || bound[role]) continue;
+    bound[role] = bareModelId(b.candidates[0]);
+  }
+  const projectPath = path.join(root, 'project', 'config', 'PROJECT.md');
+  let nodeDefault;
+  try {
+    nodeDefault = parseNodeDefaults(fs.readFileSync(projectPath, 'utf8'));
+  } catch (e) {
+    throw new Error('forma-adapter: PROJECT.md is unreadable or has no node defaults marker: ' + projectPath);
+  }
+  return { modelOf: (node) => (node && (bound[node] || nodeDefault[node])) || engineDefault };
+}
+
 function instructionWeight(root = process.cwd()) {
-  const MODEL = 'glm-5.3-flash';
+  const { modelOf } = resolveModels(root);
   const commonFiles = ['AGENTS.md', '.zcode/rules/zcode-8.md'];
   const common = commonFiles.map((f) => weighFile(root, f)).filter(Boolean);
   const commonTokens = common.reduce((s, f) => s + f.tokens, 0);
@@ -79,7 +145,7 @@ function instructionWeight(root = process.cwd()) {
     const role = weighFile(root, rel);
     if (!role) continue;
     byNode[node] = {
-      model: MODEL,
+      model: modelOf(node.toLowerCase()),
       common: commonTokens,
       role: role.tokens,
       perStep: commonTokens + role.tokens,
@@ -89,7 +155,7 @@ function instructionWeight(root = process.cwd()) {
 
   return {
     estimate: true,
-    model: MODEL,
+    model: modelOf(null),
     note: msg('zad.iw_note'),
     common: { tokens: commonTokens, files: common },
     byNode,
@@ -260,16 +326,21 @@ function mainStepOf(line, prev) {
   };
 }
 
-function readNodes(agentsDir) {
+/** The five node roles whose model the node's default may decide (the other roles - the engine default). */
+const NODE_ROLE_FILES = ['intent', 'spec', 'kit', 'run', 'core'];
+
+function readNodes(agentsDir, root = process.cwd()) {
   if (!fs.existsSync(agentsDir)) return [];
+  const { modelOf } = resolveModels(root);
   return fs.readdirSync(agentsDir).filter((x) => x.endsWith('.md')).sort().map((f) => {
     const content = fs.readFileSync(path.join(agentsDir, f), 'utf8');
     const nameMatch = /^#\s+(.+)$/m.exec(content);
+    const base = f.replace(/\.md$/, '');
     return {
-      name: f.replace(/\.md$/, ''),
-      title: nameMatch ? nameMatch[1].trim() : f.replace(/\.md$/, ''),
+      name: base,
+      title: nameMatch ? nameMatch[1].trim() : base,
       file: path.relative(process.cwd(), path.join(agentsDir, f)).replace(/\\/g, '/'),
-      model: 'glm-5.3-flash',
+      model: modelOf(NODE_ROLE_FILES.includes(base) ? base : null),
     };
   });
 }
@@ -299,7 +370,7 @@ function engineSettings(root = process.cwd()) {
     present: fs.existsSync(agentsDir),
     env: {},
     hooks: readHooks(root),
-    nodes: readNodes(path.join(agentsDir, 'agents')),
+    nodes: readNodes(path.join(agentsDir, 'agents'), root),
     skills: fs.existsSync(skillsDir)
       ? fs.readdirSync(skillsDir).filter((f) => fs.statSync(path.join(skillsDir, f)).isDirectory()).sort()
       : [],

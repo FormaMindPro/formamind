@@ -11,7 +11,7 @@ const path = require('node:path');
 
 const KEYS = require('./keys.json');
 
-const ANCHOR_RE = /<!--\s*k:([a-z0-9._-]+)\s*-->/;
+const ANCHOR_RE = /<!--\s*k:([A-Za-z0-9._-]+)\s*-->/;
 const COMMENT_RE = /<!--[\s\S]*?-->/g;
 
 const anchor = (key) => `<!-- k:${key} -->`;

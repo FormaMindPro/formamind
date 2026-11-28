@@ -13,7 +13,9 @@
 //             kit     todo        Kit      stage kit      Intent writes: opened the cycle, the card goes to kitting
 //             run     in-progress Run      stage exec     Kit writes: the kit is ready, execution
 //             intent  review      Intent   stage check    the one who executed writes: the result goes to the check
-//             accept  review      Intent   stage accept   Intent writes: the check passed, awaits the human's "yes"
+//             accept  review      Intent   stage accept   Intent writes: the check passed, awaits the human's "yes";
+//                                         refused before any write while the epic holds `k:volume` cards in done/Core -
+//                                         the cycle closes first (`--to core-close`), the next acceptance goes after
 //             close   done        Core     stage close    Intent writes: the human accepted; the file goes to done/
 //           Who holds `run` is set by the card's `route-N` label (§6–7): `route-4` (the short route) - Kit executes, `run`
 //           holds "Kit"; `route-0` and `route-1` - Intent executes, `run` holds "Intent"; the other routes - Run.
@@ -47,8 +49,8 @@
 // --gate-hash <hex> - record the readiness criterion's hash explicitly; only after the approval (--stage approve) or with
 //           --to run. Without the flag the hash is recorded by itself at those two moments. A supplied hash must match the
 //           current criterion - a mismatch is a stop before any write.
-// --selftest - the gauges of the card sampling by code, the five-field approval, the executor-only attempt budget and
-//           the gate hash in the OS temp directory (a dummy board); writes nothing; exit 0 - green.
+// --selftest - the gauges of the card sampling by code, the five-field approval, the executor-only attempt budget,
+//           the gate hash and the acceptance volume in the OS temp directory (a dummy board); writes nothing; exit 0 - green.
 // Writes `modified` (on `close` - and `completedAt`), appends a line into "History", then checks the board over this card;
 // a red check restores the card (and for `close` removes the copy in done/), so a move never leaves a broken state.
 // Part of the core: one for all engines, it knows no engine paths.
@@ -90,7 +92,10 @@ Flags:
                          label), intent (review, Intent), accept (review,
                          Intent), close (done, Core), core-close (the cycle
                          closing: several done cards, "closed" lines, the
-                         assignee reset to null).
+                         assignee reset to null). accept is refused before
+                         any write while the epic already holds k:volume
+                         cards in done/Core: the cycle closes first
+                         (--to core-close), the next acceptance goes after.
   --note "<text>"        The "what" of the stage line; required on every form.
   --kit "<text>"|-       The body of the "Kit" zone; only with --to run (Kit
                          writes the kit at the handover).
@@ -284,10 +289,30 @@ function selftest() {
     const probeText = (status, st) => '---\nstatus: "' + status + '"\n---\n- `Intent`, ' + day + ': route route-2 (why: tooling).\n- `Intent`, ' + day + ': stage ' + st + '.';
     check('(i) the pre-write gate catches a stage/status mismatch', routeStageProblems('probe.md', probeText('review', 'approve')).length === 1);
     check('(i) the pre-write gate passes a matching stage', routeStageProblems('probe.md', probeText('review', 'accept')).length === 0);
+    // (j) the epic volume at acceptance (§3, `k:volume`): the done/Core counter per epic and the acceptance stop
+    const vroot = path.join(dir, 'volume');
+    const vboard = path.join(vroot, '.devtool', 'features');
+    const vDone = path.join(vboard, 'done');
+    fs.mkdirSync(vDone, { recursive: true });
+    const mkVol = (n, epic, status, assignee) => '---\nid: "' + n + '"\nstatus: "' + status + '"\nassignee: "' + assignee + '"\nepic: "' + epic + '"\n---\n\n# ' + n + '\n\n## Task\na volume probe.\n\n## History\n\n## Result\n';
+    for (let i = 0; i < 25; i++) fs.writeFileSync(path.join(vDone, probe(920) + '-vol-' + i + '.md'), mkVol(probe(920) + '-vol-' + i, 'lane-a', 'done', 'Core'));
+    const vClosed = probe(921) + '-vol-closed';
+    fs.writeFileSync(path.join(vDone, vClosed + '.md'), mkVol(vClosed, 'lane-a', 'done', 'null'));
+    fs.writeFileSync(path.join(vboard, probe(922) + '-vol-live.md'), mkVol(probe(922) + '-vol-live', 'lane-a', 'review', 'Intent'));
+    const vOther = probe(923) + '-vol-other';
+    fs.writeFileSync(path.join(vDone, vOther + '.md'), mkVol(vOther, 'lane-b', 'done', 'Core'));
+    check('(j) the counter reads only the epic\'s done/Core cards', doneCoreCount(vDone, 'lane-a') === 25);
+    check('(j) a closed cycle (assignee null) is not counted', doneCoreCount(vDone, 'lane-a') === 25 && fs.existsSync(path.join(vDone, vClosed + '.md')));
+    check('(j) a live card of the epic is not counted', fs.existsSync(path.join(vboard, probe(922) + '-vol-live.md')) && doneCoreCount(vDone, 'lane-a') === 25);
+    check('(j) another epic counts on its own', doneCoreCount(vDone, 'lane-b') === 1);
+    check('(j) at the threshold the acceptance is blocked', acceptVolumeGate({ count: 25, volume: 25 }) === 'block');
+    check('(j) over the threshold the acceptance is blocked', acceptVolumeGate({ count: 26, volume: 25 }) === 'block');
+    check('(j) under the threshold the acceptance passes', acceptVolumeGate({ count: 24, volume: 25 }) === 'pass');
+    check('(j) no declared threshold - no gate', acceptVolumeGate({ count: 99, volume: null }) === 'pass');
     const failed = results.filter((r) => !r.ok);
     console.log((failed.length ? '✗ ' : '✓ ') + (failed.length
       ? 'mismatch: ' + failed.map((r) => r.name).join('; ')
-      : 'the gauges green, ' + results.length + ' probes: the exact sampling, the five-field approval over route-0…5, the executor-only attempt budget, the gate hash, the pre-write gate'));
+      : 'the gauges green, ' + results.length + ' probes: the exact sampling, the five-field approval over route-0…5, the executor-only attempt budget, the gate hash, the pre-write gate, the acceptance volume'));
     return failed.length === 0;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -331,6 +356,30 @@ function budgetOf(task) {
 /** The gate: at the used-up budget the pass is blocked; --override is the caller's decision, handled by the caller. */
 function budgetGate({ attempts, budget }) {
   return budget != null && attempts >= budget ? 'block' : 'pass';
+}
+/** The epic's cards already accepted, waiting for `Core`: `done` with `assignee: "Core"` in done/ — the cycle's
+ *  count (§3, counted per epic). One reading for both the acceptance stop and the informational close line. */
+function doneCoreCount(doneDir, epic) {
+  let count = 0;
+  if (!fs.existsSync(doneDir)) return count;
+  for (const f of fs.readdirSync(doneDir)) {
+    if (!f.endsWith('.md')) continue;
+    try {
+      const cText = fs.readFileSync(path.join(doneDir, f), 'utf8');
+      const cBlock = frontmatterBlock(cText) || '';
+      const cEpic = (cBlock.match(/^epic:\s*"(.+?)"/m) || [])[1];
+      const cAssignee = (cBlock.match(/^assignee:\s*"?(.+?)"?\s*$/m) || [])[1];
+      const cStatus = (cBlock.match(/^status:\s*"(.+?)"/m) || [])[1];
+      if (cEpic === epic && cStatus === 'done' && cAssignee === 'Core') count++;
+    } catch {}
+  }
+  return count;
+}
+/** The acceptance stop at the epic's volume (§3, `k:volume`): at or over the threshold the card waits — the cycle
+ *  closes first (`--to core-close`), the next acceptance goes after; below it the move goes on as before.
+ *  No declared threshold — no gate: a number is never assumed here. */
+function acceptVolumeGate({ count, volume }) {
+  return volume != null && count >= volume ? 'block' : 'pass';
 }
 /** The hash of the readiness criterion (field 3 of the five-fields line); no five fields - null. */
 function gateHashOf(taskText) {
@@ -636,6 +685,8 @@ function sessionSpendLines(num) {
 }
 
 // 1. The card: only a live one - the unified sampling by the exact number, fail-closed under ambiguity
+// PROJECT.md is read before any gate: the volume threshold (`k:volume`) is needed by the acceptance stop.
+const projectMd = fs.readFileSync(projectFile(ROOT, 'PROJECT.md'), 'utf8');
 const found = resolveCardFiles(ROOT, id);
 if (found.ambiguous) dieAmbiguous(id, found.ambiguous);
 if (!found.file) die(msg('board.card-move.no_card', { id }));
@@ -662,6 +713,15 @@ if (to === 'kit') {
 
 // 1c. --gate-hash is scoped: the approval line or the first handover to execution.
 const ghArg = gateHashArg(to === 'run');
+
+// 1d. The epic's volume at acceptance (§3, `k:volume`): at or over the threshold the card waits before any write —
+// the cycle closes first (`--to core-close`), the next acceptance comes after; below it the move goes as before.
+// A card without an epic has no lane to count: no gate.
+if (to === 'accept' && fm.epic) {
+  const volume = i18n.rowNumber(projectMd, 'volume') ?? 25;
+  const count = doneCoreCount(path.join(BOARD, 'done'), fm.epic);
+  if (acceptVolumeGate({ count, volume }) === 'block') die(msg('board.card-move.accept_volume_stop', { id: cardId, epic: fm.epic, count, vol: volume }));
+}
 
 // 2. Who holds `run` (§7): by the route-N label - the short route (route-4) is executed by Kit, route-0/1 - by Intent
 let assignee = t.assignee;
@@ -723,7 +783,6 @@ if (kitBody != null) text = setZone(text, 'kit', kitBody);
 if (resultBody != null) text = setZone(text, 'result', resultBody);
 
 // 5. The stage line - to the end of the "History" zone (before the result zone)
-const projectMd = fs.readFileSync(projectFile(ROOT, 'PROJECT.md'), 'utf8');
 const zoneHist = zoneHeadingIn(text, 'history');
 const zoneRes = zoneHeadingIn(text, 'result');
 if (!zoneHist) die(msg('board.card-move.no_history_zone'));
@@ -795,22 +854,9 @@ console.log(`ok: ${cardId} → ${t.status}/${assignee} · stage ${t.stage}`);
 if (to === 'close') {
   const epic = fm.epic;
   if (epic) {
+    // The informational line only (§3): the count is a reminder of the cycle, not a barrier — the barrier stands at `--to accept`.
     const cycleVol = i18n.rowNumber(projectMd, 'volume') ?? 25;
-    const doneDir = path.join(BOARD, 'done');
-    let count = 0;
-    if (fs.existsSync(doneDir)) {
-      for (const f of fs.readdirSync(doneDir)) {
-        if (!f.endsWith('.md')) continue;
-        try {
-          const cText = fs.readFileSync(path.join(doneDir, f), 'utf8');
-          const cBlock = frontmatterBlock(cText) || '';
-          const cEpic = (cBlock.match(/^epic:\s*"(.+?)"/m) || [])[1];
-          const cAssignee = (cBlock.match(/^assignee:\s*"?(.+?)"?\s*$/m) || [])[1];
-          const cStatus = (cBlock.match(/^status:\s*"(.+?)"/m) || [])[1];
-          if (cEpic === epic && cStatus === 'done' && cAssignee === 'Core') count++;
-        } catch {}
-      }
-    }
+    const count = doneCoreCount(path.join(BOARD, 'done'), epic);
     const note = count >= cycleVol ? msg('board.card-move.cycle_time') : msg('board.card-move.cycle_accumulating');
     console.log(msg('board.card-move.cycle_line', { epic, count, vol: cycleVol, note }));
   }

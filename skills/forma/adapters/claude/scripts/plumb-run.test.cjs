@@ -16,14 +16,14 @@ assert.strictEqual(typeof plumbLine, 'function', 'plumbLine exported');
 // Real row: jev has all four thresholds, none null.
 const jev = readThresholds(root, 'jev');
 assert.ok(jev, 'jev thresholds read');
-assert.deepStrictEqual(jev, { leader: 70, gap: 20, noul: 70, clarity: 3 });
+assert.deepStrictEqual(jev, { leader: 80, gap: 40, noul: 0.75, clarity: 3 });
 for (const v of Object.values(jev)) assert.notStrictEqual(v, null);
 
 // haiku: leader and gap only; noul and clarity may be null.
 const haiku = readThresholds(root, 'haiku');
 assert.ok(haiku, 'haiku thresholds read');
-assert.strictEqual(haiku.leader, 60);
-assert.strictEqual(haiku.gap, 20);
+assert.strictEqual(haiku.leader, 80);
+assert.strictEqual(haiku.gap, 40);
 assert.ok(haiku.noul == null && haiku.clarity == null);
 
 // Legacy form (thresholds as text inside the Plumb row): three spellings of the gap key give one value.
@@ -54,16 +54,16 @@ assert.ok(/\u043d\u0438\u0436\u0435 \u043f\u043e\u0440\u043e\u0433\u0430/.test(l
 assert.ok(/\u043f\u043e\u0440\u043e\u0433\u0438 \u043f\u0440\u043e\u0439\u0434\u0435\u043d\u044b/.test(high), high);
 assert.ok(!/\u043d\u0435 \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u043d\u044b/.test(low) && !/\u043d\u0435 \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u043d\u044b/.test(high));
 
-// Model name comes from PROJECT.md (routes.plumb_model); a missing file falls back to the constant.
+// Model name comes from PROJECT.md (routes.plumb_model); a missing or address-less file is a refusal, not a constant.
 assert.strictEqual(typeof readModel, 'function', 'readModel exported');
 const projectMd = fs.readFileSync(path.join(root, 'project', 'config', 'PROJECT.md'), 'utf8');
-const wantModel = /routes\.plumb_model -->[^|]*\|[^`]*`([\w.-]+\/[\w.:-]+)`/.exec(projectMd)[1];
+const wantModel = /routes\.plumb_model -->[^|]*\|[^`]*`(?:openrouter:)?([\w.-]+\/[\w.:-]+)`/.exec(projectMd)[1];
 assert.strictEqual(readModel(root), wantModel);
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'plumb-model-'));
 fs.mkdirSync(path.join(tmp, 'project', 'config'), { recursive: true });
 fs.writeFileSync(path.join(tmp, 'project', 'config', 'PROJECT.md'), '| x <!-- k:routes.plumb_model --> | model `acme/test-9.9`; |\n');
 assert.strictEqual(readModel(tmp), 'acme/test-9.9');
 fs.rmSync(tmp, { recursive: true, force: true });
-assert.strictEqual(readModel(path.join(os.tmpdir(), 'no-such-root-xyz')), 'typesafe/jev-1.14');
+assert.throws(() => readModel(path.join(os.tmpdir(), 'no-such-root-xyz')), /PROJECT\.md/);
 
 console.log('plumb-run.test: ok');

@@ -212,6 +212,80 @@ it('the engine mode is full (ru data value), the id and the tag - zcode', () => 
   assert.equal(a.spendTag, 'zcode');
 });
 
+// 2b. The model resolver: the same sources as the zone's role generator
+const REGISTRY = path.join(root, 'project', 'config', 'models.json');
+const PROJECT = path.join(root, 'project', 'config', 'PROJECT.md');
+
+/** A throwaway project: the node role files, a registry copy and a PROJECT.md copy. */
+function probeProject({ registry, project } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zcode-models-'));
+  fs.mkdirSync(path.join(dir, '.zcode', 'agents'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'project', 'config'), { recursive: true });
+  for (const name of ['intent', 'spec', 'kit', 'run', 'core', 'extractor']) {
+    fs.writeFileSync(path.join(dir, '.zcode', 'agents', name + '.md'), '# ' + name + '\n');
+  }
+  const reg = registry || JSON.parse(fs.readFileSync(REGISTRY, 'utf8'));
+  fs.writeFileSync(path.join(dir, 'project', 'config', 'models.json'), JSON.stringify(reg));
+  fs.writeFileSync(path.join(dir, 'project', 'config', 'PROJECT.md'), project || fs.readFileSync(PROJECT, 'utf8'));
+  return dir;
+}
+
+const bareOf = (address) => String(address).split('/').pop().toLowerCase();
+
+it('the weight and the nodes follow the registry binding of the role', () => {
+  const reg = JSON.parse(fs.readFileSync(REGISTRY, 'utf8'));
+  for (const b of reg.bindings) if (b.role === 'run' && b.engine === 'zcode') b.candidates = ['probe/Probe-Model-One'];
+  const bound = (role) => bareOf(reg.bindings.find((b) => b.role === role && b.engine === 'zcode').candidates[0]);
+  const dir = probeProject({ registry: reg });
+  try {
+    const a = adapter();
+    const w = a.instructionWeight(dir);
+    assert.equal(w.byNode.Run.model, 'probe-model-one', 'Run must follow the substituted binding');
+    for (const n of ['Intent', 'Spec', 'Kit', 'Core']) assert.equal(w.byNode[n].model, bound(n.toLowerCase()), n + ' must stay on its own binding');
+    const nodes = a.engineSettings(dir).nodes;
+    assert.equal(nodes.find((n) => n.name === 'run').model, 'probe-model-one', 'the zone tab must follow the binding too');
+    assert.equal(nodes.find((n) => n.name === 'extractor').model, w.model, 'a role outside the five nodes - the engine default');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+it('without the binding the node default of PROJECT.md decides, exactly one node moves', () => {
+  const reg = JSON.parse(fs.readFileSync(REGISTRY, 'utf8'));
+  const own = new Map(reg.bindings.filter((b) => b.engine === 'zcode').map((b) => [b.role, bareOf(b.candidates[0])]));
+  reg.bindings = reg.bindings.filter((b) => !(b.role === 'run' && b.engine === 'zcode'));
+  const lines = fs.readFileSync(PROJECT, 'utf8').split(/\r?\n/);
+  const row = lines.findIndex((l) => /^\|\s*Run\s*\|/.test(l));
+  assert.ok(row > 0, 'the Run row of the node defaults table was not found');
+  const cells = lines[row].split('|');
+  cells[2] = ' `Probe-Model-Two`, effort high ';
+  const project = lines.slice();
+  project[row] = cells.join('|');
+  const dir = probeProject({ registry: reg, project: project.join('\n') });
+  try {
+    const a = adapter();
+    const w = a.instructionWeight(dir);
+    assert.equal(w.byNode.Run.model, 'probe-model-two', 'a role without a binding must take the node default');
+    for (const n of ['Intent', 'Spec', 'Kit', 'Core']) assert.equal(w.byNode[n].model, own.get(n.toLowerCase()), n + ' must not move');
+    assert.equal(a.engineSettings(dir).nodes.find((n) => n.name === 'run').model, 'probe-model-two');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+it('an unreadable registry or PROJECT.md is a loud refusal naming the file', () => {
+  const a = adapter();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zcode-models-'));
+  try {
+    assert.throws(() => a.instructionWeight(dir), /models\.json/, 'a missing registry must be named');
+    fs.mkdirSync(path.join(dir, 'project', 'config'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'project', 'config', 'models.json'), fs.readFileSync(REGISTRY, 'utf8'));
+    assert.throws(() => a.instructionWeight(dir), /PROJECT\.md/, 'a missing PROJECT.md must be named');
+    fs.writeFileSync(path.join(dir, 'project', 'config', 'models.json'), '{not json');
+    assert.throws(() => a.instructionWeight(dir), /models\.json/, 'a broken registry must be named');
+    const reg = JSON.parse(fs.readFileSync(REGISTRY, 'utf8'));
+    reg.engines = reg.engines.filter((e) => e.id !== 'zcode');
+    fs.writeFileSync(path.join(dir, 'project', 'config', 'models.json'), JSON.stringify(reg));
+    assert.throws(() => a.instructionWeight(dir), /models\.json/, 'a registry without the zcode row must be named');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 // 3. The roles parity - by a regeneration
 it('the roles mirror is in sync with .claude/agents (gen-roles --check)', () => {
   const r = spawnSync(process.execPath, [path.join(root, '.zcode', 'scripts', 'gen-roles.cjs'), '--check'], { encoding: 'utf8' });

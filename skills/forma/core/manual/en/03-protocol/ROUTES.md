@@ -141,18 +141,20 @@ Each route is described the same way: chain, when to choose it, why it works, wh
 - **Chain:** `Intent` writes the card → `Kit` assembles the kit for the task → `Run` executes → `Intent` accepts.
 - **Choose when:** the brief is clear, nothing to slice, but a role is needed that the standard kit lacks: a special skill, site access, MCP, an external service.
 - **Why it works:** `Kit` knows the arsenal and answers for its completeness; `Run` gets exactly what it needs and does not search on its own.
-- **Not when:** the criterion is not obvious (`Spec` is needed); the kit already exists ready-made (that is `route-2` or `over-1`).
+- **Not when:** the criterion is not obvious (`Spec` is needed); the kit already exists ready-made (that is `route-6` or `over-1`).
 - **Risk:** the same weakness of the criterion as in `route-2`. **Guard:** the same — the human's approval, the consumer in the criterion.
 - **Approves:** the human — the five fields of the card.
 
 ### `route-6` — `Spec` → `Run` with a ready kit
 
 - **Chain:** `Spec` slices → `Kit` is not called, the kit is taken by name from the library (`over-1`) → `Run` executes → `Intent` accepts.
-- **Choose when:** slicing is needed, but the kind of task has been met before and its kit is recorded.
-- **Why it works:** the main thing is kept — the criterion is written by someone other than the acceptor; no `Kit` call is needed.
-- **Not when:** there is no kit for the kind, or the case differs from the kind (new access, new tool).
+- **Choose when:** this is **the normal path of a covered kind** — the kind of task has been met before, its kit is recorded in the library and taken by name, and `Spec` has confirmed the role with the Plumb. Slicing is needed; assembling the kit is not. The label is `route-6`, the reason code `plumb`.
+- **Why it works:** the main thing is kept — the criterion is written by someone other than the acceptor; no `Kit` call is needed. The human's consent has moved to the library and the registry: the human approves both at the cycle's opening, so a `route-6` card needs no separate "yes" on the five fields; acceptance of the result and `Core`'s verdict stay the same.
+- **The model comes from the candidate list** of the registry's role × engine binding (1–4 candidates): `Spec` writes into `## Kit` the role's primary address or a replacement from that list, the reason for a replacement as one line in the `Model` unit. It never goes outside the list.
+- **Not when:** there is no kit for the kind, or the case differs from the kind (new access, new tool); the Plumb reads below the thresholds — then `Kit` creates the role (`route-5` or `route-7`).
 - **Risk:** the kit is outdated. **Guard:** `Run` returns the task on a missing field — then it goes to `Kit` (`route-7`), and `Kit` updates the library entry.
-- **Approves:** not required.
+- **The boundary:** a card wholly written by `Intent`, with its kit already set, keeps `route-2` (`why: ready`) — there is no slicing, the library is not needed.
+- **Approves:** not required — the human approved the library and the registry at the cycle's opening.
 
 ### `route-7` — full cycle `Spec` → `Kit` → `Run` → `Intent`
 
@@ -273,7 +275,7 @@ Questions in order; the first "yes" determines the route. `Intent` on a single t
 2. Is the work shorter than its card? → **`route-0`**.
 3. Is the whole volume of the goal known and the image stable? → **`route-8`**; each segment card — again by questions 4–7.
 4. Is the cost of error high, the stack new or the criterion not obvious? → **`route-7`**.
-5. Slicing needed, a kit for the kind exists? → **`route-6`**.
+5. Slicing is needed and the kind of task is covered by the library — its kit is recorded by name? → **`route-6`**, the normal path of a covered kind (`why: plumb`); the model comes from the registry's role × engine candidate list.
 6. The brief lies in an accepted document: standard kit → **`route-2`**; special → **`route-5`**; it is tooling → **`route-4`**.
 7. `Intent` understands the task best, and it is large? → **`route-1`**, not `route-0`.
 
@@ -404,5 +406,5 @@ The `GOAL.md` of a `route-8` goal — section "Segments": segments → waves →
 
 ## 9. The Plumb in the route
 
-Before `Kit`, `Spec` measures role fit with the Plumb (`PLUMB.md`). A confirmed role goes straight to `Run` and the card is labelled `route-2` with the reason code `plumb`; a reading below the thresholds sends the card to `Kit`, which creates the missing role (`route-5`). `Kit` is thus a stage of the cards that need a new role and of returns — not of every card. The Plumb is not a route and not a node: it changes who is called, not the route codes.
+Before `Kit`, `Spec` measures role fit with the Plumb (`PLUMB.md`). A confirmed role goes straight to `Run` and the card is labelled `route-6` with the reason code `plumb`; a reading below the thresholds sends the card to `Kit`, which creates the missing role (`route-5`). `Kit` is thus a stage of the cards that need a new role and of returns — not of every card. The Plumb is not a route and not a node: it changes who is called, not the route codes.
 

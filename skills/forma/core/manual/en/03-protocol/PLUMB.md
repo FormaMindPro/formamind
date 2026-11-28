@@ -28,9 +28,9 @@ A decision model that writes no text and explains nothing. Three typed readings,
 
 ## Executors
 
-Set by `plumb` in `PROJECT.md`. Default — the built-in small model (`plumb-haiku`), nothing leaves the model family. Recommended — an external decision model, behind the scrubbing script. A missing key, an error or a scrubbing refusal falls back to the built-in one, the reason goes into the card's history.
+Set by `plumb` in `PROJECT.md`. Two kinds of executor: **the engine's local executor** — inside the model family, nothing leaves it; **the project-named executor** — an external decision service behind the scrubbing script, whose address and channel are project data, the `plumb` line in `PROJECT.md`. A missing key, a bridge error or a scrubbing refusal falls back to the engine's in-family lightweight fallback, the reason going into the card's history.
 
-**`jev` (Claude Code).** The driver `.forma/plumb/plumb-run.cjs` scrubs the task and the role catalog (`--engine <id>` takes `runRolesDir` of that engine's adapter, `--roles-dir <path>` a folder; default — the Claude catalog), then calls the OpenRouter Decisions API (`typesafe/jev-1.14`) through the bridge: a typed `questions`+`state` request, not `chat/completions` — the model answers `choice`/`score`/`noul` directly, one call. On a missing key, a bridge error or a scrub refusal it prints a fallback marker instead of calling Jev; the caller then runs the built-in executor and records that attempt as such, the reason named — never as a `jev` reading that didn't happen. The one-time switch `plumb-switch.cjs` flips only the `plumb` selector in `PROJECT.md`; it stops without writing anything when the key is absent, and never sets the cycle's call limit or jev's own thresholds — the human sets both.
+**The project-named executor.** The driver `.forma/plumb/plumb-run.cjs` scrubs the task and the role catalog (`--engine <id>` takes `runRolesDir` of that engine's adapter, `--roles-dir <path>` a folder; default — the engine's own catalog), then sends, through the bridge, a typed `questions`+`state` request — not `chat/completions` — to the decision service the `plumb` setting names: the driver reads the model address and the channel from `PROJECT.md`, they never enter the shared text. The model answers `choice`/`score`/`noul` directly, one call. On a missing key, a bridge error or a scrub refusal the driver prints a fallback marker instead of calling out; the caller then runs the engine's local executor and records that attempt as such, the reason named — never as a project-named executor reading that didn't happen. The one-time switch `plumb-switch.cjs` flips only the `plumb` selector in `PROJECT.md`; it stops without writing anything when the key is absent, and never sets the cycle's call limit or the executor's own thresholds — the human sets both.
 
 ## Scrubbing (prohibition 17)
 
@@ -57,7 +57,7 @@ The script only prepares and scores; the engine's own executor does the reading,
 
 | Setting | Meaning |
 |---|---|
-| `plumb` | executor: `haiku` (default, in-family) or `jev` (external decision model) |
+| `plumb` | executor selector: the engine's local executor (default, in-family) or the project-named executor — an external decision service; the model address and the channel sit on this same line |
 | thresholds | leading probability, gap to the second, noul of the leader, clarity — separate per executor, revised by `Core` only through a stop with a report |
 | external model | provider, model, key name in `.env`, the masked site domain, the cycle's call limit (in calls, never dollars) |
 
@@ -67,9 +67,9 @@ The script only prepares and scores; the engine's own executor does the reading,
 |---|---|
 | `plumb-scrub.cjs` | scrubs a card's task; `--site` adds hosts to mask; exits 2 on a refusal; test: `plumb-scrub.test.cjs` |
 | `plumb-measure.cjs` | `prepare` builds a batch from closed cards (role used = ground truth), `score` compares an executor's answers to it |
-| `plumb-haiku` | the built-in executor, a subagent with the `Read` tool only |
-| `.forma/plumb/plumb-run.cjs` | `jev` driver (shared zone): scrub the task and the catalog of `--roles-dir` / `runRolesDir` of `--engine` (default: the Claude catalog) → OpenRouter Decisions API (`typesafe/jev-1.14`) via the bridge → `{choice, score, noul}`, or a fallback marker on a missing key / bridge error / scrub refusal |
-| `plumb-switch.cjs` | flips the `plumb` selector in `PROJECT.md`; stops without writing when the key is absent; never sets the call limit or jev's thresholds |
+| the local executor's profile in an engine's zone (`.claude/agents/`, `.zcode/agents/`) | the built-in executor, a subagent with the `Read` tool only; the profile's name and model are the zone's setting and never enter the shared text |
+| `.forma/plumb/plumb-run.cjs` | the project-named executor's driver (shared zone): scrub the task and the catalog of `--roles-dir` / `runRolesDir` of `--engine` (default: the engine's own catalog) → a typed request to the external decision service through the bridge → `{choice, score, noul}`, or a fallback marker on a missing key / bridge error / scrub refusal |
+| `plumb-switch.cjs` | flips the `plumb` selector in `PROJECT.md`; stops without writing when the key is absent; never sets the call limit or the executor's thresholds |
 
 An executor earns the right to decide alone only after a measurement on closed cards: the match with the role actually used, and the match at the confidence threshold, both recorded in `PROJECT.md`.
 

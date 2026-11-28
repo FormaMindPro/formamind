@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 'use strict';
-// The external executor's Plumb driver (plumb: jev, OpenRouter Decisions API, typesafe/jev-1.14).
+// The external executor's Plumb driver (plumb: jev, OpenRouter Decisions API). The model address is a
+// project value: it comes only from project/config/PROJECT.md, the routes.plumb_model key.
 // A scrubbed card + a roles catalog -> the bridge (external-model-bridge.cjs, Decisions API) ->
 // strict JSON {choice, score, noul}. It does not call haiku itself (the script has no Agent tool) -
 // with a missing key, a bridge error or a scrub refusal it prints {fallback:"haiku", reason:...}
-// and exits with code 0: the caller (the main session) then calls plumb-haiku itself.
+// and exits with code 0: the caller (the main session) then calls plumb-haiku itself. An unreadable or
+// address-less project/config/PROJECT.md is not that case: refusal, exit code 2, the file named on
+// stderr, an empty stdout - no in-memory default.
 //
 // Usage:
 //   node .forma/plumb/plumb-run.cjs <card.md> [--root DIR] [--engine ID | --roles-dir PATH]
@@ -36,18 +39,22 @@ function requireSibling(name) {
 const { extractTask, loadSecrets, scrub, residue } = requireSibling('plumb-scrub.cjs');
 const { loadEnvKeyOptional, callDecisions, estimateCostUsd } = requireSibling('external-model-bridge.cjs');
 
-// The fallback model name: matches PROJECT.md (the routes.plumb_model key); the source is PROJECT.md.
-const FALLBACK_MODEL = 'typesafe/jev-1.14';
+// The model address is a project value, never the driver's: project/config/PROJECT.md, the first
+// `provider/model` in the line with the routes.plumb_model key. No readable address - a throw naming the
+// file, never an in-memory default.
+const PROJECT_FILE = 'project/config/PROJECT.md';
 
-// The jev model from PROJECT.md: the first `provider/model` in the line with the routes.plumb_model key.
 function readModel(root) {
+  let md;
   try {
-    const md = fs.readFileSync(path.join(root, 'project', 'config', 'PROJECT.md'), 'utf8');
-    const row = md.split(/\r?\n/).find((l) => l.includes('routes.plumb_model'));
-    const m = row && /`([\w.-]+\/[\w.:-]+)`/.exec(row.split('-->').slice(1).join('-->'));
-    if (m) return m[1];
-  } catch (e) { /* no PROJECT.md or unreadable - the fallback name */ }
-  return FALLBACK_MODEL;
+    md = fs.readFileSync(path.join(root, 'project', 'config', 'PROJECT.md'), 'utf8');
+  } catch (e) {
+    throw new Error(`no external executor address: ${PROJECT_FILE} is unreadable (${e.code || e.message})`);
+  }
+  const row = md.split(/\r?\n/).find((l) => l.includes('routes.plumb_model'));
+  const m = row && /`(?:openrouter:)?([\w.-]+\/[\w.:-]+)`/.exec(row.split('-->').slice(1).join('-->'));
+  if (!m) throw new Error(`no external executor address: ${PROJECT_FILE} has no readable routes.plumb_model key`);
+  return m[1];
 }
 const DEFAULT_ROLES_REL = '.claude/agents/run';
 
@@ -202,7 +209,13 @@ async function main() {
     process.exit(1);
   }
 
-  const model = readModel(a.root);
+  let model;
+  try {
+    model = readModel(a.root);
+  } catch (e) {
+    console.error(e.message);
+    process.exit(2);
+  }
   if (a.dry) {
     emit({ dry: true, model }, a.out);
     return;

@@ -75,6 +75,16 @@ Spend in tokens and elapsed time are statistics, not thresholds: they are writte
 | External model for the plumb <!-- k:routes.plumb_model --> | provider and model — ; key name in `.env` — ; the site's domain is masked; cycle call limit — number of calls, the human sets the value (never dollars) |
 | An epic's default route | marker `/Intent+Kit` in the epic name (table "Project epics"); a card's own `route-N` label overrides it |
 
+**Node defaults** <!-- k:routes.node_defaults --> *(a summary: each engine's zone declares its own defaults — the `nodeModels` of its adapter, the place a default is edited; a column here repeats that declaration, compared in lower case; the registry `project/config/models.json` holds the "role × engine" bindings; until a card names a model in its `Model` unit, the node works on the default)*:
+
+| Node | zcode |
+|---|---|
+| Intent | `GLM-5.3-Flash`, effort high |
+| Spec | `GLM-5.3-Flash`, effort high |
+| Kit | `GLM-5.3-Flash`, effort high |
+| Run | `GLM-5.3-Flash`, effort low |
+| Core | `GLM-5.3-Flash`, effort high |
+
 **Node qualification** — not a separate field, not filled in beforehand. Each node has its own source of level, read on the spot when the node actually looks at a task:
 
 | Node | Source of level |

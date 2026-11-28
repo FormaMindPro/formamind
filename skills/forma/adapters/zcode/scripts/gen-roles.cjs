@@ -36,14 +36,123 @@ const DST = path.join(ROOT, '.zcode', 'agents');
 /**
  * The built-in Plumb executor's name - by the zone's small model, each engine has its own
  * (Gemini - `plumb-gemini`, its own file). The body's source is one, hence the renaming map:
- * the mirror file, the `name:` field and the mentions in the roles' bodies. The wired jev fallback tag
- * (`{"fallback":"haiku"}`) and the `haiku` value of the `plumb` setting in PROJECT.md are not touched -
- * that is the setting's vocabulary, not an agent's name.
+ * the mirror file, the `name:` field and the mentions in the roles' bodies. The driver's wired
+ * fallback tag and the value of the `plumb` setting in PROJECT.md are not touched - that is the
+ * setting's vocabulary, not an agent's name.
  */
 const EXECUTOR_RENAME = { 'plumb-haiku': 'plumb-glmflash' };
 
-/** My model: one runtime; the "node / effort" distinction is expressed by the thinking level. */
-const MY_MODEL = 'glm-5.3-flash';
+/**
+ * The model of a mirror is resolved per role, never kept as a constant:
+ *   1. one of the five nodes - that node's default from the zone's own declaration, `nodeModels`
+ *      of `.zcode/forma-adapter.cjs` - the place the default is edited; the "Node defaults" table
+ *      of project/config/PROJECT.md is its summary, not the source;
+ *   2. a role outside the five nodes with a registry binding "role x engine zcode"
+ *      (project/config/models.json, first candidate);
+ *   3. any other role (the Plumb executor, helpers, the on-demand layer) - the zcode engine row's
+ *      default_model of the same registry.
+ * The value written into the frontmatter is the bare id (the last path segment of the address,
+ * lower case) - the runtime form the live role registration proved. An unreadable registry or zone
+ * adapter, a declaration without a node's model or effort, is a loud failure naming the file: the
+ * mirror never falls back to a memorized value.
+ *
+ * The tier and the effort follow the same sources, never the canon:
+ *   - the tier is the `tier` of the registry row of the model actually set, so every mirror of
+ *     that model moves together; no row for that model - a loud failure, no memorized value;
+ *   - the effort is the node's `effort` in the same declaration; a role outside the five nodes
+ *     leaves the constants MY_EFFORT/RUN_EFFORT as the fallback, never a value from memory.
+ */
+const REGISTRY_PATH = path.join(ROOT, 'project', 'config', 'models.json');
+const ADAPTER_PATH = path.join(ROOT, '.zcode', 'forma-adapter.cjs');
+const NODES = ['intent', 'spec', 'kit', 'run', 'core'];
+const EFFORTS = ['low', 'high', 'max'];
+
+function bareModelId(address) {
+  return address.split('/').pop().toLowerCase();
+}
+
+/** The five node defaults: the zone's declaration `nodeModels` of the adapter above. The values are
+ *  the zone's literals, not a computation: the table of PROJECT.md is their summary. An unreadable
+ *  adapter, or a declaration without a node's model/effort, is a loud failure naming the file. */
+function loadNodeModels() {
+  let adapter;
+  try {
+    adapter = require(ADAPTER_PATH);
+  } catch (e) {
+    throw new Error('gen-roles: the zone adapter is unreadable: ' + ADAPTER_PATH);
+  }
+  const declared = adapter && adapter.nodeModels;
+  if (!declared || typeof declared !== 'object') {
+    throw new Error('gen-roles: the zone adapter declares no nodeModels: ' + ADAPTER_PATH);
+  }
+  const defaults = {};
+  for (const node of NODES) {
+    const name = node.charAt(0).toUpperCase() + node.slice(1);
+    const row = declared[name] || declared[node];
+    const model = row && typeof row.model === 'string' ? row.model.trim() : '';
+    const effort = row && typeof row.effort === 'string' ? row.effort.trim().toLowerCase() : '';
+    if (!model || !EFFORTS.includes(effort)) {
+      throw new Error('gen-roles: nodeModels of ' + ADAPTER_PATH + ' lacks a valid model/effort for ' + name + ' (effort low|high|max)');
+    }
+    defaults[node] = { model: bareModelId(model), effort };
+  }
+  return defaults;
+}
+
+function resolveModels() {
+  let registry;
+  try {
+    registry = JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8'));
+  } catch (e) {
+    throw new Error('gen-roles: the model registry is unreadable: ' + REGISTRY_PATH);
+  }
+  const engine = (registry.engines || []).find((e) => e.id === 'zcode');
+  if (!engine || !engine.default_model) {
+    throw new Error('gen-roles: the registry has no zcode engine row with default_model');
+  }
+  const engineDefault = bareModelId(engine.default_model);
+  const bound = {};
+  for (const b of registry.bindings || []) {
+    if (b.engine === 'zcode' && Array.isArray(b.candidates) && b.candidates[0] && !bound[b.role]) {
+      bound[b.role] = bareModelId(b.candidates[0]);
+    }
+  }
+  const nodeDefault = loadNodeModels();
+  const nodeOf = (rel) => {
+    if (['intent.md', 'spec.md', 'kit.md', 'core.md'].includes(rel)) return rel.replace('.md', '');
+    if (rel === 'run.md' || rel.startsWith('run/')) return 'run';
+    return null;
+  };
+  const modelOf = (rel) => {
+    const node = nodeOf(rel);
+    if (node) return nodeDefault[node].model;
+    return bound[rel.replace(/\.md$/, '')] || engineDefault;
+  };
+  const rows = new Map();
+  for (const row of registry.models || []) {
+    if (row.engine !== 'zcode' || !row.address) continue;
+    const id = bareModelId(row.address);
+    if (!rows.has(id)) rows.set(id, row);
+  }
+  const tierOf = (rel) => {
+    const model = modelOf(rel);
+    const row = rows.get(model);
+    if (!row) {
+      throw new Error('gen-roles: the registry has no zcode model row for "' + model + '" (role ' + rel + '); expected a row of engine zcode whose address ends with that id');
+    }
+    if (!row.tier) {
+      throw new Error('gen-roles: the registry row of "' + model + '" carries no tier (role ' + rel + '); expected "tier: <strong|standard|light>"');
+    }
+    return row.tier;
+  };
+  const effortOf = (rel) => {
+    const node = nodeOf(rel);
+    return node ? nodeDefault[node].effort : null;
+  };
+  return { modelOf, tierOf, effortOf };
+}
+
+const MODELS = resolveModels();
 
 const BODY_TRANSFORMS = [
   [/\bplumb-haiku\b/g, EXECUTOR_RENAME['plumb-haiku']],
@@ -54,8 +163,6 @@ const BODY_TRANSFORMS = [
   [/\.claude\/rules\/claude-8\.md/g, '.zcode/rules/zcode-8.md'],
   [/\bclaude-8\.md\b/g, 'zcode-8.md'],
   [/\bCLAUDE\.md\b/g, 'AGENTS.md'],
-  [/Plumb on `haiku` or OpenRouter `jev`/g, 'Plumb on `' + MY_MODEL + '` or OpenRouter `jev`'],
-  [/Plumb on `haiku`\/`jev`/g, 'Plumb on `' + MY_MODEL + '`\/`jev`'],
 ];
 
 /** The tools: the clone's name -> my runtime's name. The order matters: the long ones first. */
@@ -91,7 +198,8 @@ const WRITE_PATH_RULES = [
   [/never to `\.claude\/scripts\/`/g, 'never to `.zcode/scripts/`'],
 ];
 
-/** The default effort, and Run's: the host's levels - low | high | max (no middle one). */
+/** The default effort, and Run's: the host's levels - low | high | max (no middle one).
+ *  These are the fallback only, for a role whose node cell carries no effort. */
 const MY_EFFORT = 'high';
 const RUN_EFFORT = 'low';
 
@@ -134,9 +242,9 @@ function myFrontmatter(srcFm, rel) {
   const lines = ['---'];
   if (f.name) lines.push(`name: ${EXECUTOR_RENAME[f.name] || f.name}`);
   if (f.description) lines.push(`description: ${f.description}`);
-  lines.push(`model: ${MY_MODEL}`);
-  if (f.tier) lines.push(`tier: ${f.tier}`);
-  lines.push(`effort: ${isRun ? RUN_EFFORT : MY_EFFORT}`);
+  lines.push(`model: ${MODELS.modelOf(rel)}`);
+  lines.push(`tier: ${MODELS.tierOf(rel)}`);
+  lines.push(`effort: ${MODELS.effortOf(rel) || (isRun ? RUN_EFFORT : MY_EFFORT)}`);
   if (f.tools) lines.push(`tools: ${mapTools(f.tools)}`);
   if (f.uses) lines.push(`uses: ${f.uses}`);
   if (f.omitClaudeMd) lines.push(`omitClaudeMd: ${f.omitClaudeMd}`);

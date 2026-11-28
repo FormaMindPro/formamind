@@ -20,7 +20,7 @@ The protocol itself is `AGENTS.md`, imported by the line above — sections 1–
 
 ### The Plumb (Contract 8: constructive)
 
-* Built-in executor and external executor (`typesafe/jev-1.14`) routing.
+* Routing between the engine zone's built-in fallback and the external executor named in `project/config/PROJECT.md` (`k:routes.plumb_model`).
 
 ## Models per node
 

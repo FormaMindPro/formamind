@@ -67,8 +67,11 @@ Every code carries a human name beside it; the code is the address, the name rid
 | Key | Name | In the ru mirror |
 |---|---|---|
 | `Plumb` | Plumb | the project's own name for `Plumb` |
+| `modelRegistry` | Model registry | реестр моделей |
+| `roleModel` | Role-model binding | привязка роль — модель |
+| `modelLedger` | Model ledger | модельная ведомость |
 
-The Plumb: role-fit measure between slicing and execution (`PLUMB.md`). The ru mirror of this registry carries the project's own name for `Plumb`.
+The Plumb: role-fit measure between slicing and execution (`PLUMB.md`). The ru mirror of this registry carries the project's own name for `Plumb`. The three model keys are the protocol's dictionary (the mechanism of names), never project data: model addresses and values stay in `project/**` (prohibition 16). The model registry is the project's machine and human registry of models; the role-model binding is the registry's row "role × engine → address" and its candidate list (1–4); the model ledger is the per-role, per-model statistics `Core` reads.
 
 ## Where the name lives
 

@@ -43,7 +43,7 @@ Every engine must systematically declare for each of the nine contracts whether 
 
 ### 8. Plumb (§2, `plumb`)
 - **What it guarantees:** Independent measurement of sliced tasks against catalog roles returning `{choice, score, noul}` with fail-closed secret scrubbing.
-- **Proof:** Built-in small model executor or external executor (`typesafe/jev-1.14`) via engine-agnostic `plumb-run.cjs`.
+- **Proof:** The external executor from `project/config/PROJECT.md` (`k:routes.plumb_model`) or the engine zone's built-in fallback — its weakest and cheapest executor — via engine-agnostic `plumb-run.cjs`.
 
 ### 9. Preflight Verification (`preflight`)
 - **What it guarantees:** The engine adapter's wiring (hooks, roles, permissions, capabilities) is systematically verifiable upon installation.

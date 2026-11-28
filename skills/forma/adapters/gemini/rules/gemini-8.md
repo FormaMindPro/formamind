@@ -55,18 +55,18 @@ In Mode 2, Antigravity provides a native mechanism to continue a subagent:
 
 ## Models per node
 
-Which model each node runs on is an engine matter, not a rule of the protocol — the five pairs in §1 hold whoever executes them.
+The five nodes' defaults are declared by the zone — `nodeModels` of `.agents/forma-adapter.cjs`; the declaration is what a default change edits, and this table is its declared view. Which model each node runs on is an engine matter, not a rule of the protocol — the five pairs in §1 hold whoever executes them. Roles outside the five nodes (`plumb-gemini`, `extractor`, `asset-describer`) stay in this table as the zone's own view; `node .claude/scripts/check-node-defaults.cjs` reconciles the five nodes only. <!-- k:gemini.node_defaults -->
 
-| Node | Model |
-|---|---|
-| `Intent` | `gemini-3.8-flash` (effort medium) |
-| `Spec` | `gemini-3.8-flash` (effort low) |
-| `Kit` | `gemini-3.8-flash` (effort low) |
-| `Run` | `gemini-3.8-flash` (effort low) |
-| `Core` | `gemini-3.8-flash` (effort low) |
-| `plumb-gemini` | `gemini-3.8-flash` (effort low) |
-| `extractor` | `gemini-3.8-flash` (effort low) |
-| `asset-describer` | `gemini-flash-lite` (effort low) |
+| Node | Model | Effort |
+| --- | --- | --- |
+| `Intent` | `gemini-3.8-flash` | `medium` |
+| `Spec` | `gemini-3.8-flash` | `low` |
+| `Kit` | `gemini-3.8-flash` | `low` |
+| `Run` | `gemini-3.8-flash` | `low` |
+| `Core` | `gemini-3.8-flash` | `low` |
+| `plumb-gemini` | `gemini-3.8-flash` | `low` |
+| `extractor` | `gemini-3.8-flash` | `low` |
+| `asset-describer` | `gemini-flash-lite` | `low` |
 
 ## Spend fields (§3) (Contract 5: constructive)
 

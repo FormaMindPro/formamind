@@ -3,6 +3,80 @@
 All notable changes to the Forma engine are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow the installer version in `.claude-plugin/plugin.json`.
 
+## [0.0.47] - 2026-11-28
+### Added
+- the model registry as a protocol concept: three dictionary names — `modelRegistry` ("Model
+  registry"), `roleModel` ("Role-model binding") and `modelLedger` ("Model ledger") — in the i18n
+  keys and the names registry (`NAMES.md`, EN and RU), with the manual's account of what each one is;
+  model addresses and values stay in `project/**`, never in the shared text.
+- node defaults are owned by the engine zone. Law §2 states that each of the five nodes takes its
+  default model from the zone's own declaration (`nodeModels` of the zone's `forma-adapter.cjs`), that
+  `PROJECT.md`, "Node defaults", is an aggregate summary for reading and reconciliation and never the
+  place a default is edited, and that switching engines means the new zone's defaults apply. Each
+  zone's §8 carries the declared view of its five nodes under the marker `k:<zone>.node_defaults` —
+  the Claude, Gemini, ZCode and Qoder zone tables in this release.
+- `check-node-defaults.cjs`, one shared checker of a zone's declared node defaults: it discovers the
+  zones by their adapters and reconciles the declaration, the §8 table under the zone's marker and
+  the five node roles' frontmatter, painting every divergence red with the zone, the node, the file
+  and line, the expected and the got value; a zone without a declaration is a named skip instead of a
+  failure. `--self-test` runs a synthetic zone in the temp base — green baseline, red on each of the
+  three axes, green again after each restore.
+- ZCode declares `nodeModels` in its adapter and generates its role mirrors from the sources: a node
+  role takes the node's default from the declaration, a role with a registry binding "role x engine
+  zcode" its first candidate, any other role the engine row's `default_model`; the tier comes from
+  the registry row of the model actually set, the effort from the node declaration, and the constants
+  remain the fallback only for a role outside the five nodes. The adapter's `instructionWeight` and
+  `readNodes` resolve models by the same sources, and an unreadable registry or `PROJECT.md` is a loud
+  refusal naming the file — never a memorized value. The adapter tests cover a substituted binding, a
+  node default without a binding, and the refusals.
+- `dispatch-address.cjs --engine <id>`: the engine column of `PROJECT.md`, "Node defaults"
+  (`k:routes.node_defaults`), is the source of an empty `Model` unit — the cell's first whole model
+  value, its `effort X` setting the level; prose around the value is read as nothing. A bare model id
+  is engine-relative: the snapshot's owner is read from the model registry (`adapter_output` of the
+  `engines` rows), never guessed, and a snapshot belonging to another engine, several owners, no
+  owner or a missing `--engine` is a fail-closed refusal naming the bare id, the engine, the owner
+  and the expected value.
+- `card-move.cjs`: the epic's volume stops `--to accept` at `k:volume` cards in `done` with
+  `assignee: Core`, before any write — the cycle closes first (`--to core-close`), the next
+  acceptance goes after. The close's informational line reads the same counter; the self-test covers
+  the per-epic count, the closed and live exclusions, and the gate at, over and under the threshold.
+- `run-protocol-audit` gains a second kind, the coverage audit: an accepted decision's points against
+  the implemented files, registries and closed cards — rows of decision point, implementation address
+  and a `full` / `partial` / `missing` verdict, findings with an address and an expected value, and a
+  check of the open plan cards the kit names.
+### Changed
+- `Spec` chooses a model by fitness — the model's kind, level and strength from the registry — and
+  the price class decides only at equal fitness; the law's good/fast/cheap paragraph now says so.
+  The Plumb's confirmed role is written into `## Kit` together with a `Model` unit from the
+  registry's role x engine candidate list (1-4), a replacement carrying its one-line reason; a
+  dilemma between equal candidates is a Plumb reading over the same list, and a list where none fits
+  is a missing role, not a model choice. The Plumb-confirmed path is labelled `route-6`
+  (`why: plumb`) throughout the route table, `ROUTES.md` and the node roles.
+- `Kit`'s tier vocabulary names the classes `strong` / `standard` / `light` without concrete models:
+  the class and its level come from the registry row, and the tier matches the model actually set.
+- the Plumb's external executor is de-named. Its address lives only in the project layer
+  (`project/config/PROJECT.md`, `k:routes.plumb_model`), and the shared text speaks of the engine's
+  local executor and the project-named executor; `plumb-run.cjs` refuses — exit code 2, the file
+  named on stderr, empty stdout — instead of falling back to a memorized address, and its test
+  asserts the refusal. The mechanism wording matches in the manual, the node roles, the setup skills
+  and `templates/ENGINE-8-TEMPLATE.md`.
+- `dispatch-address.cjs` no longer reads a prose cell as an address: a node default is a whole model
+  value, backticked or the whole cell, never the first address-shaped token in prose.
+- the setup skills of the Claude, Codex and MiniMax zones and the core skill describe the Plumb and
+  `over-2` addresses as project values, with no baked-in model names.
+- the manual (EN and RU) is de-named in `ROUTES.md`, `NAMES.md`, `PLUMB.md`, `FUNCTIONS.md`,
+  `ENGINE-CONTRACT.md` and `SKILLS.md`: executors are named by kind, model addresses stay in the
+  project layer, and the three registry keys join the names registry.
+- the i18n anchor parser accepts upper-case letters in a key's name.
+### Fixed
+- a fresh install writes `.forma/i18n/registers.json` from the project's language-mode table in
+  `PROJECT.md`, so the register check no longer fails on a clean installation.
+- the scaffold carries the model registry and the node-defaults section of `PROJECT.md` (EN and RU),
+  so a fresh ZCode install has its zone defaults and the role generator its registry; the scaffold
+  stays byte-parallel.
+- the MiniMax zone's `human-register` skill mirror is a byte copy of the core skill again, so the
+  adapter parity test holds.
+
 ## [0.0.46] - 2026-11-24
 ### Added
 - ZCode: the deletion guard is constructive. `PreToolUse` with the `Bash` matcher calls

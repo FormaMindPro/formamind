@@ -1,6 +1,6 @@
 ---
 name: project-setup
-description: Initial setup wizard for a new project in the Forma protocol. Guides step-by-step mandatory opening and closing of setup card on the board, configuration of virtual RAM disk, project thresholds (volume=25, attempts=3), route settings (enabled routes, route-0 threshold, over-2 model and limit, over-4 batch, dispatcher), the Claude Code auto-compact window (250000 or off), Plumb calibration and models (OpenRouter typesafe/jev-1.14 or builtin, calibration thresholds, and .env key), and language localization (ru, en, or package generation). Invoke when starting the protocol in a new project, when "STOP START" appears in the session start report, or upon project configuration requests.
+description: Initial setup wizard for a new project in the Forma protocol. Guides step-by-step mandatory opening and closing of setup card on the board, configuration of virtual RAM disk, project thresholds (volume=25, attempts=3), route settings (enabled routes, route-0 threshold, over-2 model and limit, over-4 batch, dispatcher), the Claude Code auto-compact window (250000 or off), Plumb calibration and models (the external executor from project/config/PROJECT.md or the engine zone's builtin fallback, calibration thresholds, and .env key), and language localization (ru, en, or package generation). Invoke when starting the protocol in a new project, when "STOP START" appears in the session start report, or upon project configuration requests.
 ---
 
 # project-setup — initial project setup wizard
@@ -76,7 +76,7 @@ Fill the route settings with the user in `project/config/PROJECT.md` under `## R
 |---|---|
 | Enabled routes | all `route-0`…`route-8` and overlays `over-1`…`over-4` enabled |
 | `route-0` small-task threshold | work smaller than its own card: up to 3 edits in up to 3 files, mechanical, without interpretation |
-| `over-2` (external cheap model) | enabled — mechanical "was → becomes" edits through `external-model-bridge.cjs`; external model `openrouter:typesafe/jev-1.14` (same channel as the Plumb `jev`), cycle call limit **100** |
+| `over-2` (external cheap model) | enabled — mechanical "was → becomes" edits through `external-model-bridge.cjs`; the external executor's address comes from `project/config/PROJECT.md` (`k:routes.over2`), cycle call limit **100** |
 | `over-4` (batch acceptance) | enabled — batch up to **10** cards, one acceptance per batch |
 | Dispatcher | `Intent` (Workflow not connected; no threshold for switching to Workflow) |
 
@@ -90,8 +90,8 @@ Configure Plumb in `project/config/PROJECT.md` under `## Routes` (`<!-- k:routes
    - `leadThreshold: 0.65` — minimum confidence for primary role fit.
    - `gapThreshold: 0.15` — minimum margin between top role and second candidate.
 2. **Model and provider:**
-   - Recommended external model: `openrouter:typesafe/jev-1.14` (fast, low-cost structural classifier).
-   - Fallback in-family model by engine: Claude Code — `claude-3-5-haiku` (`haiku`); Gemini (Antigravity) — `gemini-3.8-flash (low)`; Codex — `gpt-5.6-luna (low)`; MiniMax — `minimax-m3.1-flash`; ZCode — `glm-4-flash`.
+   - Recommended external executor: its address lives in `project/config/PROJECT.md` (`k:routes.plumb_model`).
+   - Built-in fallback: the engine zone's weakest and cheapest executor; its address is a project value too, never baked into the skill.
 3. **Credentials check:**
    - Verify OpenRouter API key presence in `.env` (`OPENROUTER_API_KEY`).
    - If absent and external Plumb is chosen, prompt user to supply key.

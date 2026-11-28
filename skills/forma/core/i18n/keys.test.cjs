@@ -232,7 +232,7 @@ test('name sections: exact code sets, exactly the languages declared, en always 
     routeNames: [...Array(9).keys()].map((n) => 'route-' + n).concat([1, 2, 3, 4].map((n) => 'over-' + n)),
     lawSections: [1, 2, 3, 4, 5, 6, 7].map((n) => 'law-' + n),
     prohibitionNames: Array.from({ length: 20 }, (_, i) => 'prohibition-' + (i + 1)),
-    namedKeys: ['plumb'],
+    namedKeys: ['modelLedger', 'modelRegistry', 'plumb', 'roleModel'],
   };
   for (const [name, codes] of Object.entries(sets)) {
     const dict = KEYS[name];

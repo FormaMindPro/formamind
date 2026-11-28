@@ -11,6 +11,7 @@ const { spawnSync } = require('node:child_process')
 const os = require('node:os')
 const { walk, projectFile } = require('../skills/forma/core/dashboard/lib/fs.cjs')
 const i18n = require('../skills/forma/core/i18n/index.cjs')
+const registers = require('../skills/forma/core/i18n/registers.cjs')
 const { parseLong } = require('../skills/forma/core/dashboard/lib/cli.cjs')
 const verifyInstall = require('../skills/forma/core/verify/verify-install.cjs')
 const extensions = require('../skills/forma/core/extensions/extensions.cjs')
@@ -1016,6 +1017,10 @@ function install(root, choice) {
       ? (choice.lang === 'en' ? 'document language: English' : `document language: ${langName(choice.lang)} (bundled scaffold)`)
       : `document language: ${langName(choice.lang)} — translation awaits the agent: ${n} files (.forma/translation-pending.json; step in SKILL.md "Scaffold translation")${catalogLangs().includes(choice.lang) ? '' : `; no message catalog for "${choice.lang}": hook messages stay English (add core/i18n/messages/${choice.lang}.json)`}`)
   } else if (choice.lang !== 'en') report.push('language: project/ already existed — not translated (language is chosen on first install only)')
+  // The speech register map is project data (epic names come from this project's own config), so it is built
+  // here, after the language is in place, and never shipped as a file. An existing map is the human's edit:
+  // a rerun heals a missing one only. Written outside `owned`, so it stays out of the install manifest.
+  if (i18n.projectMdPath(root)) registers.write(root)
   writeManifest(root, { engines: choice.engines, lang: choice.lang, template: choice.template === 'none' ? (existingTemplate || 'none') : choice.template, projectCreated: core.projectCreated })
   return { report, boardLines: board(choice.boardMode) }
 }

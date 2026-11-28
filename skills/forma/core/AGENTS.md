@@ -82,6 +82,8 @@ Intent (cycle presentation)
 
 **The Plumb** gives readings (role fit, task clarity); `Spec` decides on them by the thresholds in `PROJECT.md`; `Kit` is called only on a reading below the threshold or a return, and leaves the catalog a role. Details — `spec.md`; for `Core` the divergences between readings and results — `core.md`; the external executor passes the scrubbing of prohibition 17.
 
+**Node defaults live in the engine zone.** Each of the five nodes takes its default model from the zone's own config — the declaration by which the zone predefines its nodes — and the human changes a default there. The project's node-defaults table is an aggregate: a summary for reading and reconciliation, never the place a default is edited. Switching engines means the defaults of the new zone apply. Reconciliation names the drift between a zone and the summary.
+
 **Choosing the route.** The chain above is `route-7`; the codes `route-0`…`route-8` and overlays `over-1`…`over-4` — `route-choice.md`. `route-0`…`route-5` open only on the human's approval of the five fields; `Kit` may lengthen a route, never shorten it past what the human approved.
 
 An environment limitation isn't a defect — it's a discovery: no one erred, the map was drawn without that fact.
@@ -89,6 +91,8 @@ An environment limitation isn't a defect — it's a discovery: no one erred, the
 **Reaching the "human" row leaves a visible trace:** the node opens or updates a card in epic "3. Project protocol", `backlog`, flagged as awaiting a decision; who carries out the decision by domain — `card-and-board.md`.
 
 **Housekeeping — of the tooling itself and of resources and tools — is `Kit`'s to execute, `Intent`'s to confirm** (`kit.md`, `intent.md`).
+
+**The model registry is a dynamic value.** A task already handed to `Run` carries the model named to it to the end — work in flight is not interrupted. The registry itself may be revised in the course of work: the human decides the revision, `Kit` executes it — the registry and its human-readable mirror are edited, the role mirrors regenerated, the check kept green; `Spec` reads the current list at the next equipping; spend in flight is recorded by fact, as it was written.
 
 **The human's code phrase "Отключи сенсорику"** (literal, a password) lifts the delete-guard for one action and lets the addressed node act outside the route for one task, once — not a standing state, not an exemption beyond what was named; prohibition 11 holds — `intent.md`, `intent-housekeeping.md`.
 
@@ -107,7 +111,7 @@ Two, declared as numbers in `PROJECT.md`: **attempts** (cap per task) and **volu
 
 **Spend is counted by fact, not by impression** — from the call's metadata, written by the caller (or the engine's hook) right after the return into the card's `## History`, never estimated; `unknown` marks only what the engine never returned, never zero. Holders: `ledger-recorder.cjs`, `card-session-spend.cjs --auto`, `ledger-parity.cjs`; fields — `spend-line.md`, `ECONOMY.md`, engine's §8 (`spendTag`).
 
-**Good / fast / cheap — good at the center, unbending to the other two.** `Intent` holds cheap, `Kit` holds fast, `Core` holds good. `Spec` and `Run` are deliberately outside this: their job is execution, not tracking a limit.
+**Good / fast / cheap — good at the center, unbending to the other two.** `Intent` holds cheap, `Kit` holds fast, `Core` holds good. `Spec` chooses a model by fitness for the task — the model's kind, level and strength from the registry; the price class decides only at equal fitness. This is not limit-watching: budget and "cheap" stay with `Intent`, "fast" with `Kit`, "good" with `Core`. No dollar limit is set; spend is recorded by fact.
 
 ---
 

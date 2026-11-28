@@ -778,6 +778,33 @@
       "ru": [
         "Режимы речи"
       ]
+    },
+    "modelRegistry": {
+      "match": "prefix",
+      "en": [
+        "Model registry"
+      ],
+      "ru": [
+        "реестр моделей"
+      ]
+    },
+    "roleModel": {
+      "match": "prefix",
+      "en": [
+        "Role-model binding"
+      ],
+      "ru": [
+        "привязка роль — модель"
+      ]
+    },
+    "modelLedger": {
+      "match": "prefix",
+      "en": [
+        "Model ledger"
+      ],
+      "ru": [
+        "модельная ведомость"
+      ]
     }
   },
   "phrases": {
@@ -1007,6 +1034,18 @@
     "plumb": {
       "en": "Plumb",
       "ru": "отвес"
+    },
+    "modelRegistry": {
+      "en": "Model registry",
+      "ru": "реестр моделей"
+    },
+    "roleModel": {
+      "en": "Role-model binding",
+      "ru": "привязка роль — модель"
+    },
+    "modelLedger": {
+      "en": "Model ledger",
+      "ru": "модельная ведомость"
     }
   },
   "cardMask": {
